@@ -362,7 +362,7 @@ interface Props {
   elevators: ElevatorRecord[];
 }
 
-const INITIAL_SHOW = 25;
+const PAGE_SIZE = 20;
 
 export default function SitesClient({ initial, elevators }: Props) {
   const [sites, setSites]       = useState(initial);
@@ -376,6 +376,7 @@ export default function SitesClient({ initial, elevators }: Props) {
   const [showElevatorForm, setShowElevatorForm]     = useState(false);
   const [editElevator, setEditElevator]             = useState<ElevatorRecord | null>(null);
   const [deleteElevatorTarget, setDeleteElevatorTarget] = useState<ElevatorRecord | null>(null);
+  const [page, setPage] = useState(1);
 
   const { user } = useAuth();
   const viewOnly = user ? isViewOnly(user) : true;
@@ -397,9 +398,9 @@ export default function SitesClient({ initial, elevators }: Props) {
     return matched;
   }, [allElevators, q]);
 
-  const displaySites = useMemo(() => {
+  const filteredSites = useMemo(() => {
     const byCompany = companyFilter !== "전체" ? sites.filter(s => s.companyType === companyFilter) : sites;
-    if (!q) return byCompany.slice(0, INITIAL_SHOW);
+    if (!q) return byCompany;
     return byCompany.filter(s =>
       s.name.toLowerCase().includes(q) ||
       (s.primaryInspector?.toLowerCase().includes(q) ?? false) ||
@@ -408,13 +409,17 @@ export default function SitesClient({ initial, elevators }: Props) {
       (s.address?.toLowerCase().includes(q) ?? false) ||
       (s.companyType?.toLowerCase().includes(q) ?? false) ||
       (s.vendor?.toLowerCase().includes(q) ?? false) ||
-      // 비상통화장치번호
       (s.emergencyDevice?.toLowerCase().includes(q) ?? false) ||
       (s.emergencyDevices?.some(d => d.number.toLowerCase().includes(q)) ?? false) ||
-      // 승강기번호
       elevatorMatchSites.has(s.name)
     );
   }, [sites, q, elevatorMatchSites, companyFilter]);
+
+  const totalPages  = Math.max(1, Math.ceil(filteredSites.length / PAGE_SIZE));
+  const safePage    = Math.min(page, totalPages);
+  const displaySites = filteredSites.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  function changePage(next: number) { setPage(Math.max(1, Math.min(next, totalPages))); }
 
   const selectedElevators = useMemo(() =>
     selected ? allElevators.filter(e => e.siteName === selected.name) : [],
@@ -507,7 +512,7 @@ export default function SitesClient({ initial, elevators }: Props) {
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
               <input
                 value={query}
-                onChange={e => setQuery(e.target.value)}
+                onChange={e => { setQuery(e.target.value); setPage(1); }}
                 placeholder="현장명, 점검자, 소재지, 비상통화장치, 승강기번호 검색"
                 className={`w-full pl-9 pr-8 py-2 rounded-lg border text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 ${isDark ? "border-gray-600 bg-gray-700 text-white focus:ring-gray-500" : "border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 focus:ring-blue-400"}`}
               />
@@ -518,7 +523,7 @@ export default function SitesClient({ initial, elevators }: Props) {
             </div>
             <div className="mt-2 flex gap-1 p-1 bg-gray-100 rounded-xl">
               {(["전체", "TKE", "DS"] as const).map(t => (
-                <button key={t} type="button" onClick={() => setCompanyFilter(t)}
+                <button key={t} type="button" onClick={() => { setCompanyFilter(t); setPage(1); }}
                   className={`flex-1 py-1 rounded-lg text-xs font-semibold transition-colors ${
                     companyFilter === t
                       ? t === "전체" ? "bg-gray-900 text-white shadow-sm"
@@ -528,13 +533,31 @@ export default function SitesClient({ initial, elevators }: Props) {
                   }`}>{t}</button>
               ))}
             </div>
-            <p className={`mt-1.5 text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-              {q
-                ? `검색 결과 ${displaySites.length}건`
-                : companyFilter !== "전체"
-                  ? `${companyFilter} ${displaySites.length.toLocaleString()}건`
-                  : `전체 ${sites.length.toLocaleString()}건 중 ${Math.min(INITIAL_SHOW, sites.length)}건 표시`}
-            </p>
+            <div className={`mt-1.5 flex items-center justify-between text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+              <span>{filteredSites.length.toLocaleString()}건</span>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-0.5">
+                  <button onClick={() => changePage(safePage - 1)} disabled={safePage === 1}
+                    className={`px-1.5 py-1 rounded disabled:opacity-30 transition-colors ${isDark ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}>‹</button>
+                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                    const half = 2;
+                    let start = Math.max(1, safePage - half);
+                    const end = Math.min(totalPages, start + 4);
+                    if (end - start < 4) start = Math.max(1, end - 4);
+                    return start + i;
+                  }).filter(p => p >= 1 && p <= totalPages).map(p => (
+                    <button key={p} onClick={() => changePage(p)}
+                      className={`min-w-[24px] px-1.5 py-1 rounded text-xs transition-colors ${
+                        p === safePage
+                          ? "bg-slate-700 text-white"
+                          : isDark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"
+                      }`}>{p}</button>
+                  ))}
+                  <button onClick={() => changePage(safePage + 1)} disabled={safePage === totalPages}
+                    className={`px-1.5 py-1 rounded disabled:opacity-30 transition-colors ${isDark ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}>›</button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* 현장 리스트 */}
