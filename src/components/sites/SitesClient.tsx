@@ -362,7 +362,7 @@ interface Props {
   elevators: ElevatorRecord[];
 }
 
-const INITIAL_SHOW = 50;
+const INITIAL_SHOW = 25;
 
 export default function SitesClient({ initial, elevators }: Props) {
   const [sites, setSites]       = useState(initial);
