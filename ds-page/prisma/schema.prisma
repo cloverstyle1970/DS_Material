@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Material {
+  id           String   @id @map("material_id")
+  categoryCode String   @map("category_code")
+  name         String
+  alias        String?
+  modelNo      String?  @map("model_no")
+  storageLoc   String?  @map("storage_loc")
+  stockQty     Int      @default(0) @map("stock_qty")
+  isRepair     Boolean  @default(false) @map("is_repair")
+  eCountCd     String?  @map("e_count_cd")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  requests Request[]
+
+  @@map("materials")
+}
+
+model Site {
+  id        String     @id @map("site_id")
+  name      String     @map("site_name")
+  address   String?
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  elevators Elevator[]
+
+  @@map("sites")
+}
+
+model Elevator {
+  id       String @id @map("elevator_id")
+  siteId   String @map("site_id")
+  hoGiNo   String @map("ho_gi_no")
+
+  site     Site      @relation(fields: [siteId], references: [id])
+  requests Request[]
+
+  @@map("elevators")
+}
+
+model User {
+  id        String   @id @map("user_id")
+  name      String
+  phone     String?
+  role      String   @default("engineer")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  requests Request[]
+
+  @@map("users")
+}
+
+model Vendor {
+  id        String   @id @map("vendor_id")
+  name      String
+  contact   String?
+  phone     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("vendors")
+}
+
+model Request {
+  id          String   @id @default(cuid()) @map("request_id")
+  materialId  String   @map("material_id")
+  elevatorId  String   @map("elevator_id")
+  userId      String   @map("user_id")
+  qty         Int
+  status      String   @default("pending")
+  note        String?
+  requestedAt DateTime @default(now()) @map("requested_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  material Material @relation(fields: [materialId], references: [id])
+  elevator Elevator @relation(fields: [elevatorId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@map("requests")
+}
+
+model Return {
+  id           String   @id @default(cuid()) @map("return_id")
+  materialId   String   @map("material_id")
+  elevatorId   String   @map("elevator_id")
+  userId       String   @map("user_id")
+  serialNumber String?  @map("serial_number")
+  returnedAt   DateTime @default(now()) @map("returned_at")
+
+  @@map("returns")
+}

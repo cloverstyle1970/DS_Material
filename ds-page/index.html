@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DS 자재관리 시스템</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; }
+    input::placeholder { color: #9ca3af; }
+    input:focus { outline: none; }
+    .error-msg { display: none; }
+    .error-msg.show { display: block; }
+    .btn-loading { opacity: 0.6; cursor: not-allowed; pointer-events: none; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+
+  <div class="w-full max-w-sm">
+
+    <!-- 로고 영역 -->
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-slate-700 mb-4">
+        <span class="text-2xl">📦</span>
+      </div>
+      <h1 class="text-xl font-bold text-white">DS 자재관리 시스템</h1>
+      <p class="text-slate-400 text-sm mt-1">승강기 유지보수 스마트 자재관리</p>
+    </div>
+
+    <!-- 로그인 카드 -->
+    <form id="loginForm" class="bg-white rounded-2xl shadow-xl p-8 space-y-5" onsubmit="handleLogin(event)">
+
+      <div class="space-y-1.5">
+        <label class="text-sm font-medium text-gray-700">이름</label>
+        <input
+          id="nameInput"
+          type="text"
+          placeholder="홍길동"
+          autocomplete="username"
+          autofocus
+          required
+          class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-800 ring-0 focus:ring-2 focus:ring-slate-400 bg-gray-50 transition-shadow"
+          style="outline:none;"
+          onfocus="this.style.boxShadow='0 0 0 2px #94a3b8'"
+          onblur="this.style.boxShadow='none'"
+        />
+      </div>
+
+      <div class="space-y-1.5">
+        <label class="text-sm font-medium text-gray-700">비밀번호</label>
+        <input
+          id="pwInput"
+          type="password"
+          placeholder="••••"
+          autocomplete="current-password"
+          required
+          class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-800 bg-gray-50 transition-shadow"
+          style="outline:none;"
+          onfocus="this.style.boxShadow='0 0 0 2px #94a3b8'"
+          onblur="this.style.boxShadow='none'"
+        />
+      </div>
+
+      <!-- 오류 메시지 -->
+      <p id="errorMsg" class="error-msg text-sm text-red-500 bg-red-50 rounded-lg px-4 py-2.5"></p>
+
+      <button
+        id="loginBtn"
+        type="submit"
+        class="w-full bg-slate-800 text-white py-3 rounded-xl text-sm font-semibold hover:bg-slate-700 transition-colors"
+      >
+        로그인
+      </button>
+
+      <p class="text-center text-xs text-gray-400">
+        초기 비밀번호: <span class="font-mono font-medium text-gray-500">1234</span>
+      </p>
+    </form>
+
+    <p class="text-center text-xs text-slate-600 mt-6">
+      © 2025 DS Elevator. All rights reserved.
+    </p>
+  </div>
+
+  <script>
+    const MOCK_PASSWORD = "1234";
+
+    function showError(msg) {
+      const el = document.getElementById("errorMsg");
+      el.textContent = msg;
+      el.classList.add("show");
+    }
+
+    function hideError() {
+      const el = document.getElementById("errorMsg");
+      el.textContent = "";
+      el.classList.remove("show");
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      hideError();
+
+      const name = document.getElementById("nameInput").value.trim();
+      const pw   = document.getElementById("pwInput").value;
+      const btn  = document.getElementById("loginBtn");
+
+      if (!name) { showError("이름을 입력해 주세요."); return; }
+
+      if (pw !== MOCK_PASSWORD) {
+        showError("비밀번호가 올바르지 않습니다.");
+        return;
+      }
+
+      // 로딩 상태
+      btn.textContent = "로그인 중...";
+      btn.classList.add("btn-loading");
+
+      // 실제 서비스: 1초 후 /dashboard 이동
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 800);
+    }
+
+    // Enter 키 처리
+    document.addEventListener("keydown", function(e) {
+      if (e.key === "Enter") {
+        document.getElementById("loginForm").requestSubmit();
+      }
+    });
+  </script>
+
+</body>
+</html>
