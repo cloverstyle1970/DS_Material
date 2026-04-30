@@ -45,6 +45,18 @@ next-env.d.ts
 # 임시 Office 잠금 파일
 ~$*
 
+# Office 참조 자료 (대용량 바이너리 — git LFS 또는 외부 저장소 권장)
+*.xlsx
+*.xls
+*.docx
+*.pptx
+/참조/
+
+# embedded/복제 폴더
+/ds-page/
+/DS-Material/
+/desktop-tutorial/
+
 # 런타임 데이터 (서버 재시작 시 초기화)
 /data/material-requests.json
 
