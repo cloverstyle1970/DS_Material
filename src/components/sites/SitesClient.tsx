@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, FormEvent, useMemo } from "react";
+import { useState, FormEvent, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { SiteRecord } from "@/lib/mock-sites";
 import { ElevatorRecord } from "@/lib/mock-elevators";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { supabase } from "@/lib/supabase";
 
 // ── 배지 ────────────────────────────────────────────────────────
 const COMPANY_STYLES: Record<string, string> = {
@@ -381,6 +382,24 @@ export default function SitesClient({ initial, elevators }: Props) {
   const { user } = useAuth();
   const viewOnly = user ? isViewOnly(user) : true;
   const canEdit  = user ? !viewOnly : false;
+
+  // Supabase 초기 로드 + Realtime 구독
+  useEffect(() => {
+    api.get<SiteRecord[]>("/api/sites").then(setSites).catch(() => {});
+    api.get<ElevatorRecord[]>("/api/elevators").then(setAllElevators).catch(() => {});
+
+    const channel = supabase
+      .channel("sites-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "sites" }, () => {
+        api.get<SiteRecord[]>("/api/sites").then(setSites).catch(() => {});
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "elevators" }, () => {
+        api.get<ElevatorRecord[]>("/api/elevators").then(setAllElevators).catch(() => {});
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const q = query.trim().toLowerCase();
   const { theme } = useTheme();
