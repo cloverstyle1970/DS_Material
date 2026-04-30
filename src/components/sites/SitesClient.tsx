@@ -586,8 +586,13 @@ export default function SitesClient({ initial, elevators }: Props) {
                         <p className={`text-sm font-medium truncate ${isSelected ? isDark ? "text-white" : "text-blue-700" : isDark ? "text-gray-200" : "text-gray-800"}`}>
                           {site.name}
                         </p>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                           {companyBadge(site.companyType, isDark)}
+                          {site.contractType && (
+                            <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${isDark ? "bg-gray-700 text-gray-400" : "bg-gray-100 text-gray-500"}`}>
+                              {site.contractType}
+                            </span>
+                          )}
                           {site.primaryInspector && (
                             <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>{site.primaryInspector}</span>
                           )}
