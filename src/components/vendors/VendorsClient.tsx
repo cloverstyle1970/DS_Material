@@ -344,24 +344,19 @@ export default function VendorsClient({ initial }: Props) {
         <table className="w-full text-sm">
           <thead className={`border-b transition-colors ${isDark ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-100"}`}>
             <tr>
-              {["구분", "거래처명", "대표자", "사업자번호", "전화번호", "주소", ...(admin ? [""] : [])].map(h => (
+              {["거래처명", "대표자", "사업자번호", "전화번호", "주소", ...(admin ? [""] : [])].map(h => (
                 <th key={h} className={`px-4 py-3 text-left text-xs font-medium whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-500"}`}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className={`divide-y ${isDark ? "divide-gray-700" : "divide-gray-50"}`}>
             {filtered.length === 0 ? (
-              <tr><td colSpan={admin ? 7 : 6} className={`text-center py-12 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+              <tr><td colSpan={admin ? 6 : 5} className={`text-center py-12 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
                 {q ? "검색 결과가 없습니다" : "등록된 거래처가 없습니다"}
               </td></tr>
             ) : paginated.map(v => (
               <tr key={v.id} onClick={() => setSelected(v)}
                 className={`transition-colors cursor-pointer ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-50"}`}>
-                <td className="px-4 py-3">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${activeCls[v.type ?? "매출"]}`}>
-                    {v.type ?? "매출"}
-                  </span>
-                </td>
                 <td className={`px-4 py-3 font-medium max-w-[200px] truncate whitespace-nowrap ${isDark ? "text-white" : "text-gray-800"}`}>{v.name}</td>
                 <td className={`px-4 py-3 whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"}`}>{v.representative ?? "-"}</td>
                 <td className={`px-4 py-3 font-mono text-xs whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-500"}`}>{v.bizNo ?? "-"}</td>
