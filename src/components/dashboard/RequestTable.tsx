@@ -1,4 +1,5 @@
 import { RecentRequest, RequestStatus } from "@/lib/types";
+import TimeAgo from "./TimeAgo";
 
 const STATUS_LABEL: Record<RequestStatus, string> = {
   pending:    "대기",
@@ -11,14 +12,6 @@ const STATUS_CLASS: Record<RequestStatus, string> = {
   dispatched: "bg-blue-100 text-blue-700",
   completed:  "bg-green-100 text-green-700",
 };
-
-function timeAgo(isoString: string): string {
-  const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
-  if (diff < 60) return `${diff}초 전`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}분 전`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}시간 전`;
-  return `${Math.floor(diff / 86400)}일 전`;
-}
 
 export default function RequestTable({ requests }: { requests: RecentRequest[] }) {
   return (
@@ -47,7 +40,7 @@ export default function RequestTable({ requests }: { requests: RecentRequest[] }
                   {STATUS_LABEL[r.status]}
                 </span>
               </td>
-              <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs">{timeAgo(r.requestedAt)}</td>
+              <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs"><TimeAgo iso={r.requestedAt} /></td>
             </tr>
           ))}
         </tbody>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { CategoryStore } from "@/lib/mock-categories";
 import { generateMaterialCode } from "@/lib/category-codes";
+import { api, getErrorMessage } from "@/lib/api-client";
 import CategoryManagerModal from "./CategoryManagerModal";
 
 interface Props {
@@ -30,14 +31,17 @@ export default function AddMaterialModal({ onClose, onSaved }: Props) {
   const [saving, setSaving] = useState(false);
 
   async function loadCats() {
-    const res = await fetch("/api/categories");
-    const data: CategoryStore = await res.json();
-    setCats(data);
-    if (!major && data.major.length) {
-      const m = data.major[0].code;
-      const mi = (data.mid[m]?.[0]?.code) ?? "";
-      const s = (data.sub[`${m}${mi}`]?.[0]?.code) ?? "";
-      setMajor(m); setMid(mi); setSub(s);
+    try {
+      const data = await api.get<CategoryStore>("/api/categories");
+      setCats(data);
+      if (!major && data.major.length) {
+        const m = data.major[0].code;
+        const mi = (data.mid[m]?.[0]?.code) ?? "";
+        const s = (data.sub[`${m}${mi}`]?.[0]?.code) ?? "";
+        setMajor(m); setMid(mi); setSub(s);
+      }
+    } catch (e) {
+      alert(getErrorMessage(e));
     }
   }
 
@@ -68,13 +72,14 @@ export default function AddMaterialModal({ onClose, onSaved }: Props) {
     e.preventDefault();
     if (!name.trim() || !major || !mid || !sub) return;
     setSaving(true);
-    await fetch("/api/materials", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isDs, major, mid, sub, isRepair, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty }),
-    });
-    setSaving(false);
-    onSaved();
+    try {
+      await api.post("/api/materials", { isDs, major, mid, sub, isRepair, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty });
+      onSaved();
+    } catch (e) {
+      alert(getErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (

@@ -56,6 +56,30 @@ export function updateStock(id: string, qty: number): MaterialRecord | null {
   return materials[idx];
 }
 
+/**
+ * 재고 증감을 단일 동기 호출로 처리한다.
+ * 호출 중간에 await가 들어가지 않도록 사용처는 절대 await을 끼우지 말 것.
+ *
+ * 반환:
+ *   - 성공: { material, prevStock, afterStock }
+ *   - 자재 없음: { error: "NOT_FOUND" }
+ *   - 재고 부족: { error: "INSUFFICIENT", prevStock }
+ */
+export type AdjustStockResult =
+  | { material: MaterialRecord; prevStock: number; afterStock: number; error?: undefined }
+  | { error: "NOT_FOUND";   prevStock?: undefined; afterStock?: undefined; material?: undefined }
+  | { error: "INSUFFICIENT"; prevStock: number; afterStock?: undefined; material?: undefined };
+
+export function adjustStock(id: string, delta: number): AdjustStockResult {
+  const idx = materials.findIndex((m) => m.id === id);
+  if (idx === -1) return { error: "NOT_FOUND" };
+  const prevStock = materials[idx].stockQty;
+  const afterStock = prevStock + delta;
+  if (afterStock < 0) return { error: "INSUFFICIENT", prevStock };
+  materials[idx] = { ...materials[idx], stockQty: afterStock };
+  return { material: materials[idx], prevStock, afterStock };
+}
+
 export function updateMaterial(id: string, patch: Partial<Omit<MaterialRecord, "id" | "categoryCode" | "createdAt">>): MaterialRecord | null {
   const idx = materials.findIndex((m) => m.id === id);
   if (idx === -1) return null;

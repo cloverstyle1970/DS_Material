@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { MaterialRequestRecord } from "@/lib/mock-material-requests";
 import { ElevatorRecord } from "@/lib/mock-elevators";
+import { api, getErrorMessage } from "@/lib/api-client";
 
 interface SiteOption   { id: number; name: string }
 interface VendorOption { id: number; name: string }
@@ -68,7 +69,7 @@ export default function PurchaseOrderEntry({ sites, vendors, pendingRequests }: 
       const t = setTimeout(() => setElevators([]), 0);
       return () => clearTimeout(t);
     }
-    fetch(`/api/elevators?site=${encodeURIComponent(siteName)}`).then(r => r.json()).then(setElevators);
+    api.get<ElevatorRecord[]>(`/api/elevators?site=${encodeURIComponent(siteName)}`).then(setElevators).catch(() => setElevators([]));
   }, [siteName]);
 
   function patchRow(id: string, patch: Partial<Row>) {
@@ -110,8 +111,7 @@ export default function PurchaseOrderEntry({ sites, vendors, pendingRequests }: 
     if (req.requesterName) setManagerName(req.requesterName);
     const newRows: Row[] = [];
     for (const item of req.items) {
-      const res = await fetch(`/api/materials?q=${encodeURIComponent(item.materialId)}`);
-      const list: MaterialRecord[] = await res.json();
+      const list = await api.get<MaterialRecord[]>(`/api/materials?q=${encodeURIComponent(item.materialId)}`).catch(() => [] as MaterialRecord[]);
       const m = list.find(x => x.id === item.materialId);
       const unitPrice = m?.buyPrice ?? 0;
       newRows.push(newRow({ materialId: item.materialId, materialName: item.materialName, spec: m?.modelNo ?? "", qty: item.qty, unitPrice, vat: Math.round(item.qty * unitPrice * VAT_RATE), elevatorName: item.elevatorName ?? "", remark: `신청#${req.id}`, reqId: req.id }));
@@ -132,16 +132,18 @@ export default function PurchaseOrderEntry({ sites, vendors, pendingRequests }: 
     if (valid.length === 0) { alert("품목을 1개 이상 입력해 주세요."); return; }
     setSaving(true);
     try {
-      await Promise.all(valid.map(r =>
-        fetch("/api/purchase-orders", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ materialId: r.materialId, materialName: r.materialName, qty: r.qty, vendorName: vendorName || null, unitPrice: r.unitPrice || null, requestId: r.reqId, siteName: siteName || null, elevatorName: r.elevatorName || null, requesterName: managerName || null, note: r.remark || reference || null, userId: user.id, userName: user.name }),
-        })
-      ));
+      for (const r of valid) {
+        await api.post("/api/purchase-orders", {
+          materialId: r.materialId, materialName: r.materialName, qty: r.qty,
+          vendorName: vendorName || null, unitPrice: r.unitPrice || null, requestId: r.reqId,
+          siteName: siteName || null, elevatorName: r.elevatorName || null,
+          requesterName: managerName || null, note: r.remark || reference || null,
+          userId: user.id, userName: user.name,
+        });
+      }
       if (goList) router.push("/purchase-orders");
       else clearAll();
-    } catch { alert("저장 중 오류가 발생했습니다."); }
+    } catch (e) { alert(getErrorMessage(e)); }
     finally { setSaving(false); }
   }
 
@@ -429,9 +431,11 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
       if (!value.trim()) { setResults([]); setOpen(false); return; }
       const params = new URLSearchParams({ q: value });
       if (matType !== "전체") params.set("matType", matType);
-      const data: MaterialRecord[] = await fetch(`/api/materials?${params}`).then(r => r.json());
-      setResults(data.slice(0, 15));
-      setOpen(data.length > 0);
+      try {
+        const data = await api.get<MaterialRecord[]>(`/api/materials?${params}`);
+        setResults(data.slice(0, 15));
+        setOpen(data.length > 0);
+      } catch { setResults([]); setOpen(false); }
     }, value.trim() ? 150 : 0);
     return () => clearTimeout(t);
   }, [value, matType]);

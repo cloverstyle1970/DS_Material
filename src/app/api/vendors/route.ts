@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getVendors, addVendor, VendorType } from "@/lib/mock-vendors";
+import { requirePermission, isResponse } from "@/lib/auth-server";
 
 export async function GET(req: NextRequest) {
   const query = req.nextUrl.searchParams.get("q") ?? undefined;
@@ -8,6 +9,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requirePermission(req, "mutate");
+  if (isResponse(auth)) return auth;
   const data = await req.json();
   const record = addVendor(data);
   return NextResponse.json(record, { status: 201 });

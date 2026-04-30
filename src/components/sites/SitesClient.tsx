@@ -6,6 +6,7 @@ import { SiteRecord } from "@/lib/mock-sites";
 import { ElevatorRecord } from "@/lib/mock-elevators";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
+import { api, getErrorMessage } from "@/lib/api-client";
 
 // ── 배지 ────────────────────────────────────────────────────────
 const COMPANY_STYLES: Record<string, string> = {
@@ -47,16 +48,15 @@ function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: Elevato
     if (!unitName.trim()) { setError("호기명을 입력해 주세요."); return; }
     setSaving(true);
     const body = { siteName, unitName: unitName.trim(), elevatorNo: elevatorNo.trim() || null };
-    const res = isEdit
-      ? await fetch(`/api/elevators/${editElevator!.id}`, {
-          method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-        })
-      : await fetch("/api/elevators", {
-          method: "POST",  headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-        });
-    setSaving(false);
-    if (!res.ok) { setError(isEdit ? "수정 중 오류가 발생했습니다." : "등록 중 오류가 발생했습니다."); return; }
-    onSaved();
+    try {
+      if (isEdit) await api.patch(`/api/elevators/${editElevator!.id}`, body);
+      else        await api.post("/api/elevators", body);
+      onSaved();
+    } catch (e) {
+      setError(getErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -167,12 +167,15 @@ function AddSiteModal({ onClose, onSaved, editSite }: AddSiteModalProps) {
       warrantyStart: warrantyStart || null,
       warrantyEnd: warrantyEnd || null,
     };
-    const url    = isEdit ? `/api/sites/${editSite!.id}` : "/api/sites";
-    const method = isEdit ? "PATCH" : "POST";
-    const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    setSaving(false);
-    if (!res.ok) { setError(isEdit ? "수정 중 오류가 발생했습니다." : "등록 중 오류가 발생했습니다."); return; }
-    onSaved();
+    try {
+      if (isEdit) await api.patch(`/api/sites/${editSite!.id}`, body);
+      else        await api.post("/api/sites", body);
+      onSaved();
+    } catch (e) {
+      setError(getErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -440,8 +443,8 @@ export default function SitesClient({ initial, elevators }: Props) {
   }
 
   async function reload() {
-    const res = await fetch("/api/sites");
-    const updated: SiteRecord[] = await res.json();
+    const updated = await api.get<SiteRecord[]>("/api/sites").catch(() => null);
+    if (!updated) { alert("현장 목록 조회에 실패했습니다."); return; }
     setSites(updated);
     setShowAdd(false);
     if (editTarget) {
@@ -452,8 +455,7 @@ export default function SitesClient({ initial, elevators }: Props) {
   }
 
   async function reloadElevators(siteName: string) {
-    const res = await fetch(`/api/elevators?site=${encodeURIComponent(siteName)}`);
-    const updated: ElevatorRecord[] = await res.json();
+    const updated = await api.get<ElevatorRecord[]>(`/api/elevators?site=${encodeURIComponent(siteName)}`).catch(() => [] as ElevatorRecord[]);
     setAllElevators(prev => [
       ...prev.filter(e => e.siteName !== siteName),
       ...updated,
@@ -464,8 +466,12 @@ export default function SitesClient({ initial, elevators }: Props) {
   }
 
   async function handleDeleteElevator(e: ElevatorRecord) {
-    await fetch(`/api/elevators/${e.id}`, { method: "DELETE" });
-    if (selected) reloadElevators(selected.name);
+    try {
+      await api.delete(`/api/elevators/${e.id}`);
+      if (selected) reloadElevators(selected.name);
+    } catch (err) {
+      alert(getErrorMessage(err));
+    }
   }
 
   return (
@@ -689,8 +695,8 @@ export default function SitesClient({ initial, elevators }: Props) {
                 canEdit={canEdit}
                 isDark={isDark}
                 onSaved={async () => {
-                  const res = await fetch("/api/sites");
-                  const updated: SiteRecord[] = await res.json();
+                  const updated = await api.get<SiteRecord[]>("/api/sites").catch(() => null);
+                  if (!updated) return;
                   setSites(updated);
                   const refreshed = updated.find(s => s.id === selected.id) ?? null;
                   setSelected(refreshed);
@@ -855,12 +861,13 @@ function EmergencyDevicesPanel({
 
   async function save() {
     setSaving(true);
-    await fetch(`/api/sites/${site.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ emergencyDevices: devices.filter(d => d.number.trim()) }),
-    });
-    setSaving(false);
+    try {
+      await api.patch(`/api/sites/${site.id}`, { emergencyDevices: devices.filter(d => d.number.trim()) });
+    } catch (e) {
+      alert(getErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
     setEditing(false);
     onSaved();
   }

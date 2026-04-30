@@ -7,6 +7,7 @@ import AddMaterialModal from "./AddMaterialModal";
 import EditMaterialModal from "./EditMaterialModal";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
+import { api, getErrorMessage } from "@/lib/api-client";
 
 const LOW_STOCK_THRESHOLD = 5;
 
@@ -18,14 +19,15 @@ function StockCell({ material, editable }: { material: MaterialRecord; editable:
 
   async function save() {
     setSaving(true);
-    await fetch(`/api/materials/${encodeURIComponent(material.id)}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stockQty: draft }),
-    });
-    setQty(draft);
-    setSaving(false);
-    setEditing(false);
+    try {
+      await api.patch(`/api/materials/${encodeURIComponent(material.id)}`, { stockQty: draft });
+      setQty(draft);
+      setEditing(false);
+    } catch (e) {
+      alert(getErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (editable && editing) {
@@ -155,10 +157,15 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
 
   const reload = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/materials");
-    setMaterials(await res.json());
-    setLoading(false);
-    setShowModal(false);
+    try {
+      const data = await api.get<MaterialRecord[]>("/api/materials");
+      setMaterials(data);
+    } catch (e) {
+      alert(getErrorMessage(e));
+    } finally {
+      setLoading(false);
+      setShowModal(false);
+    }
   }, []);
 
   const headers = viewOnly

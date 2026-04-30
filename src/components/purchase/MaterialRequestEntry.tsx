@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { ElevatorRecord } from "@/lib/mock-elevators";
+import { api, getErrorMessage } from "@/lib/api-client";
 
 interface SiteOption { id: number; name: string }
 
@@ -54,7 +55,7 @@ export default function MaterialRequestEntry({ sites }: Props) {
       const t = setTimeout(() => setElevators([]), 0);
       return () => clearTimeout(t);
     }
-    fetch(`/api/elevators?site=${encodeURIComponent(siteName)}`).then(r => r.json()).then(setElevators);
+    api.get<ElevatorRecord[]>(`/api/elevators?site=${encodeURIComponent(siteName)}`).then(setElevators).catch(() => setElevators([]));
   }, [siteName]);
 
   function patchRow(id: string, patch: Partial<Row>) {
@@ -102,27 +103,22 @@ export default function MaterialRequestEntry({ sites }: Props) {
     if (valid.length === 0) { alert("품목을 1개 이상 입력해 주세요."); return; }
     setSaving(true);
     try {
-      const res = await fetch("/api/material-requests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          siteName: siteName || null,
-          items: valid.map(r => ({
-            materialId: r.materialId,
-            materialName: r.materialName,
-            qty: r.qty,
-            elevatorName: r.elevatorName || null,
-          })),
-          note: reference || null,
-          requesterId: user.id,
-          requesterName: user.name,
-          requesterDept: user.dept,
-        }),
+      await api.post("/api/material-requests", {
+        siteName: siteName || null,
+        items: valid.map(r => ({
+          materialId: r.materialId,
+          materialName: r.materialName,
+          qty: r.qty,
+          elevatorName: r.elevatorName || null,
+        })),
+        note: reference || null,
+        requesterId: user.id,
+        requesterName: user.name,
+        requesterDept: user.dept,
       });
-      if (!res.ok) { alert("저장 중 오류가 발생했습니다."); return; }
       if (goList) router.push("/requests");
       else clearAll();
-    } catch { alert("저장 중 오류가 발생했습니다."); }
+    } catch (e) { alert(getErrorMessage(e)); }
     finally { setSaving(false); }
   }
 
@@ -314,10 +310,11 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
       if (!value.trim()) { setResults([]); setOpen(false); return; }
       const params = new URLSearchParams({ q: value });
       if (matType !== "전체") params.set("matType", matType);
-      const res = await fetch(`/api/materials?${params}`);
-      const data: MaterialRecord[] = await res.json();
-      setResults(data.slice(0, 15));
-      setOpen(data.length > 0);
+      try {
+        const data = await api.get<MaterialRecord[]>(`/api/materials?${params}`);
+        setResults(data.slice(0, 15));
+        setOpen(data.length > 0);
+      } catch { setResults([]); setOpen(false); }
     }, value.trim() ? 150 : 0);
     return () => clearTimeout(t);
   }, [value, matType]);
@@ -489,8 +486,10 @@ function MaterialPopup({ onSelect, onClose }: { onSelect: (m: MaterialRecord) =>
   useEffect(() => {
     const t = setTimeout(async () => {
       if (!q.trim()) { setResults([]); return; }
-      const res = await fetch(`/api/materials?q=${encodeURIComponent(q)}`);
-      setResults((await res.json()).slice(0, 50));
+      try {
+        const data = await api.get<MaterialRecord[]>(`/api/materials?q=${encodeURIComponent(q)}`);
+        setResults(data.slice(0, 50));
+      } catch { setResults([]); }
     }, q.trim() ? 200 : 0);
     return () => clearTimeout(t);
   }, [q]);

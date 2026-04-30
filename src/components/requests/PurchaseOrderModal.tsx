@@ -7,6 +7,7 @@ import { MaterialRequestRecord } from "@/lib/mock-material-requests";
 import { ElevatorRecord } from "@/lib/mock-elevators";
 import SiteSearchInput from "@/components/ui/SiteSearchInput";
 import SearchableSelect from "@/components/ui/SearchableSelect";
+import { api, getErrorMessage } from "@/lib/api-client";
 
 interface VendorOption { id: number; name: string }
 interface SiteOption  { id: number; name: string }
@@ -57,10 +58,14 @@ export default function PurchaseOrderModal({ vendors, sites, pendingRequests, us
     setSiteName(name);
     setElevatorId("");
     if (!name) { setElevators([]); return []; }
-    const res = await fetch(`/api/elevators?site=${encodeURIComponent(name)}`);
-    const data: ElevatorRecord[] = await res.json();
-    setElevators(data);
-    return data;
+    try {
+      const data = await api.get<ElevatorRecord[]>(`/api/elevators?site=${encodeURIComponent(name)}`);
+      setElevators(data);
+      return data;
+    } catch {
+      setElevators([]);
+      return [];
+    }
   }, []);
 
   const pendingItems = pendingRequests.flatMap(r =>
@@ -81,10 +86,11 @@ export default function PurchaseOrderModal({ vendors, sites, pendingRequests, us
       if (!matQuery.trim()) { setMatResults([]); setShowDropdown(false); return; }
       const params = new URLSearchParams({ q: matQuery });
       if (matType !== "ALL") params.set("matType", matType);
-      const res = await fetch(`/api/materials?${params}`);
-      const data: MaterialRecord[] = await res.json();
-      setMatResults(data.slice(0, 10));
-      setShowDropdown(true);
+      try {
+        const data = await api.get<MaterialRecord[]>(`/api/materials?${params}`);
+        setMatResults(data.slice(0, 10));
+        setShowDropdown(true);
+      } catch { setMatResults([]); setShowDropdown(false); }
     }, matQuery.trim() ? 200 : 0);
     return () => clearTimeout(t);
   }, [matQuery, matType]);
@@ -110,8 +116,7 @@ export default function PurchaseOrderModal({ vendors, sites, pendingRequests, us
     setMatType(item.materialId.startsWith("D") ? "DS" : "TK");
 
     // 신청 자재를 selectedItems에 자동 추가 (수량은 신청 수량으로 초기값, 편집 가능)
-    const res = await fetch(`/api/materials?q=${encodeURIComponent(item.materialId)}`);
-    const list: MaterialRecord[] = await res.json();
+    const list = await api.get<MaterialRecord[]>(`/api/materials?q=${encodeURIComponent(item.materialId)}`).catch(() => [] as MaterialRecord[]);
     const mat = list.find(m => m.id === item.materialId);
     if (mat) {
       setSelectedItems(prev => {
@@ -176,29 +181,25 @@ export default function PurchaseOrderModal({ vendors, sites, pendingRequests, us
       const elevatorName = elevatorId !== ""
         ? (elevators.find(e => e.id === elevatorId)?.unitName ?? null)
         : null;
-      await Promise.all(selectedItems.map(item =>
-        fetch("/api/purchase-orders", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            materialId: item.material.id,
-            materialName: item.material.name,
-            qty: item.qty,
-            vendorName: vendorName || null,
-            unitPrice: item.unitPrice ? Number(item.unitPrice) : null,
-            requestId: linkedRequestId,
-            siteName: siteName || null,
-            elevatorName,
-            requesterName: requesterName || null,
-            note: note || null,
-            userId: user.id,
-            userName: user.name,
-          }),
-        })
-      ));
+      for (const item of selectedItems) {
+        await api.post("/api/purchase-orders", {
+          materialId: item.material.id,
+          materialName: item.material.name,
+          qty: item.qty,
+          vendorName: vendorName || null,
+          unitPrice: item.unitPrice ? Number(item.unitPrice) : null,
+          requestId: linkedRequestId,
+          siteName: siteName || null,
+          elevatorName,
+          requesterName: requesterName || null,
+          note: note || null,
+          userId: user.id,
+          userName: user.name,
+        });
+      }
       onSaved();
-    } catch {
-      setError("오류가 발생했습니다.");
+    } catch (e) {
+      setError(getErrorMessage(e));
       setSaving(false);
     }
   }

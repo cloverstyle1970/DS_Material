@@ -4,12 +4,15 @@ import {
   addMid, updateMid, deleteMid,
   addSub, updateSub, deleteSub,
 } from "@/lib/mock-categories";
+import { requirePermission, isResponse } from "@/lib/auth-server";
 
 export async function GET() {
   return NextResponse.json(getCategories());
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requirePermission(req, "mutate");
+  if (isResponse(auth)) return auth;
   const body = await req.json();
   const { level, majorCode, midCode, label } = body;
 
@@ -20,6 +23,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const auth = requirePermission(req, "mutate");
+  if (isResponse(auth)) return auth;
   const body = await req.json();
   const { level, majorCode, midCode, code, label } = body;
 
@@ -30,6 +35,8 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const auth = requirePermission(req, "mutate");
+  if (isResponse(auth)) return auth;
   const body = await req.json();
   const { level, majorCode, midCode, code } = body;
 

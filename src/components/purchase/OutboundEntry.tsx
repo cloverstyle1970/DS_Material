@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { ElevatorRecord } from "@/lib/mock-elevators";
 import { TransactionRecord } from "@/lib/mock-transactions";
+import { api, getErrorMessage } from "@/lib/api-client";
 
 interface SiteOption { id: number; name: string }
 
@@ -55,7 +56,7 @@ export default function OutboundEntry({ sites }: Props) {
       const t = setTimeout(() => setElevators([]), 0);
       return () => clearTimeout(t);
     }
-    fetch(`/api/elevators?site=${encodeURIComponent(siteName)}`).then(r => r.json()).then(setElevators);
+    api.get<ElevatorRecord[]>(`/api/elevators?site=${encodeURIComponent(siteName)}`).then(setElevators).catch(() => setElevators([]));
   }, [siteName]);
 
   function patchRow(id: string, patch: Partial<Row>) {
@@ -109,23 +110,18 @@ export default function OutboundEntry({ sites }: Props) {
     if (valid.length === 0) { alert("품목을 1개 이상 입력해 주세요."); return; }
     setSaving(true);
     try {
-      const results = await Promise.all(valid.map(r =>
-        fetch("/api/transactions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: "출고", materialId: r.materialId, materialName: r.materialName,
-            qty: r.qty, siteName: siteName || null,
-            note: r.remark || reference || null, userId: user.id, userName: user.name,
-          }),
-        }).then(r => r.json())
-      ));
-      const err = results.find(r => r.error);
-      if (err) { alert(err.error); return; }
+      for (const r of valid) {
+        await api.post("/api/transactions", {
+          type: "출고", materialId: r.materialId, materialName: r.materialName,
+          qty: r.qty, siteName: siteName || null,
+          note: r.remark || reference || null, userId: user.id, userName: user.name,
+        });
+      }
       if (goList) router.push("/outbound");
       else clearAll();
-    } catch { alert("저장 중 오류가 발생했습니다."); }
-    finally { setSaving(false); }
+    } catch (e) {
+      alert(getErrorMessage(e));
+    } finally { setSaving(false); }
   }
 
   function handleKey(e: KeyboardEvent) {
@@ -331,9 +327,11 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
       if (!value.trim()) { setResults([]); setOpen(false); return; }
       const params = new URLSearchParams({ q: value });
       if (matType !== "전체") params.set("matType", matType);
-      const data: MaterialRecord[] = await fetch(`/api/materials?${params}`).then(r => r.json());
-      setResults(data.slice(0, 15));
-      setOpen(data.length > 0);
+      try {
+        const data = await api.get<MaterialRecord[]>(`/api/materials?${params}`);
+        setResults(data.slice(0, 15));
+        setOpen(data.length > 0);
+      } catch { setResults([]); setOpen(false); }
     }, value.trim() ? 150 : 0);
     return () => clearTimeout(t);
   }, [value, matType]);
@@ -423,7 +421,7 @@ function InboundRefPopup({ onSelect, onClose }: { onSelect: (t: TransactionRecor
   const [records, setRecords] = useState<TransactionRecord[]>([]);
   const [q, setQ] = useState("");
   useEffect(() => {
-    fetch("/api/transactions?type=입고").then(r => r.json()).then((data: TransactionRecord[]) => setRecords(data.slice(0, 200)));
+    api.get<TransactionRecord[]>("/api/transactions?type=입고").then(data => setRecords(data.slice(0, 200))).catch(() => setRecords([]));
   }, []);
   const filtered = records.filter(t =>
     !q || t.materialName.toLowerCase().includes(q.toLowerCase()) ||

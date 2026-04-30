@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { UserRecord, Permission } from "@/lib/mock-users";
 import { useAuth, isAdmin } from "@/context/AuthContext";
+import { api, getErrorMessage } from "@/lib/api-client";
 
 const STATUS_STYLES: Record<string, string> = {
   "재직": "bg-green-50 text-green-700",
@@ -79,17 +80,16 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
   async function savePerms() {
     if (!editPerms) return;
     setSavingPerms(true);
-    const res = await fetch(`/api/users/${editPerms.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ permissions: draftPerms }),
-    });
-    setSavingPerms(false);
-    if (!res.ok) { alert("저장 중 오류가 발생했습니다."); return; }
-    const updated: UserRecord = await res.json();
-    setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
-    if (selected?.id === updated.id) setSelected(updated);
-    setEditPerms(null);
+    try {
+      const updated = await api.patch<UserRecord>(`/api/users/${editPerms.id}`, { permissions: draftPerms });
+      setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+      if (selected?.id === updated.id) setSelected(updated);
+      setEditPerms(null);
+    } catch (e) {
+      alert(getErrorMessage(e));
+    } finally {
+      setSavingPerms(false);
+    }
   }
 
   return (

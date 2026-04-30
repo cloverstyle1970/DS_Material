@@ -6,6 +6,7 @@ import { MaterialRecord } from "@/lib/mock-materials";
 import { PurchaseOrderRecord } from "@/lib/mock-purchase-orders";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import SiteSearchInput from "@/components/ui/SiteSearchInput";
+import { api, getErrorMessage } from "@/lib/api-client";
 
 interface SiteOption { id: number; name: string }
 
@@ -53,13 +54,11 @@ export default function StockTxModal({ initialType, sites, user, onClose, onSave
   // ── 참조 데이터 로드 ─────────────────────────────────────────
   useEffect(() => {
     if (txType === "입고") {
-      fetch("/api/purchase-orders?status=발주")
-        .then(r => r.json())
-        .then(setPendingOrders);
+      api.get<PurchaseOrderRecord[]>("/api/purchase-orders?status=발주")
+        .then(setPendingOrders).catch(() => setPendingOrders([]));
     } else {
-      fetch("/api/transactions?type=입고")
-        .then(r => r.json())
-        .then((data: TransactionRecord[]) => setInboundList(data.slice(0, 100)));
+      api.get<TransactionRecord[]>("/api/transactions?type=입고")
+        .then(data => setInboundList(data.slice(0, 100))).catch(() => setInboundList([]));
     }
   }, [txType]);
 
@@ -69,10 +68,11 @@ export default function StockTxModal({ initialType, sites, user, onClose, onSave
       if (!matQuery.trim()) { setMatResults([]); return; }
       const params = new URLSearchParams({ q: matQuery });
       if (matType !== "전체") params.set("matType", matType);
-      const res = await fetch(`/api/materials?${params}`);
-      const data: MaterialRecord[] = await res.json();
-      setMatResults(data.slice(0, 10));
-      setShowDropdown(true);
+      try {
+        const data = await api.get<MaterialRecord[]>(`/api/materials?${params}`);
+        setMatResults(data.slice(0, 10));
+        setShowDropdown(true);
+      } catch { setMatResults([]); setShowDropdown(false); }
     }, matQuery.trim() ? 200 : 0);
     return () => clearTimeout(t);
   }, [matQuery, matType]);
@@ -95,12 +95,11 @@ export default function StockTxModal({ initialType, sites, user, onClose, onSave
     setSiteName(o.siteName ?? "");
     setNote(`발주#${o.id}${o.vendorName ? ` (${o.vendorName})` : ""}`);
     // 자재 ID로 실제 MaterialRecord 조회
-    fetch(`/api/materials?q=${encodeURIComponent(o.materialId)}`)
-      .then(r => r.json())
-      .then((list: MaterialRecord[]) => {
+    api.get<MaterialRecord[]>(`/api/materials?q=${encodeURIComponent(o.materialId)}`)
+      .then(list => {
         const m = list.find(x => x.id === o.materialId);
         if (m) { setSelected(m); setMatQuery(m.name); }
-      });
+      }).catch(() => {});
     setRefOpen(false);
     setError("");
   }
@@ -112,12 +111,11 @@ export default function StockTxModal({ initialType, sites, user, onClose, onSave
     setQty(t.qty);
     setSiteName(t.siteName ?? "");
     setNote(`입고#${t.id} 참조`);
-    fetch(`/api/materials?q=${encodeURIComponent(t.materialId)}`)
-      .then(r => r.json())
-      .then((list: MaterialRecord[]) => {
+    api.get<MaterialRecord[]>(`/api/materials?q=${encodeURIComponent(t.materialId)}`)
+      .then(list => {
         const m = list.find(x => x.id === t.materialId);
         if (m) { setSelected(m); setMatQuery(m.name); }
-      });
+      }).catch(() => {});
     setRefOpen(false);
     setError("");
   }
@@ -137,10 +135,8 @@ export default function StockTxModal({ initialType, sites, user, onClose, onSave
     if (qty <= 0)  { setError("수량은 1 이상이어야 합니다."); return; }
 
     setSaving(true);
-    const res = await fetch("/api/transactions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    try {
+      await api.post("/api/transactions", {
         type: txType,
         materialId: selected.id,
         materialName: selected.name,
@@ -149,12 +145,13 @@ export default function StockTxModal({ initialType, sites, user, onClose, onSave
         note: note || null,
         userId: user.id,
         userName: user.name,
-      }),
-    });
-    const json = await res.json();
-    setSaving(false);
-    if (!res.ok) { setError(json.error ?? "오류가 발생했습니다."); return; }
-    onSaved();
+      });
+      onSaved();
+    } catch (e) {
+      setError(getErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
   }
 
   // ── 참조 목록 필터 ───────────────────────────────────────────

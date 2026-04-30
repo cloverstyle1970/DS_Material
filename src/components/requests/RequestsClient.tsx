@@ -8,6 +8,7 @@ import { PurchaseOrderRecord, OrderStatus } from "@/lib/mock-purchase-orders";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import StockHistoryClient from "@/components/stock/StockHistoryClient";
+import { api, getErrorMessage } from "@/lib/api-client";
 
 interface SiteOption   { id: number; name: string }
 interface VendorOption { id: number; name: string }
@@ -116,12 +117,13 @@ function MaterialAutocomplete({ value, onChange }: {
   useEffect(() => {
     const t = setTimeout(async () => {
       if (!value.trim()) { setResults([]); return; }
-      const res = await fetch(`/api/materials?q=${encodeURIComponent(value)}`);
-      const data = await res.json();
-      setResults(data.slice(0, 10).map((m: { name: string; id: string; alias?: string | null }) => ({
-        name: m.name, id: m.id, alias: m.alias ?? null,
-      })));
-      setOpen(true);
+      try {
+        const data = await api.get<{ name: string; id: string; alias?: string | null }[]>(`/api/materials?q=${encodeURIComponent(value)}`);
+        setResults(data.slice(0, 10).map(m => ({
+          name: m.name, id: m.id, alias: m.alias ?? null,
+        })));
+        setOpen(true);
+      } catch { setResults([]); setOpen(false); }
     }, value.trim() ? 150 : 0);
     return () => clearTimeout(t);
   }, [value]);
@@ -219,28 +221,28 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
   async function handleReqAction(id: number, action: string) {
     if (!user) return;
     setActionLoading(id);
-    const res = await fetch(`/api/material-requests/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, processorId: user.id, processorName: user.name }),
-    });
-    setActionLoading(null);
-    if (!res.ok) { alert((await res.json()).error); return; }
-    setRequests(await fetch("/api/material-requests").then(r => r.json()));
+    try {
+      await api.patch(`/api/material-requests/${id}`, { action, processorId: user.id, processorName: user.name });
+      setRequests(await api.get<MaterialRequestRecord[]>("/api/material-requests"));
+    } catch (e) {
+      alert(getErrorMessage(e));
+    } finally {
+      setActionLoading(null);
+    }
   }
 
   // ── 발주 액션 ────────────────────────────────────────────────────
   async function handleOrdAction(id: number, action: string) {
     if (!user) return;
     setActionLoading(id);
-    const res = await fetch(`/api/purchase-orders/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, userId: user.id, userName: user.name }),
-    });
-    setActionLoading(null);
-    if (!res.ok) { alert((await res.json()).error); return; }
-    setOrders(await fetch("/api/purchase-orders").then(r => r.json()));
+    try {
+      await api.patch(`/api/purchase-orders/${id}`, { action, userId: user.id, userName: user.name });
+      setOrders(await api.get<PurchaseOrderRecord[]>("/api/purchase-orders"));
+    } catch (e) {
+      alert(getErrorMessage(e));
+    } finally {
+      setActionLoading(null);
+    }
   }
 
   // ── 필터 ────────────────────────────────────────────────────────

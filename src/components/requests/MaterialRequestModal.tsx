@@ -5,6 +5,7 @@ import { AuthUser } from "@/context/AuthContext";
 import { MaterialRecord } from "@/lib/mock-materials";
 import SiteSearchInput from "@/components/ui/SiteSearchInput";
 import { ElevatorRecord } from "@/lib/mock-elevators";
+import { api, getErrorMessage } from "@/lib/api-client";
 
 interface SiteOption { id: number; name: string }
 interface SelectedItem { material: MaterialRecord; qty: number }
@@ -44,10 +45,11 @@ function ElevatorGroupRow({
       if (!matQuery.trim()) { setMatResults([]); setShowDropdown(false); return; }
       const params = new URLSearchParams({ q: matQuery });
       if (matType !== "ALL") params.set("matType", matType);
-      const res = await fetch(`/api/materials?${params}`);
-      const data: MaterialRecord[] = await res.json();
-      setMatResults(data.slice(0, 10));
-      setShowDropdown(true);
+      try {
+        const data = await api.get<MaterialRecord[]>(`/api/materials?${params}`);
+        setMatResults(data.slice(0, 10));
+        setShowDropdown(true);
+      } catch { setMatResults([]); setShowDropdown(false); }
     }, matQuery.trim() ? 200 : 0);
     return () => clearTimeout(t);
   }, [matQuery, matType]);
@@ -229,9 +231,8 @@ export default function MaterialRequestModal({ sites, user, onClose, onSaved }: 
       const t = setTimeout(() => setElevators([]), 0);
       return () => clearTimeout(t);
     }
-    fetch(`/api/elevators?site=${encodeURIComponent(siteName)}`)
-      .then(r => r.json())
-      .then(setElevators);
+    api.get<ElevatorRecord[]>(`/api/elevators?site=${encodeURIComponent(siteName)}`)
+      .then(setElevators).catch(() => setElevators([]));
   }, [siteName]);
 
   function addGroup() {
@@ -260,22 +261,17 @@ export default function MaterialRequestModal({ sites, user, onClose, onSaved }: 
           elevatorName: group.elevatorName || null,
         }))
       );
-      const res = await fetch("/api/material-requests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          siteName: siteName || null,
-          items,
-          note: note || null,
-          requesterId: user.id,
-          requesterName: user.name,
-          requesterDept: user.dept,
-        }),
+      await api.post("/api/material-requests", {
+        siteName: siteName || null,
+        items,
+        note: note || null,
+        requesterId: user.id,
+        requesterName: user.name,
+        requesterDept: user.dept,
       });
-      if (!res.ok) throw new Error();
       onSaved();
-    } catch {
-      setError("오류가 발생했습니다.");
+    } catch (e) {
+      setError(getErrorMessage(e));
       setSaving(false);
     }
   }

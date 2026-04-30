@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { CategoryStore, CategoryItem } from "@/lib/mock-categories";
+import { api as apiClient, getErrorMessage } from "@/lib/api-client";
 
 interface Props {
   onClose: () => void;
@@ -86,17 +87,30 @@ export default function CategoryManagerModal({ onClose }: Props) {
   const [selMid, setSelMid] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/categories");
-    const data: CategoryStore = await res.json();
-    setStore(data);
-    if (!selMajor && data.major.length) setSelMajor(data.major[0].code);
+    try {
+      const data = await apiClient.get<CategoryStore>("/api/categories");
+      setStore(data);
+      if (!selMajor && data.major.length) setSelMajor(data.major[0].code);
+    } catch (e) {
+      alert(getErrorMessage(e));
+    }
   }, [selMajor]);
 
   useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function api(method: string, body: object) {
-    await fetch("/api/categories", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    await load();
+    try {
+      if (method === "POST")        await apiClient.post("/api/categories", body);
+      else if (method === "PATCH")  await apiClient.patch("/api/categories", body);
+      else if (method === "DELETE") {
+        // DELETE에 body 전달 위해 직접 fetch — api-client는 body 미지원
+        const res = await fetch("/api/categories", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        if (!res.ok) throw new Error(`${res.status}`);
+      }
+      await load();
+    } catch (e) {
+      alert(getErrorMessage(e));
+    }
   }
 
   if (!store) return null;

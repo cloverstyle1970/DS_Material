@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMaterials, addMaterial, getNextSeq } from "@/lib/mock-materials";
 import { generateMaterialCode } from "@/lib/category-codes";
+import { requirePermission, isResponse } from "@/lib/auth-server";
 
 export async function GET(req: NextRequest) {
   const q       = req.nextUrl.searchParams.get("q") ?? undefined;
@@ -10,6 +11,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requirePermission(req, "mutate");
+  if (isResponse(auth)) return auth;
   const body = await req.json();
   const { directId, categoryCode: directCatCode, isDs, major, mid, sub, isRepair, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty, eCountCd } = body;
 

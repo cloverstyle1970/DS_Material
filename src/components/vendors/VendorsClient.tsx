@@ -4,6 +4,7 @@ import { useState } from "react";
 import { VendorRecord, VendorType } from "@/lib/mock-vendors";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
+import { api, getErrorMessage } from "@/lib/api-client";
 
 // ── 공통 필드 입력 스타일 ───────────────────────────────────
 const field = "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-slate-400";
@@ -241,44 +242,50 @@ export default function VendorsClient({ initial }: Props) {
   function resetPage() { setPage(1); }
 
   async function reload() {
-    const res = await fetch("/api/vendors");
-    setVendors(await res.json());
+    try {
+      setVendors(await api.get<VendorRecord[]>("/api/vendors"));
+    } catch (e) {
+      alert(getErrorMessage(e));
+    }
   }
 
   async function handleAdd(f: FormState) {
     setSaving(true); setError("");
-    const res = await fetch("/api/vendors", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...f, bizNo: f.bizNo || null, vendorCode: null }),
-    });
-    setSaving(false);
-    if (!res.ok) { setError("등록 중 오류가 발생했습니다."); return; }
-    await reload();
-    setShowAdd(false);
+    try {
+      await api.post("/api/vendors", { ...f, bizNo: f.bizNo || null, vendorCode: null });
+      await reload();
+      setShowAdd(false);
+    } catch (e) {
+      setError(getErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleEdit(f: FormState) {
     if (!editTarget) return;
     setSaving(true); setError("");
-    const res = await fetch(`/api/vendors/${editTarget.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(f),
-    });
-    setSaving(false);
-    if (!res.ok) { setError("수정 중 오류가 발생했습니다."); return; }
-    await reload();
-    setEditTarget(null);
-    setSelected(null);
+    try {
+      await api.patch(`/api/vendors/${editTarget.id}`, f);
+      await reload();
+      setEditTarget(null);
+      setSelected(null);
+    } catch (e) {
+      setError(getErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleDelete(v: VendorRecord) {
-    const res = await fetch(`/api/vendors/${v.id}`, { method: "DELETE" });
-    if (!res.ok) { alert("삭제 중 오류가 발생했습니다."); return; }
-    await reload();
-    setDeleteConfirm(null);
-    setSelected(null);
+    try {
+      await api.delete(`/api/vendors/${v.id}`);
+      await reload();
+      setDeleteConfirm(null);
+      setSelected(null);
+    } catch (e) {
+      alert(getErrorMessage(e));
+    }
   }
 
   return (

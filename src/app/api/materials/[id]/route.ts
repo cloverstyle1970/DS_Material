@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateStock, updateMaterial } from "@/lib/mock-materials";
+import { requirePermission, isResponse } from "@/lib/auth-server";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = requirePermission(req, "mutate");
+  if (isResponse(auth)) return auth;
   const { id } = await params;
   const body = await req.json();
 

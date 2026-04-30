@@ -2,6 +2,7 @@
 
 import { useState, FormEvent } from "react";
 import { MaterialRecord } from "@/lib/mock-materials";
+import { api, getErrorMessage } from "@/lib/api-client";
 import RegisterRepairModal from "./RegisterRepairModal";
 
 interface Props {
@@ -31,14 +32,14 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
     e.preventDefault();
     if (!name.trim()) { setError("부품명을 입력해 주세요."); return; }
     setSaving(true);
-    const res = await fetch(`/api/materials/${encodeURIComponent(material.id)}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty, isRepair }),
-    });
-    setSaving(false);
-    if (!res.ok) { setError("저장 중 오류가 발생했습니다."); return; }
-    onSaved();
+    try {
+      await api.patch(`/api/materials/${encodeURIComponent(material.id)}`, { name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty, isRepair });
+      onSaved();
+    } catch (e) {
+      setError(getErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
   }
 
   const field = "w-full rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-400";

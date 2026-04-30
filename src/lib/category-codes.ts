@@ -72,6 +72,12 @@ export function generateMaterialCode(params: {
   seq: number;
   isRepair: boolean;
 }): string {
+  if (params.major.length !== 2) throw new Error(`major는 2자리여야 합니다 (got "${params.major}")`);
+  if (params.mid.length   !== 2) throw new Error(`mid는 2자리여야 합니다 (got "${params.mid}")`);
+  if (params.sub.length   !== 2) throw new Error(`sub는 2자리여야 합니다 (got "${params.sub}")`);
+  if (!Number.isInteger(params.seq) || params.seq < 1 || params.seq > 9999) {
+    throw new Error(`seq는 1~9999 정수여야 합니다 (got ${params.seq})`);
+  }
   const prefix = params.isDs ? "D" : "_";
   const seqStr = String(params.seq).padStart(4, "0");
   const suffix = params.isRepair ? "R" : "_";

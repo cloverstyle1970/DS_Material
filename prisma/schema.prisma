@@ -13,6 +13,9 @@ model Material {
   name         String
   alias        String?
   modelNo      String?  @map("model_no")
+  unit         String?  @default("EA")
+  buyPrice     Int?     @map("buy_price")
+  sellPrice    Int?     @map("sell_price")
   storageLoc   String?  @map("storage_loc")
   stockQty     Int      @default(0) @map("stock_qty")
   isRepair     Boolean  @default(false) @map("is_repair")
