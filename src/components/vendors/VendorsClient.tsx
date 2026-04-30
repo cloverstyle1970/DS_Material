@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { VendorRecord, VendorType } from "@/lib/mock-vendors";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -189,6 +189,17 @@ function VendorFormModal({ title, initial, saving, error, onSubmit, onClose, sub
   );
 }
 
+type SortKey = "name" | "representative" | "bizNo" | "phone" | "address";
+type SortDir = "asc" | "desc";
+
+const COLUMNS: { key: SortKey; label: string }[] = [
+  { key: "name",           label: "거래처명"   },
+  { key: "representative", label: "대표자"     },
+  { key: "bizNo",          label: "사업자번호" },
+  { key: "phone",          label: "전화번호"   },
+  { key: "address",        label: "주소"       },
+];
+
 const PAGE_SIZE = 20;
 
 // ── 메인 컴포넌트 ───────────────────────────────────────────
@@ -205,6 +216,14 @@ export default function VendorsClient({ initial }: Props) {
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<VendorRecord | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  function toggleSort(key: SortKey) {
+    if (key === sortKey) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir("asc"); }
+    setPage(1);
+  }
 
   const { user } = useAuth();
   const admin = user ? !isViewOnly(user) : false;
@@ -234,9 +253,18 @@ export default function VendorsClient({ initial }: Props) {
     );
   });
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      const av = a[sortKey] ?? "";
+      const bv = b[sortKey] ?? "";
+      const cmp = String(av).localeCompare(String(bv), "ko");
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [filtered, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
-  const paginated  = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const paginated  = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   function changePage(next: number) { setPage(Math.max(1, Math.min(next, totalPages))); }
   function resetPage() { setPage(1); }
@@ -344,9 +372,21 @@ export default function VendorsClient({ initial }: Props) {
         <table className="w-full text-sm">
           <thead className={`border-b transition-colors ${isDark ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-100"}`}>
             <tr>
-              {["거래처명", "대표자", "사업자번호", "전화번호", "주소", ...(admin ? [""] : [])].map(h => (
-                <th key={h} className={`px-4 py-3 text-left text-xs font-medium whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-500"}`}>{h}</th>
-              ))}
+              {COLUMNS.map(c => {
+                const active = sortKey === c.key;
+                return (
+                  <th key={c.key} className={`px-4 py-3 text-left text-xs font-medium whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-500"}`}>
+                    <button type="button" onClick={() => toggleSort(c.key)}
+                      className={`flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ${active ? "text-gray-700 dark:text-gray-100 font-semibold" : ""}`}>
+                      {c.label}
+                      <span className={`text-[10px] ${active ? "opacity-100" : "opacity-30"}`}>
+                        {active ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
+                      </span>
+                    </button>
+                  </th>
+                );
+              })}
+              {admin && <th className="px-4 py-3" />}
             </tr>
           </thead>
           <tbody className={`divide-y ${isDark ? "divide-gray-700" : "divide-gray-50"}`}>
@@ -381,7 +421,7 @@ export default function VendorsClient({ initial }: Props) {
         {totalPages > 1 && (
           <div className={`flex items-center justify-between px-5 py-3 border-t ${isDark ? "border-gray-700 bg-gray-800/60" : "border-gray-100 bg-gray-50/60"}`}>
             <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-              {((safePage - 1) * PAGE_SIZE + 1).toLocaleString()}–{Math.min(safePage * PAGE_SIZE, filtered.length).toLocaleString()} / {filtered.length.toLocaleString()}건
+              {((safePage - 1) * PAGE_SIZE + 1).toLocaleString()}–{Math.min(safePage * PAGE_SIZE, sorted.length).toLocaleString()} / {sorted.length.toLocaleString()}건
             </span>
             <div className="flex items-center gap-1">
               <button onClick={() => changePage(1)} disabled={safePage === 1}
