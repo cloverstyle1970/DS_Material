@@ -102,11 +102,7 @@ export default function CategoryManagerModal({ onClose }: Props) {
     try {
       if (method === "POST")        await apiClient.post("/api/categories", body);
       else if (method === "PATCH")  await apiClient.patch("/api/categories", body);
-      else if (method === "DELETE") {
-        // DELETE에 body 전달 위해 직접 fetch — api-client는 body 미지원
-        const res = await fetch("/api/categories", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-        if (!res.ok) throw new Error(`${res.status}`);
-      }
+      else if (method === "DELETE") await apiClient.delete("/api/categories", body);
       await load();
     } catch (e) {
       alert(getErrorMessage(e));

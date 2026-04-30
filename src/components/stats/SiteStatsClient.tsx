@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import * as XLSX from "xlsx";
+import { getTransactions } from "@/lib/mock-transactions";
 
 interface Transaction {
   id: number;
@@ -33,30 +34,13 @@ export default function SiteStatsClient({ sites }: Props) {
     return d.toISOString().substring(0, 10);
   });
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().substring(0, 10));
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        const [inRes, outRes] = await Promise.all([
-          fetch("/api/transactions?type=입고"),
-          fetch("/api/transactions?type=출고"),
-        ]);
-        const inbound:  Transaction[] = await inRes.json();
-        const outbound: Transaction[] = await outRes.json();
-        setTransactions([
-          ...inbound.map(t => ({ ...t, type: "입고" })),
-          ...outbound.map(t => ({ ...t, type: "출고" })),
-        ]);
-      } catch {
-        // noop
-      }
-      setLoading(false);
-    }
-    load();
-  }, []);
+  const transactions: Transaction[] = useMemo(() => [
+    ...getTransactions("입고").map(t => ({ ...t, type: "입고" })),
+    ...getTransactions("출고").map(t => ({ ...t, type: "출고" })),
+  ], []);
+
+  const loading = false;
 
   function setThisMonth() {
     const now = new Date();
