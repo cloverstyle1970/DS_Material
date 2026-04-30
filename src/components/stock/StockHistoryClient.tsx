@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import * as XLSX from "xlsx";
 import { TransactionRecord } from "@/lib/mock-transactions";
@@ -15,6 +15,20 @@ interface Props {
 }
 
 interface Search { dateFrom: string; dateTo: string; siteName: string; userName: string }
+
+type SortKey = "createdAt" | "materialName" | "materialId" | "qty" | "siteName" | "userName";
+type SortDir = "asc" | "desc";
+
+const COLUMNS: { key: SortKey | null; label: string; sortable: boolean }[] = [
+  { key: "createdAt",    label: "일시",     sortable: true  },
+  { key: "materialName", label: "자재명",   sortable: true  },
+  { key: "materialId",   label: "자재코드", sortable: true  },
+  { key: "qty",          label: "수량",     sortable: true  },
+  { key: null,           label: "재고변동", sortable: false },
+  { key: "siteName",     label: "현장",     sortable: true  },
+  { key: "userName",     label: "처리자",   sortable: true  },
+  { key: null,           label: "비고",     sortable: false },
+];
 
 function today() { return new Date().toISOString().substring(0, 10); }
 function defaultSearch(): Search { return { dateFrom: today(), dateTo: today(), siteName: "", userName: "" }; }
@@ -38,6 +52,8 @@ function inputCls() {
 export default function StockHistoryClient({ mode, initial, sites }: Props) {
   const [transactions] = useState(initial);
   const [search, setSearch] = useState<Search>(defaultSearch);
+  const [sortKey, setSortKey] = useState<SortKey>("createdAt");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const { user } = useAuth();
   const admin = user ? !isViewOnly(user) : false;
 
@@ -52,9 +68,30 @@ export default function StockHistoryClient({ mode, initial, sites }: Props) {
     return true;
   });
 
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    arr.sort((a, b) => {
+      const av = a[sortKey];
+      const bv = b[sortKey];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      let cmp: number;
+      if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
+      else cmp = String(av).localeCompare(String(bv), "ko");
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return arr;
+  }, [filtered, sortKey, sortDir]);
+
+  function toggleSort(key: SortKey) {
+    if (key === sortKey) setSortDir(d => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("asc"); }
+  }
+
   function downloadExcel() {
     const stamp = new Date().toISOString().slice(0,10).replace(/-/g,"");
-    const rows = filtered.map(t => ({
+    const rows = sorted.map(t => ({
       일시: fmtDate(t.createdAt),
       자재명: t.materialName,
       자재코드: t.materialId,
@@ -108,7 +145,7 @@ export default function StockHistoryClient({ mode, initial, sites }: Props) {
             <button type="button" onClick={() => setSearch(defaultSearch())}
               className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 underline">초기화</button>
           )}
-          <span className="ml-auto text-xs text-gray-400 dark:text-gray-500 shrink-0">{filtered.length}건</span>
+          <span className="ml-auto text-xs text-gray-400 dark:text-gray-500 shrink-0">{sorted.length}건</span>
         </div>
 
         {admin && (
@@ -128,13 +165,26 @@ export default function StockHistoryClient({ mode, initial, sites }: Props) {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
             <tr>
-              {["일시", "자재명", "자재코드", "수량", "재고변동", "현장", "처리자", "비고"].map(h => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{h}</th>
-              ))}
+              {COLUMNS.map(c => {
+                const active = c.sortable && c.key === sortKey;
+                return (
+                  <th key={c.label} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                    {c.sortable && c.key ? (
+                      <button type="button" onClick={() => toggleSort(c.key as SortKey)}
+                        className={`flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ${active ? "text-gray-700 dark:text-gray-100 font-semibold" : ""}`}>
+                        {c.label}
+                        <span className={`text-[10px] ${active ? "opacity-100" : "opacity-30"}`}>
+                          {active ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
+                        </span>
+                      </button>
+                    ) : c.label}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-            {filtered.length === 0 ? (
+            {sorted.length === 0 ? (
               <tr>
                 <td colSpan={8} className="text-center py-16 text-gray-400 dark:text-gray-500">
                   {transactions.length === 0
@@ -142,7 +192,7 @@ export default function StockHistoryClient({ mode, initial, sites }: Props) {
                     : "조건에 맞는 내역이 없습니다."}
                 </td>
               </tr>
-            ) : filtered.map(t => (
+            ) : sorted.map(t => (
               <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
                 <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(t.createdAt)}</td>
                 <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200 max-w-[200px] truncate">{t.materialName}</td>

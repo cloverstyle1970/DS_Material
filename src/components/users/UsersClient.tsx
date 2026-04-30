@@ -1,9 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { UserRecord, Permission } from "@/lib/mock-users";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { api, getErrorMessage } from "@/lib/api-client";
+
+type SortKey = "id" | "name" | "dept" | "rank" | "cert" | "hireDate" | "phone" | "status";
+type SortDir = "asc" | "desc";
+
+const COLUMNS: { key: SortKey | null; label: string; sortable: boolean }[] = [
+  { key: "id",       label: "번호",     sortable: true  },
+  { key: "name",     label: "이름",     sortable: true  },
+  { key: "dept",     label: "부서",     sortable: true  },
+  { key: "rank",     label: "직급",     sortable: true  },
+  { key: null,       label: "권한",     sortable: false },
+  { key: "cert",     label: "자격증",   sortable: true  },
+  { key: "hireDate", label: "입사일",   sortable: true  },
+  { key: "phone",    label: "전화번호", sortable: true  },
+  { key: "status",   label: "상태",     sortable: true  },
+];
 
 const STATUS_STYLES: Record<string, string> = {
   "재직": "bg-green-50 text-green-700",
@@ -40,6 +55,8 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
   const [editPerms, setEditPerms] = useState<UserRecord | null>(null);
   const [savingPerms, setSavingPerms] = useState(false);
   const [draftPerms, setDraftPerms] = useState<Permission[]>([]);
+  const [sortKey, setSortKey] = useState<SortKey>("id");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const { user: me } = useAuth();
   const meIsAdmin = me ? isAdmin(me) : false;
@@ -57,12 +74,42 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
     );
   });
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    arr.sort((a, b) => {
+      const av = a[sortKey];
+      const bv = b[sortKey];
+      // null/undefined는 항상 뒤로
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      let cmp: number;
+      if (typeof av === "number" && typeof bv === "number") {
+        cmp = av - bv;
+      } else {
+        cmp = String(av).localeCompare(String(bv), "ko");
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return arr;
+  }, [filtered, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
-  const paginated  = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const paginated  = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   function changePage(next: number) { setPage(Math.max(1, Math.min(next, totalPages))); }
   function resetPage() { setPage(1); }
+
+  function toggleSort(key: SortKey) {
+    if (key === sortKey) {
+      setSortDir(d => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+    setPage(1);
+  }
 
   const active = users.filter(u => u.status === "재직").length;
 
@@ -117,10 +164,28 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
             <tr>
-              {["번호","이름","부서","직급","권한","자격증","입사일","전화번호","상태", meIsAdmin ? "" : null]
-                .filter(h => h !== null).map(h => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{h}</th>
-              ))}
+              {COLUMNS.map(c => {
+                const active = c.sortable && c.key === sortKey;
+                return (
+                  <th key={c.label} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                    {c.sortable && c.key ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleSort(c.key as SortKey)}
+                        className={`flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ${active ? "text-gray-700 dark:text-gray-100 font-semibold" : ""}`}
+                      >
+                        {c.label}
+                        <span className={`text-[10px] ${active ? "opacity-100" : "opacity-30"}`}>
+                          {active ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
+                        </span>
+                      </button>
+                    ) : (
+                      c.label
+                    )}
+                  </th>
+                );
+              })}
+              {meIsAdmin && <th className="px-4 py-3" />}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50 dark:divide-gray-700">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Fragment, useRef, useEffect } from "react";
+import { useState, useMemo, Fragment, useRef, useEffect } from "react";
 import Link from "next/link";
 import * as XLSX from "xlsx";
 import { MaterialRequestRecord, RequestStatus } from "@/lib/mock-material-requests";
@@ -198,6 +198,46 @@ const ORD_STATUS_STYLE: Record<OrderStatus, string> = {
   "취소":     "bg-gray-100 text-gray-400",
 };
 
+type SortDir = "asc" | "desc";
+type ReqSortKey = "requestedAt" | "status" | "siteName" | "totalQty" | "requesterName";
+type OrdSortKey = "orderedAt" | "status" | "materialName" | "materialId" | "qty" | "siteName" | "elevatorName" | "requesterName" | "vendorName" | "unitPrice" | "userName";
+
+const REQ_COLS: { key: ReqSortKey | null; label: string; sortable: boolean }[] = [
+  { key: null,            label: "",         sortable: false }, // expand toggle
+  { key: "requestedAt",   label: "신청일시", sortable: true  },
+  { key: "status",        label: "상태",     sortable: true  },
+  { key: "siteName",      label: "현장",     sortable: true  },
+  { key: null,            label: "자재 요약", sortable: false },
+  { key: "totalQty",      label: "총 수량",  sortable: true  },
+  { key: "requesterName", label: "신청자",   sortable: true  },
+  { key: null,            label: "메모",     sortable: false },
+];
+
+const ORD_COLS: { key: OrdSortKey | null; label: string; sortable: boolean }[] = [
+  { key: "orderedAt",     label: "발주일시", sortable: true  },
+  { key: "status",        label: "상태",     sortable: true  },
+  { key: "materialName",  label: "자재명",   sortable: true  },
+  { key: "materialId",    label: "코드",     sortable: true  },
+  { key: "qty",           label: "수량",     sortable: true  },
+  { key: "siteName",      label: "현장",     sortable: true  },
+  { key: "elevatorName",  label: "호기",     sortable: true  },
+  { key: "requesterName", label: "신청자",   sortable: true  },
+  { key: "vendorName",    label: "거래처",   sortable: true  },
+  { key: "unitPrice",     label: "단가",     sortable: true  },
+  { key: "userName",      label: "담당자",   sortable: true  },
+  { key: null,            label: "비고",     sortable: false },
+];
+
+function compareSort<T>(a: T, b: T, dir: SortDir) {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  let cmp: number;
+  if (typeof a === "number" && typeof b === "number") cmp = a - b;
+  else cmp = String(a).localeCompare(String(b), "ko");
+  return dir === "asc" ? cmp : -cmp;
+}
+
 export default function RequestsClient({ initialRequests, initialOrders, initialInbound, initialOutbound, sites, vendors, mode = "all", materialAliases = {}, requesterNames = [] }: Props) {
   const defaultTab: Tab = mode === "orders-only" ? "발주" : "자재신청";
   const [tab, setTab]       = useState<Tab>(defaultTab);
@@ -213,6 +253,21 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
   const [ordStatus,    setOrdStatus]    = useState<OrderStatus | "전체">("전체");
   const [ordDraft,     setOrdDraft]     = useState<OrdSearch>(defaultOrd);
   const [ordSearch,    setOrdSearch]    = useState<OrdSearch>(defaultOrd);
+
+  // 정렬
+  const [reqSortKey, setReqSortKey] = useState<ReqSortKey>("requestedAt");
+  const [reqSortDir, setReqSortDir] = useState<SortDir>("desc");
+  const [ordSortKey, setOrdSortKey] = useState<OrdSortKey>("orderedAt");
+  const [ordSortDir, setOrdSortDir] = useState<SortDir>("desc");
+
+  function toggleReqSort(key: ReqSortKey) {
+    if (key === reqSortKey) setReqSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setReqSortKey(key); setReqSortDir("asc"); }
+  }
+  function toggleOrdSort(key: OrdSortKey) {
+    if (key === ordSortKey) setOrdSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setOrdSortKey(key); setOrdSortDir("asc"); }
+  }
 
   const { user } = useAuth();
   const admin = user ? !isViewOnly(user) : false;
@@ -273,6 +328,16 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
     });
   };
 
+  const sortedReqs = useMemo(() => {
+    const arr = [...filteredReqs];
+    arr.sort((a, b) => {
+      const av = reqSortKey === "totalQty" ? a.items.reduce((s, i) => s + i.qty, 0) : a[reqSortKey];
+      const bv = reqSortKey === "totalQty" ? b.items.reduce((s, i) => s + i.qty, 0) : b[reqSortKey];
+      return compareSort(av, bv, reqSortDir);
+    });
+    return arr;
+  }, [filteredReqs, reqSortKey, reqSortDir]);
+
   const filteredOrds = orders.filter(o => {
     if (ordStatus !== "전체" && o.status !== ordStatus) return false;
     if (!inRange(o.orderedAt, ordSearch.dateFrom, ordSearch.dateTo)) return false;
@@ -286,6 +351,12 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
     }
     return true;
   });
+
+  const sortedOrds = useMemo(() => {
+    const arr = [...filteredOrds];
+    arr.sort((a, b) => compareSort(a[ordSortKey], b[ordSortKey], ordSortDir));
+    return arr;
+  }, [filteredOrds, ordSortKey, ordSortDir]);
 
   function xlsxDownload(rows: Record<string, unknown>[], sheetName: string, fileName: string) {
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -301,7 +372,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
 
   function downloadReqs() {
     const stamp = new Date().toISOString().slice(0,10).replace(/-/g,"");
-    const rows = filteredReqs.flatMap(r =>
+    const rows = sortedReqs.flatMap(r =>
       r.items.map(item => ({
         신청일시: fmtDate(r.requestedAt),
         상태: r.status,
@@ -321,7 +392,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
 
   function downloadOrds() {
     const stamp = new Date().toISOString().slice(0,10).replace(/-/g,"");
-    const rows = filteredOrds.map(o => ({
+    const rows = sortedOrds.map(o => ({
       발주일시: fmtDate(o.orderedAt),
       상태: o.status,
       자재명: o.materialName,
@@ -416,7 +487,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
               className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
               초기화
             </button>
-            <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">{filteredReqs.length}건</span>
+            <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">{sortedReqs.length}건</span>
           </div>
 
           {/* 테이블 */}
@@ -424,17 +495,31 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
                 <tr>
-                  {["", "신청일시","상태","현장","자재 요약","총 수량","신청자","메모", admin ? "처리" : ""].filter(Boolean).map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{h}</th>
-                  ))}
+                  {REQ_COLS.map((c, idx) => {
+                    const active = c.sortable && c.key === reqSortKey;
+                    return (
+                      <th key={idx} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                        {c.sortable && c.key ? (
+                          <button type="button" onClick={() => toggleReqSort(c.key as ReqSortKey)}
+                            className={`flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ${active ? "text-gray-700 dark:text-gray-100 font-semibold" : ""}`}>
+                            {c.label}
+                            <span className={`text-[10px] ${active ? "opacity-100" : "opacity-30"}`}>
+                              {active ? (reqSortDir === "asc" ? "▲" : "▼") : "⇅"}
+                            </span>
+                          </button>
+                        ) : c.label}
+                      </th>
+                    );
+                  })}
+                  {admin && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">처리</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-                {filteredReqs.length === 0 ? (
+                {sortedReqs.length === 0 ? (
                   <tr><td colSpan={admin ? 9 : 8} className="text-center py-16 text-gray-400 dark:text-gray-500">
                     {requests.length === 0 ? "자재 신청 내역이 없습니다." : "조건에 맞는 내역이 없습니다."}
                   </td></tr>
-                ) : filteredReqs.map(r => {
+                ) : sortedReqs.map(r => {
                   const totalQty = r.items.reduce((s, i) => s + i.qty, 0);
                   const kind = matKind(r.items.map(i => i.materialId));
                   const elevators = Array.from(new Set(r.items.map(i => i.elevatorName).filter(Boolean)));
@@ -589,7 +674,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
               className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
               초기화
             </button>
-            <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">{filteredOrds.length}건</span>
+            <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">{sortedOrds.length}건</span>
           </form>
 
           {/* 테이블 */}
@@ -597,17 +682,31 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
                 <tr>
-                  {["발주일시","상태","자재명","코드","수량","현장","호기","신청자","거래처","단가","담당자","비고", admin ? "처리" : ""].filter(Boolean).map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{h}</th>
-                  ))}
+                  {ORD_COLS.map((c, idx) => {
+                    const active = c.sortable && c.key === ordSortKey;
+                    return (
+                      <th key={idx} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                        {c.sortable && c.key ? (
+                          <button type="button" onClick={() => toggleOrdSort(c.key as OrdSortKey)}
+                            className={`flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ${active ? "text-gray-700 dark:text-gray-100 font-semibold" : ""}`}>
+                            {c.label}
+                            <span className={`text-[10px] ${active ? "opacity-100" : "opacity-30"}`}>
+                              {active ? (ordSortDir === "asc" ? "▲" : "▼") : "⇅"}
+                            </span>
+                          </button>
+                        ) : c.label}
+                      </th>
+                    );
+                  })}
+                  {admin && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">처리</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-                {filteredOrds.length === 0 ? (
+                {sortedOrds.length === 0 ? (
                   <tr><td colSpan={admin ? 13 : 12} className="text-center py-16 text-gray-400 dark:text-gray-500">
                     {orders.length === 0 ? "발주 내역이 없습니다." : "조건에 맞는 내역이 없습니다."}
                   </td></tr>
-                ) : filteredOrds.map(o => (
+                ) : sortedOrds.map(o => (
                   <tr key={o.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
                     <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(o.orderedAt)}</td>
                     <td className="px-4 py-3">
