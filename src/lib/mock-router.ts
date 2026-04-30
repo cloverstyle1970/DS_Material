@@ -2,9 +2,10 @@
 // Maps /api/* URL patterns to mock-*.ts functions directly, bypassing HTTP.
 
 import { getMaterials, addMaterial, updateStock, updateMaterial } from "./mock-materials";
-import { getSites, addSite, updateSite, deleteSite } from "./mock-sites";
-import { getElevators, addElevator, updateElevator, deleteElevator } from "./mock-elevators";
 import { getVendors, addVendor, updateVendor, deleteVendor, VendorType } from "./mock-vendors";
+import { supabase } from "./supabase";
+import type { SiteRecord } from "./mock-sites";
+import type { ElevatorRecord } from "./mock-elevators";
 import {
   getCategories, addMajor, updateMajor, deleteMajor,
   addMid, updateMid, deleteMid,
@@ -15,6 +16,92 @@ import { getMaterialRequests, addMaterialRequest, updateMaterialRequest } from "
 import { getPurchaseOrders, addPurchaseOrder, updatePurchaseOrder } from "./mock-purchase-orders";
 import { getUsers, addUser, updateUser, deleteUser } from "./mock-users";
 import { DashboardStats, RecentRequest } from "./types";
+
+// ── Supabase 변환 헬퍼 ────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function dbToSite(r: any): SiteRecord {
+  return {
+    id:                r.id,
+    name:              r.name,
+    companyType:       r.company_type       ?? null,
+    contractType:      r.contract_type      ?? null,
+    contractDate:      r.contract_date      ?? null,
+    contractStart:     r.contract_start     ?? null,
+    contractEnd:       r.contract_end       ?? null,
+    primaryInspector:  r.primary_inspector  ?? null,
+    subInspector:      r.sub_inspector      ?? null,
+    subInspector2:     r.sub_inspector2     ?? null,
+    sitePhone:         r.site_phone         ?? null,
+    siteMobile:        r.site_mobile        ?? null,
+    fax:               r.fax                ?? null,
+    managerPhone:      r.manager_phone      ?? null,
+    managerEmail:      r.manager_email      ?? null,
+    address:           r.address            ?? null,
+    entryInfo:         r.entry_info         ?? null,
+    vendor:            r.vendor             ?? null,
+    customerEmail:     r.customer_email     ?? null,
+    jobNo:             r.job_no             ?? null,
+    note:              r.note               ?? null,
+    emergencyDevice:   r.emergency_device   ?? null,
+    emergencyDevices:  r.emergency_devices  ?? [],
+    warrantyCount:     r.warranty_count     ?? null,
+    warrantyUnits:     r.warranty_units     ?? null,
+    warrantyStart:     r.warranty_start     ?? null,
+    warrantyEnd:       r.warranty_end       ?? null,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function siteToDb(d: any): Record<string, unknown> {
+  const obj: Record<string, unknown> = {};
+  if (d.name              !== undefined) obj.name               = d.name;
+  if (d.companyType       !== undefined) obj.company_type       = d.companyType;
+  if (d.contractType      !== undefined) obj.contract_type      = d.contractType;
+  if (d.contractDate      !== undefined) obj.contract_date      = d.contractDate;
+  if (d.contractStart     !== undefined) obj.contract_start     = d.contractStart;
+  if (d.contractEnd       !== undefined) obj.contract_end       = d.contractEnd;
+  if (d.primaryInspector  !== undefined) obj.primary_inspector  = d.primaryInspector;
+  if (d.subInspector      !== undefined) obj.sub_inspector      = d.subInspector;
+  if (d.subInspector2     !== undefined) obj.sub_inspector2     = d.subInspector2;
+  if (d.sitePhone         !== undefined) obj.site_phone         = d.sitePhone;
+  if (d.siteMobile        !== undefined) obj.site_mobile        = d.siteMobile;
+  if (d.fax               !== undefined) obj.fax                = d.fax;
+  if (d.managerPhone      !== undefined) obj.manager_phone      = d.managerPhone;
+  if (d.managerEmail      !== undefined) obj.manager_email      = d.managerEmail;
+  if (d.address           !== undefined) obj.address            = d.address;
+  if (d.entryInfo         !== undefined) obj.entry_info         = d.entryInfo;
+  if (d.vendor            !== undefined) obj.vendor             = d.vendor;
+  if (d.customerEmail     !== undefined) obj.customer_email     = d.customerEmail;
+  if (d.jobNo             !== undefined) obj.job_no             = d.jobNo;
+  if (d.note              !== undefined) obj.note               = d.note;
+  if (d.emergencyDevice   !== undefined) obj.emergency_device   = d.emergencyDevice;
+  if (d.emergencyDevices  !== undefined) obj.emergency_devices  = d.emergencyDevices;
+  if (d.warrantyCount     !== undefined) obj.warranty_count     = d.warrantyCount;
+  if (d.warrantyUnits     !== undefined) obj.warranty_units     = d.warrantyUnits;
+  if (d.warrantyStart     !== undefined) obj.warranty_start     = d.warrantyStart;
+  if (d.warrantyEnd       !== undefined) obj.warranty_end       = d.warrantyEnd;
+  return obj;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function dbToElevator(r: any): ElevatorRecord {
+  return {
+    id:          r.id,
+    siteName:    r.site_name   ?? "",
+    unitName:    r.unit_name   ?? null,
+    elevatorNo:  r.elevator_no ?? null,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function elevatorToDb(d: any): Record<string, unknown> {
+  const obj: Record<string, unknown> = {};
+  if (d.siteName   !== undefined) obj.site_name   = d.siteName;
+  if (d.unitName   !== undefined) obj.unit_name   = d.unitName;
+  if (d.elevatorNo !== undefined) obj.elevator_no = d.elevatorNo;
+  return obj;
+}
 
 export class MockApiError extends Error {
   status: number;
@@ -58,9 +145,20 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
   if (path === "/api/dashboard") return { stats: MOCK_STATS, recentRequests: MOCK_REQUESTS };
   if (path === "/api/materials")         return getMaterials(params.get("q") ?? undefined, (params.get("matType") as "DS" | "TK") || undefined);
   if (path === "/api/categories")        return getCategories();
-  if (path === "/api/sites")             return getSites(params.get("q") ?? undefined);
+  if (path === "/api/sites") {
+    const { data, error } = await supabase.from("sites").select("*").order("name");
+    if (error) throw new MockApiError(error.message, 500);
+    return (data ?? []).map(dbToSite);
+  }
   if (path === "/api/vendors")           return getVendors(params.get("q") ?? undefined, (params.get("type") as VendorType | "전체") || undefined);
-  if (path === "/api/elevators")         return getElevators(params.get("site") ?? undefined);
+  if (path === "/api/elevators") {
+    const site = params.get("site");
+    let query = supabase.from("elevators").select("*").order("unit_name");
+    if (site) query = query.eq("site_name", site);
+    const { data, error } = await query;
+    if (error) throw new MockApiError(error.message, 500);
+    return (data ?? []).map(dbToElevator);
+  }
   if (path === "/api/transactions")      return getTransactions(params.get("type") ?? undefined);
   if (path === "/api/material-requests") return getMaterialRequests(params.get("status") ?? undefined);
   if (path === "/api/purchase-orders")   return getPurchaseOrders(params.get("status") ?? undefined);
@@ -77,12 +175,20 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
     if (level === "sub")   return addSub(majorCode, midCode, label);
     throw new MockApiError("invalid level", 400);
   }
-  if (path === "/api/sites")    return addSite(body);
+  if (path === "/api/sites") {
+    const { data, error } = await supabase.from("sites").insert(siteToDb(body)).select().single();
+    if (error) throw new MockApiError(error.message, 500);
+    return dbToSite(data);
+  }
   if (path === "/api/vendors")  return addVendor(body);
   if (path === "/api/elevators") {
     const { siteName, unitName, elevatorNo } = body;
     if (!siteName) throw new MockApiError("siteName 필수", 400);
-    return addElevator({ siteName, unitName: unitName || null, elevatorNo: elevatorNo || null });
+    const { data, error } = await supabase.from("elevators")
+      .insert({ site_name: siteName, unit_name: unitName || null, elevator_no: elevatorNo || null })
+      .select().single();
+    if (error) throw new MockApiError(error.message, 500);
+    return dbToElevator(data);
   }
   if (path === "/api/transactions") {
     const { record, error } = addTransaction(body);
@@ -130,9 +236,11 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
 
   const siteId = extractId(path, "/api/sites");
   if (siteId) {
-    const updated = updateSite(Number(siteId), body);
-    if (!updated) throw new MockApiError("not found", 404);
-    return updated;
+    const { data, error } = await supabase.from("sites")
+      .update(siteToDb(body)).eq("id", Number(siteId)).select().single();
+    if (error) throw new MockApiError(error.message, 500);
+    if (!data) throw new MockApiError("not found", 404);
+    return dbToSite(data);
   }
 
   const vendorId = extractId(path, "/api/vendors");
@@ -144,9 +252,11 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
 
   const elevatorId = extractId(path, "/api/elevators");
   if (elevatorId) {
-    const record = updateElevator(Number(elevatorId), body);
-    if (!record) throw new MockApiError("Not found", 404);
-    return record;
+    const { data, error } = await supabase.from("elevators")
+      .update(elevatorToDb(body)).eq("id", Number(elevatorId)).select().single();
+    if (error) throw new MockApiError(error.message, 500);
+    if (!data) throw new MockApiError("Not found", 404);
+    return dbToElevator(data);
   }
 
   const reqId = extractId(path, "/api/material-requests");
@@ -243,13 +353,15 @@ async function routeDELETE(path: string, body: AnyBody): Promise<unknown> {
 
   const siteId = extractId(path, "/api/sites");
   if (siteId) {
-    if (!deleteSite(Number(siteId))) throw new MockApiError("not found", 404);
+    const { error } = await supabase.from("sites").delete().eq("id", Number(siteId));
+    if (error) throw new MockApiError(error.message, 500);
     return { ok: true };
   }
 
   const elevatorId = extractId(path, "/api/elevators");
   if (elevatorId) {
-    if (!deleteElevator(Number(elevatorId))) throw new MockApiError("not found", 404);
+    const { error } = await supabase.from("elevators").delete().eq("id", Number(elevatorId));
+    if (error) throw new MockApiError(error.message, 500);
     return { ok: true };
   }
 
