@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth, isViewOnly, isAdmin } from "@/context/AuthContext";
 
@@ -83,19 +83,18 @@ export default function Sidebar({ open, onToggle }: Props) {
     return null;
   }
 
-  const [expanded, setExpanded] = useState<Set<string>>(() => {
+  const [manualExpanded, setManualExpanded] = useState<Set<string>>(() => {
     const id = activeGroupId();
     return new Set(id ? [id] : [NAV_GROUPS[0].id]);
   });
 
-  useEffect(() => {
-    const id = activeGroupId();
-    if (id) setExpanded(prev => prev.has(id) ? prev : new Set([...prev, id]));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+  const activeId = NAV_GROUPS.find(g => g.items.some(item => isActive(item.href)))?.id ?? null;
+  const expanded = activeId && !manualExpanded.has(activeId)
+    ? new Set([...manualExpanded, activeId])
+    : manualExpanded;
 
   function toggleGroup(id: string) {
-    setExpanded(prev => {
+    setManualExpanded(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;

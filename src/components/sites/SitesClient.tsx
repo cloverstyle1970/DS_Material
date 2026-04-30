@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, FormEvent, useMemo } from "react";
+import { useState, FormEvent, useMemo } from "react";
 import * as XLSX from "xlsx";
 import { SiteRecord } from "@/lib/mock-sites";
 import { ElevatorRecord } from "@/lib/mock-elevators";
@@ -123,7 +123,7 @@ function AddSiteModal({ onClose, onSaved, editSite }: AddSiteModalProps) {
   const [address,          setAddress]           = useState(editSite?.address ?? "");
   const [postalCode,       setPostalCode]        = useState("");
   const [vendor,           setVendor]            = useState(editSite?.vendor ?? "");
-  const [entryInfo,        setEntryInfo]         = useState(editSite?.entryInfo ?? "");
+  const [entryInfo]                              = useState(editSite?.entryInfo ?? "");
   const [note,             setNote]              = useState(editSite?.note ?? "");
   const [warrantyCount,    setWarrantyCount]     = useState<string>(editSite?.warrantyCount != null ? String(editSite.warrantyCount) : "");
   const [warrantyUnits,    setWarrantyUnits]     = useState(editSite?.warrantyUnits ?? "");
@@ -691,6 +691,7 @@ export default function SitesClient({ initial, elevators }: Props) {
 
               {/* 비상통화장치 */}
               <EmergencyDevicesPanel
+                key={selected.id}
                 site={selected}
                 canEdit={canEdit}
                 isDark={isDark}
@@ -848,12 +849,6 @@ function EmergencyDevicesPanel({
   );
   const [editing, setEditing] = useState(false);
   const [saving,  setSaving]  = useState(false);
-
-  // site가 바뀌면 로컬 state 동기화
-  useEffect(() => {
-    setDevices(site.emergencyDevices?.length ? site.emergencyDevices : []);
-    setEditing(false);
-  }, [site.id]);
 
   function patch(i: number, field: "number" | "note", value: string) {
     setDevices(prev => prev.map((d, j) => j === i ? { ...d, [field]: value } : d));
