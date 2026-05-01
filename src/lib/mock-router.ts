@@ -8,11 +8,7 @@ import type { VendorRecord } from "./mock-vendors";
 import type { UserRecord } from "./mock-users";
 import type { MaterialRecord } from "./mock-materials";
 import type { TransactionRecord } from "./mock-transactions";
-import {
-  getCategories, addMajor, updateMajor, deleteMajor,
-  addMid, updateMid, deleteMid,
-  addSub, updateSub, deleteSub,
-} from "./mock-categories";
+import type { CategoryStore } from "./mock-categories";
 import type { MaterialRequestRecord } from "./mock-material-requests";
 import type { PurchaseOrderRecord } from "./mock-purchase-orders";
 import { DashboardStats, RecentRequest } from "./types";
@@ -376,7 +372,30 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
     }
     return list;
   }
-  if (path === "/api/categories")        return getCategories();
+  if (path === "/api/categories") {
+    const { data, error } = await supabase.from("categories").select("*").order("major_code").order("mid_code").order("code");
+    if (error) throw new MockApiError(error.message, 500);
+    const rows = data ?? [];
+    const store: CategoryStore = { major: [], mid: {}, sub: {} };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rows.filter((r: any) => r.level === "major").forEach((r: any) => {
+      store.major.push({ code: r.code, label: r.label });
+      store.mid[r.code] = [];
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rows.filter((r: any) => r.level === "mid").forEach((r: any) => {
+      if (!store.mid[r.major_code]) store.mid[r.major_code] = [];
+      store.mid[r.major_code].push({ code: r.code, label: r.label });
+      store.sub[`${r.major_code}${r.code}`] = [];
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rows.filter((r: any) => r.level === "sub").forEach((r: any) => {
+      const key = `${r.major_code}${r.mid_code}`;
+      if (!store.sub[key]) store.sub[key] = [];
+      store.sub[key].push({ code: r.code, label: r.label });
+    });
+    return store;
+  }
   if (path === "/api/sites") {
     const { data, error } = await supabase.from("sites").select("*").order("name");
     if (error) throw new MockApiError(error.message, 500);
@@ -457,9 +476,30 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
   }
   if (path === "/api/categories") {
     const { level, majorCode, midCode, label } = body;
-    if (level === "major") return addMajor(label);
-    if (level === "mid")   return addMid(majorCode, label);
-    if (level === "sub")   return addSub(majorCode, midCode, label);
+    if (level === "major") {
+      const { data: ex } = await supabase.from("categories").select("code").eq("level", "major");
+      const nums = (ex ?? []).map((r: {code: string}) => parseInt(r.code, 10)).filter(Number.isFinite);
+      const code = String((nums.length ? Math.max(...nums) : 0) + 1).padStart(2, "0");
+      const { data, error } = await supabase.from("categories").insert({ level, code, label, major_code: null, mid_code: null }).select().single();
+      if (error) throw new MockApiError(error.message, 500);
+      return { code: data.code, label: data.label };
+    }
+    if (level === "mid") {
+      const { data: ex } = await supabase.from("categories").select("code").eq("level", "mid").eq("major_code", majorCode);
+      const nums = (ex ?? []).map((r: {code: string}) => parseInt(r.code, 10)).filter(Number.isFinite);
+      const code = String((nums.length ? Math.max(...nums) : 0) + 1).padStart(2, "0");
+      const { data, error } = await supabase.from("categories").insert({ level, code, label, major_code: majorCode, mid_code: null }).select().single();
+      if (error) throw new MockApiError(error.message, 500);
+      return { code: data.code, label: data.label };
+    }
+    if (level === "sub") {
+      const { data: ex } = await supabase.from("categories").select("code").eq("level", "sub").eq("major_code", majorCode).eq("mid_code", midCode);
+      const nums = (ex ?? []).map((r: {code: string}) => parseInt(r.code, 10)).filter(Number.isFinite);
+      const code = String((nums.length ? Math.max(...nums) : 0) + 1).padStart(2, "0");
+      const { data, error } = await supabase.from("categories").insert({ level, code, label, major_code: majorCode, mid_code: midCode }).select().single();
+      if (error) throw new MockApiError(error.message, 500);
+      return { code: data.code, label: data.label };
+    }
     throw new MockApiError("invalid level", 400);
   }
   if (path === "/api/sites") {
@@ -544,10 +584,12 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
 
   if (path === "/api/categories") {
     const { level, majorCode, midCode, code, label } = body;
-    if (level === "major") { updateMajor(code, label);           return { ok: true }; }
-    if (level === "mid")   { updateMid(majorCode, code, label);  return { ok: true }; }
-    if (level === "sub")   { updateSub(majorCode, midCode, code, label); return { ok: true }; }
-    throw new MockApiError("invalid level", 400);
+    let q = supabase.from("categories").update({ label }).eq("level", level).eq("code", code);
+    if (level === "mid" || level === "sub") q = q.eq("major_code", majorCode);
+    if (level === "sub") q = q.eq("mid_code", midCode);
+    const { error } = await q;
+    if (error) throw new MockApiError(error.message, 500);
+    return { ok: true };
   }
 
   const siteId = extractId(path, "/api/sites");
@@ -673,10 +715,20 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
 async function routeDELETE(path: string, body: AnyBody): Promise<unknown> {
   if (path === "/api/categories") {
     const { level, majorCode, midCode, code } = body ?? {};
-    if (level === "major") { deleteMajor(code);             return { ok: true }; }
-    if (level === "mid")   { deleteMid(majorCode, code);    return { ok: true }; }
-    if (level === "sub")   { deleteSub(majorCode, midCode, code); return { ok: true }; }
-    throw new MockApiError("invalid level", 400);
+    if (level === "major") {
+      await supabase.from("categories").delete().eq("level", "sub").eq("major_code", code);
+      await supabase.from("categories").delete().eq("level", "mid").eq("major_code", code);
+      const { error } = await supabase.from("categories").delete().eq("level", "major").eq("code", code);
+      if (error) throw new MockApiError(error.message, 500);
+    } else if (level === "mid") {
+      await supabase.from("categories").delete().eq("level", "sub").eq("major_code", majorCode).eq("mid_code", code);
+      const { error } = await supabase.from("categories").delete().eq("level", "mid").eq("major_code", majorCode).eq("code", code);
+      if (error) throw new MockApiError(error.message, 500);
+    } else if (level === "sub") {
+      const { error } = await supabase.from("categories").delete().eq("level", "sub").eq("major_code", majorCode).eq("mid_code", midCode).eq("code", code);
+      if (error) throw new MockApiError(error.message, 500);
+    } else throw new MockApiError("invalid level", 400);
+    return { ok: true };
   }
 
   const vendorId = extractId(path, "/api/vendors");
