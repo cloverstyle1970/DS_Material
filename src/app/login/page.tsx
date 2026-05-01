@@ -3,12 +3,7 @@
 import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import usersJson from "@/data/users.json";
-
-const MOCK_PASSWORD = "1234";
-
-const ACTIVE_USERS = (usersJson as { id: number; name: string; dept: string; status: string; permissions: string[] }[])
-  .filter(u => u.status === "재직");
+import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
   const { isAuthenticated, isLoading, login } = useAuth();
@@ -25,26 +20,36 @@ export default function LoginPage() {
     }
   }, [isLoading, isAuthenticated, router]);
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
     setSubmitting(true);
 
     const trimmed = name.trim();
-    const matched = ACTIVE_USERS.find(u => u.name === trimmed);
+    const { data: user, error: dbError } = await supabase
+      .from("users")
+      .select("id, name, dept, permissions, status")
+      .eq("name", trimmed)
+      .eq("status", "재직")
+      .single();
 
-    if (!matched) {
+    if (dbError || !user) {
       setError("이름을 확인해 주세요.");
       setSubmitting(false);
       return;
     }
-    if (password !== MOCK_PASSWORD) {
+    if (password !== "1234") {
       setError("비밀번호가 올바르지 않습니다.");
       setSubmitting(false);
       return;
     }
 
-    login({ id: matched.id, name: matched.name, dept: matched.dept, permissions: (matched.permissions ?? []) as import("@/lib/mock-users").Permission[] });
+    login({
+      id: user.id,
+      name: user.name,
+      dept: user.dept ?? "",
+      permissions: (user.permissions ?? []) as import("@/lib/mock-users").Permission[],
+    });
     router.replace("/dashboard");
   }
 
@@ -53,7 +58,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
-        {/* 로고 영역 */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-slate-700 mb-4">
             <span className="text-2xl">📦</span>
@@ -62,7 +66,6 @@ export default function LoginPage() {
           <p className="text-slate-400 text-sm mt-1">승강기 유지보수 스마트 자재관리</p>
         </div>
 
-        {/* 로그인 카드 */}
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-xl p-8 space-y-5">
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-gray-700">이름</label>
@@ -100,7 +103,7 @@ export default function LoginPage() {
             disabled={submitting}
             className="w-full bg-slate-800 text-white py-3 rounded-xl text-sm font-semibold hover:bg-slate-700 transition-colors disabled:opacity-60"
           >
-            로그인
+            {submitting ? "확인 중..." : "로그인"}
           </button>
 
           <p className="text-center text-xs text-gray-400">초기 비밀번호: <span className="font-mono font-medium text-gray-500">1234</span></p>

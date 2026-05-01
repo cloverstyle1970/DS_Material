@@ -321,20 +321,6 @@ export class MockApiError extends Error {
   }
 }
 
-const MOCK_STATS: DashboardStats = {
-  todayRequests: 7,
-  pendingRequests: 3,
-  lowStockMaterials: 5,
-  totalMaterials: 248,
-};
-
-const MOCK_REQUESTS: RecentRequest[] = [
-  { id: "1", materialName: "도어 클로저",    siteName: "서울중앙빌딩",     hoGiNo: "1호기", userName: "김철수", qty: 1, status: "pending",    requestedAt: new Date(Date.now() - 1000 * 60 * 30).toISOString() },
-  { id: "2", materialName: "안전스위치",     siteName: "강남타워",         hoGiNo: "3호기", userName: "이영희", qty: 2, status: "dispatched", requestedAt: new Date(Date.now() - 1000 * 60 * 90).toISOString() },
-  { id: "3", materialName: "제어반 기판",    siteName: "부산해운대빌딩",   hoGiNo: "2호기", userName: "박민수", qty: 1, status: "pending",    requestedAt: new Date(Date.now() - 1000 * 60 * 120).toISOString() },
-  { id: "4", materialName: "와이어 로프",    siteName: "인천공항물류센터", hoGiNo: "5호기", userName: "최지영", qty: 1, status: "completed",  requestedAt: new Date(Date.now() - 1000 * 60 * 180).toISOString() },
-  { id: "5", materialName: "가이드 슈",      siteName: "서울중앙빌딩",     hoGiNo: "2호기", userName: "김철수", qty: 4, status: "pending",    requestedAt: new Date(Date.now() - 1000 * 60 * 240).toISOString() },
-];
 
 function parseUrl(url: string): { path: string; params: URLSearchParams } {
   const [path, qs = ""] = url.split("?");
@@ -350,7 +336,34 @@ function extractId(path: string, prefix: string): string | null {
 type AnyBody = any;
 
 async function routeGET(path: string, params: URLSearchParams): Promise<unknown> {
-  if (path === "/api/dashboard") return { stats: MOCK_STATS, recentRequests: MOCK_REQUESTS };
+  if (path === "/api/dashboard") {
+    const today = new Date().toISOString().split("T")[0];
+    const [todayResult, pendingResult, lowStockResult, totalResult, recentResult] = await Promise.all([
+      supabase.from("material_requests").select("*", { count: "exact", head: true }).gte("requested_at", `${today}T00:00:00`),
+      supabase.from("material_requests").select("*", { count: "exact", head: true }).eq("status", "신청"),
+      supabase.from("materials").select("*", { count: "exact", head: true }).lte("stock_qty", 0),
+      supabase.from("materials").select("*", { count: "exact", head: true }),
+      supabase.from("material_requests").select("*").order("requested_at", { ascending: false }).limit(10),
+    ]);
+    const stats: DashboardStats = {
+      todayRequests:     todayResult.count     ?? 0,
+      pendingRequests:   pendingResult.count   ?? 0,
+      lowStockMaterials: lowStockResult.count  ?? 0,
+      totalMaterials:    totalResult.count     ?? 0,
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const recentRequests: RecentRequest[] = (recentResult.data ?? []).map((r: any) => ({
+      id:           String(r.id),
+      materialName: r.items?.[0]?.materialName ?? "자재",
+      siteName:     r.site_name      ?? "",
+      hoGiNo:       r.items?.[0]?.elevatorName ?? "",
+      userName:     r.requester_name,
+      qty:          r.items?.[0]?.qty ?? 0,
+      status:       r.status === "완료" ? "completed" : r.status === "처리중" ? "dispatched" : ("pending" as const),
+      requestedAt:  r.requested_at,
+    }));
+    return { stats, recentRequests };
+  }
   if (path === "/api/materials") {
     const q = params.get("q");
     const matType = params.get("matType") as "DS" | "TK" | null;
