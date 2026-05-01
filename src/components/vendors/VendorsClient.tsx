@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { VendorRecord, VendorType } from "@/lib/mock-vendors";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -224,6 +224,10 @@ export default function VendorsClient({ initial }: Props) {
     else { setSortKey(key); setSortDir("asc"); }
     setPage(1);
   }
+
+  useEffect(() => {
+    api.get<VendorRecord[]>("/api/vendors").then(setVendors).catch(() => {});
+  }, []);
 
   const { user } = useAuth();
   const admin = user ? !isViewOnly(user) : false;

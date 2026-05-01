@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { UserRecord, Permission } from "@/lib/mock-users";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { api, getErrorMessage } from "@/lib/api-client";
@@ -57,6 +57,10 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
   const [draftPerms, setDraftPerms] = useState<Permission[]>([]);
   const [sortKey, setSortKey] = useState<SortKey>("id");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  useEffect(() => {
+    api.get<UserRecord[]>("/api/users").then(setUsers).catch(() => {});
+  }, []);
 
   const { user: me } = useAuth();
   const meIsAdmin = me ? isAdmin(me) : false;
