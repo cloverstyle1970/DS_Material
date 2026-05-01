@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import * as XLSX from "xlsx";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
+import { api } from "@/lib/api-client";
 
 interface SiteOption { id: number; name: string }
 
@@ -50,7 +51,12 @@ function inputCls() {
 }
 
 export default function StockHistoryClient({ mode, initial, sites }: Props) {
-  const [transactions] = useState(initial);
+  const [transactions, setTransactions] = useState(initial);
+
+  useEffect(() => {
+    api.get<TransactionRecord[]>(`/api/transactions?type=${encodeURIComponent(mode)}`)
+      .then(setTransactions).catch(() => {});
+  }, [mode]);
   const [search, setSearch] = useState<Search>(defaultSearch);
   const [sortKey, setSortKey] = useState<SortKey>("createdAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");

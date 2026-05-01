@@ -1,18 +1,18 @@
 // Client-side virtual router for static GitHub Pages deployment.
 // Maps /api/* URL patterns to mock-*.ts functions directly, bypassing HTTP.
 
-import { getMaterials, addMaterial, updateStock, updateMaterial } from "./mock-materials";
 import { supabase } from "./supabase";
 import type { SiteRecord } from "./mock-sites";
 import type { ElevatorRecord } from "./mock-elevators";
 import type { VendorRecord } from "./mock-vendors";
 import type { UserRecord } from "./mock-users";
+import type { MaterialRecord } from "./mock-materials";
+import type { TransactionRecord } from "./mock-transactions";
 import {
   getCategories, addMajor, updateMajor, deleteMajor,
   addMid, updateMid, deleteMid,
   addSub, updateSub, deleteSub,
 } from "./mock-categories";
-import { getTransactions, addTransaction } from "./mock-transactions";
 import { getMaterialRequests, addMaterialRequest, updateMaterialRequest } from "./mock-material-requests";
 import { getPurchaseOrders, addPurchaseOrder, updatePurchaseOrder } from "./mock-purchase-orders";
 import { getUsers, addUser, updateUser, deleteUser } from "./mock-users";
@@ -179,6 +179,83 @@ function userToDb(d: any): Record<string, unknown> {
   return obj;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function dbToMaterial(r: any): MaterialRecord {
+  return {
+    id:          r.id,
+    categoryCode: r.category_code,
+    name:        r.name,
+    alias:       r.alias       ?? null,
+    modelNo:     r.model_no    ?? null,
+    unit:        r.unit        ?? null,
+    buyPrice:    r.buy_price   ?? null,
+    sellPrice:   r.sell_price  ?? null,
+    storageLoc:  r.storage_loc ?? null,
+    stockQty:    r.stock_qty,
+    isRepair:    r.is_repair,
+    eCountCd:    r.e_count_cd  ?? null,
+    createdAt:   r.created_at,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function materialToDb(d: any): Record<string, unknown> {
+  const obj: Record<string, unknown> = {};
+  if (d.id           !== undefined) obj.id           = d.id;
+  if (d.categoryCode !== undefined) obj.category_code = d.categoryCode;
+  if (d.name         !== undefined) obj.name         = d.name;
+  if (d.alias        !== undefined) obj.alias        = d.alias;
+  if (d.modelNo      !== undefined) obj.model_no     = d.modelNo;
+  if (d.unit         !== undefined) obj.unit         = d.unit;
+  if (d.buyPrice     !== undefined) obj.buy_price    = d.buyPrice;
+  if (d.sellPrice    !== undefined) obj.sell_price   = d.sellPrice;
+  if (d.storageLoc   !== undefined) obj.storage_loc  = d.storageLoc;
+  if (d.stockQty     !== undefined) obj.stock_qty    = d.stockQty;
+  if (d.isRepair     !== undefined) obj.is_repair    = d.isRepair;
+  if (d.eCountCd     !== undefined) obj.e_count_cd   = d.eCountCd;
+  if (d.createdAt    !== undefined) obj.created_at   = d.createdAt;
+  return obj;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function dbToTransaction(r: any): TransactionRecord {
+  return {
+    id:           r.id,
+    type:         r.type,
+    materialId:   r.material_id,
+    materialName: r.material_name,
+    qty:          r.qty,
+    prevStock:    r.prev_stock,
+    afterStock:   r.after_stock,
+    siteName:     r.site_name ?? null,
+    note:         r.note      ?? null,
+    userId:       r.user_id,
+    userName:     r.user_name,
+    createdAt:    r.created_at,
+  };
+}
+
+async function supabaseAddTransaction(data: {
+  type: "입고" | "출고";
+  materialId: string; materialName: string; qty: number;
+  siteName: string | null; note: string | null;
+  userId: number; userName: string;
+}): Promise<{ record?: TransactionRecord; error?: string }> {
+  const { data: result, error } = await supabase.rpc("add_transaction", {
+    p_type:          data.type,
+    p_material_id:   data.materialId,
+    p_material_name: data.materialName,
+    p_qty:           data.qty,
+    p_site_name:     data.siteName,
+    p_note:          data.note,
+    p_user_id:       data.userId,
+    p_user_name:     data.userName,
+  });
+  if (error) return { error: error.message };
+  if (result?.error) return { error: result.error };
+  return { record: dbToTransaction(result.record) };
+}
+
 export class MockApiError extends Error {
   status: number;
   code?: string;
@@ -219,7 +296,27 @@ type AnyBody = any;
 
 async function routeGET(path: string, params: URLSearchParams): Promise<unknown> {
   if (path === "/api/dashboard") return { stats: MOCK_STATS, recentRequests: MOCK_REQUESTS };
-  if (path === "/api/materials")         return getMaterials(params.get("q") ?? undefined, (params.get("matType") as "DS" | "TK") || undefined);
+  if (path === "/api/materials") {
+    const q = params.get("q");
+    const matType = params.get("matType") as "DS" | "TK" | null;
+    let query = supabase.from("materials").select("*").order("name");
+    if (matType === "DS") query = query.like("id", "D%");
+    if (matType === "TK") query = query.not("id", "like", "D%");
+    const { data, error } = await query;
+    if (error) throw new MockApiError(error.message, 500);
+    let list = (data ?? []).map(dbToMaterial);
+    if (q) {
+      const qLower = q.toLowerCase();
+      list = list.filter(m =>
+        m.name.toLowerCase().includes(qLower) ||
+        m.id.toLowerCase().includes(qLower) ||
+        (m.alias?.toLowerCase().includes(qLower) ?? false) ||
+        (m.modelNo?.toLowerCase().includes(qLower) ?? false) ||
+        (m.storageLoc?.toLowerCase().includes(qLower) ?? false)
+      );
+    }
+    return list;
+  }
   if (path === "/api/categories")        return getCategories();
   if (path === "/api/sites") {
     const { data, error } = await supabase.from("sites").select("*").order("name");
@@ -252,7 +349,14 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
     if (error) throw new MockApiError(error.message, 500);
     return (data ?? []).map(dbToElevator);
   }
-  if (path === "/api/transactions")      return getTransactions(params.get("type") ?? undefined);
+  if (path === "/api/transactions") {
+    const type = params.get("type");
+    let query = supabase.from("transactions").select("*").order("created_at", { ascending: false });
+    if (type === "입고" || type === "출고") query = query.eq("type", type);
+    const { data, error } = await query;
+    if (error) throw new MockApiError(error.message, 500);
+    return (data ?? []).map(dbToTransaction);
+  }
   if (path === "/api/material-requests") return getMaterialRequests(params.get("status") ?? undefined);
   if (path === "/api/purchase-orders")   return getPurchaseOrders(params.get("status") ?? undefined);
   if (path === "/api/users") {
@@ -273,7 +377,11 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
 }
 
 async function routePOST(path: string, body: AnyBody): Promise<unknown> {
-  if (path === "/api/materials") return addMaterial(body);
+  if (path === "/api/materials") {
+    const { data, error } = await supabase.from("materials").insert(materialToDb(body)).select().single();
+    if (error) throw new MockApiError(error.message, 500);
+    return dbToMaterial(data);
+  }
   if (path === "/api/categories") {
     const { level, majorCode, midCode, label } = body;
     if (level === "major") return addMajor(label);
@@ -301,7 +409,7 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
     return dbToElevator(data);
   }
   if (path === "/api/transactions") {
-    const { record, error } = addTransaction(body);
+    const { record, error } = await supabaseAddTransaction(body);
     if (error) throw new MockApiError(error, 400);
     return record;
   }
@@ -319,25 +427,30 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
   const materialId = extractId(path, "/api/materials");
   if (materialId) {
     const id = decodeURIComponent(materialId);
+    const dbId = decodeURIComponent(id);
     if (Object.keys(body).length === 1 && "stockQty" in body) {
-      const updated = updateStock(id, Number(body.stockQty));
-      if (!updated) throw new MockApiError("not found", 404);
-      return updated;
+      const { data, error } = await supabase.from("materials")
+        .update({ stock_qty: Number(body.stockQty) }).eq("id", dbId).select().single();
+      if (error) throw new MockApiError(error.message, 500);
+      if (!data) throw new MockApiError("not found", 404);
+      return dbToMaterial(data);
     }
+    const patch: Record<string, unknown> = {};
     const { stockQty, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, isRepair } = body;
-    const updated = updateMaterial(id, {
-      ...(name       !== undefined && { name }),
-      ...(alias      !== undefined && { alias:      alias      || null }),
-      ...(modelNo    !== undefined && { modelNo:    modelNo    || null }),
-      ...(unit       !== undefined && { unit:       unit       || null }),
-      ...(buyPrice   !== undefined && { buyPrice:   buyPrice   !== "" ? Number(buyPrice)   : null }),
-      ...(sellPrice  !== undefined && { sellPrice:  sellPrice  !== "" ? Number(sellPrice)  : null }),
-      ...(storageLoc !== undefined && { storageLoc: storageLoc || null }),
-      ...(stockQty   !== undefined && { stockQty:   Number(stockQty) }),
-      ...(isRepair   !== undefined && { isRepair }),
-    });
-    if (!updated) throw new MockApiError("not found", 404);
-    return updated;
+    if (name       !== undefined) patch.name         = name;
+    if (alias      !== undefined) patch.alias        = alias      || null;
+    if (modelNo    !== undefined) patch.model_no     = modelNo    || null;
+    if (unit       !== undefined) patch.unit         = unit       || null;
+    if (buyPrice   !== undefined) patch.buy_price    = buyPrice   !== "" ? Number(buyPrice)  : null;
+    if (sellPrice  !== undefined) patch.sell_price   = sellPrice  !== "" ? Number(sellPrice) : null;
+    if (storageLoc !== undefined) patch.storage_loc  = storageLoc || null;
+    if (stockQty   !== undefined) patch.stock_qty    = Number(stockQty);
+    if (isRepair   !== undefined) patch.is_repair    = isRepair;
+    const { data, error } = await supabase.from("materials")
+      .update(patch).eq("id", dbId).select().single();
+    if (error) throw new MockApiError(error.message, 500);
+    if (!data) throw new MockApiError("not found", 404);
+    return dbToMaterial(data);
   }
 
   if (path === "/api/categories") {
@@ -385,7 +498,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
     if (action === "출고처리") {
       const records = [];
       for (const item of request.items) {
-        const { record, error } = addTransaction({
+        const { record, error } = await supabaseAddTransaction({
           type: "출고",
           materialId: item.materialId,
           materialName: item.materialName,
@@ -424,7 +537,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
     const order = getPurchaseOrders().find(o => o.id === numId);
     if (!order) throw new MockApiError("not found", 404);
     if (action === "입고완료") {
-      const { record, error } = addTransaction({
+      const { record, error } = await supabaseAddTransaction({
         type: "입고",
         materialId: order.materialId,
         materialName: order.materialName,

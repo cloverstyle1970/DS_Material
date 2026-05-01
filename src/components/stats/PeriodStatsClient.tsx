@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
-import { getTransactions } from "@/lib/mock-transactions";
+import { api } from "@/lib/api-client";
 
 interface Transaction {
   id: number;
@@ -57,12 +57,16 @@ export default function PeriodStatsClient() {
   const [viewMode, setViewMode] = useState<ViewMode>("monthly");
   const [year, setYear]         = useState(CURRENT_YEAR);
   const [showChart, setShowChart] = useState(true);
-  const transactions: Transaction[] = useMemo(() => [
-    ...getTransactions("입고").map(t => ({ ...t, type: "입고" })),
-    ...getTransactions("출고").map(t => ({ ...t, type: "출고" })),
-  ], []);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const loading = false;
+  useEffect(() => {
+    setLoading(true);
+    api.get<Transaction[]>("/api/transactions")
+      .then(data => setTransactions(data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   const periods = useMemo(() => generatePeriodLabels(year, viewMode), [year, viewMode]);
 

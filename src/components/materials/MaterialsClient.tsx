@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { MaterialRecord } from "@/lib/mock-materials";
 import AddMaterialModal from "./AddMaterialModal";
@@ -65,6 +65,10 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState<MaterialRecord | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    api.get<MaterialRecord[]>("/api/materials").then(setMaterials).catch(() => {});
+  }, []);
 
   const { user } = useAuth();
   const viewOnly = user ? isViewOnly(user) : false;
