@@ -13,9 +13,8 @@ import {
   addMid, updateMid, deleteMid,
   addSub, updateSub, deleteSub,
 } from "./mock-categories";
-import { getMaterialRequests, addMaterialRequest, updateMaterialRequest } from "./mock-material-requests";
-import { getPurchaseOrders, addPurchaseOrder, updatePurchaseOrder } from "./mock-purchase-orders";
-import { getUsers, addUser, updateUser, deleteUser } from "./mock-users";
+import type { MaterialRequestRecord } from "./mock-material-requests";
+import type { PurchaseOrderRecord } from "./mock-purchase-orders";
 import { DashboardStats, RecentRequest } from "./types";
 
 // ── Supabase 변환 헬퍼 ────────────────────────────────────────────
@@ -256,6 +255,66 @@ async function supabaseAddTransaction(data: {
   return { record: dbToTransaction(result.record) };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function dbToRequest(r: any): MaterialRequestRecord {
+  return {
+    id:            r.id,
+    status:        r.status,
+    siteName:      r.site_name      ?? null,
+    items:         r.items          ?? [],
+    note:          r.note           ?? null,
+    requesterId:   r.requester_id,
+    requesterName: r.requester_name,
+    requesterDept: r.requester_dept,
+    requestedAt:   r.requested_at,
+    processedAt:   r.processed_at   ?? null,
+    processorId:   r.processor_id   ?? null,
+    processorName: r.processor_name ?? null,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function dbToOrder(r: any): PurchaseOrderRecord {
+  return {
+    id:            r.id,
+    status:        r.status,
+    materialId:    r.material_id,
+    materialName:  r.material_name,
+    qty:           r.qty,
+    vendorName:    r.vendor_name    ?? null,
+    unitPrice:     r.unit_price     ?? null,
+    requestId:     r.request_id     ?? null,
+    siteName:      r.site_name      ?? null,
+    elevatorName:  r.elevator_name  ?? null,
+    requesterName: r.requester_name ?? null,
+    note:          r.note           ?? null,
+    userId:        r.user_id,
+    userName:      r.user_name,
+    orderedAt:     r.ordered_at,
+    receivedAt:    r.received_at    ?? null,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function orderToDb(d: any): Record<string, unknown> {
+  const obj: Record<string, unknown> = {};
+  if (d.materialId    !== undefined) obj.material_id    = d.materialId;
+  if (d.materialName  !== undefined) obj.material_name  = d.materialName;
+  if (d.qty           !== undefined) obj.qty            = d.qty;
+  if (d.vendorName    !== undefined) obj.vendor_name    = d.vendorName;
+  if (d.unitPrice     !== undefined) obj.unit_price     = d.unitPrice;
+  if (d.requestId     !== undefined) obj.request_id     = d.requestId;
+  if (d.siteName      !== undefined) obj.site_name      = d.siteName;
+  if (d.elevatorName  !== undefined) obj.elevator_name  = d.elevatorName;
+  if (d.requesterName !== undefined) obj.requester_name = d.requesterName;
+  if (d.note          !== undefined) obj.note           = d.note;
+  if (d.userId        !== undefined) obj.user_id        = d.userId;
+  if (d.userName      !== undefined) obj.user_name      = d.userName;
+  if (d.status        !== undefined) obj.status         = d.status;
+  if (d.receivedAt    !== undefined) obj.received_at    = d.receivedAt;
+  return obj;
+}
+
 export class MockApiError extends Error {
   status: number;
   code?: string;
@@ -357,8 +416,22 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
     if (error) throw new MockApiError(error.message, 500);
     return (data ?? []).map(dbToTransaction);
   }
-  if (path === "/api/material-requests") return getMaterialRequests(params.get("status") ?? undefined);
-  if (path === "/api/purchase-orders")   return getPurchaseOrders(params.get("status") ?? undefined);
+  if (path === "/api/material-requests") {
+    const status = params.get("status");
+    let query = supabase.from("material_requests").select("*").order("requested_at", { ascending: false });
+    if (status) query = query.eq("status", status);
+    const { data, error } = await query;
+    if (error) throw new MockApiError(error.message, 500);
+    return (data ?? []).map(dbToRequest);
+  }
+  if (path === "/api/purchase-orders") {
+    const status = params.get("status");
+    let query = supabase.from("purchase_orders").select("*").order("ordered_at", { ascending: false });
+    if (status) query = query.eq("status", status);
+    const { data, error } = await query;
+    if (error) throw new MockApiError(error.message, 500);
+    return (data ?? []).map(dbToOrder);
+  }
   if (path === "/api/users") {
     const q = params.get("q")?.toLowerCase();
     const { data, error } = await supabase.from("users").select("*").order("name");
@@ -413,8 +486,24 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
     if (error) throw new MockApiError(error, 400);
     return record;
   }
-  if (path === "/api/material-requests") return addMaterialRequest(body);
-  if (path === "/api/purchase-orders")   return addPurchaseOrder(body);
+  if (path === "/api/material-requests") {
+    const { data, error } = await supabase.from("material_requests").insert({
+      status: "신청",
+      site_name:      body.siteName      ?? null,
+      items:          body.items         ?? [],
+      note:           body.note          ?? null,
+      requester_id:   body.requesterId,
+      requester_name: body.requesterName,
+      requester_dept: body.requesterDept,
+    }).select().single();
+    if (error) throw new MockApiError(error.message, 500);
+    return dbToRequest(data);
+  }
+  if (path === "/api/purchase-orders") {
+    const { data, error } = await supabase.from("purchase_orders").insert(orderToDb(body)).select().single();
+    if (error) throw new MockApiError(error.message, 500);
+    return dbToOrder(data);
+  }
   if (path === "/api/users") {
     const { data, error } = await supabase.from("users").insert(userToDb(body)).select().single();
     if (error) throw new MockApiError(error.message, 500);
@@ -492,10 +581,17 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
   if (reqId) {
     const numId = Number(reqId);
     const { action, processorId, processorName } = body;
-    const request = getMaterialRequests().find(r => r.id === numId);
-    if (!request) throw new MockApiError("not found", 404);
-    if (action === "처리중") return updateMaterialRequest(numId, { status: "처리중" });
+    if (action === "처리중") {
+      const { data, error } = await supabase.from("material_requests")
+        .update({ status: "처리중" }).eq("id", numId).select().single();
+      if (error) throw new MockApiError(error.message, 500);
+      return dbToRequest(data);
+    }
     if (action === "출고처리") {
+      const { data: req, error: fetchErr } = await supabase.from("material_requests")
+        .select("*").eq("id", numId).single();
+      if (fetchErr || !req) throw new MockApiError("not found", 404);
+      const request = dbToRequest(req);
       const records = [];
       for (const item of request.items) {
         const { record, error } = await supabaseAddTransaction({
@@ -511,21 +607,18 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
         if (error) throw new MockApiError(error, 400);
         records.push(record);
       }
-      const updated = updateMaterialRequest(numId, {
-        status: "완료",
-        processedAt: new Date().toISOString(),
-        processorId,
-        processorName,
-      });
-      return { request: updated, transactions: records };
+      const { data: updated, error: updateErr } = await supabase.from("material_requests")
+        .update({ status: "완료", processed_at: new Date().toISOString(), processor_id: processorId, processor_name: processorName })
+        .eq("id", numId).select().single();
+      if (updateErr) throw new MockApiError(updateErr.message, 500);
+      return { request: dbToRequest(updated), transactions: records };
     }
     if (action === "취소") {
-      return updateMaterialRequest(numId, {
-        status: "취소",
-        processedAt: new Date().toISOString(),
-        processorId,
-        processorName,
-      });
+      const { data, error } = await supabase.from("material_requests")
+        .update({ status: "취소", processed_at: new Date().toISOString(), processor_id: processorId, processor_name: processorName })
+        .eq("id", numId).select().single();
+      if (error) throw new MockApiError(error.message, 500);
+      return dbToRequest(data);
     }
     throw new MockApiError("unknown action", 400);
   }
@@ -534,9 +627,11 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
   if (orderId) {
     const numId = Number(orderId);
     const { action, userId, userName } = body;
-    const order = getPurchaseOrders().find(o => o.id === numId);
-    if (!order) throw new MockApiError("not found", 404);
     if (action === "입고완료") {
+      const { data: ord, error: fetchErr } = await supabase.from("purchase_orders")
+        .select("*").eq("id", numId).single();
+      if (fetchErr || !ord) throw new MockApiError("not found", 404);
+      const order = dbToOrder(ord);
       const { record, error } = await supabaseAddTransaction({
         type: "입고",
         materialId: order.materialId,
@@ -548,10 +643,18 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
         userName,
       });
       if (error) throw new MockApiError(error, 400);
-      const updated = updatePurchaseOrder(numId, { status: "입고완료", receivedAt: new Date().toISOString() });
-      return { order: updated, transaction: record };
+      const { data: updated, error: updateErr } = await supabase.from("purchase_orders")
+        .update({ status: "입고완료", received_at: new Date().toISOString() })
+        .eq("id", numId).select().single();
+      if (updateErr) throw new MockApiError(updateErr.message, 500);
+      return { order: dbToOrder(updated), transaction: record };
     }
-    if (action === "취소") return updatePurchaseOrder(numId, { status: "취소" });
+    if (action === "취소") {
+      const { data, error } = await supabase.from("purchase_orders")
+        .update({ status: "취소" }).eq("id", numId).select().single();
+      if (error) throw new MockApiError(error.message, 500);
+      return dbToOrder(data);
+    }
     throw new MockApiError("unknown action", 400);
   }
 

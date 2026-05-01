@@ -244,6 +244,11 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
   const [requests, setRequests] = useState(initialRequests);
   const [orders,   setOrders]   = useState(initialOrders);
 
+  useEffect(() => {
+    api.get<MaterialRequestRecord[]>("/api/material-requests").then(setRequests).catch(() => {});
+    api.get<PurchaseOrderRecord[]>("/api/purchase-orders").then(setOrders).catch(() => {});
+  }, []);
+
   // 자재신청 탭
   const [reqStatus,     setReqStatus]     = useState<RequestStatus | "전체">("전체");
   const [reqSearch,     setReqSearch]     = useState<ReqSearch>(defaultReq);
