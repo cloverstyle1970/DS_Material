@@ -6,6 +6,17 @@ export interface DashboardStats {
   pendingRequests: number;
   lowStockMaterials: number;
   totalMaterials: number;
+  
+  // 현장 및 기종 통계 추가
+  totalSites: number;
+  tkeSites: number;
+  dsSites: number;
+  
+  totalElevators: number;
+  tkeElevators: number;
+  hyundaiElevators: number;
+  otisElevators: number;
+  otherElevators: number;
 }
 
 export interface RecentRequest {

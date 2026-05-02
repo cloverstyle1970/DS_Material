@@ -21,37 +21,60 @@ type NavGroup = {
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    id: "master",
-    label: "기준 정보 관리",
+    id: "data",
+    label: "데이터관리",
     color: "text-sky-400",
     items: [
-      { href: "/users",     label: "사용자 관리",    icon: "👤", adminOnly: true },
-      { href: "/vendors",   label: "거래처 관리",    icon: "🤝" },
-      { href: "/sites",     label: "현장/호기 관리", icon: "🏢" },
-      { href: "/materials", label: "자재품목 관리",  icon: "🗄️" },
+      { href: "/data/users",     label: "사용자 관리",    icon: "👤", adminOnly: true },
+      { href: "/data/vendors",   label: "거래처 관리",    icon: "🤝" },
     ],
   },
   {
-    id: "stock",
-    label: "자재 수불 관리",
+    id: "site",
+    label: "현장관리",
+    color: "text-emerald-400",
+    items: [
+      { href: "/site/units",     label: "현장/호기 관리", icon: "🏢" },
+      { href: "/stats/sites",    label: "현장/호기별 현황", icon: "📍" },
+    ],
+  },
+  {
+    id: "material",
+    label: "자재관리",
     color: "text-amber-400",
     items: [
+      { href: "/material",         label: "자재품목 관리",  icon: "🗄️" },
       { href: "/requests",         label: "자재 신청 관리", icon: "📋" },
       { href: "/purchase-orders",  label: "발주 관리",      icon: "📑" },
       { href: "/inbound",          label: "입고 관리",      icon: "📥" },
       { href: "/outbound",         label: "출고 관리",      icon: "📤" },
+      { href: "/stats/period",     label: "기간별 입출고 내역", icon: "📅" },
     ],
   },
   {
-    id: "stats",
-    label: "현황 및 통계",
-    color: "text-emerald-400",
+    id: "safety",
+    label: "산업안전",
+    color: "text-rose-400",
     items: [
-      { href: "/stats/period", label: "기간별 입출고 내역",    icon: "📅" },
-      { href: "/stats/sites",  label: "현장/호기별 투입 현황", icon: "📍" },
-      { href: "/materials",    label: "현재고 현황",           icon: "📦" },
+      { href: "#safety", label: "준비중", icon: "🛡️" }
     ],
   },
+  {
+    id: "hr",
+    label: "관리/인사",
+    color: "text-purple-400",
+    items: [
+      { href: "#hr", label: "준비중", icon: "👥" }
+    ],
+  },
+  {
+    id: "accounting",
+    label: "회계/세무",
+    color: "text-indigo-400",
+    items: [
+      { href: "#accounting", label: "준비중", icon: "💳" }
+    ],
+  }
 ];
 
 interface Props {

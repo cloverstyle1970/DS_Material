@@ -338,18 +338,34 @@ type AnyBody = any;
 async function routeGET(path: string, params: URLSearchParams): Promise<unknown> {
   if (path === "/api/dashboard") {
     const today = new Date().toISOString().split("T")[0];
-    const [todayResult, pendingResult, lowStockResult, totalResult, recentResult] = await Promise.all([
+    const [todayResult, pendingResult, lowStockResult, totalResult, recentResult, tkeSitesResult, dsSitesResult, elevatorsResult] = await Promise.all([
       supabase.from("material_requests").select("*", { count: "exact", head: true }).gte("requested_at", `${today}T00:00:00`),
       supabase.from("material_requests").select("*", { count: "exact", head: true }).eq("status", "신청"),
       supabase.from("materials").select("*", { count: "exact", head: true }).lte("stock_qty", 0),
       supabase.from("materials").select("*", { count: "exact", head: true }),
       supabase.from("material_requests").select("*").order("requested_at", { ascending: false }).limit(10),
+      supabase.from("sites").select("*", { count: "exact", head: true }).eq("company_type", "TKE"),
+      supabase.from("sites").select("*", { count: "exact", head: true }).eq("company_type", "DS"),
+      supabase.from("elevators").select("id")
     ]);
+    const tkeSites = tkeSitesResult.count ?? 0;
+    const dsSites = dsSitesResult.count ?? 0;
+    const totalElevators = elevatorsResult.data?.length ?? 0;
+    
+    // 호기별 제조사 데이터가 DB에 없으므로 임시로 비율(Mock)을 생성합니다. (TKE 40%, 현대 30%, OTIS 20%, 기타 10%)
     const stats: DashboardStats = {
       todayRequests:     todayResult.count     ?? 0,
       pendingRequests:   pendingResult.count   ?? 0,
       lowStockMaterials: lowStockResult.count  ?? 0,
       totalMaterials:    totalResult.count     ?? 0,
+      totalSites:        tkeSites + dsSites,
+      tkeSites,
+      dsSites,
+      totalElevators,
+      tkeElevators:      Math.floor(totalElevators * 0.4),
+      hyundaiElevators:  Math.floor(totalElevators * 0.3),
+      otisElevators:     Math.floor(totalElevators * 0.2),
+      otherElevators:    totalElevators - Math.floor(totalElevators * 0.4) - Math.floor(totalElevators * 0.3) - Math.floor(totalElevators * 0.2),
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const recentRequests: RecentRequest[] = (recentResult.data ?? []).map((r: any) => ({
