@@ -112,7 +112,7 @@ console.log("\n[3/4] 현장 import...");
     sites.push({
       id: id++,
       name,
-      company_type:      str(row[1]),
+      company_type:      str(row[1]) === "자사" ? "DS" : str(row[1]),
       contract_type:     str(row[2]),
       contract_date:     excelDate(row[3]),
       contract_start:    excelDate(row[4]),

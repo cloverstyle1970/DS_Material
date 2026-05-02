@@ -14,8 +14,7 @@ export interface DashboardStats {
   
   totalElevators: number;
   tkeElevators: number;
-  hyundaiElevators: number;
-  otisElevators: number;
+  dsElevators: number;
   otherElevators: number;
 }
 

@@ -360,11 +360,13 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
     (sitesResult.data ?? []).forEach((s: any) => siteTypeMap.set(s.name, s.company_type));
 
     let tkeElevators = 0;
+    let dsElevators = 0;
     let otherElevators = 0;
-    
+
     allElevators.forEach((e: any) => {
       const type = siteTypeMap.get(e.site_name);
       if (type === "TKE") tkeElevators++;
+      else if (type === "DS") dsElevators++;
       else otherElevators++;
     });
 
@@ -378,8 +380,7 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
       dsSites,
       totalElevators,
       tkeElevators,
-      hyundaiElevators:  0, // 데이터 부족
-      otisElevators:     0, // 데이터 부족
+      dsElevators,
       otherElevators,
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
