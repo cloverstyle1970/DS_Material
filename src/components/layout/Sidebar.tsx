@@ -49,6 +49,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/inbound",          label: "입고 관리",          icon: "📥" },
       { href: "/outbound",         label: "출고 관리",          icon: "📤" },
       { href: "/stats/period",     label: "기간별 입출고 내역", icon: "📅" },
+      { href: "/inventory-check",  label: "재고실사",           icon: "📊", adminOnly: true },
     ],
   },
   {
@@ -103,6 +104,7 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
     if (href === "/outbound") return pathname === "/outbound" || pathname.startsWith("/outbound/");
     if (href === "/stats/period") return pathname === "/stats/period";
     if (href === "/stats/sites")  return pathname === "/stats/sites";
+    if (href === "/inventory-check") return pathname === "/inventory-check";
     return pathname === href || (href !== "/" && pathname.startsWith(href + "/"));
   }
 
