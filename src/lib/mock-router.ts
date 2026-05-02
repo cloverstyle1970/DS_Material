@@ -338,7 +338,7 @@ type AnyBody = any;
 async function routeGET(path: string, params: URLSearchParams): Promise<unknown> {
   if (path === "/api/dashboard") {
     const today = new Date().toISOString().split("T")[0];
-    const [todayResult, pendingResult, lowStockResult, totalResult, recentResult, tkeSitesResult, dsSitesResult, elevatorsResult] = await Promise.all([
+    const [todayResult, pendingResult, lowStockResult, totalResult, recentResult, tkeSitesResult, dsSitesResult, elevatorsResult, sitesResult] = await Promise.all([
       supabase.from("material_requests").select("*", { count: "exact", head: true }).gte("requested_at", `${today}T00:00:00`),
       supabase.from("material_requests").select("*", { count: "exact", head: true }).eq("status", "신청"),
       supabase.from("materials").select("*", { count: "exact", head: true }).lte("stock_qty", 0),
@@ -346,13 +346,28 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
       supabase.from("material_requests").select("*").order("requested_at", { ascending: false }).limit(10),
       supabase.from("sites").select("*", { count: "exact", head: true }).eq("company_type", "TKE"),
       supabase.from("sites").select("*", { count: "exact", head: true }).eq("company_type", "DS"),
-      supabase.from("elevators").select("id")
+      supabase.from("elevators").select("*"),
+      supabase.from("sites").select("name, company_type")
     ]);
     const tkeSites = tkeSitesResult.count ?? 0;
     const dsSites = dsSitesResult.count ?? 0;
-    const totalElevators = elevatorsResult.data?.length ?? 0;
     
-    // 호기별 제조사 데이터가 DB에 없으므로 임시로 비율(Mock)을 생성합니다. (TKE 40%, 현대 30%, OTIS 20%, 기타 10%)
+    // 실제 등록된 호기 정보로 통계 계산
+    const allElevators = elevatorsResult.data ?? [];
+    const totalElevators = allElevators.length;
+    
+    const siteTypeMap = new Map<string, string>();
+    (sitesResult.data ?? []).forEach((s: any) => siteTypeMap.set(s.name, s.company_type));
+
+    let tkeElevators = 0;
+    let otherElevators = 0;
+    
+    allElevators.forEach((e: any) => {
+      const type = siteTypeMap.get(e.site_name);
+      if (type === "TKE") tkeElevators++;
+      else otherElevators++;
+    });
+
     const stats: DashboardStats = {
       todayRequests:     todayResult.count     ?? 0,
       pendingRequests:   pendingResult.count   ?? 0,
@@ -362,10 +377,10 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
       tkeSites,
       dsSites,
       totalElevators,
-      tkeElevators:      Math.floor(totalElevators * 0.4),
-      hyundaiElevators:  Math.floor(totalElevators * 0.3),
-      otisElevators:     Math.floor(totalElevators * 0.2),
-      otherElevators:    totalElevators - Math.floor(totalElevators * 0.4) - Math.floor(totalElevators * 0.3) - Math.floor(totalElevators * 0.2),
+      tkeElevators,
+      hyundaiElevators:  0, // 데이터 부족
+      otisElevators:     0, // 데이터 부족
+      otherElevators,
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const recentRequests: RecentRequest[] = (recentResult.data ?? []).map((r: any) => ({
