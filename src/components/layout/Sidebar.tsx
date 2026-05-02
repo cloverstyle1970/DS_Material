@@ -35,7 +35,6 @@ const NAV_GROUPS: NavGroup[] = [
     color: "text-emerald-400",
     items: [
       { href: "/site/units",     label: "현장/호기 관리",  icon: "🏢" },
-      { href: "/stats/sites",    label: "현장/호기별 현황", icon: "📍" },
     ],
   },
   {
@@ -49,6 +48,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/inbound",          label: "입고 관리",          icon: "📥" },
       { href: "/outbound",         label: "출고 관리",          icon: "📤" },
       { href: "/stats/period",     label: "기간별 입출고 내역", icon: "📅" },
+      { href: "/stats/sites",      label: "현장/호기별 현황",   icon: "📍" },
       { href: "/inventory-check",  label: "재고실사",           icon: "📊", adminOnly: true },
     ],
   },
