@@ -610,7 +610,7 @@ export default function SitesClient({ initial, elevators }: Props) {
                           {site.contractType && (
                             <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
                               site.contractType.includes("FM")
-                                ? "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400"
+                                ? isDark ? "bg-gray-700 text-red-400" : "bg-gray-100 text-red-600"
                                 : isDark ? "bg-gray-700 text-gray-400" : "bg-gray-100 text-gray-500"
                             }`}>
                               {site.contractType}
@@ -656,9 +656,9 @@ export default function SitesClient({ initial, elevators }: Props) {
                       <h2 className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>{selected.name}</h2>
                       {companyBadge(selected.companyType, isDark)}
                       {selected.contractType && (
-                        <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${
+                        <span className={`text-xs px-2 py-0.5 rounded-full border ${
                           selected.contractType.includes("FM")
-                            ? isDark ? "bg-red-900/40 text-red-400 border-red-700" : "bg-red-50 text-red-600 border-red-300"
+                            ? isDark ? "bg-gray-700 text-red-400 border-gray-600" : "bg-gray-100 text-red-600 border-gray-200"
                             : isDark ? "bg-gray-700 text-gray-300 border-gray-600" : "bg-gray-100 text-gray-600 border-gray-200"
                         }`}>
                           {selected.contractType}
