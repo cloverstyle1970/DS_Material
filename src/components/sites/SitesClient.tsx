@@ -18,10 +18,15 @@ const COMPANY_STYLES_DARK: Record<string, string> = {
   TKE: "bg-blue-900/60 text-blue-300 border border-blue-800",
   DS:  "bg-emerald-900/60 text-emerald-300 border border-emerald-800",
 };
+function normalizeCompany(type: string | null): string | null {
+  if (type === "자사") return "DS";
+  return type;
+}
 function companyBadge(type: string | null, dark = false) {
+  const normalized = normalizeCompany(type);
   const styles = dark ? COMPANY_STYLES_DARK : COMPANY_STYLES;
-  const style = (type && styles[type]) ?? (dark ? "bg-gray-700 text-gray-300 border border-gray-600" : "bg-gray-100 text-gray-500 border border-gray-200");
-  return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${style}`}>{type ?? "기타"}</span>;
+  const style = (normalized && styles[normalized]) ?? (dark ? "bg-gray-700 text-gray-300 border border-gray-600" : "bg-gray-100 text-gray-500 border border-gray-200");
+  return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${style}`}>{normalized ?? "기타"}</span>;
 }
 
 // ── 호기 등록/수정 모달 ───────────────────────────────────────
@@ -418,7 +423,7 @@ export default function SitesClient({ initial, elevators }: Props) {
   }, [allElevators, q]);
 
   const filteredSites = useMemo(() => {
-    const byCompany = companyFilter !== "전체" ? sites.filter(s => s.companyType === companyFilter) : sites;
+    const byCompany = companyFilter !== "전체" ? sites.filter(s => normalizeCompany(s.companyType) === companyFilter) : sites;
     if (!q) return byCompany;
     return byCompany.filter(s =>
       s.name.toLowerCase().includes(q) ||
