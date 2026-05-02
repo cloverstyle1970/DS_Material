@@ -9,7 +9,14 @@ import SidebarContext from "@/context/SidebarContext";
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  // 데스크탑(md 이상)에서는 사이드바 기본 열림, 모바일에서는 닫힘
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    if (window.innerWidth >= 768) {
+      setSidebarOpen(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
