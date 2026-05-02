@@ -1,10 +1,75 @@
 "use client";
 
+import { useState, FormEvent } from "react";
 import { useTheme } from "@/context/ThemeContext";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase";
+import { hashPassword } from "@/lib/password";
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const isDark = theme === "dark";
+  const { user } = useAuth();
+
+  const [currentPw, setCurrentPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [pwStatus, setPwStatus] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [pwSubmitting, setPwSubmitting] = useState(false);
+
+  async function handlePasswordChange(e: FormEvent) {
+    e.preventDefault();
+    if (!user) return;
+    setPwStatus(null);
+
+    if (newPw.length < 4) {
+      setPwStatus({ type: "error", msg: "새 비밀번호는 4자 이상이어야 합니다." });
+      return;
+    }
+    if (newPw !== confirmPw) {
+      setPwStatus({ type: "error", msg: "새 비밀번호가 일치하지 않습니다." });
+      return;
+    }
+
+    setPwSubmitting(true);
+    try {
+      const { data: row, error: fetchErr } = await supabase
+        .from("users")
+        .select("password_hash")
+        .eq("id", user.id)
+        .single();
+
+      if (fetchErr || !row) {
+        setPwStatus({ type: "error", msg: "사용자 정보를 불러오지 못했습니다." });
+        return;
+      }
+
+      const currentHash = await hashPassword(currentPw);
+      const storedHash = row.password_hash as string | null;
+      if (storedHash && currentHash !== storedHash) {
+        setPwStatus({ type: "error", msg: "현재 비밀번호가 올바르지 않습니다." });
+        return;
+      }
+
+      const newHash = await hashPassword(newPw);
+      const { error: updateErr } = await supabase
+        .from("users")
+        .update({ password_hash: newHash })
+        .eq("id", user.id);
+
+      if (updateErr) {
+        setPwStatus({ type: "error", msg: "비밀번호 변경에 실패했습니다." });
+        return;
+      }
+
+      setPwStatus({ type: "success", msg: "비밀번호가 변경되었습니다." });
+      setCurrentPw("");
+      setNewPw("");
+      setConfirmPw("");
+    } finally {
+      setPwSubmitting(false);
+    }
+  }
 
   return (
     <div className={`min-h-full transition-colors ${isDark ? "bg-gray-900" : "bg-gray-50"}`}>
@@ -114,6 +179,81 @@ export default function SettingsPage() {
               설정은 브라우저에 저장되며 다음 접속 시에도 유지됩니다
             </p>
           </div>
+        </div>
+
+        {/* 비밀번호 변경 카드 */}
+        <div className={`rounded-xl border p-5 transition-colors ${isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
+          <h2 className={`text-sm font-semibold mb-1 ${isDark ? "text-gray-200" : "text-gray-700"}`}>비밀번호 변경</h2>
+          <p className={`text-xs mb-4 ${isDark ? "text-gray-500" : "text-gray-400"}`}>초기 비밀번호(1234)를 변경하거나 새 비밀번호로 재설정합니다</p>
+
+          <form onSubmit={handlePasswordChange} className="space-y-3">
+            <div className="space-y-1">
+              <label className={`text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-600"}`}>현재 비밀번호</label>
+              <input
+                type="password"
+                value={currentPw}
+                onChange={e => setCurrentPw(e.target.value)}
+                placeholder="현재 비밀번호"
+                autoComplete="current-password"
+                required
+                className={`w-full px-3 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 ${
+                  isDark
+                    ? "bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-500"
+                    : "bg-gray-50 border-gray-200 text-gray-800"
+                }`}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className={`text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-600"}`}>새 비밀번호</label>
+              <input
+                type="password"
+                value={newPw}
+                onChange={e => setNewPw(e.target.value)}
+                placeholder="새 비밀번호 (4자 이상)"
+                autoComplete="new-password"
+                required
+                className={`w-full px-3 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 ${
+                  isDark
+                    ? "bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-500"
+                    : "bg-gray-50 border-gray-200 text-gray-800"
+                }`}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className={`text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-600"}`}>새 비밀번호 확인</label>
+              <input
+                type="password"
+                value={confirmPw}
+                onChange={e => setConfirmPw(e.target.value)}
+                placeholder="새 비밀번호 재입력"
+                autoComplete="new-password"
+                required
+                className={`w-full px-3 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 ${
+                  isDark
+                    ? "bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-500"
+                    : "bg-gray-50 border-gray-200 text-gray-800"
+                }`}
+              />
+            </div>
+
+            {pwStatus && (
+              <p className={`text-xs rounded-lg px-3 py-2 ${
+                pwStatus.type === "success"
+                  ? "bg-green-50 text-green-700"
+                  : "bg-red-50 text-red-600"
+              }`}>
+                {pwStatus.msg}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={pwSubmitting}
+              className="mt-1 w-full bg-slate-700 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-600 transition-colors disabled:opacity-60"
+            >
+              {pwSubmitting ? "변경 중..." : "비밀번호 변경"}
+            </button>
+          </form>
         </div>
       </div>
     </div>

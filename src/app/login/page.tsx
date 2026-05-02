@@ -4,6 +4,7 @@ import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { hashPassword } from "@/lib/password";
 
 export default function LoginPage() {
   const { isAuthenticated, isLoading, login } = useAuth();
@@ -28,7 +29,7 @@ export default function LoginPage() {
     const trimmed = name.trim();
     const { data: user, error: dbError } = await supabase
       .from("users")
-      .select("id, name, dept, permissions, status")
+      .select("id, name, dept, permissions, status, password_hash")
       .eq("name", trimmed)
       .eq("status", "재직")
       .single();
@@ -38,7 +39,10 @@ export default function LoginPage() {
       setSubmitting(false);
       return;
     }
-    if (password !== "1234") {
+
+    const inputHash = await hashPassword(password);
+    const storedHash = user.password_hash as string | null;
+    if (storedHash && inputHash !== storedHash) {
       setError("비밀번호가 올바르지 않습니다.");
       setSubmitting(false);
       return;
