@@ -373,7 +373,8 @@ export default function VendorsClient({ initial }: Props) {
 
       {/* 테이블 */}
       <div className={`rounded-xl border overflow-hidden transition-colors ${isDark ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[700px] text-sm">
           <thead className={`border-b transition-colors ${isDark ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-100"}`}>
             <tr>
               {COLUMNS.map(c => {
@@ -420,6 +421,7 @@ export default function VendorsClient({ initial }: Props) {
             ))}
           </tbody>
         </table>
+        </div>
 
         {/* 페이지네이션 */}
         {totalPages > 1 && (

@@ -502,7 +502,8 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
 
           {/* 테이블 */}
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[700px] text-sm">
               <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
                 <tr>
                   {REQ_COLS.map((c, idx) => {
@@ -623,6 +624,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -688,8 +690,9 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
           </form>
 
           {/* 테이블 */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[700px] text-sm">
               <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
                 <tr>
                   {ORD_COLS.map((c, idx) => {
@@ -751,6 +754,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}

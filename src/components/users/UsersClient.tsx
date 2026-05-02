@@ -165,7 +165,8 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
 
       {/* 테이블 */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[700px] text-sm">
           <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
             <tr>
               {COLUMNS.map(c => {
@@ -232,6 +233,7 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
             ))}
           </tbody>
         </table>
+        </div>
 
         {/* 페이지네이션 */}
         {totalPages > 1 && (

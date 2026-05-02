@@ -78,7 +78,8 @@ export default function RequestTable({ requests }: { requests: RecentRequest[] }
           전체 {sorted.length.toLocaleString()}건
         </span>
       </div>
-      <table className="w-full text-sm">
+      <div className="overflow-x-auto">
+      <table className="w-full min-w-[640px] text-sm">
         <thead className="bg-gray-50 dark:bg-gray-700/50">
           <tr>
             {COLUMNS.map(c => {
@@ -128,6 +129,7 @@ export default function RequestTable({ requests }: { requests: RecentRequest[] }
           ))}
         </tbody>
       </table>
+      </div>
 
       {totalPages > 1 && (
         <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-800/60">

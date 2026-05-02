@@ -254,7 +254,8 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
             : isDark ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"
       }`}>
         {loading && <div className="text-center py-4 text-sm text-gray-400 dark:text-gray-500">로딩 중...</div>}
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[800px] text-sm">
           <thead className={`border-b transition-colors ${
             matType === "DS"
               ? isDark ? "bg-gray-800 border-red-800" : "bg-red-50 border-red-200"
@@ -336,6 +337,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
             })}
           </tbody>
         </table>
+        </div>
 
         {/* 페이지네이션 */}
         {totalPages > 1 && (

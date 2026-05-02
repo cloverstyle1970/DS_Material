@@ -46,7 +46,7 @@ export default function DashboardPage() {
           <h2 className="text-lg font-bold tracking-tight text-slate-800 dark:text-slate-100 mb-4">
             현장 관련 정보
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4">
             {/* 유지보수 현장 수 */}
             <StatCard label="총 유지보수 현장" value={stats.totalSites} unit="곳" color="blue" />
             <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 flex flex-col justify-center shadow-sm">
@@ -86,7 +86,7 @@ export default function DashboardPage() {
           <h2 className="text-lg font-bold tracking-tight text-slate-800 dark:text-slate-100 mb-4">
             자재 수급 현황
           </h2>
-          <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 xl:grid-cols-4">
             <StatCard label="오늘 신청"      value={stats.todayRequests}     color="blue"   />
             <StatCard label="미출고 건"      value={stats.pendingRequests}   color="orange" />
             <StatCard label="재고 없는 자재" value={stats.lowStockMaterials} unit="종" color="red"   />
