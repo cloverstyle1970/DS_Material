@@ -29,7 +29,7 @@ export default function LoginPage() {
     const trimmed = name.trim();
     const { data: user, error: dbError } = await supabase
       .from("users")
-      .select("id, name, dept, permissions, status, password_hash")
+      .select("id, name, dept, permissions, status")
       .eq("name", trimmed)
       .eq("status", "재직")
       .single();
@@ -40,12 +40,21 @@ export default function LoginPage() {
       return;
     }
 
-    const inputHash = await hashPassword(password);
-    const storedHash = user.password_hash as string | null;
-    if (storedHash && inputHash !== storedHash) {
-      setError("비밀번호가 올바르지 않습니다.");
-      setSubmitting(false);
-      return;
+    // password_hash 컬럼은 마이그레이션 후 활성화 — 컬럼 없으면 에러 무시
+    const { data: pwRow } = await supabase
+      .from("users")
+      .select("password_hash")
+      .eq("id", user.id)
+      .single();
+
+    const storedHash = (pwRow as { password_hash?: string | null } | null)?.password_hash ?? null;
+    if (storedHash) {
+      const inputHash = await hashPassword(password);
+      if (inputHash !== storedHash) {
+        setError("비밀번호가 올바르지 않습니다.");
+        setSubmitting(false);
+        return;
+      }
     }
 
     login({
