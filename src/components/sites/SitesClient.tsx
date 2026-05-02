@@ -348,7 +348,7 @@ function AddSiteModal({ onClose, onSaved, editSite }: AddSiteModalProps) {
 }
 
 // ── 상세 행 ────────────────────────────────────────────────────
-function InfoRow({ label, value, dark = false }: { label: string; value: string | null | undefined; dark?: boolean }) {
+function InfoRow({ label, value, dark = false }: { label: string; value: React.ReactNode; dark?: boolean }) {
   return (
     <div className={`flex items-start gap-3 py-2 border-b last:border-0 ${dark ? "border-gray-700" : "border-gray-50"}`}>
       <span className={`text-xs w-24 shrink-0 pt-0.5 ${dark ? "text-gray-500" : "text-gray-400"}`}>{label}</span>
@@ -683,7 +683,11 @@ export default function SitesClient({ initial, elevators }: Props) {
                 {/* 계약 정보 */}
                 <div className={`rounded-xl border p-4 transition-colors ${isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
                   <h3 className={`text-xs font-semibold uppercase tracking-wide mb-3 ${isDark ? "text-gray-400" : "text-gray-500"}`}>계약 정보</h3>
-                  <InfoRow label="계약구분"   value={selected.contractType} dark={isDark} />
+                  <InfoRow label="계약구분"   value={
+                    selected.contractType?.includes("FM") 
+                      ? <span className="text-red-500 font-bold">{selected.contractType}</span> 
+                      : selected.contractType
+                  } dark={isDark} />
                   <InfoRow label="계약일자"   value={selected.contractDate} dark={isDark} />
                   <InfoRow label="계약기간"   value={
                     selected.contractStart || selected.contractEnd
