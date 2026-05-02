@@ -19,8 +19,6 @@ interface Row {
   remark: string;
 }
 
-interface Props { sites: SiteOption[] }
-
 function newRow(seed: Partial<Row> = {}): Row {
   return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, elevatorName: "", remark: "", ...seed };
 }
@@ -28,13 +26,14 @@ function newRow(seed: Partial<Row> = {}): Row {
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 function fmtNum(n: number) { return n.toLocaleString(); }
 
-export default function MaterialRequestEntry({ sites }: Props) {
+export default function MaterialRequestEntry() {
   const router = useRouter();
   const { user } = useAuth();
 
   const [reqDate,     setReqDate]     = useState(todayISO());
   const [siteName,    setSiteName]    = useState("");
   const [elevators,   setElevators]   = useState<ElevatorRecord[]>([]);
+  const [sites,       setSites]       = useState<SiteOption[]>([]);
   const [reference,   setReference]   = useState("");
   const [matType,     setMatType]     = useState<"전체" | "DS" | "TK">("전체");
 
@@ -49,6 +48,10 @@ export default function MaterialRequestEntry({ sites }: Props) {
   const [saving, setSaving] = useState(false);
   const [popup, setPopup] = useState<null | "material">(null);
   const [popupRow, setPopupRow] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!siteName) {

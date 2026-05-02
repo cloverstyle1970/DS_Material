@@ -21,8 +21,6 @@ interface Row {
   inboundRef: number | null;
 }
 
-interface Props { sites: SiteOption[] }
-
 function newRow(seed: Partial<Row> = {}): Row {
   return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, elevatorName: "", remark: "", inboundRef: null, ...seed };
 }
@@ -30,13 +28,14 @@ function newRow(seed: Partial<Row> = {}): Row {
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 function fmtNum(n: number) { return n.toLocaleString(); }
 
-export default function OutboundEntry({ sites }: Props) {
+export default function OutboundEntry() {
   const router   = useRouter();
   const { user } = useAuth();
 
   const [outboundDate, setOutboundDate] = useState(todayISO());
   const [siteName,     setSiteName]     = useState("");
   const [elevators,    setElevators]    = useState<ElevatorRecord[]>([]);
+  const [sites,        setSites]        = useState<SiteOption[]>([]);
   const [reference,    setReference]    = useState("");
   const [matType,      setMatType]      = useState<"전체" | "DS" | "TK">("전체");
 
@@ -47,6 +46,11 @@ export default function OutboundEntry({ sites }: Props) {
     }, 0);
     return () => clearTimeout(t);
   }, [user]);
+
+  useEffect(() => {
+    api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
+  }, []);
+
   const [rows,  setRows]  = useState<Row[]>([newRow(), newRow(), newRow(), newRow(), newRow()]);
   const [saving, setSaving] = useState(false);
   const [popup,  setPopup]  = useState<null | "inbound">(null);

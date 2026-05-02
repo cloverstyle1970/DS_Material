@@ -12,7 +12,6 @@ interface SiteOption { id: number; name: string }
 interface Props {
   mode: "입고" | "출고";
   initial: TransactionRecord[];
-  sites: SiteOption[];
 }
 
 interface Search { dateFrom: string; dateTo: string; siteName: string; userName: string }
@@ -50,13 +49,17 @@ function inputCls() {
   return "px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-xs text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-slate-400 bg-white dark:bg-gray-700";
 }
 
-export default function StockHistoryClient({ mode, initial, sites }: Props) {
+export default function StockHistoryClient({ mode, initial }: Props) {
   const [transactions, setTransactions] = useState(initial);
+  const [sites, setSites] = useState<SiteOption[]>([]);
 
   useEffect(() => {
     api.get<TransactionRecord[]>(`/api/transactions?type=${encodeURIComponent(mode)}`)
       .then(setTransactions).catch(() => {});
   }, [mode]);
+  useEffect(() => {
+    api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
+  }, []);
   const [search, setSearch] = useState<Search>(defaultSearch);
   const [sortKey, setSortKey] = useState<SortKey>("createdAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");

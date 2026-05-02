@@ -18,15 +18,11 @@ interface Transaction {
 
 interface SiteOption { id: number; name: string }
 
-interface Props {
-  sites: SiteOption[];
-}
-
 function fmtDate(iso: string) {
   return iso.substring(0, 10);
 }
 
-export default function SiteStatsClient({ sites }: Props) {
+export default function SiteStatsClient() {
   const [selectedSite, setSelectedSite] = useState<string>("");
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date();
@@ -36,6 +32,7 @@ export default function SiteStatsClient({ sites }: Props) {
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().substring(0, 10));
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [sites, setSites] = useState<SiteOption[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,6 +41,9 @@ export default function SiteStatsClient({ sites }: Props) {
       .then(data => setTransactions(data))
       .catch(() => {})
       .finally(() => setLoading(false));
+  }, []);
+  useEffect(() => {
+    api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
   }, []);
 
   function setThisMonth() {

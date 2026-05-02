@@ -23,11 +23,6 @@ interface Row {
   orderId: number | null;
 }
 
-interface Props {
-  sites: SiteOption[];
-  vendors: VendorOption[];
-}
-
 const VAT_RATE = 0.1;
 
 function newRow(seed: Partial<Row> = {}): Row {
@@ -37,7 +32,7 @@ function newRow(seed: Partial<Row> = {}): Row {
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 function fmtNum(n: number) { return n.toLocaleString(); }
 
-export default function InboundEntry({ sites, vendors }: Props) {
+export default function InboundEntry() {
   const router = useRouter();
   const { user } = useAuth();
 
@@ -45,6 +40,8 @@ export default function InboundEntry({ sites, vendors }: Props) {
   const [vendorName,  setVendorName]  = useState("");
   const [reference,   setReference]   = useState("");
   const [matType,     setMatType]     = useState<"전체" | "DS" | "TK">("전체");
+  const [sites,       setSites]       = useState<SiteOption[]>([]);
+  const [vendors,     setVendors]     = useState<VendorOption[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -53,6 +50,11 @@ export default function InboundEntry({ sites, vendors }: Props) {
     }, 0);
     return () => clearTimeout(t);
   }, [user]);
+
+  useEffect(() => {
+    api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
+    api.get<VendorOption[]>("/api/vendors?type=매입").then(setVendors).catch(() => {});
+  }, []);
   const [rows,  setRows]  = useState<Row[]>([newRow(), newRow(), newRow(), newRow(), newRow()]);
   const [saving, setSaving] = useState(false);
   const [popup,  setPopup]  = useState<null | "order">(null);

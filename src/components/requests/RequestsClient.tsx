@@ -18,11 +18,8 @@ interface Props {
   initialOrders:    PurchaseOrderRecord[];
   initialInbound:   TransactionRecord[];
   initialOutbound:  TransactionRecord[];
-  sites:   SiteOption[];
-  vendors: VendorOption[];
   mode?: "all" | "requests-only" | "orders-only";
   materialAliases?: Record<string, string>;
-  requesterNames?: string[];
 }
 
 const TABS = ["자재신청", "발주", "입고", "출고"] as const;
@@ -238,15 +235,23 @@ function compareSort<T>(a: T, b: T, dir: SortDir) {
   return dir === "asc" ? cmp : -cmp;
 }
 
-export default function RequestsClient({ initialRequests, initialOrders, initialInbound, initialOutbound, sites, vendors, mode = "all", materialAliases = {}, requesterNames = [] }: Props) {
+export default function RequestsClient({ initialRequests, initialOrders, initialInbound, initialOutbound, mode = "all", materialAliases = {} }: Props) {
   const defaultTab: Tab = mode === "orders-only" ? "발주" : "자재신청";
   const [tab, setTab]       = useState<Tab>(defaultTab);
   const [requests, setRequests] = useState(initialRequests);
+  const [sites, setSites] = useState<SiteOption[]>([]);
+  const [vendors, setVendors] = useState<VendorOption[]>([]);
+  const [requesterNames, setRequesterNames] = useState<string[]>([]);
   const [orders,   setOrders]   = useState(initialOrders);
 
   useEffect(() => {
     api.get<MaterialRequestRecord[]>("/api/material-requests").then(setRequests).catch(() => {});
     api.get<PurchaseOrderRecord[]>("/api/purchase-orders").then(setOrders).catch(() => {});
+    api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
+    api.get<VendorOption[]>("/api/vendors").then(setVendors).catch(() => {});
+    api.get<{ name: string; status: string | null }[]>("/api/users")
+      .then(data => setRequesterNames(data.filter(u => u.status === "재직").map(u => u.name).sort()))
+      .catch(() => {});
   }, []);
 
   // 자재신청 탭
@@ -753,14 +758,14 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
       {/* ═══ 입고 탭 ════════════════════════════════════════════════ */}
       {tab === "입고" && (
         <div className="space-y-3">
-          <StockHistoryClient mode="입고" initial={initialInbound} sites={sites} />
+          <StockHistoryClient mode="입고" initial={initialInbound} />
         </div>
       )}
 
       {/* ═══ 출고 탭 ════════════════════════════════════════════════ */}
       {tab === "출고" && (
         <div className="space-y-3">
-          <StockHistoryClient mode="출고" initial={initialOutbound} sites={sites} />
+          <StockHistoryClient mode="출고" initial={initialOutbound} />
         </div>
       )}
 

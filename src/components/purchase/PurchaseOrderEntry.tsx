@@ -24,12 +24,6 @@ interface Row {
   reqId: number | null;
 }
 
-interface Props {
-  sites: SiteOption[];
-  vendors: VendorOption[];
-  pendingRequests: MaterialRequestRecord[];
-}
-
 const VAT_RATE = 0.1;
 
 function newRow(seed: Partial<Row> = {}): Row {
@@ -39,11 +33,14 @@ function newRow(seed: Partial<Row> = {}): Row {
 function fmtNum(n: number) { return n.toLocaleString(); }
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
-export default function PurchaseOrderEntry({ sites, vendors, pendingRequests }: Props) {
+export default function PurchaseOrderEntry() {
   const router = useRouter();
   const { user } = useAuth();
 
   const [orderDate,   setOrderDate]   = useState(todayISO());
+  const [sites,       setSites]       = useState<SiteOption[]>([]);
+  const [vendors,     setVendors]     = useState<VendorOption[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<MaterialRequestRecord[]>([]);
   const [vendorName,  setVendorName]  = useState("");
   const [managerName, setManagerName] = useState(user?.name ?? "");
   const [siteName,    setSiteName]    = useState("");
@@ -58,6 +55,15 @@ export default function PurchaseOrderEntry({ sites, vendors, pendingRequests }: 
     }, 0);
     return () => clearTimeout(t);
   }, [user]);
+
+  useEffect(() => {
+    api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
+    api.get<VendorOption[]>("/api/vendors?type=매입").then(setVendors).catch(() => {});
+    api.get<MaterialRequestRecord[]>("/api/material-requests")
+      .then(data => setPendingRequests(data.filter(r => r.status === "신청" || r.status === "처리중")))
+      .catch(() => {});
+  }, []);
+
   const [orderRefNo,  setOrderRefNo]  = useState("");
   const [files,       setFiles]       = useState<File[]>([]);
   const [popup,       setPopup]       = useState<null | "request">(null);
