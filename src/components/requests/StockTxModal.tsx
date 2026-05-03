@@ -227,7 +227,7 @@ export default function StockTxModal({ initialType, sites, user, onClose, onSave
                     type="text"
                     value={refSearch}
                     onChange={e => setRefSearch(e.target.value)}
-                    placeholder="자재명, 코드, 현장 검색"
+                    placeholder="자재명, 코드, 규격, 현장 검색"
                     className="w-full px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-slate-400"
                   />
 
@@ -317,7 +317,7 @@ export default function StockTxModal({ initialType, sites, user, onClose, onSave
                 <input type="text" value={matQuery}
                   onChange={e => { setMatQuery(e.target.value); setSelected(null); setSelectedRef(null); }}
                   onFocus={() => matResults.length > 0 && setShowDropdown(true)}
-                  placeholder="부품명, 코드, 별칭 검색"
+                  placeholder="부품명, 코드, 규격, 별칭 검색"
                   className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-slate-400"
                 />
                 {showDropdown && matResults.length > 0 && (

@@ -204,7 +204,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
             <input
               value={query}
               onChange={e => { setQuery(e.target.value); resetPage(); }}
-              placeholder="부품명, 코드, 별칭, 기종명, 보관장소 검색"
+              placeholder="부품명, 코드, 규격, 별칭, 보관장소 검색"
               className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white dark:bg-gray-700"
             />
             {query && (

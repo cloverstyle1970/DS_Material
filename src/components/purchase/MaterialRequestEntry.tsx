@@ -505,7 +505,7 @@ function MaterialPopup({ onSelect, onClose }: { onSelect: (m: MaterialRecord) =>
         </div>
         <div className="p-3">
           <input type="text" value={q} onChange={e => setQ(e.target.value)} autoFocus
-            placeholder="품목코드, 품목명, 별칭"
+            placeholder="품목코드, 품목명, 규격, 별칭"
             className="w-full px-3 py-2 text-sm font-medium text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-500 placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:font-normal" />
         </div>
         <div className="flex-1 overflow-y-auto">

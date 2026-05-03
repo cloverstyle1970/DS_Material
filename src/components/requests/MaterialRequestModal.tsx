@@ -135,7 +135,7 @@ function ElevatorGroupRow({
           value={matQuery}
           onChange={e => setMatQuery(e.target.value)}
           onFocus={() => matResults.length > 0 && setShowDropdown(true)}
-          placeholder={matType === "DS" ? "DS 자재 검색" : matType === "TK" ? "TK 자재 검색" : "자재 검색 (부품명·코드·별칭)"}
+          placeholder={matType === "DS" ? "DS 자재 검색 (코드, 부품명, 규격)" : matType === "TK" ? "TK 자재 검색 (코드, 부품명, 규격)" : "자재 검색 (부품명·코드·규격·별칭)"}
           className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-600 text-sm text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-slate-400"
         />
         {showDropdown && matResults.length > 0 && (
