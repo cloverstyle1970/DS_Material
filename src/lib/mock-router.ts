@@ -871,6 +871,17 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
     return dbToTransaction(data);
   }
 
+  const constReqEditId = extractId(path, "/api/construction-requests");
+  if (constReqEditId) {
+    const idx = mockConstRequests.findIndex(r => r.id === Number(constReqEditId));
+    if (idx === -1) throw new MockApiError("not found", 404);
+    const { siteName, elevatorName, details } = body;
+    if (siteName !== undefined) mockConstRequests[idx].siteName = siteName;
+    if (elevatorName !== undefined) mockConstRequests[idx].elevatorName = elevatorName;
+    if (details !== undefined) mockConstRequests[idx].details = details;
+    return mockConstRequests[idx];
+  }
+
   throw new MockApiError("Not found", 404);
 }
 
@@ -890,6 +901,13 @@ async function routeDELETE(path: string, body: AnyBody): Promise<unknown> {
       const { error } = await supabase.from("categories").delete().eq("level", "sub").eq("major_code", majorCode).eq("mid_code", midCode).eq("code", code);
       if (error) throw new MockApiError(error.message, 500);
     } else throw new MockApiError("invalid level", 400);
+    return { ok: true };
+  }
+
+  const matReqId = extractId(path, "/api/material-requests");
+  if (matReqId) {
+    const { error } = await supabase.from("material_requests").delete().eq("id", Number(matReqId));
+    if (error) throw new MockApiError(error.message, 500);
     return { ok: true };
   }
 

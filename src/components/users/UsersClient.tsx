@@ -14,7 +14,6 @@ const COLUMNS: { key: SortKey | null; label: string; sortable: boolean }[] = [
   { key: "name",     label: "이름",     sortable: true  },
   { key: "dept",     label: "부서",     sortable: true  },
   { key: "rank",     label: "직급",     sortable: true  },
-  { key: null,       label: "권한",     sortable: false },
   { key: "cert",     label: "자격증",   sortable: true  },
   { key: "hireDate", label: "입사일",   sortable: true  },
   { key: "phone",    label: "전화번호", sortable: true  },
@@ -192,14 +191,6 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
                 <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200 whitespace-nowrap">{u.name}</td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">{u.dept ?? "-"}</td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">{u.rank ?? "-"}</td>
-                <td className="px-4 py-3">
-                  <div className="flex gap-1 flex-wrap">
-                    {(u.permissions ?? []).length === 0
-                      ? <span className="text-xs text-gray-300 dark:text-gray-600">-</span>
-                      : <PermBadge perms={u.permissions ?? []} />
-                    }
-                  </div>
-                </td>
                 <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{u.cert ?? "-"}</td>
                 <td className="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{u.hireDate ?? "-"}</td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">{u.phone ?? "-"}</td>

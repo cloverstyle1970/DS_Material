@@ -31,6 +31,27 @@ export default function ConstructionRequestClient() {
   const [elevators, setElevators] = useState<{ id: number; unitName: string }[]>([]);
   const [saving, setSaving] = useState(false);
 
+  const [editId, setEditId] = useState<number | null>(null);
+
+  function handleEdit(req: ConstructionRequest) {
+    setEditId(req.id);
+    setSiteName(req.siteName);
+    setElevatorName(req.elevatorName || "");
+    setDetails(req.details);
+    setShowModal(true);
+  }
+
+  async function handleDelete(id: number) {
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+    try {
+      await api.delete(`/api/construction-requests/${id}`);
+      fetchRequests();
+    } catch (e) {
+      alert(getErrorMessage(e));
+    }
+  }
+
+
   useEffect(() => {
     fetchRequests();
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
@@ -70,13 +91,23 @@ export default function ConstructionRequestClient() {
     if (!siteName || !details) return alert("현장명과 공사내역을 입력해주세요.");
     setSaving(true);
     try {
-      await api.post("/api/construction-requests", {
-        siteName,
-        elevatorName,
-        details,
-        requesterName: user?.name || "익명",
-      });
+      if (editId) {
+        await api.patch(`/api/construction-requests/${editId}`, {
+          action: "수정",
+          siteName,
+          elevatorName,
+          details
+        });
+      } else {
+        await api.post("/api/construction-requests", {
+          siteName,
+          elevatorName,
+          details,
+          requesterName: user?.name || "익명",
+        });
+      }
       setShowModal(false);
+      setEditId(null);
       setSiteName("");
       setElevatorName("");
       setDetails("");
@@ -150,8 +181,8 @@ export default function ConstructionRequestClient() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
             <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">공사 요청 등록</h3>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">{editId ? "공사 요청 수정" : "공사 요청 등록"}</h3>
+              <button onClick={() => { setShowModal(false); setEditId(null); setSiteName(""); setElevatorName(""); setDetails(""); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
             </div>
             <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
               <div>
@@ -210,7 +241,7 @@ export default function ConstructionRequestClient() {
                 />
               </div>
               <div className="pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-2">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600">취소</button>
+                <button type="button" onClick={() => { setShowModal(false); setEditId(null); setSiteName(""); setElevatorName(""); setDetails(""); }} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600">취소</button>
                 <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded hover:bg-orange-700 disabled:opacity-50">등록하기</button>
               </div>
             </form>
