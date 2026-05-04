@@ -92,18 +92,40 @@ export default function InboundEntry() {
     });
   }
 
-  function applyOrder(o: PurchaseOrderRecord) {
-    const row = newRow({
-      materialId: o.materialId, materialName: o.materialName,
-      qty: o.qty, unitPrice: o.unitPrice ?? 0,
-      vat: Math.round(o.qty * (o.unitPrice ?? 0) * VAT_RATE),
-      siteName: o.siteName ?? "", remark: `발주#${o.id}`, orderId: o.id,
-    });
-    if (o.vendorName && !vendorName) setVendorName(o.vendorName);
+  async function applyMultipleOrders(orders: PurchaseOrderRecord[]) {
+    if (orders.length === 0) return;
+    const firstVendor = orders.find(o => o.vendorName)?.vendorName;
+    if (firstVendor) setVendorName(firstVendor);
+
+    const firstOrderDate = orders[0]?.orderedAt?.slice(0, 10);
+    if (firstOrderDate) setInboundDate(firstOrderDate);
+
+    let mats: MaterialRecord[] = [];
+    try { mats = await api.get<MaterialRecord[]>("/api/materials"); } catch (e) {}
+
     setRows(prev => {
-      const firstEmpty = prev.findIndex(r => !r.materialId);
-      if (firstEmpty >= 0) { const next = [...prev]; next[firstEmpty] = row; return next; }
-      return [...prev, row];
+      const next = [...prev];
+      let emptyIdx = next.findIndex(r => !r.materialId);
+      
+      orders.forEach(o => {
+        const mat = mats.find(m => m.id === o.materialId);
+        const spec = mat?.modelNo || "";
+        const patch = {
+          materialId: o.materialId, materialName: o.materialName,
+          spec,
+          qty: o.qty, unitPrice: o.unitPrice ?? 0,
+          vat: Math.round(o.qty * (o.unitPrice ?? 0) * VAT_RATE),
+          siteName: o.siteName ?? "", remark: `발주#${o.id}`, orderId: o.id,
+        };
+        
+        if (emptyIdx >= 0 && emptyIdx < next.length) {
+          next[emptyIdx] = { ...next[emptyIdx], ...patch };
+          emptyIdx = next.findIndex((r, idx) => idx > emptyIdx && !r.materialId);
+        } else {
+          next.push(newRow(patch));
+        }
+      });
+      return next;
     });
     setPopup(null);
   }
@@ -168,8 +190,12 @@ export default function InboundEntry() {
         </div>
       </div>
 
-      <div className="bg-[#f0f2f5] dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 px-5 py-1.5 flex items-center gap-1 flex-wrap text-xs shrink-0">
-        <ToolBtn onClick={() => setPopup("order")}>발주서 참조</ToolBtn>
+      <div className="bg-[#f0f2f5] dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 px-5 py-2 flex items-center gap-2 flex-wrap text-xs shrink-0">
+        <button type="button" onClick={() => setPopup("order")}
+          className="px-4 py-1.5 rounded-md bg-red-600 text-white font-bold hover:bg-red-700 shadow-sm transition-colors flex items-center gap-1.5 text-xs ring-2 ring-red-600 ring-offset-1 dark:ring-offset-gray-700">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          발주서 참조 (불러오기)
+        </button>
         <span className="ml-auto text-gray-500 dark:text-gray-400">{rows.filter(r => r.materialId).length}품목 / 총액 {fmtNum(totals.total)}원</span>
       </div>
 
@@ -195,8 +221,12 @@ export default function InboundEntry() {
               <tr key={r.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-blue-50/30 dark:hover:bg-blue-900/10">
                 <Td center className="text-gray-800 dark:text-gray-200 font-medium">{i + 1}</Td>
                 <Td>
-                  <input type="text" value={r.materialId} readOnly
-                    className={cellInput + " bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500"} />
+                  <MatInlineSearch
+                    value={r.materialId}
+                    matType={matType}
+                    onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
+                    onChange={v => patchRow(r.id, { materialId: v })}
+                  />
                 </Td>
                 <Td>
                   <MatInlineSearch
@@ -206,7 +236,12 @@ export default function InboundEntry() {
                   />
                 </Td>
                 <Td>
-                  <input type="text" value={r.spec} onChange={e => patchRow(r.id, { spec: e.target.value })} className={cellInput} />
+                  <MatInlineSearch
+                    value={r.spec}
+                    matType={matType}
+                    onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
+                    onChange={v => patchRow(r.id, { spec: v })}
+                  />
                 </Td>
                 <Td right>
                   <input type="text" inputMode="numeric" value={r.qty === 0 ? "" : String(r.qty)}
@@ -264,7 +299,7 @@ export default function InboundEntry() {
       </div>
 
       {popup === "order" && (
-        <OrderPopup onClose={() => setPopup(null)} onSelect={applyOrder} />
+        <OrderPopup onClose={() => setPopup(null)} onMultiSelect={applyMultipleOrders} />
       )}
     </div>
   );
@@ -333,7 +368,16 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
   const [results, setResults] = useState<MaterialRecord[]>([]);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
+  const ulRef = useRef<HTMLUListElement>(null);
+
+  useEffect(() => {
+    if (focusedIndex >= 0 && ulRef.current) {
+      const el = ulRef.current.children[focusedIndex] as HTMLElement;
+      if (el) el.scrollIntoView({ block: "nearest" });
+    }
+  }, [focusedIndex]);
 
   useEffect(() => {
     const t = setTimeout(async () => {
@@ -344,6 +388,7 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
         const data = await api.get<MaterialRecord[]>(`/api/materials?${params}`);
         setResults(data.slice(0, 15));
         setOpen(data.length > 0);
+        setFocusedIndex(-1);
       } catch { setResults([]); setOpen(false); }
     }, value.trim() ? 150 : 0);
     return () => clearTimeout(t);
@@ -363,22 +408,36 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
     onMultiSelect(sel); setChecked(new Set()); setOpen(false);
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!open || results.length === 0) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setFocusedIndex(i => (i < results.length - 1 ? i + 1 : i)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setFocusedIndex(i => (i > 0 ? i - 1 : 0)); }
+    else if (e.key === " ") { if (focusedIndex >= 0) { e.preventDefault(); toggle(results[focusedIndex].id); } }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      if (checked.size > 0) applyChecked();
+      else if (focusedIndex >= 0) { onMultiSelect([results[focusedIndex]]); setChecked(new Set()); setOpen(false); }
+    }
+    else if (e.key === "Escape") setOpen(false);
+  }
+
   return (
     <div ref={ref} className="relative">
       <input type="text" value={value} onChange={e => { onChange(e.target.value); setChecked(new Set()); }}
-        onFocus={() => results.length > 0 && setOpen(true)} className={cellInput} />
+        onFocus={() => results.length > 0 && setOpen(true)} onKeyDown={handleKeyDown} className={cellInput} />
       {open && results.length > 0 && (
         <div className="absolute z-50 top-full left-0 mt-0.5 w-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl">
-          <ul className="max-h-52 overflow-y-auto">
-            {results.map(m => (
+          <ul ref={ulRef} className="max-h-52 overflow-y-auto">
+            {results.map((m, idx) => (
               <li key={m.id}>
                 <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => toggle(m.id)}
-                  className={`w-full text-left px-3 py-2 border-b border-gray-50 dark:border-gray-700 last:border-0 flex items-center gap-2 ${checked.has(m.id) ? "bg-blue-50 dark:bg-blue-900/30" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
+                  className={`w-full text-left px-3 py-2 border-b border-gray-50 dark:border-gray-700 last:border-0 flex items-center gap-2 ${checked.has(m.id) ? "bg-blue-50 dark:bg-blue-900/30" : focusedIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
                   <input type="checkbox" readOnly checked={checked.has(m.id)} className="accent-blue-600 shrink-0" />
                   <div className="min-w-0">
                     <div className="text-xs font-medium text-gray-800 dark:text-gray-200">{m.name}</div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{m.id}</span>
+                      {m.modelNo && <span className="text-[10px] text-gray-500 dark:text-gray-400 border-l border-gray-300 dark:border-gray-600 pl-2">{m.modelNo}</span>}
                       {m.alias && <span className="text-[10px] text-gray-400 dark:text-gray-500">{m.alias}</span>}
                       <span className="text-[10px] text-gray-300 dark:text-gray-500 ml-auto">단가 {m.buyPrice ? fmtNum(m.buyPrice) : "-"} / 재고 {m.stockQty}</span>
                     </div>
@@ -388,10 +447,10 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
             ))}
           </ul>
           <div className="px-3 py-2 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-b-lg">
-            <span className="text-xs text-gray-500 dark:text-gray-400">{checked.size > 0 ? `${checked.size}개 선택됨` : "항목을 클릭하여 선택"}</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">{checked.size > 0 ? `${checked.size}개 선택됨` : "항목을 클릭하여 선택 (스페이스바로 체크)"}</span>
             <button type="button" onMouseDown={e => e.preventDefault()} onClick={applyChecked} disabled={checked.size === 0}
               className="px-3 py-1 text-xs bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed">
-              {checked.size > 0 ? `${checked.size}개 추가` : "추가"}
+              {checked.size > 0 ? `${checked.size}개 추가` : "엔터로 추가"}
             </button>
           </div>
         </div>
@@ -405,9 +464,20 @@ function SiteInlineSearch({ value, onChange, sites, cls }: {
   sites: { id: number; name: string }[]; cls?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
+  const ulRef = useRef<HTMLUListElement>(null);
   const base = cls ?? inputCls;
   const suggestions = value.trim() ? sites.filter(s => s.name.toLowerCase().includes(value.toLowerCase())).slice(0, 10) : [];
+
+  useEffect(() => { setFocusedIndex(-1); }, [value]);
+
+  useEffect(() => {
+    if (focusedIndex >= 0 && ulRef.current) {
+      const el = ulRef.current.children[focusedIndex] as HTMLElement;
+      if (el) el.scrollIntoView({ block: "nearest" });
+    }
+  }, [focusedIndex]);
 
   useEffect(() => {
     function h(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }
@@ -415,16 +485,29 @@ function SiteInlineSearch({ value, onChange, sites, cls }: {
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!open || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setFocusedIndex(i => (i < suggestions.length - 1 ? i + 1 : i)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setFocusedIndex(i => (i > 0 ? i - 1 : 0)); }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      if (focusedIndex >= 0) { onChange(suggestions[focusedIndex].name); setOpen(false); }
+    }
+    else if (e.key === "Escape") setOpen(false);
+  }
+
   return (
     <div ref={ref} className="relative">
       <input type="text" value={value} onChange={e => { onChange(e.target.value); setOpen(true); }}
-        onFocus={() => value.trim() && setOpen(true)} className={base} />
+        onFocus={() => value.trim() && setOpen(true)} onKeyDown={handleKeyDown} className={base} />
       {open && suggestions.length > 0 && (
-        <ul className="absolute z-50 top-full left-0 mt-0.5 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-52 overflow-y-auto">
-          {suggestions.map(s => (
+        <ul ref={ulRef} className="absolute z-50 top-full left-0 mt-0.5 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-52 overflow-y-auto">
+          {suggestions.map((s, idx) => (
             <li key={s.id}>
               <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => { onChange(s.name); setOpen(false); }}
-                className="w-full text-left px-3 py-2 text-xs text-gray-800 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-b border-gray-50 dark:border-gray-700 last:border-0">{s.name}</button>
+                className={`w-full text-left px-3 py-2 text-xs text-gray-800 dark:text-gray-200 border-b border-gray-50 dark:border-gray-700 last:border-0 ${focusedIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-blue-50 dark:hover:bg-blue-900/20"}`}>
+                {s.name}
+              </button>
             </li>
           ))}
         </ul>
@@ -435,8 +518,19 @@ function SiteInlineSearch({ value, onChange, sites, cls }: {
 
 function VendorInlineSearch({ value, onChange, vendors }: { value: string; onChange: (v: string) => void; vendors: { id: number; name: string }[] }) {
   const [open, setOpen] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
+  const ulRef = useRef<HTMLUListElement>(null);
   const suggestions = value.trim() ? vendors.filter(v => v.name.toLowerCase().includes(value.toLowerCase())).slice(0, 10) : [];
+
+  useEffect(() => { setFocusedIndex(-1); }, [value]);
+
+  useEffect(() => {
+    if (focusedIndex >= 0 && ulRef.current) {
+      const el = ulRef.current.children[focusedIndex] as HTMLElement;
+      if (el) el.scrollIntoView({ block: "nearest" });
+    }
+  }, [focusedIndex]);
 
   useEffect(() => {
     function h(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }
@@ -444,16 +538,29 @@ function VendorInlineSearch({ value, onChange, vendors }: { value: string; onCha
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!open || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setFocusedIndex(i => (i < suggestions.length - 1 ? i + 1 : i)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setFocusedIndex(i => (i > 0 ? i - 1 : 0)); }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      if (focusedIndex >= 0) { onChange(suggestions[focusedIndex].name); setOpen(false); }
+    }
+    else if (e.key === "Escape") setOpen(false);
+  }
+
   return (
     <div ref={ref} className="relative">
       <input type="text" value={value} onChange={e => { onChange(e.target.value); setOpen(true); }}
-        onFocus={() => value.trim() && setOpen(true)} className={inputCls} />
+        onFocus={() => value.trim() && setOpen(true)} onKeyDown={handleKeyDown} className={inputCls} />
       {open && suggestions.length > 0 && (
-        <ul className="absolute z-50 top-full left-0 mt-0.5 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-52 overflow-y-auto">
-          {suggestions.map(v => (
+        <ul ref={ulRef} className="absolute z-50 top-full left-0 mt-0.5 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-52 overflow-y-auto">
+          {suggestions.map((v, idx) => (
             <li key={v.id}>
               <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => { onChange(v.name); setOpen(false); }}
-                className="w-full text-left px-3 py-2 text-xs text-gray-800 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-b border-gray-50 dark:border-gray-700 last:border-0">{v.name}</button>
+                className={`w-full text-left px-3 py-2 text-xs text-gray-800 dark:text-gray-200 border-b border-gray-50 dark:border-gray-700 last:border-0 ${focusedIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-blue-50 dark:hover:bg-blue-900/20"}`}>
+                {v.name}
+              </button>
             </li>
           ))}
         </ul>
@@ -463,52 +570,102 @@ function VendorInlineSearch({ value, onChange, vendors }: { value: string; onCha
 }
 
 // ── 발주서 참조 팝업 ────────────────────────────────────────────
-function OrderPopup({ onSelect, onClose }: { onSelect: (o: PurchaseOrderRecord) => void; onClose: () => void }) {
+function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: PurchaseOrderRecord[]) => void; onClose: () => void }) {
   const [orders, setOrders] = useState<PurchaseOrderRecord[]>([]);
+  const [mats, setMats] = useState<Record<string, string>>({});
   const [q, setQ] = useState("");
+  const [checked, setChecked] = useState<Set<number>>(new Set());
+
   useEffect(() => {
     api.get<PurchaseOrderRecord[]>("/api/purchase-orders?status=발주").then(setOrders).catch(() => setOrders([]));
+    api.get<MaterialRecord[]>("/api/materials").then(list => {
+      const map: Record<string, string> = {};
+      list.forEach(m => { map[m.id] = m.modelNo ?? ""; });
+      setMats(map);
+    }).catch(() => {});
   }, []);
+
   const filtered = orders.filter(o =>
     !q || o.materialName.toLowerCase().includes(q.toLowerCase()) ||
     o.materialId.toLowerCase().includes(q.toLowerCase()) ||
     (o.vendorName?.toLowerCase().includes(q.toLowerCase()) ?? false) ||
-    (o.siteName?.toLowerCase().includes(q.toLowerCase()) ?? false)
+    (o.siteName?.toLowerCase().includes(q.toLowerCase()) ?? false) ||
+    (o.note?.toLowerCase().includes(q.toLowerCase()) ?? false)
   );
+
+  function toggle(id: number) {
+    setChecked(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (checked.size === filtered.length && filtered.length > 0) {
+      setChecked(new Set());
+    } else {
+      setChecked(new Set(filtered.map(o => o.id)));
+    }
+  }
+
+  function applyChecked() {
+    const sel = orders.filter(o => checked.has(o.id));
+    if (sel.length) onMultiSelect(sel);
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-[700px] max-h-[70vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-[1000px] max-w-[95vw] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-700">
           <h3 className="text-sm font-semibold dark:text-gray-100">발주서 참조 (미입고 {orders.length}건)</h3>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none">×</button>
         </div>
         <div className="p-3">
-          <input type="text" value={q} onChange={e => setQ(e.target.value)} autoFocus
+          <input type="text" value={q} onChange={e => { setQ(e.target.value); setChecked(new Set()); }} autoFocus
             placeholder="자재명, 코드, 거래처, 현장 검색"
             className="w-full px-3 py-2 text-sm font-medium text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-500 placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:font-normal" />
         </div>
         <div className="flex-1 overflow-y-auto">
           <table className="w-full text-xs">
             <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
-              <tr>{["발주일","자재명","코드","수량","단가","거래처","현장"].map(h =>
-                <th key={h} className="px-2 py-1.5 text-left border-b border-gray-200 dark:border-gray-600 font-medium text-gray-700 dark:text-gray-300">{h}</th>)}
+              <tr>
+                <th className="px-2 py-1.5 border-b border-gray-200 dark:border-gray-600 text-center w-10">
+                  <input type="checkbox" checked={filtered.length > 0 && checked.size === filtered.length} onChange={toggleAll} className="accent-blue-600" />
+                </th>
+                {["주문참조번호","발주일","자재코드","품목명","규격","수량","단가","거래처","현장"].map(h =>
+                <th key={h} className="px-2 py-1.5 text-left border-b border-gray-200 dark:border-gray-600 font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">{h}</th>)}
               </tr>
             </thead>
             <tbody>
               {filtered.map(o => (
-                <tr key={o.id} onClick={() => onSelect(o)} className="hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer border-b border-gray-50 dark:border-gray-700">
-                  <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400">{o.orderedAt.slice(0,10)}</td>
-                  <td className="px-2 py-1.5 dark:text-gray-200 font-medium">{o.materialName}</td>
-                  <td className="px-2 py-1.5 font-mono text-slate-500 dark:text-slate-400">{o.materialId}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums dark:text-gray-300">{o.qty}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums dark:text-gray-300">{o.unitPrice ? fmtNum(o.unitPrice) : "-"}</td>
-                  <td className="px-2 py-1.5 dark:text-gray-300">{o.vendorName ?? "-"}</td>
-                  <td className="px-2 py-1.5 dark:text-gray-300">{o.siteName ?? "-"}</td>
+                <tr key={o.id} onClick={() => toggle(o.id)} className={`cursor-pointer border-b border-gray-50 dark:border-gray-700 ${checked.has(o.id) ? "bg-blue-50 dark:bg-blue-900/30" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
+                  <td className="px-2 py-1.5 text-center" onClick={e => e.stopPropagation()}>
+                    <input type="checkbox" checked={checked.has(o.id)} onChange={() => toggle(o.id)} className="accent-blue-600" />
+                  </td>
+                  <td className="px-2 py-1.5 text-blue-600 dark:text-blue-400 font-medium whitespace-nowrap">{o.note?.match(/^\[(.*?)\]/)?.[1] || "-"}</td>
+                  <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400 whitespace-nowrap">{o.orderedAt.slice(0,10)}</td>
+                  <td className="px-2 py-1.5 font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">{o.materialId}</td>
+                  <td className="px-2 py-1.5 dark:text-gray-200 font-medium whitespace-nowrap">{o.materialName}</td>
+                  <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400 whitespace-nowrap">{mats[o.materialId] || "-"}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums dark:text-gray-300 whitespace-nowrap">{o.qty}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums dark:text-gray-300 whitespace-nowrap">{o.unitPrice ? fmtNum(o.unitPrice) : "-"}</td>
+                  <td className="px-2 py-1.5 dark:text-gray-300 whitespace-nowrap">{o.vendorName ?? "-"}</td>
+                  <td className="px-2 py-1.5 dark:text-gray-300 whitespace-nowrap">{o.siteName ?? "-"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
           {filtered.length === 0 && <p className="text-center py-8 text-xs text-gray-400 dark:text-gray-500">미입고 발주서 없음</p>}
+        </div>
+        <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-b-lg shrink-0">
+          <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+            {checked.size > 0 ? `${checked.size}개 품목 선택됨` : "입고할 품목을 선택하세요"}
+          </span>
+          <button type="button" disabled={checked.size === 0} onClick={applyChecked}
+            className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 transition-colors">
+            선택 품목 적용
+          </button>
         </div>
       </div>
     </div>

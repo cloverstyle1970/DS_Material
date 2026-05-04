@@ -263,6 +263,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
   const [ordStatus,    setOrdStatus]    = useState<OrderStatus | "전체">("전체");
   const [ordDraft,     setOrdDraft]     = useState<OrdSearch>(defaultOrd);
   const [ordSearch,    setOrdSearch]    = useState<OrdSearch>(defaultOrd);
+  const [editingOrder, setEditingOrder] = useState<PurchaseOrderRecord | null>(null);
 
   // 정렬
   const [reqSortKey, setReqSortKey] = useState<ReqSortKey>("requestedAt");
@@ -297,12 +298,13 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
   }
 
   // ── 발주 액션 ────────────────────────────────────────────────────
-  async function handleOrdAction(id: number, action: string) {
+  async function handleOrdAction(id: number, action: string, data?: Record<string, unknown>) {
     if (!user) return;
     setActionLoading(id);
     try {
-      await api.patch(`/api/purchase-orders/${id}`, { action, userId: user.id, userName: user.name });
+      await api.patch(`/api/purchase-orders/${id}`, { action, userId: user.id, userName: user.name, ...data });
       setOrders(await api.get<PurchaseOrderRecord[]>("/api/purchase-orders"));
+      if (action === "수정") setEditingOrder(null);
     } catch (e) {
       alert(getErrorMessage(e));
     } finally {
@@ -741,6 +743,8 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                       <td className="px-4 py-3">
                         {o.status === "발주" && (
                           <div className="flex gap-1">
+                            <button type="button" disabled={actionLoading === o.id} onClick={() => setEditingOrder(o)}
+                              className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 whitespace-nowrap">수정</button>
                             <button type="button" disabled={actionLoading === o.id} onClick={() => handleOrdAction(o.id, "입고완료")}
                               className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 whitespace-nowrap">입고완료</button>
                             <button type="button" disabled={actionLoading === o.id} onClick={() => handleOrdAction(o.id, "취소")}
@@ -773,6 +777,136 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
         </div>
       )}
 
+      {/* 발주 수정 모달 */}
+      {editingOrder && (
+        <EditOrderModal
+          order={editingOrder}
+          onClose={() => setEditingOrder(null)}
+          onSave={data => handleOrdAction(editingOrder.id, "수정", data)}
+          sites={sites}
+          vendors={vendors}
+        />
+      )}
+
     </>
+  );
+}
+
+// ── 발주 수정 모달 ────────────────────────────────────────────────
+function EditOrderModal({
+  order,
+  onClose,
+  onSave,
+  sites,
+  vendors
+}: {
+  order: PurchaseOrderRecord;
+  onClose: () => void;
+  onSave: (data: Record<string, unknown>) => void;
+  sites: SiteOption[];
+  vendors: VendorOption[];
+}) {
+  const [qty, setQty] = useState(order.qty.toString());
+  const [unitPrice, setUnitPrice] = useState(order.unitPrice?.toString() ?? "");
+  const [siteName, setSiteName] = useState(order.siteName ?? "");
+  const [elevatorName, setElevatorName] = useState(order.elevatorName ?? "");
+  const [vendorName, setVendorName] = useState(order.vendorName ?? "");
+  const [requesterName, setRequesterName] = useState(order.requesterName ?? "");
+  const [note, setNote] = useState(order.note ?? "");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!qty || isNaN(Number(qty)) || Number(qty) <= 0) {
+      alert("유효한 수량을 입력해주세요.");
+      return;
+    }
+    onSave({
+      qty: Number(qty),
+      unitPrice: unitPrice ? Number(unitPrice) : null,
+      siteName,
+      elevatorName,
+      vendorName,
+      requesterName,
+      note
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-[480px] overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">발주 내역 수정</h3>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none">&times;</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div className="mb-4">
+            <p className="text-xs text-gray-500 dark:text-gray-400">자재 정보</p>
+            <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{order.materialName} <span className="text-xs font-mono text-gray-400">({order.materialId})</span></p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">수량 <span className="text-red-500">*</span></label>
+              <input type="number" value={qty} onChange={e => setQty(e.target.value)} required min="1"
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">단가</label>
+              <input type="number" value={unitPrice} onChange={e => setUnitPrice(e.target.value)} min="0"
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">거래처</label>
+              <select value={vendorName} onChange={e => setVendorName(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                <option value="">(선택 안함)</option>
+                {vendors.map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">신청자</label>
+              <input type="text" value={requesterName} onChange={e => setRequesterName(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">현장</label>
+              <select value={siteName} onChange={e => setSiteName(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                <option value="">(선택 안함)</option>
+                {sites.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">호기</label>
+              <input type="text" value={elevatorName} onChange={e => setElevatorName(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">비고</label>
+            <input type="text" value={note} onChange={e => setNote(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+          </div>
+
+          <div className="mt-6 flex justify-end gap-2 pt-4 border-t border-gray-100 dark:border-gray-700">
+            <button type="button" onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+              취소
+            </button>
+            <button type="submit"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+              저장
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

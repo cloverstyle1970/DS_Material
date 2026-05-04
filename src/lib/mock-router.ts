@@ -13,6 +13,34 @@ import type { MaterialRequestRecord } from "./mock-material-requests";
 import type { PurchaseOrderRecord } from "./mock-purchase-orders";
 import { DashboardStats, RecentRequest } from "./types";
 
+// ── 공사일정 모듈 (In-Memory Mock) ─────────────────────────────────
+export interface ConstructionRequest {
+  id: number;
+  status: "요청" | "접수" | "일정등록됨" | "완료";
+  siteName: string;
+  elevatorName: string;
+  requesterName: string;
+  details: string;
+  requestedAt: string;
+}
+
+export interface ConstructionSchedule {
+  id: number;
+  requestId: number | null;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  siteName: string;
+  elevatorName: string;
+  details: string;
+  workers: string;
+  manager: string;
+}
+
+let nextConstReqId = 1;
+let nextConstSchedId = 1;
+export const mockConstRequests: ConstructionRequest[] = [];
+export const mockConstSchedules: ConstructionSchedule[] = [];
+
 // ── Supabase 변환 헬퍼 ────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -510,6 +538,12 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
     );
     return list;
   }
+  if (path === "/api/construction-requests") {
+    return [...mockConstRequests].reverse();
+  }
+  if (path === "/api/construction-schedules") {
+    return [...mockConstSchedules];
+  }
   throw new MockApiError("Not found", 404);
 }
 
@@ -593,6 +627,40 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
     const { data, error } = await supabase.from("users").insert(userToDb(body)).select().single();
     if (error) throw new MockApiError(error.message, 500);
     return dbToUser(data);
+  }
+  if (path === "/api/construction-requests") {
+    const record: ConstructionRequest = {
+      id: nextConstReqId++,
+      status: "요청",
+      siteName: body.siteName || "",
+      elevatorName: body.elevatorName || "",
+      requesterName: body.requesterName || "",
+      details: body.details || "",
+      requestedAt: new Date().toISOString()
+    };
+    mockConstRequests.push(record);
+    return record;
+  }
+  if (path === "/api/construction-schedules") {
+    const record: ConstructionSchedule = {
+      id: nextConstSchedId++,
+      requestId: body.requestId || null,
+      startDate: body.startDate,
+      endDate: body.endDate || body.startDate,
+      siteName: body.siteName || "",
+      elevatorName: body.elevatorName || "",
+      details: body.details || "",
+      workers: body.workers || "",
+      manager: body.manager || "",
+    };
+    mockConstSchedules.push(record);
+    
+    // 만약 공사요청에서 바로 등록된 경우, 공사요청 상태 변경
+    if (record.requestId) {
+      const req = mockConstRequests.find(r => r.id === record.requestId);
+      if (req) req.status = "일정등록됨";
+    }
+    return record;
   }
   throw new MockApiError("Not found", 404);
 }
@@ -742,6 +810,21 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
       if (error) throw new MockApiError(error.message, 500);
       return dbToOrder(data);
     }
+    if (action === "수정") {
+      const patch: Record<string, unknown> = {};
+      if (body.qty !== undefined) patch.qty = Number(body.qty);
+      if (body.siteName !== undefined) patch.site_name = body.siteName || null;
+      if (body.elevatorName !== undefined) patch.elevator_name = body.elevatorName || null;
+      if (body.vendorName !== undefined) patch.vendor_name = body.vendorName || null;
+      if (body.unitPrice !== undefined) patch.unit_price = body.unitPrice ? Number(body.unitPrice) : null;
+      if (body.note !== undefined) patch.note = body.note || null;
+      if (body.requesterName !== undefined) patch.requester_name = body.requesterName || null;
+
+      const { data, error } = await supabase.from("purchase_orders")
+        .update(patch).eq("id", numId).select().single();
+      if (error) throw new MockApiError(error.message, 500);
+      return dbToOrder(data);
+    }
     throw new MockApiError("unknown action", 400);
   }
 
@@ -752,6 +835,40 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
     if (error) throw new MockApiError(error.message, 500);
     if (!data) throw new MockApiError("not found", 404);
     return dbToUser(data);
+  }
+
+  const txId = extractId(path, "/api/transactions");
+  if (txId) {
+    const numId = Number(txId);
+    const { qty, siteName, note, userName } = body;
+    const { data: tx, error: fetchErr } = await supabase.from("transactions").select("*").eq("id", numId).single();
+    if (fetchErr || !tx) throw new MockApiError("not found", 404);
+    
+    const patch: Record<string, unknown> = {};
+    if (siteName !== undefined) patch.site_name = siteName || null;
+    if (note !== undefined) patch.note = note || null;
+    if (userName !== undefined) patch.user_name = userName;
+
+    if (qty !== undefined) {
+      const newQty = Number(qty);
+      const diff = newQty - tx.qty;
+      if (diff !== 0) {
+        const { data: mat, error: mErr } = await supabase.from("materials").select("stock_qty").eq("id", tx.material_id).single();
+        if (mErr || !mat) throw new MockApiError("material not found", 404);
+        
+        let newStock = mat.stock_qty;
+        if (tx.type === "입고") newStock += diff;
+        else if (tx.type === "출고") newStock -= diff;
+
+        await supabase.from("materials").update({ stock_qty: newStock }).eq("id", tx.material_id);
+        patch.qty = newQty;
+        patch.after_stock = tx.prev_stock + (tx.type === "입고" ? newQty : -newQty);
+      }
+    }
+
+    const { data, error } = await supabase.from("transactions").update(patch).eq("id", numId).select().single();
+    if (error) throw new MockApiError(error.message, 500);
+    return dbToTransaction(data);
   }
 
   throw new MockApiError("Not found", 404);
@@ -801,6 +918,57 @@ async function routeDELETE(path: string, body: AnyBody): Promise<unknown> {
   if (userId) {
     const { error } = await supabase.from("users").delete().eq("id", Number(userId));
     if (error) throw new MockApiError(error.message, 500);
+    return { ok: true };
+  }
+
+  const txId = extractId(path, "/api/transactions");
+  if (txId) {
+    const numId = Number(txId);
+    const { data: tx, error: fetchErr } = await supabase.from("transactions").select("*").eq("id", numId).single();
+    if (fetchErr || !tx) throw new MockApiError("not found", 404);
+
+    // 재고 원복
+    const { data: mat, error: mErr } = await supabase.from("materials").select("stock_qty").eq("id", tx.material_id).single();
+    if (mErr || !mat) throw new MockApiError("material not found", 404);
+    
+    let newStock = mat.stock_qty;
+    if (tx.type === "입고") newStock -= tx.qty;
+    else if (tx.type === "출고") newStock += tx.qty;
+    await supabase.from("materials").update({ stock_qty: newStock }).eq("id", tx.material_id);
+
+    // 발주/신청 상태 원복
+    if (tx.note) {
+      const ordMatch = tx.note.match(/발주 #(\d+) 입고완료/);
+      if (ordMatch) {
+        await supabase.from("purchase_orders").update({ status: "발주", received_at: null }).eq("id", Number(ordMatch[1]));
+      }
+      const reqMatch = tx.note.match(/신청 #(\d+) 출고처리/);
+      if (reqMatch) {
+        await supabase.from("material_requests").update({ status: "처리중" }).eq("id", Number(reqMatch[1]));
+      }
+    }
+
+    const { error } = await supabase.from("transactions").delete().eq("id", numId);
+    if (error) throw new MockApiError(error.message, 500);
+    return { ok: true };
+  }
+
+  const constSchedId = extractId(path, "/api/construction-schedules");
+  if (constSchedId) {
+    const idx = mockConstSchedules.findIndex(s => s.id === Number(constSchedId));
+    if (idx === -1) throw new MockApiError("not found", 404);
+    const deleted = mockConstSchedules.splice(idx, 1)[0];
+    if (deleted.requestId) {
+      const req = mockConstRequests.find(r => r.id === deleted.requestId);
+      if (req && req.status === "일정등록됨") req.status = "요청";
+    }
+    return { ok: true };
+  }
+  const constReqId = extractId(path, "/api/construction-requests");
+  if (constReqId) {
+    const idx = mockConstRequests.findIndex(r => r.id === Number(constReqId));
+    if (idx === -1) throw new MockApiError("not found", 404);
+    mockConstRequests.splice(idx, 1);
     return { ok: true };
   }
 

@@ -63,6 +63,8 @@ export default function StockHistoryClient({ mode, initial }: Props) {
   const [search, setSearch] = useState<Search>(defaultSearch);
   const [sortKey, setSortKey] = useState<SortKey>("createdAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [editingTx, setEditingTx] = useState<TransactionRecord | null>(null);
+  const [actionLoading, setActionLoading] = useState<number | null>(null);
   const { user } = useAuth();
   const admin = user ? !isViewOnly(user) : false;
 
@@ -96,6 +98,33 @@ export default function StockHistoryClient({ mode, initial }: Props) {
   function toggleSort(key: SortKey) {
     if (key === sortKey) setSortDir(d => (d === "asc" ? "desc" : "asc"));
     else { setSortKey(key); setSortDir("asc"); }
+  }
+
+  async function handleDelete(id: number) {
+    if (!confirm("정말 이 내역을 취소(삭제)하시겠습니까?\n취소 시 재고가 자동으로 원복되며 연관된 전표의 상태도 복구됩니다.")) return;
+    setActionLoading(id);
+    try {
+      await api.delete(`/api/transactions/${id}`);
+      setTransactions(await api.get<TransactionRecord[]>(`/api/transactions?type=${encodeURIComponent(mode)}`));
+    } catch (e) {
+      alert("취소 실패: " + (e as Error).message);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleSaveEdit(data: Record<string, unknown>) {
+    if (!editingTx) return;
+    setActionLoading(editingTx.id);
+    try {
+      await api.patch(`/api/transactions/${editingTx.id}`, { userName: user?.name, ...data });
+      setTransactions(await api.get<TransactionRecord[]>(`/api/transactions?type=${encodeURIComponent(mode)}`));
+      setEditingTx(null);
+    } catch (e) {
+      alert("수정 실패: " + (e as Error).message);
+    } finally {
+      setActionLoading(null);
+    }
   }
 
   function downloadExcel() {
@@ -191,12 +220,13 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                   </th>
                 );
               })}
+              {admin && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">처리</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-16 text-gray-400 dark:text-gray-500">
+                <td colSpan={admin ? 9 : 8} className="text-center py-16 text-gray-400 dark:text-gray-500">
                   {transactions.length === 0
                     ? `${mode} 내역이 없습니다.`
                     : "조건에 맞는 내역이 없습니다."}
@@ -216,6 +246,16 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                 <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{t.siteName ?? "-"}</td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{t.userName}</td>
                 <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs max-w-[140px] truncate">{t.note ?? "-"}</td>
+                {admin && (
+                  <td className="px-4 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                    <div className="flex gap-1">
+                      <button type="button" disabled={actionLoading === t.id} onClick={() => setEditingTx(t)}
+                        className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors">수정</button>
+                      <button type="button" disabled={actionLoading === t.id} onClick={() => handleDelete(t.id)}
+                        className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors">취소</button>
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -223,6 +263,89 @@ export default function StockHistoryClient({ mode, initial }: Props) {
         </div>
       </div>
 
+      {editingTx && (
+        <EditTransactionModal
+          tx={editingTx}
+          onClose={() => setEditingTx(null)}
+          onSave={handleSaveEdit}
+          sites={sites}
+        />
+      )}
     </>
+  );
+}
+
+function EditTransactionModal({
+  tx,
+  onClose,
+  onSave,
+  sites,
+}: {
+  tx: TransactionRecord;
+  onClose: () => void;
+  onSave: (data: Record<string, unknown>) => void;
+  sites: SiteOption[];
+}) {
+  const [qty, setQty] = useState(tx.qty.toString());
+  const [siteName, setSiteName] = useState(tx.siteName ?? "");
+  const [note, setNote] = useState(tx.note ?? "");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!qty || isNaN(Number(qty)) || Number(qty) <= 0) {
+      alert("유효한 수량을 입력해주세요.");
+      return;
+    }
+    onSave({ qty: Number(qty), siteName, note });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-[400px] overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">내역 수정</h3>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none">&times;</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div className="mb-4">
+            <p className="text-xs text-gray-500 dark:text-gray-400">자재 정보</p>
+            <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{tx.materialName} <span className="text-xs font-mono text-gray-400">({tx.materialId})</span></p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">수량 <span className="text-red-500">*</span></label>
+            <input type="number" value={qty} onChange={e => setQty(e.target.value)} required min="1"
+              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+            <p className="mt-1 text-[10px] text-orange-500">주의: 수량 변경 시 현재 재고도 함께 변동됩니다.</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">현장</label>
+            <select value={siteName} onChange={e => setSiteName(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+              <option value="">(선택 안함)</option>
+              {sites.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">비고</label>
+            <input type="text" value={note} onChange={e => setNote(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+          </div>
+
+          <div className="mt-6 flex justify-end gap-2 pt-4 border-t border-gray-100 dark:border-gray-700">
+            <button type="button" onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+              취소
+            </button>
+            <button type="submit"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+              저장
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

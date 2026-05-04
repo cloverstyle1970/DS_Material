@@ -205,8 +205,12 @@ export default function MaterialRequestEntry() {
               <tr key={r.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-blue-50/30 dark:hover:bg-blue-900/10">
                 <Td center className="text-gray-800 dark:text-gray-200 font-medium">{i + 1}</Td>
                 <Td>
-                  <input type="text" value={r.materialId} readOnly
-                    className={cellInput + " bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500"} />
+                  <MatInlineSearch
+                    value={r.materialId}
+                    matType={matType}
+                    onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
+                    onChange={v => patchRow(r.id, { materialId: v })}
+                  />
                 </Td>
                 <Td>
                   <MatInlineSearch
@@ -217,9 +221,12 @@ export default function MaterialRequestEntry() {
                   />
                 </Td>
                 <Td>
-                  <input type="text" value={r.spec}
-                    onChange={e => patchRow(r.id, { spec: e.target.value })}
-                    className={cellInput} />
+                  <MatInlineSearch
+                    value={r.spec}
+                    matType={matType}
+                    onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
+                    onChange={v => patchRow(r.id, { spec: v })}
+                  />
                 </Td>
                 <Td right>
                   <input type="text" inputMode="numeric" value={r.qty === 0 ? "" : String(r.qty)}
@@ -306,7 +313,16 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
   const [results, setResults]   = useState<MaterialRecord[]>([]);
   const [checked, setChecked]   = useState<Set<string>>(new Set());
   const [open, setOpen]         = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
+  const ulRef = useRef<HTMLUListElement>(null);
+
+  useEffect(() => {
+    if (focusedIndex >= 0 && ulRef.current) {
+      const el = ulRef.current.children[focusedIndex] as HTMLElement;
+      if (el) el.scrollIntoView({ block: "nearest" });
+    }
+  }, [focusedIndex]);
 
   useEffect(() => {
     const t = setTimeout(async () => {
@@ -317,6 +333,7 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
         const data = await api.get<MaterialRecord[]>(`/api/materials?${params}`);
         setResults(data.slice(0, 15));
         setOpen(data.length > 0);
+        setFocusedIndex(-1);
       } catch { setResults([]); setOpen(false); }
     }, value.trim() ? 150 : 0);
     return () => clearTimeout(t);
@@ -349,6 +366,19 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
     setOpen(false);
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!open || results.length === 0) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setFocusedIndex(i => (i < results.length - 1 ? i + 1 : i)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setFocusedIndex(i => (i > 0 ? i - 1 : 0)); }
+    else if (e.key === " ") { if (focusedIndex >= 0) { e.preventDefault(); toggle(results[focusedIndex].id); } }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      if (checked.size > 0) applyChecked();
+      else if (focusedIndex >= 0) { onMultiSelect([results[focusedIndex]]); setChecked(new Set()); setOpen(false); }
+    }
+    else if (e.key === "Escape") setOpen(false);
+  }
+
   return (
     <div ref={ref} className="relative">
       <input
@@ -356,19 +386,20 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
         value={value}
         onChange={e => { onChange(e.target.value); setChecked(new Set()); }}
         onFocus={() => results.length > 0 && setOpen(true)}
+        onKeyDown={handleKeyDown}
         className={cellInput}
       />
       {open && results.length > 0 && (
         <div className="absolute z-50 top-full left-0 mt-0.5 w-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl">
-          <ul className="max-h-52 overflow-y-auto">
-            {results.map(m => (
+          <ul ref={ulRef} className="max-h-52 overflow-y-auto">
+            {results.map((m, idx) => (
               <li key={m.id}>
                 <button
                   type="button"
                   onMouseDown={e => e.preventDefault()}
                   onClick={() => toggle(m.id)}
                   className={`w-full text-left px-3 py-2 transition-colors border-b border-gray-50 dark:border-gray-700 last:border-0 flex items-center gap-2 ${
-                    checked.has(m.id) ? "bg-blue-50 dark:bg-blue-900/30" : "hover:bg-gray-50 dark:hover:bg-gray-700"
+                    checked.has(m.id) ? "bg-blue-50 dark:bg-blue-900/30" : focusedIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"
                   }`}
                 >
                   <input
@@ -381,6 +412,7 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
                     <div className="text-xs font-medium text-gray-800 dark:text-gray-200">{m.name}</div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{m.id}</span>
+                      {m.modelNo && <span className="text-[10px] text-gray-500 dark:text-gray-400 border-l border-gray-300 dark:border-gray-600 pl-2">{m.modelNo}</span>}
                       {m.alias && <span className="text-[10px] text-gray-400 dark:text-gray-500">{m.alias}</span>}
                       <span className="text-[10px] text-gray-300 dark:text-gray-500 ml-auto">재고 {m.stockQty}</span>
                     </div>
@@ -392,7 +424,7 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
           {/* 다중선택 적용 버튼 */}
           <div className="px-3 py-2 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-b-lg">
             <span className="text-xs text-gray-500 dark:text-gray-400">
-              {checked.size > 0 ? `${checked.size}개 선택됨` : "항목을 클릭하여 선택"}
+              {checked.size > 0 ? `${checked.size}개 선택됨` : "항목을 클릭하여 선택 (스페이스바로 체크)"}
             </span>
             <button
               type="button"
@@ -401,7 +433,7 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
               disabled={checked.size === 0}
               className="px-3 py-1 text-xs bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              {checked.size > 0 ? `${checked.size}개 추가` : "추가"}
+              {checked.size > 0 ? `${checked.size}개 추가` : "엔터로 추가"}
             </button>
           </div>
         </div>
@@ -427,11 +459,22 @@ function SiteInlineSearch({ value, onChange, sites }: {
   sites: { id: number; name: string }[];
 }) {
   const [open, setOpen] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
+  const ulRef = useRef<HTMLUListElement>(null);
 
   const suggestions = value.trim()
     ? sites.filter(s => s.name.toLowerCase().includes(value.toLowerCase())).slice(0, 10)
     : [];
+
+  useEffect(() => { setFocusedIndex(-1); }, [value]);
+
+  useEffect(() => {
+    if (focusedIndex >= 0 && ulRef.current) {
+      const el = ulRef.current.children[focusedIndex] as HTMLElement;
+      if (el) el.scrollIntoView({ block: "nearest" });
+    }
+  }, [focusedIndex]);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -441,20 +484,32 @@ function SiteInlineSearch({ value, onChange, sites }: {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!open || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setFocusedIndex(i => (i < suggestions.length - 1 ? i + 1 : i)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setFocusedIndex(i => (i > 0 ? i - 1 : 0)); }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      if (focusedIndex >= 0) { onChange(suggestions[focusedIndex].name); setOpen(false); }
+    }
+    else if (e.key === "Escape") setOpen(false);
+  }
+
   return (
     <div ref={ref} className="relative">
       <input type="text" value={value}
         onChange={e => { onChange(e.target.value); setOpen(true); }}
         onFocus={() => value.trim() && setOpen(true)}
+        onKeyDown={handleKeyDown}
         className={inputCls} />
       {open && suggestions.length > 0 && (
-        <ul className="absolute z-50 top-full left-0 mt-0.5 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-52 overflow-y-auto">
-          {suggestions.map(s => (
+        <ul ref={ulRef} className="absolute z-50 top-full left-0 mt-0.5 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-52 overflow-y-auto">
+          {suggestions.map((s, idx) => (
             <li key={s.id}>
               <button type="button"
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => { onChange(s.name); setOpen(false); }}
-                className="w-full text-left px-3 py-2 text-xs text-gray-800 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors border-b border-gray-50 dark:border-gray-700 last:border-0">
+                className={`w-full text-left px-3 py-2 text-xs text-gray-800 dark:text-gray-200 transition-colors border-b border-gray-50 dark:border-gray-700 last:border-0 ${focusedIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-blue-50 dark:hover:bg-blue-900/20"}`}>
                 {s.name}
               </button>
             </li>

@@ -61,6 +61,15 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    id: "construction",
+    label: "공사일정",
+    color: "text-orange-400",
+    items: [
+      { href: "/construction/schedule", label: "일정 캘린더", icon: "📅" },
+      { href: "/construction/requests", label: "공사 요청", icon: "📝" }
+    ],
+  },
+  {
     id: "hr",
     label: "관리/인사",
     color: "text-purple-400",
@@ -105,6 +114,8 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
     if (href === "/stats/period") return pathname === "/stats/period";
     if (href === "/stats/sites")  return pathname === "/stats/sites";
     if (href === "/inventory-check") return pathname === "/inventory-check";
+    if (href === "/construction/schedule") return pathname === "/construction/schedule";
+    if (href === "/construction/requests") return pathname === "/construction/requests";
     return pathname === href || (href !== "/" && pathname.startsWith(href + "/"));
   }
 
