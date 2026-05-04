@@ -279,9 +279,14 @@ function CalendarContent() {
                 <textarea value={details} onChange={e => setDetails(e.target.value)} rows={3} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none" />
               </div>
               <div className="pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center">
-                {editingId ? (
-                  <button type="button" onClick={handleDelete} disabled={saving} className="text-red-500 hover:text-red-700 text-sm font-medium px-2 py-1">삭제</button>
-                ) : <div />}
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={() => setSiteName("공사휴무")} className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded hover:bg-green-700 transition-colors">
+                    공사휴무
+                  </button>
+                  {editingId && (
+                    <button type="button" onClick={handleDelete} disabled={saving} className="text-red-500 hover:text-red-700 text-sm font-medium px-2 py-1">삭제</button>
+                  )}
+                </div>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600">취소</button>
                   <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded hover:bg-orange-700 disabled:opacity-50">저장</button>
