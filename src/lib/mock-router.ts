@@ -568,34 +568,40 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
 
 async function routePOST(path: string, body: AnyBody): Promise<unknown> {
   if (path === "/api/materials") {
-    const { isDs, major, mid, sub, isRepair, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty } = body;
+    const { sourceId, isDs, major, mid, sub, isRepair, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty } = body;
     if (!major || !mid || !sub) throw new MockApiError("분류 코드(major/mid/sub)가 누락됐습니다", 400);
 
-    // 동일 분류 내 최대 일련번호 조회 후 +1 채번
-    // "_" 는 PostgreSQL LIKE 와일드카드이므로 LIKE 대신 범위 비교 사용
-    const prefix = isDs ? "D" : "_";
-    const catPrefix = `${prefix}${major}${mid}${sub}`;
-    const catPrefixNext = `${prefix}${major}${mid}${sub.replace(/.$/, (c: string) => String.fromCharCode(c.charCodeAt(0) + 1))}`;
-    let seqQuery = supabase.from("materials").select("id");
-    if (isDs) {
-      // DS: prefix가 "D"이므로 LIKE 사용 가능
-      seqQuery = seqQuery.like("id", `D${major}${mid}${sub}%`);
+    let id: string;
+    if (sourceId) {
+      // 수리품: 원본 자재코드 뒤에 "R"을 붙여 13자리 ID로 사용
+      if (typeof sourceId !== "string" || !sourceId) throw new MockApiError("원본 자재코드가 유효하지 않습니다", 400);
+      id = `${sourceId}R`;
     } else {
-      // TK: "_"가 LIKE 와일드카드이므로 gte/lt 범위로 조회
-      seqQuery = seqQuery.gte("id", catPrefix).lt("id", catPrefixNext);
+      // 신규 자재: 동일 분류 내 최대 일련번호 조회 후 +1 채번
+      // "_" 는 PostgreSQL LIKE 와일드카드이므로 LIKE 대신 범위 비교 사용
+      const prefix = isDs ? "D" : "_";
+      const catPrefix = `${prefix}${major}${mid}${sub}`;
+      const catPrefixNext = `${prefix}${major}${mid}${sub.replace(/.$/, (c: string) => String.fromCharCode(c.charCodeAt(0) + 1))}`;
+      let seqQuery = supabase.from("materials").select("id");
+      if (isDs) {
+        // DS: prefix가 "D"이므로 LIKE 사용 가능
+        seqQuery = seqQuery.like("id", `D${major}${mid}${sub}%`);
+      } else {
+        // TK: "_"가 LIKE 와일드카드이므로 gte/lt 범위로 조회
+        seqQuery = seqQuery.gte("id", catPrefix).lt("id", catPrefixNext);
+      }
+      const { data: existing } = await seqQuery;
+      const seqs = (existing ?? [])
+        .map((r: { id: string | null }) => {
+          const rid = r?.id;
+          if (!rid || rid.length !== 12 || rid.slice(0, 7) !== catPrefix) return NaN;
+          return parseInt(rid.slice(7, 11), 10);
+        })
+        .filter((n): n is number => Number.isFinite(n));
+      const seq = seqs.length ? Math.max(...seqs) + 1 : 1;
+      if (seq > 9999) throw new MockApiError("일련번호 초과 (최대 9999)", 400);
+      id = generateMaterialCode({ isDs, major, mid, sub, seq, isRepair });
     }
-    const { data: existing } = await seqQuery;
-    const seqs = (existing ?? [])
-      .map((r: { id: string | null }) => {
-        const id = r?.id;
-        if (!id || id.length !== 12 || id.slice(0, 7) !== catPrefix) return NaN;
-        return parseInt(id.slice(7, 11), 10);
-      })
-      .filter((n): n is number => Number.isFinite(n));
-    const seq = seqs.length ? Math.max(...seqs) + 1 : 1;
-    if (seq > 9999) throw new MockApiError("일련번호 초과 (최대 9999)", 400);
-
-    const id = generateMaterialCode({ isDs, major, mid, sub, seq, isRepair });
     const row = {
       id,
       category_code: `${major}${mid}${sub}`,

@@ -75,16 +75,18 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
     return () => clearTimeout(t);
   }, [major, mid, cats]);
 
-  const previewCode = major && mid && sub
-    ? generateMaterialCode({ isDs, major, mid, sub, seq: 9999, isRepair }).slice(0, 7) + "?????"
-    : "____________";
+  const previewCode = isRepairMode && source
+    ? `${source.id}R`
+    : major && mid && sub
+      ? generateMaterialCode({ isDs, major, mid, sub, seq: 9999, isRepair }).slice(0, 7) + "?????"
+      : "____________";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !major || !mid || !sub) return;
     setSaving(true);
     try {
-      await api.post("/api/materials", { isDs, major, mid, sub, isRepair, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty });
+      await api.post("/api/materials", { sourceId: source?.id, isDs, major, mid, sub, isRepair, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty });
       onSaved();
     } catch (e) {
       alert(getErrorMessage(e));
@@ -147,7 +149,8 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
                 <div key={label}>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{label}</label>
                   <select value={value} onChange={e => onChange(e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                    disabled={isRepairMode}
+                    className="w-full rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:opacity-60 disabled:cursor-not-allowed">
                     {options.map(o => <option key={o.code} value={o.code}>{o.code} {o.label}</option>)}
                   </select>
                 </div>
