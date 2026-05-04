@@ -453,6 +453,7 @@ function SiteInlineSearch({ value, onChange, sites }: { value: string; onChange:
     else if (e.key === "Enter") {
       e.preventDefault();
       if (focusedIndex >= 0) { onChange(suggestions[focusedIndex].name); setOpen(false); }
+      else if (suggestions.length === 1) { onChange(suggestions[0].name); setOpen(false); }
     }
     else if (e.key === "Escape") setOpen(false);
   }

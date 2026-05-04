@@ -28,12 +28,30 @@ export default function ConstructionRequestClient() {
   const [elevatorName, setElevatorName] = useState("");
   const [details, setDetails] = useState("");
   const [sites, setSites] = useState<SiteOption[]>([]);
+  const [elevators, setElevators] = useState<{ id: number; unitName: string }[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchRequests();
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (siteName && sites.find(s => s.name === siteName)) {
+      api.get<{ id: number; unitName: string }[]>(`/api/elevators?site=${encodeURIComponent(siteName)}`)
+        .then(data => {
+          setElevators(data);
+          if (data.length === 1) {
+            setElevatorName(data[0].unitName);
+          } else if (data.length > 1 && !data.some(e => e.unitName === elevatorName)) {
+            setElevatorName(""); // reset if current is invalid
+          }
+        })
+        .catch(() => setElevators([]));
+    } else {
+      setElevators([]);
+    }
+  }, [siteName, sites]);
 
   async function fetchRequests() {
     setLoading(true);
@@ -142,6 +160,16 @@ export default function ConstructionRequestClient() {
                   type="text" 
                   value={siteName} 
                   onChange={e => setSiteName(e.target.value)} 
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && siteName.trim()) {
+                      const matched = sites.filter(s => s.name.toLowerCase().includes(siteName.toLowerCase()));
+                      if (matched.length === 1) {
+                        e.preventDefault();
+                        setSiteName(matched[0].name);
+                        e.currentTarget.blur();
+                      }
+                    }
+                  }}
                   placeholder="현장명을 입력하거나 검색하세요" 
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   list="sites-list"
@@ -152,13 +180,24 @@ export default function ConstructionRequestClient() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">호기 정보</label>
-                <input 
-                  type="text" 
-                  value={elevatorName} 
-                  onChange={e => setElevatorName(e.target.value)} 
-                  placeholder="예: 1호기, 2호기 (생략 가능)" 
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
+                {elevators.length > 0 ? (
+                  <select 
+                    value={elevatorName} 
+                    onChange={e => setElevatorName(e.target.value)} 
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="">호기 선택 (생략 가능)</option>
+                    {elevators.map(e => <option key={e.id} value={e.unitName}>{e.unitName}</option>)}
+                  </select>
+                ) : (
+                  <input 
+                    type="text" 
+                    value={elevatorName} 
+                    onChange={e => setElevatorName(e.target.value)} 
+                    placeholder="예: 1호기, 2호기 (생략 가능)" 
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">공사 내역 <span className="text-red-500">*</span></label>

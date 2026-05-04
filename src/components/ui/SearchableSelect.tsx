@@ -53,6 +53,12 @@ export default function SearchableSelect({ options, value, onChange, placeholder
         value={query}
         onChange={e => handleChange(e.target.value)}
         onFocus={() => setOpen(true)}
+        onKeyDown={e => {
+          if (e.key === "Enter" && query.trim() && filtered.length === 1) {
+            e.preventDefault();
+            select(filtered[0].name);
+          }
+        }}
         placeholder={placeholder}
         autoComplete="off"
         className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-slate-400"
