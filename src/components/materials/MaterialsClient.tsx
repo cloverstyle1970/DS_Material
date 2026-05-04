@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import * as XLSX from "xlsx";
 import { MaterialRecord } from "@/lib/mock-materials";
 import AddMaterialModal from "./AddMaterialModal";
@@ -10,6 +10,11 @@ import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 
 const LOW_STOCK_THRESHOLD = 5;
+
+type SortKey = "id" | "name" | "modelNo" | "unit" | "buyPrice" | "sellPrice" | "storageLoc" | "stockQty";
+type SortDir = "asc" | "desc";
+
+const NUMERIC_KEYS: ReadonlySet<SortKey> = new Set(["buyPrice", "sellPrice", "stockQty"]);
 
 function StockCell({ material, editable }: { material: MaterialRecord; editable: boolean }) {
   const [qty, setQty] = useState(material.stockQty);
@@ -65,6 +70,14 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState<MaterialRecord | null>(null);
   const [loading, setLoading] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  function toggleSort(key: SortKey) {
+    if (key === sortKey) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir(NUMERIC_KEYS.has(key) ? "desc" : "asc"); }
+    setPage(1);
+  }
 
   useEffect(() => {
     api.get<MaterialRecord[]>("/api/materials").then(setMaterials).catch(() => {});
@@ -89,9 +102,26 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
     );
   });
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    const numeric = NUMERIC_KEYS.has(sortKey);
+    arr.sort((a, b) => {
+      const av = a[sortKey];
+      const bv = b[sortKey];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      const cmp = numeric
+        ? Number(av) - Number(bv)
+        : String(av).localeCompare(String(bv), "ko");
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return arr;
+  }, [filtered, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
-  const paginated  = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const paginated  = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   function changePage(next: number) {
     setPage(Math.max(1, Math.min(next, totalPages)));
@@ -172,10 +202,30 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
     }
   }, []);
 
-  const headers = viewOnly
-    ? ["", "구분", "자재코드", "부품명", "규격", "단위", "판매단가", "보관장소", "재고"]
-    : ["", "구분", "자재코드", "부품명", "규격", "단위", "구매단가", "판매단가", "보관장소", "재고", ""];
-  const colSpan = headers.length;
+  type ColDef = { key: SortKey | null; label: string; align?: "left" | "right" };
+  const COLUMNS: ColDef[] = viewOnly
+    ? [
+        { key: null,         label: "구분"     },
+        { key: "id",         label: "자재코드" },
+        { key: "name",       label: "부품명"   },
+        { key: "modelNo",    label: "규격"     },
+        { key: "unit",       label: "단위"     },
+        { key: "sellPrice",  label: "판매단가", align: "right" },
+        { key: "storageLoc", label: "보관장소" },
+        { key: "stockQty",   label: "재고"     },
+      ]
+    : [
+        { key: null,         label: "구분"     },
+        { key: "id",         label: "자재코드" },
+        { key: "name",       label: "부품명"   },
+        { key: "modelNo",    label: "규격"     },
+        { key: "unit",       label: "단위"     },
+        { key: "buyPrice",   label: "구매단가", align: "right" },
+        { key: "sellPrice",  label: "판매단가", align: "right" },
+        { key: "storageLoc", label: "보관장소" },
+        { key: "stockQty",   label: "재고"     },
+      ];
+  const colSpan = COLUMNS.length + 1 + (viewOnly ? 0 : 1); // checkbox + edit
   const isDark = theme === "dark";
 
   return (
@@ -273,9 +323,26 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
                   className="w-4 h-4 rounded border-gray-300 accent-slate-700 cursor-pointer"
                 />
               </th>
-              {headers.slice(1).map(h => (
-                <th key={h} className={`px-4 py-3 text-left text-xs font-medium whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-500"}`}>{h}</th>
-              ))}
+              {COLUMNS.map(c => {
+                const active = c.key !== null && c.key === sortKey;
+                const alignCls = c.align === "right" ? "text-right" : "text-left";
+                return (
+                  <th key={c.label} className={`px-4 py-3 ${alignCls} text-xs font-medium whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-500"}`}>
+                    {c.key ? (
+                      <button type="button" onClick={() => toggleSort(c.key as SortKey)}
+                        className={`inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ${active ? "text-gray-700 dark:text-gray-100 font-semibold" : ""}`}>
+                        {c.label}
+                        <span className={`text-[10px] ${active ? "opacity-100" : "opacity-30"}`}>
+                          {active ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
+                        </span>
+                      </button>
+                    ) : (
+                      c.label
+                    )}
+                  </th>
+                );
+              })}
+              {!viewOnly && <th className="px-4 py-3" />}
             </tr>
           </thead>
           <tbody className={`divide-y ${isDark ? "divide-gray-700" : "divide-gray-100"}`}>

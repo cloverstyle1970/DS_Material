@@ -427,12 +427,20 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
   if (path === "/api/materials") {
     const q = params.get("q");
     const matType = params.get("matType") as "DS" | "TK" | null;
-    let query = supabase.from("materials").select("*").order("name");
-    if (matType === "DS") query = query.like("id", "D%");
-    if (matType === "TK") query = query.not("id", "like", "D%");
-    const { data, error } = await query;
-    if (error) throw new MockApiError(error.message, 500);
-    let list = (data ?? []).map(dbToMaterial);
+    const PAGE = 1000;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const all: any[] = [];
+    for (let offset = 0; ; offset += PAGE) {
+      let query = supabase.from("materials").select("*").order("name").range(offset, offset + PAGE - 1);
+      if (matType === "DS") query = query.like("id", "D%");
+      if (matType === "TK") query = query.not("id", "like", "D%");
+      const { data, error } = await query;
+      if (error) throw new MockApiError(error.message, 500);
+      const rows = data ?? [];
+      all.push(...rows);
+      if (rows.length < PAGE) break;
+    }
+    let list = all.map(dbToMaterial);
     if (q) {
       const qLower = q.toLowerCase();
       list = list.filter(m =>
@@ -494,11 +502,19 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
   }
   if (path === "/api/elevators") {
     const site = params.get("site");
-    let query = supabase.from("elevators").select("*").order("unit_name");
-    if (site) query = query.eq("site_name", site);
-    const { data, error } = await query;
-    if (error) throw new MockApiError(error.message, 500);
-    return (data ?? []).map(dbToElevator);
+    const PAGE = 1000;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const all: any[] = [];
+    for (let offset = 0; ; offset += PAGE) {
+      let query = supabase.from("elevators").select("*").order("unit_name").range(offset, offset + PAGE - 1);
+      if (site) query = query.eq("site_name", site);
+      const { data, error } = await query;
+      if (error) throw new MockApiError(error.message, 500);
+      const rows = data ?? [];
+      all.push(...rows);
+      if (rows.length < PAGE) break;
+    }
+    return all.map(dbToElevator);
   }
   if (path === "/api/transactions") {
     const type = params.get("type");
