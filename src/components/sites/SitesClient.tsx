@@ -791,9 +791,9 @@ export default function SitesClient({ initial, elevators }: Props) {
                     <p className="text-sm">등록된 호기가 없습니다</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-auto max-h-[calc(100vh-250px)]">
                     <table className="w-full text-sm">
-                      <thead className={`border-b ${isDark ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-100"}`}>
+                      <thead className={`sticky top-0 z-10 border-b ${isDark ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-100"}`}>
                         <tr>
                           <th className={`px-4 py-3 text-left text-xs font-medium w-8 ${isDark ? "text-gray-400" : "text-gray-500"}`}>#</th>
                           <th className={`px-4 py-3 text-left text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>호기명</th>

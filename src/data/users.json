@@ -11,7 +11,21 @@
     "phone": "010-7177-7094",
     "status": "재직",
     "address": "경기 고양시 일산동구 숲속마을로 68 604동 404호(숲속마을6단지아파트)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 2,
@@ -26,7 +40,19 @@
     "status": "재직",
     "address": "서울 영등포구 당산로 95 102동 303호(현대아파트)",
     "permissions": [
-      "admin"
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
     ]
   },
   {
@@ -41,7 +67,21 @@
     "phone": "010-5221-1582",
     "status": "재직",
     "address": "경기 고양시 덕양구 소원로 47 607동 408호(무원마을6단지아파트)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 4,
@@ -55,7 +95,21 @@
     "phone": "010-3139-1196",
     "status": "재직",
     "address": "경기 고양시 덕양구 세솔로 149 1601동 1105호(삼송마을엘에이치16단지)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 5,
@@ -69,7 +123,21 @@
     "phone": "010-8632-3875",
     "status": "재직",
     "address": "경기 파주시 청석로 350 811동 202호(청석마을 운정 동문 THE EST)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 6,
@@ -83,7 +151,21 @@
     "phone": "010-5743-5005",
     "status": "재직",
     "address": "서울 은평구 갈현로 101-1",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 7,
@@ -97,7 +179,21 @@
     "phone": "010-9388-0066",
     "status": "재직",
     "address": "경기 파주시 조리읍 대원로 56 302동 202호(그린시티동문아파트)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 8,
@@ -111,7 +207,21 @@
     "phone": "010-3713-3006",
     "status": "재직",
     "address": "인천 강화군 선원면 중앙로447번길 1-7",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 9,
@@ -125,7 +235,21 @@
     "phone": "010-5248-5921",
     "status": "재직",
     "address": "경기 남양주시 진접읍 내각1로73번안길 21-4 108동 101호 (이현궁안에)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 10,
@@ -139,7 +263,21 @@
     "phone": "010-6266-5940",
     "status": "재직",
     "address": "경기 시흥시 은행로 108 303동 1905호(벽산아파트)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 11,
@@ -153,7 +291,21 @@
     "phone": "010-5500-4776",
     "status": "재직",
     "address": "서울 은평구 통일로 630 202동 1005호(래미안베라힐즈)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 12,
@@ -167,7 +319,21 @@
     "phone": "010-2581-5688",
     "status": "재직",
     "address": "경기 고양시 일산서구 일현로 97-11 101동 4207호(일산 위브더제니스)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 13,
@@ -181,7 +347,21 @@
     "phone": "010-3181-0603",
     "status": "재직",
     "address": "경기 파주시 탄현면 사슴벌레로 50 101호(화이트빌)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 14,
@@ -195,7 +375,21 @@
     "phone": "010-8896-0257",
     "status": "재직",
     "address": "경기 파주시 정담길 185 520호(그린아파트)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 15,
@@ -225,7 +419,21 @@
     "phone": "010-7906-9080",
     "status": "재직",
     "address": "경기 고양시 덕양구 푸른마을로 37 702동 403호 (푸른마을7단지아파트)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 17,
@@ -239,7 +447,21 @@
     "phone": "010-2224-0923",
     "status": "재직",
     "address": "경기 파주시 파주읍 연풍5길 51",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 18,
@@ -253,7 +475,21 @@
     "phone": "010-3958-1279",
     "status": "재직",
     "address": "경기 고양시 덕양구 충장로152번길 39 2002동 1101호 (햇빛마을20단지아파트)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 19,
@@ -268,7 +504,19 @@
     "status": "재직",
     "address": "경기 고양시 덕양구 지도로80번길 3 304호",
     "permissions": [
-      "site_manage"
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
     ]
   },
   {
@@ -284,7 +532,19 @@
     "status": "재직",
     "address": "경기 파주시 동패로 100 303동 803호(한울마을3단지 운정더클래스)",
     "permissions": [
-      "admin"
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
     ]
   },
   {
@@ -299,7 +559,21 @@
     "phone": "010-7762-8429",
     "status": "재직",
     "address": "경기 고양시 덕양구 삼송로193번길 95-25",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 22,
@@ -329,7 +603,21 @@
     "phone": "010-4081-8505",
     "status": "재직",
     "address": "서울 은평구 통일로68가길 3-10 101호(한창주택)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 24,
@@ -343,7 +631,21 @@
     "phone": "010-2905-2027",
     "status": "재직",
     "address": "경기 파주시 금바위로 47 813동 1105호(가람마을8단지 동문굿모닝힐)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 25,
@@ -357,7 +659,21 @@
     "phone": "010-8985-9069",
     "status": "재직",
     "address": "서울 도봉구 시루봉로 58 601동 501호(쌍문6차한양아파트)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 26,
@@ -371,7 +687,21 @@
     "phone": "010-7106-9559",
     "status": "재직",
     "address": "경기 고양시 일산동구 감내길 127 3동 301호(에덴빌리지)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 27,
@@ -385,7 +715,21 @@
     "phone": "010-9125-0912",
     "status": "재직",
     "address": "인천 계양구 새벌로112번길 12 404동 1402호(현대4차아파트)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 28,
@@ -399,7 +743,21 @@
     "phone": "010-9811-7129",
     "status": "재직",
     "address": "경기 고양시 일산서구 강성로 62 905동 801호(강선마을9단지아파트)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 29,
@@ -413,7 +771,21 @@
     "phone": "010-6265-9930",
     "status": "재직",
     "address": "인천 부평구 충선로 18 203호(천기레뷰)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 30,
@@ -427,7 +799,21 @@
     "phone": "010-5759-4387",
     "status": "재직",
     "address": "경기 고양시 일산서구 일현로41번길 16 815호 (탄현 헤센스마트)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 31,
@@ -441,7 +827,21 @@
     "phone": "010-7762-1470",
     "status": "재직",
     "address": "경기 고양시 덕양구 은빛로77번길 39-4 102호(동화마을)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 32,
@@ -455,7 +855,21 @@
     "phone": "010-9392-2880",
     "status": "재직",
     "address": "서울 은평구 불광로8길 4-5 4층 402호",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 33,
@@ -469,7 +883,21 @@
     "phone": "010-7538-3465",
     "status": "재직",
     "address": "경기 고양시 일산동구 고봉로620번길 52-12 102동 302호(해가온)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 34,
@@ -483,7 +911,21 @@
     "phone": "010-2755-6055",
     "status": "재직",
     "address": "경기 파주시 정담길 20 101동 704호(파라다이스아파트)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 35,
@@ -497,7 +939,21 @@
     "phone": "010-6429-0659",
     "status": "재직",
     "address": "경기 고양시 덕양구 의장로 114 914호(더하이브 A타워)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 36,
@@ -511,7 +967,21 @@
     "phone": "010-9475-6856",
     "status": "재직",
     "address": "경기 파주시 초롱꽃로 17 302동 406호(초롱꽃마을3단지)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 37,
@@ -525,7 +995,21 @@
     "phone": "010-3841-8850",
     "status": "재직",
     "address": "인천 미추홀구 매소홀로 511 204호(온누리타운)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 38,
@@ -539,7 +1023,21 @@
     "phone": "010-9374-2363",
     "status": "재직",
     "address": "서울 동작구 상도로68가길 10 302호(골든빌라)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 39,
@@ -553,7 +1051,21 @@
     "phone": "010-8101-8507",
     "status": "퇴직",
     "address": "경기 성남시 분당구 판교로197번길 12-1",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 40,
@@ -567,7 +1079,21 @@
     "phone": "010-2489-2920",
     "status": "재직",
     "address": "경기 고양시 덕양구 소원로181번길 20 711동 403호(서정마을7단지아파트)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 41,
@@ -581,7 +1107,21 @@
     "phone": "010-9110-3115",
     "status": "재직",
     "address": "경기 파주시 돌곶이길 108-42",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 42,
@@ -595,7 +1135,21 @@
     "phone": "010-7767-4188",
     "status": "재직",
     "address": "경기 김포시 고촌읍 수기로 67-53 221동 804호(수기마을힐스테이트2단지)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 43,
@@ -609,7 +1163,21 @@
     "phone": "010-4458-3324",
     "status": "재직",
     "address": "경기 고양시 덕양구 세솔로 25 2213동 2701호(동산마을 22단지 호반베르디움)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 44,
@@ -623,7 +1191,21 @@
     "phone": "010-4175-8248",
     "status": "재직",
     "address": "경기 고양시 덕양구 백양로 84 1201동 801호(옥빛마을12단지아파트)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 45,
@@ -637,7 +1219,21 @@
     "phone": "010-4086-6692",
     "status": "재직",
     "address": "서울 관악구 호암로 399 305동 203호(삼성산주공아파트)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 46,
@@ -651,7 +1247,21 @@
     "phone": "010-5264-2694",
     "status": "재직",
     "address": "서울 강서구 화곡로 341 103동 1203호(그랜드아이파크)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 47,
@@ -665,7 +1275,21 @@
     "phone": "010-2670-5832",
     "status": "재직",
     "address": "서울 강남구 개포로109길 5 101동 806로(대치아파트)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 48,
@@ -679,7 +1303,21 @@
     "phone": "010-4181-8308",
     "status": "재직",
     "address": "경기 고양시 덕양구 삼송로 238 310동 1113호(힐스테이트삼송역스칸센)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 49,
@@ -693,7 +1331,21 @@
     "phone": "010-7414-8774",
     "status": "재직",
     "address": "경기 파주시 와석순환로 347 209동 1402호(해솔마을2단지 월드메르디앙)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 50,
@@ -707,7 +1359,21 @@
     "phone": "010-6402-4390",
     "status": "재직",
     "address": "경기 부천시 원미구 원미로 245 101동 402호(트리플스테이트by로뎀)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 51,
@@ -721,7 +1387,21 @@
     "phone": "010-8996-5744",
     "status": "퇴직",
     "address": "경기 부천시 원미구 신흥로321번길 28-9 2동 112호(흥립약대아파트)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 52,
@@ -735,7 +1415,21 @@
     "phone": "010-3160-6526",
     "status": "재직",
     "address": "서울 은평구 통일로65길 3-10",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 53,
@@ -749,7 +1443,21 @@
     "phone": "010-2105-6754",
     "status": "퇴직",
     "address": "서울 성북구 화랑로48길 16 108동 501호(두산아파트)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 54,
@@ -763,7 +1471,21 @@
     "phone": "010-7565-2870",
     "status": "퇴직",
     "address": "서울 동작구 동작대로11길 64 102호(삼성월드아파트)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 55,
@@ -777,7 +1499,21 @@
     "phone": "010-2222-6766",
     "status": "퇴직",
     "address": "서울 서대문구 증가로 150 110동 1201호(DMC센트럴아이파크)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 56,
@@ -791,7 +1527,21 @@
     "phone": "010-8949-1419",
     "status": "퇴직",
     "address": "경기 남양주시 경춘로1286번길 35 1608동 402호(평내마을상록데시앙)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 57,
@@ -805,7 +1555,21 @@
     "phone": "010-3939-9087",
     "status": "퇴직",
     "address": "서울 관악구 신사로 82 712호(아데나534)",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 58,
@@ -819,7 +1583,21 @@
     "phone": "010-9293-0582",
     "status": "퇴직",
     "address": "서울 용산구 보광로31길 24-3",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 59,
@@ -833,7 +1611,21 @@
     "phone": "010-8373-9673",
     "status": "재직",
     "address": "경기 고양시 일산동구 숲속마을로 48 경기 고양시 일산동구 숲속마을로 48",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 60,
@@ -847,7 +1639,21 @@
     "phone": "010-3906-4878",
     "status": "퇴직",
     "address": "인천 중구 운남동 1532-7 인천 중구 운남동 1532-7",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 61,
@@ -861,7 +1667,21 @@
     "phone": "010-6236-3312",
     "status": "재직",
     "address": "경기 고양시 덕양구 호국로627번길 144-16 경기 고양시 덕양구 호국로627번길 144-16",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 62,
@@ -875,7 +1695,21 @@
     "phone": "010-8674-6771",
     "status": "재직",
     "address": "",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 63,
@@ -889,7 +1723,21 @@
     "phone": "010-4620-7569",
     "status": "재직",
     "address": "경기 김포시 감정로38번길 16 푸른마을(신안실크밸리1차아파트) 102동 1405호",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 65,
@@ -903,7 +1751,21 @@
     "phone": "010-7160-5172",
     "status": "재직",
     "address": "경기 고양시 일산동구 숲속마을2로 136 경기 고양시 일산동구 숲속마을2로 136",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 66,
@@ -917,7 +1779,21 @@
     "phone": "010-8758-5301",
     "status": "재직",
     "address": "경기 고양시 덕양구 내유동 432-9 경기 고양시 덕양구 내유동 432-9",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   },
   {
     "id": 67,
@@ -931,6 +1807,20 @@
     "phone": "010-3760-7041",
     "status": "재직",
     "address": "경기 용인시 수지구 죽전로27번길 14-30 경기 용인시 수지구 죽전로27번길 14-30",
-    "permissions": []
+    "permissions": [
+      "menu:/data/users:read",
+      "menu:/data/vendors:read",
+      "menu:/site/units:read",
+      "menu:/material:read",
+      "menu:/requests:read",
+      "menu:/purchase-orders:read",
+      "menu:/inbound:read",
+      "menu:/outbound:read",
+      "menu:/stats/period:read",
+      "menu:/stats/sites:read",
+      "menu:/inventory-check:read",
+      "menu:/construction/schedule:read",
+      "menu:/construction/requests:read"
+    ]
   }
 ]

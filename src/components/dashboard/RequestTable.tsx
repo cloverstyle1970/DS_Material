@@ -78,9 +78,9 @@ export default function RequestTable({ requests }: { requests: RecentRequest[] }
           전체 {sorted.length.toLocaleString()}건
         </span>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-[calc(100vh-250px)]">
       <table className="w-full min-w-[640px] text-sm">
-        <thead className="bg-gray-50 dark:bg-gray-700/50">
+        <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50">
           <tr>
             {COLUMNS.map(c => {
               const active = sortKey === c.key;

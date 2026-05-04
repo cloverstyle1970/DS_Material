@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { UserRecord, Permission } from "@/lib/mock-users";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { api, getErrorMessage } from "@/lib/api-client";
+import PermissionsModal from "./PermissionsModal";
 
 type SortKey = "id" | "name" | "dept" | "rank" | "cert" | "hireDate" | "phone" | "status";
 type SortDir = "asc" | "desc";
@@ -31,10 +32,20 @@ const PERMISSION_OPTIONS: { value: Permission; label: string; desc: string; colo
   { value: "view_only",   label: "조회 전용",     desc: "읽기만 가능",           color: "bg-gray-100 text-gray-500" },
 ];
 
-function PermBadge({ perm }: { perm: Permission }) {
-  const opt = PERMISSION_OPTIONS.find(o => o.value === perm);
-  if (!opt) return null;
-  return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${opt.color}`}>{opt.label}</span>;
+function PermBadge({ perms }: { perms: string[] }) {
+  if (perms.includes("admin")) return <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-50 text-red-600">시스템 관리자</span>;
+  
+  const menuPerms = perms.filter(p => p.startsWith("menu:"));
+  const viewOnly = perms.includes("view_only");
+  const siteManage = perms.includes("site_manage");
+
+  return (
+    <>
+      {siteManage && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-50 text-blue-600">현장 관리</span>}
+      {viewOnly && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-500">조회 전용</span>}
+      {menuPerms.length > 0 && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-600">상세 권한 {menuPerms.length}개</span>}
+    </>
+  );
 }
 
 function maskSsn(ssn: string | null): string {
@@ -53,8 +64,6 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<UserRecord | null>(null);
   const [editPerms, setEditPerms] = useState<UserRecord | null>(null);
-  const [savingPerms, setSavingPerms] = useState(false);
-  const [draftPerms, setDraftPerms] = useState<Permission[]>([]);
   const [sortKey, setSortKey] = useState<SortKey>("id");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
@@ -118,29 +127,7 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
   const active = users.filter(u => u.status === "재직").length;
 
   function openEditPerms(u: UserRecord) {
-    setDraftPerms([...(u.permissions ?? [])]);
     setEditPerms(u);
-  }
-
-  function togglePerm(p: Permission) {
-    setDraftPerms(prev =>
-      prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]
-    );
-  }
-
-  async function savePerms() {
-    if (!editPerms) return;
-    setSavingPerms(true);
-    try {
-      const updated = await api.patch<UserRecord>(`/api/users/${editPerms.id}`, { permissions: draftPerms });
-      setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
-      if (selected?.id === updated.id) setSelected(updated);
-      setEditPerms(null);
-    } catch (e) {
-      alert(getErrorMessage(e));
-    } finally {
-      setSavingPerms(false);
-    }
   }
 
   return (
@@ -165,9 +152,9 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
 
       {/* 테이블 */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[calc(100vh-250px)]">
         <table className="w-full min-w-[700px] text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
+          <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
             <tr>
               {COLUMNS.map(c => {
                 const active = c.sortable && c.key === sortKey;
@@ -209,7 +196,7 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
                   <div className="flex gap-1 flex-wrap">
                     {(u.permissions ?? []).length === 0
                       ? <span className="text-xs text-gray-300 dark:text-gray-600">-</span>
-                      : (u.permissions ?? []).map(p => <PermBadge key={p} perm={p} />)
+                      : <PermBadge perms={u.permissions ?? []} />
                     }
                   </div>
                 </td>
@@ -307,7 +294,7 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
                 <div className="flex gap-3 pt-1">
                   <span className="text-gray-400 dark:text-gray-500 w-20 shrink-0">권한</span>
                   <div className="flex gap-1 flex-wrap">
-                    {(selected.permissions ?? []).map(p => <PermBadge key={p} perm={p} />)}
+                    <PermBadge perms={selected.permissions ?? []} />
                   </div>
                 </div>
               )}
@@ -318,46 +305,20 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
 
       {/* 권한 수정 모달 */}
       {editPerms && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setEditPerms(null)}>
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-base font-semibold text-gray-800 dark:text-white">권한 수정</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{editPerms.name} · {editPerms.dept}</p>
-              </div>
-              <button onClick={() => setEditPerms(null)} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">×</button>
-            </div>
-
-            <div className="space-y-2 mb-6">
-              {PERMISSION_OPTIONS.map(opt => (
-                <label key={opt.value}
-                  className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors
-                    ${draftPerms.includes(opt.value) ? "border-slate-300 dark:border-slate-500 bg-slate-50 dark:bg-slate-700/50" : "border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
-                  <input type="checkbox" checked={draftPerms.includes(opt.value)}
-                    onChange={() => togglePerm(opt.value)}
-                    className="mt-0.5 accent-slate-700" />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${opt.color}`}>{opt.label}</span>
-                    </div>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{opt.desc}</p>
-                  </div>
-                </label>
-              ))}
-            </div>
-
-            <div className="flex gap-3">
-              <button type="button" onClick={() => setEditPerms(null)}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                취소
-              </button>
-              <button type="button" onClick={savePerms} disabled={savingPerms}
-                className="flex-1 py-2.5 rounded-xl bg-slate-700 text-white text-sm font-semibold hover:bg-slate-800 disabled:opacity-60 transition-colors">
-                {savingPerms ? "저장 중..." : "저장"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <PermissionsModal
+          user={editPerms}
+          onClose={() => setEditPerms(null)}
+          onSave={async (newPerms) => {
+            try {
+              const updated = await api.patch<UserRecord>(`/api/users/${editPerms.id}`, { permissions: newPerms });
+              setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+              if (selected?.id === updated.id) setSelected(updated);
+              setEditPerms(null);
+            } catch (e) {
+              alert(getErrorMessage(e));
+            }
+          }}
+        />
       )}
     </>
   );

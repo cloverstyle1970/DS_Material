@@ -197,9 +197,9 @@ export default function SiteStatsClient() {
               <p className="text-sm">해당 기간의 데이터가 없습니다</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-auto max-h-[calc(100vh-250px)]">
             <table className="w-full min-w-[500px] text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
+              <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
                 <tr>
                   {["현장명", "입고", "출고", "자재종수", "최종처리일"].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{h}</th>

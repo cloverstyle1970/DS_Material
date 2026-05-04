@@ -228,9 +228,9 @@ export default function InventoryCheckClient() {
             : isDark ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"
       }`}>
         {loading && <div className="text-center py-4 text-sm text-gray-400">로딩 중...</div>}
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[calc(100vh-250px)]">
           <table className="w-full min-w-[800px] text-sm">
-            <thead className={`border-b transition-colors ${
+            <thead className={`sticky top-0 z-10 border-b transition-colors ${
               matType === "DS"
                 ? isDark ? "bg-gray-800 border-red-800" : "bg-red-50 border-red-200"
                 : matType === "TK"

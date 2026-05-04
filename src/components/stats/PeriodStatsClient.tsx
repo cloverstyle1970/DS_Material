@@ -268,9 +268,9 @@ export default function PeriodStatsClient() {
             <p className="text-sm mt-1">입고 또는 출고를 등록하면 여기에 표시됩니다</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-auto max-h-[calc(100vh-250px)]">
             <table className="w-full min-w-[560px] text-xs">
-              <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
+              <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
                 <tr>
                   <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap sticky left-0 bg-gray-50 dark:bg-gray-700/50 z-10 min-w-[180px]">자재명</th>
                   <th className="px-3 py-3 text-left font-medium text-gray-400 dark:text-gray-500 whitespace-nowrap font-mono min-w-[120px]">코드</th>

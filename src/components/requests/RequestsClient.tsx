@@ -504,9 +504,9 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
 
           {/* 테이블 */}
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-auto max-h-[calc(100vh-250px)]">
             <table className="w-full min-w-[700px] text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
+              <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
                 <tr>
                   {REQ_COLS.map((c, idx) => {
                     const active = c.sortable && c.key === reqSortKey;
@@ -593,7 +593,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                           <td colSpan={admin ? 9 : 8} className="px-6 py-3">
                             <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 overflow-hidden">
                               <table className="w-full text-xs">
-                                <thead className="bg-gray-50 dark:bg-gray-700/50">
+                                <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50">
                                   <tr>
                                     {["호기", "자재명", "코드", "구분", "수량"].map(h => (
                                       <th key={h} className="px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">{h}</th>
@@ -693,9 +693,9 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
 
           {/* 테이블 */}
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-auto max-h-[calc(100vh-250px)]">
             <table className="w-full min-w-[700px] text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
+              <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
                 <tr>
                   {ORD_COLS.map((c, idx) => {
                     const active = c.sortable && c.key === ordSortKey;
