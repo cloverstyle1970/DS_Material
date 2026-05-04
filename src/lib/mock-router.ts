@@ -9,6 +9,7 @@ import type { UserRecord } from "./mock-users";
 import type { MaterialRecord } from "./mock-materials";
 import type { TransactionRecord } from "./mock-transactions";
 import type { CategoryStore } from "./mock-categories";
+import { getCategories as getStaticCategories } from "./mock-categories";
 import type { MaterialRequestRecord } from "./mock-material-requests";
 import type { PurchaseOrderRecord } from "./mock-purchase-orders";
 import { DashboardStats, RecentRequest } from "./types";
@@ -476,6 +477,7 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
       if (!store.sub[key]) store.sub[key] = [];
       store.sub[key].push({ code: r.code, label: r.label });
     });
+    if (store.major.length === 0) return getStaticCategories();
     return store;
   }
   if (path === "/api/sites") {
