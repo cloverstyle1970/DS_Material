@@ -1,34 +1,40 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { CategoryStore } from "@/lib/mock-categories";
 import { generateMaterialCode } from "@/lib/category-codes";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { MaterialRecord } from "@/lib/mock-materials";
 import CategoryManagerModal from "./CategoryManagerModal";
 
 interface Props {
   onClose: () => void;
   onSaved: () => void;
+  source?: MaterialRecord | null;
 }
 
-export default function AddMaterialModal({ onClose, onSaved }: Props) {
+export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
+  const isRepairMode = !!source;
+
   const [cats, setCats] = useState<CategoryStore | null>(null);
   const [showCatManager, setShowCatManager] = useState(false);
 
-  const [isDs, setIsDs] = useState(true);
-  const [major, setMajor] = useState("");
-  const [mid, setMid] = useState("");
-  const [sub, setSub] = useState("");
-  const [isRepair, setIsRepair] = useState(false);
-  const [name, setName] = useState("");
-  const [alias, setAlias] = useState("");
-  const [modelNo, setModelNo] = useState("");
-  const [unit, setUnit] = useState("EA");
-  const [buyPrice, setBuyPrice] = useState("");
-  const [sellPrice, setSellPrice] = useState("");
-  const [storageLoc, setStorageLoc] = useState("");
+  const [isDs, setIsDs] = useState(source ? source.id.startsWith("D") : true);
+  const [major, setMajor] = useState(source ? source.id.slice(1, 3) : "");
+  const [mid, setMid] = useState(source ? source.id.slice(3, 5) : "");
+  const [sub, setSub] = useState(source ? source.id.slice(5, 7) : "");
+  const [isRepair, setIsRepair] = useState(isRepairMode);
+  const [name, setName] = useState(source?.name ?? "");
+  const [alias, setAlias] = useState(source?.alias ?? "");
+  const [modelNo, setModelNo] = useState(source?.modelNo ?? "");
+  const [unit, setUnit] = useState(source?.unit ?? "EA");
+  const [buyPrice, setBuyPrice] = useState(source?.buyPrice != null ? String(source.buyPrice) : "");
+  const [sellPrice, setSellPrice] = useState(source?.sellPrice != null ? String(source.sellPrice) : "");
+  const [storageLoc, setStorageLoc] = useState(source?.storageLoc ?? "");
   const [stockQty, setStockQty] = useState(0);
   const [saving, setSaving] = useState(false);
+
+  const skipInitialCascadeRef = useRef(isRepairMode);
 
   async function loadCats() {
     try {
@@ -52,6 +58,7 @@ export default function AddMaterialModal({ onClose, onSaved }: Props) {
 
   useEffect(() => {
     if (!cats) return;
+    if (skipInitialCascadeRef.current) return;
     const mi = cats.mid[major]?.[0]?.code ?? "";
     const t = setTimeout(() => setMid(mi), 0);
     return () => clearTimeout(t);
@@ -59,6 +66,10 @@ export default function AddMaterialModal({ onClose, onSaved }: Props) {
 
   useEffect(() => {
     if (!cats) return;
+    if (skipInitialCascadeRef.current) {
+      skipInitialCascadeRef.current = false;
+      return;
+    }
     const s = cats.sub[`${major}${mid}`]?.[0]?.code ?? "";
     const t = setTimeout(() => setSub(s), 0);
     return () => clearTimeout(t);
@@ -87,7 +98,7 @@ export default function AddMaterialModal({ onClose, onSaved }: Props) {
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-            <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">신규 자재 등록</h2>
+            <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">{isRepairMode ? "수리품 등록" : "신규 자재 등록"}</h2>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">×</button>
           </div>
 
@@ -109,7 +120,8 @@ export default function AddMaterialModal({ onClose, onSaved }: Props) {
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">구분</label>
                 <select value={isDs ? "D" : "_"} onChange={e => setIsDs(e.target.value === "D")}
-                  className="w-full rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                  disabled={isRepairMode}
+                  className="w-full rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:opacity-60 disabled:cursor-not-allowed">
                   <option value="D">DS 자사 (D)</option>
                   <option value="_">TKE (_)</option>
                 </select>
@@ -117,7 +129,8 @@ export default function AddMaterialModal({ onClose, onSaved }: Props) {
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">수리품 여부</label>
                 <select value={isRepair ? "R" : "_"} onChange={e => setIsRepair(e.target.value === "R")}
-                  className="w-full rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                  disabled={isRepairMode}
+                  className="w-full rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:opacity-60 disabled:cursor-not-allowed">
                   <option value="_">신품 (_)</option>
                   <option value="R">수리품 (R)</option>
                 </select>

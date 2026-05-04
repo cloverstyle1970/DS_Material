@@ -69,6 +69,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState<MaterialRecord | null>(null);
+  const [repairTarget, setRepairTarget] = useState<MaterialRecord | null>(null);
   const [loading, setLoading] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -392,13 +393,25 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
                   </td>
                   {!viewOnly && (
                     <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        onClick={() => setEditTarget(m)}
-                        className={`text-xs px-2.5 py-1 rounded-lg border transition-colors whitespace-nowrap ${isDark ? "border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white hover:border-gray-500" : "border-gray-200 text-gray-500 hover:bg-slate-50 hover:text-slate-700 hover:border-slate-300"}`}
-                      >
-                        수정
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setEditTarget(m)}
+                          className={`text-xs px-2.5 py-1 rounded-lg border transition-colors whitespace-nowrap ${isDark ? "border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white hover:border-gray-500" : "border-gray-200 text-gray-500 hover:bg-slate-50 hover:text-slate-700 hover:border-slate-300"}`}
+                        >
+                          수정
+                        </button>
+                        {!m.isRepair && (
+                          <button
+                            type="button"
+                            onClick={() => setRepairTarget(m)}
+                            title="수리품 등록"
+                            className={`text-xs px-2.5 py-1 rounded-lg border font-bold transition-colors whitespace-nowrap ${isDark ? "border-purple-700 text-purple-300 hover:bg-purple-900/40 hover:text-purple-200" : "border-purple-300 text-purple-600 hover:bg-purple-50 hover:text-purple-800 hover:border-purple-400"}`}
+                          >
+                            R
+                          </button>
+                        )}
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -463,6 +476,13 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
       </div>
 
       {showModal && <AddMaterialModal onClose={() => setShowModal(false)} onSaved={reload} />}
+      {repairTarget && (
+        <AddMaterialModal
+          source={repairTarget}
+          onClose={() => setRepairTarget(null)}
+          onSaved={() => { setRepairTarget(null); reload(); }}
+        />
+      )}
       {editTarget && (
         <EditMaterialModal
           material={editTarget}
