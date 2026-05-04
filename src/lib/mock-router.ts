@@ -12,6 +12,7 @@ import type { CategoryStore } from "./mock-categories";
 import type { MaterialRequestRecord } from "./mock-material-requests";
 import type { PurchaseOrderRecord } from "./mock-purchase-orders";
 import { DashboardStats, RecentRequest } from "./types";
+import { generateMaterialCode } from "./category-codes";
 
 // ── 공사일정 모듈 (In-Memory Mock) ─────────────────────────────────
 export interface ConstructionRequest {
@@ -565,7 +566,33 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
 
 async function routePOST(path: string, body: AnyBody): Promise<unknown> {
   if (path === "/api/materials") {
-    const { data, error } = await supabase.from("materials").insert(materialToDb(body)).select().single();
+    const { isDs, major, mid, sub, isRepair, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty } = body;
+
+    // 동일 분류 내 최대 일련번호 조회 후 +1 채번
+    const prefix = isDs ? "D" : "_";
+    const catPrefix = `${prefix}${major}${mid}${sub}`;
+    const { data: existing } = await supabase.from("materials").select("id").like("id", `${catPrefix}%`);
+    const seqs = (existing ?? [])
+      .map((r: { id: string }) => r.id.length === 12 ? parseInt(r.id.slice(7, 11), 10) : NaN)
+      .filter(Number.isFinite);
+    const seq = seqs.length ? Math.max(...seqs) + 1 : 1;
+    if (seq > 9999) throw new MockApiError("일련번호 초과 (최대 9999)", 400);
+
+    const id = generateMaterialCode({ isDs, major, mid, sub, seq, isRepair });
+    const row = {
+      id,
+      category_code: `${major}${mid}${sub}`,
+      name,
+      alias:       alias      || null,
+      model_no:    modelNo    || null,
+      unit:        unit       || null,
+      buy_price:   buyPrice   !== "" && buyPrice   != null ? Number(buyPrice)  : null,
+      sell_price:  sellPrice  !== "" && sellPrice  != null ? Number(sellPrice) : null,
+      storage_loc: storageLoc || null,
+      stock_qty:   Number(stockQty) || 0,
+      is_repair:   isRepair,
+    };
+    const { data, error } = await supabase.from("materials").insert(row).select().single();
     if (error) throw new MockApiError(error.message, 500);
     return dbToMaterial(data);
   }
