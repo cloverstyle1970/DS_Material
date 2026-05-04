@@ -270,6 +270,8 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
   const [reqSortDir, setReqSortDir] = useState<SortDir>("desc");
   const [ordSortKey, setOrdSortKey] = useState<OrdSortKey>("orderedAt");
   const [ordSortDir, setOrdSortDir] = useState<SortDir>("desc");
+  const [selectedReqIds, setSelectedReqIds] = useState<Set<number>>(new Set());
+  const [selectedOrdIds, setSelectedOrdIds] = useState<Set<number>>(new Set());
 
   function toggleReqSort(key: ReqSortKey) {
     if (key === reqSortKey) setReqSortDir(d => d === "asc" ? "desc" : "asc");
@@ -384,7 +386,11 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
 
   function downloadReqs() {
     const stamp = new Date().toISOString().slice(0,10).replace(/-/g,"");
-    const rows = sortedReqs.flatMap(r =>
+    const list = selectedReqIds.size > 0
+      ? requests.filter(r => selectedReqIds.has(r.id))
+      : requests;
+    const label = selectedReqIds.size > 0 ? `선택${selectedReqIds.size}건` : "전체";
+    const rows = list.flatMap(r =>
       r.items.map(item => ({
         신청일시: fmtDate(r.requestedAt),
         상태: r.status,
@@ -399,12 +405,16 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
         메모: r.note ?? "",
       }))
     );
-    xlsxDownload(rows, "자재신청", `자재신청_${stamp}.xlsx`);
+    xlsxDownload(rows, "자재신청", `자재신청_${label}_${stamp}.xlsx`);
   }
 
   function downloadOrds() {
     const stamp = new Date().toISOString().slice(0,10).replace(/-/g,"");
-    const rows = sortedOrds.map(o => ({
+    const list = selectedOrdIds.size > 0
+      ? orders.filter(o => selectedOrdIds.has(o.id))
+      : orders;
+    const label = selectedOrdIds.size > 0 ? `선택${selectedOrdIds.size}건` : "전체";
+    const rows = list.map(o => ({
       발주일시: fmtDate(o.orderedAt),
       상태: o.status,
       자재명: o.materialName,
@@ -418,7 +428,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
       담당자: o.userName,
       비고: o.note ?? "",
     }));
-    xlsxDownload(rows, "발주", `발주내역_${stamp}.xlsx`);
+    xlsxDownload(rows, "발주", `발주내역_${label}_${stamp}.xlsx`);
   }
 
 
@@ -465,7 +475,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
             </Link>
             <button type="button" onClick={downloadReqs}
               className="bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 transition-colors">
-              엑셀 다운로드
+              {selectedReqIds.size > 0 ? `선택 ${selectedReqIds.size}건 다운로드` : "엑셀 다운로드"}
             </button>
           </div>
 
@@ -508,6 +518,17 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
             <table className="w-full min-w-[700px] text-sm">
               <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
                 <tr>
+                  <th className="px-3 py-3 w-8">
+                    <input type="checkbox"
+                      checked={sortedReqs.length > 0 && sortedReqs.every(r => selectedReqIds.has(r.id))}
+                      onChange={() => {
+                        if (sortedReqs.length > 0 && sortedReqs.every(r => selectedReqIds.has(r.id)))
+                          setSelectedReqIds(new Set());
+                        else setSelectedReqIds(new Set(sortedReqs.map(r => r.id)));
+                      }}
+                      className="h-3.5 w-3.5 rounded cursor-pointer"
+                    />
+                  </th>
                   {REQ_COLS.map((c, idx) => {
                     const active = c.sortable && c.key === reqSortKey;
                     return (
@@ -529,7 +550,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                 {sortedReqs.length === 0 ? (
-                  <tr><td colSpan={admin ? 9 : 8} className="text-center py-16 text-gray-400 dark:text-gray-500">
+                  <tr><td colSpan={admin ? 10 : 9} className="text-center py-16 text-gray-400 dark:text-gray-500">
                     {requests.length === 0 ? "자재 신청 내역이 없습니다." : "조건에 맞는 내역이 없습니다."}
                   </td></tr>
                 ) : sortedReqs.map(r => {
@@ -540,6 +561,17 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                   return (
                     <Fragment key={r.id}>
                       <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors cursor-pointer" onClick={() => toggleExpand(r.id)}>
+                        <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
+                          <input type="checkbox"
+                            checked={selectedReqIds.has(r.id)}
+                            onChange={() => setSelectedReqIds(prev => {
+                              const next = new Set(prev);
+                              if (next.has(r.id)) next.delete(r.id); else next.add(r.id);
+                              return next;
+                            })}
+                            className="h-3.5 w-3.5 rounded cursor-pointer"
+                          />
+                        </td>
                         <td className="px-4 py-3 w-8 text-gray-400 dark:text-gray-500 text-xs">
                           <span className={`inline-block transition-transform ${isOpen ? "rotate-90" : ""}`}>▶</span>
                         </td>
@@ -590,7 +622,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                       </tr>
                       {isOpen && (
                         <tr className="bg-slate-50/60 dark:bg-gray-700/20">
-                          <td colSpan={admin ? 9 : 8} className="px-6 py-3">
+                          <td colSpan={admin ? 10 : 9} className="px-6 py-3">
                             <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 overflow-hidden">
                               <table className="w-full text-xs">
                                 <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50">
@@ -651,7 +683,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
             )}
             <button type="button" onClick={downloadOrds}
               className={`${admin ? "" : "ml-auto "}bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 transition-colors`}>
-              엑셀 다운로드
+              {selectedOrdIds.size > 0 ? `선택 ${selectedOrdIds.size}건 다운로드` : "엑셀 다운로드"}
             </button>
           </div>
 
@@ -697,6 +729,17 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
             <table className="w-full min-w-[700px] text-sm">
               <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
                 <tr>
+                  <th className="px-3 py-3 w-8">
+                    <input type="checkbox"
+                      checked={sortedOrds.length > 0 && sortedOrds.every(o => selectedOrdIds.has(o.id))}
+                      onChange={() => {
+                        if (sortedOrds.length > 0 && sortedOrds.every(o => selectedOrdIds.has(o.id)))
+                          setSelectedOrdIds(new Set());
+                        else setSelectedOrdIds(new Set(sortedOrds.map(o => o.id)));
+                      }}
+                      className="h-3.5 w-3.5 rounded cursor-pointer"
+                    />
+                  </th>
                   {ORD_COLS.map((c, idx) => {
                     const active = c.sortable && c.key === ordSortKey;
                     return (
@@ -718,11 +761,22 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                 {sortedOrds.length === 0 ? (
-                  <tr><td colSpan={admin ? 13 : 12} className="text-center py-16 text-gray-400 dark:text-gray-500">
+                  <tr><td colSpan={admin ? 14 : 13} className="text-center py-16 text-gray-400 dark:text-gray-500">
                     {orders.length === 0 ? "발주 내역이 없습니다." : "조건에 맞는 내역이 없습니다."}
                   </td></tr>
                 ) : sortedOrds.map(o => (
                   <tr key={o.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                    <td className="px-3 py-3">
+                      <input type="checkbox"
+                        checked={selectedOrdIds.has(o.id)}
+                        onChange={() => setSelectedOrdIds(prev => {
+                          const next = new Set(prev);
+                          if (next.has(o.id)) next.delete(o.id); else next.add(o.id);
+                          return next;
+                        })}
+                        className="h-3.5 w-3.5 rounded cursor-pointer"
+                      />
+                    </td>
                     <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(o.orderedAt)}</td>
                     <td className="px-4 py-3">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ORD_STATUS_STYLE[o.status]}`}>{o.status}</span>

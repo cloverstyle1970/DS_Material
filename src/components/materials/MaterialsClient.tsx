@@ -156,7 +156,9 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
   }
 
   function downloadExcel() {
-    const list = q ? filtered : materials;
+    const list = selected.size > 0
+      ? materials.filter(m => selected.has(m.id))
+      : materials;
     const rows = list.map(m => {
       const base: Record<string, string | number | null> = {
         구분: m.isRepair ? "수리품" : m.id.startsWith("D") ? "DS" : "TK",
@@ -178,7 +180,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
 
     const now = new Date();
     const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-    const label = q ? `검색결과_${q}` : "전체자재";
+    const label = selected.size > 0 ? `선택${selected.size}건` : "전체자재";
     const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     const blob = new Blob([buf], { type: "application/octet-stream" });
     const url = URL.createObjectURL(blob);

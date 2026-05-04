@@ -65,6 +65,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [editingTx, setEditingTx] = useState<TransactionRecord | null>(null);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const { user } = useAuth();
   const admin = user ? !isViewOnly(user) : false;
 
@@ -129,7 +130,11 @@ export default function StockHistoryClient({ mode, initial }: Props) {
 
   function downloadExcel() {
     const stamp = new Date().toISOString().slice(0,10).replace(/-/g,"");
-    const rows = sorted.map(t => ({
+    const list = selectedIds.size > 0
+      ? transactions.filter(t => selectedIds.has(t.id))
+      : transactions;
+    const label = selectedIds.size > 0 ? `선택${selectedIds.size}건` : "전체";
+    const rows = list.map(t => ({
       일시: fmtDate(t.createdAt),
       자재명: t.materialName,
       자재코드: t.materialId,
@@ -147,7 +152,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
     const blob = new Blob([buf], { type: "application/octet-stream" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `${mode}내역_${stamp}.xlsx`; a.click();
+    a.href = url; a.download = `${mode}내역_${label}_${stamp}.xlsx`; a.click();
     URL.revokeObjectURL(url);
   }
 
@@ -194,7 +199,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
         )}
         <button type="button" onClick={downloadExcel}
           className="bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 transition-colors shrink-0">
-          엑셀 다운로드
+          {selectedIds.size > 0 ? `선택 ${selectedIds.size}건 다운로드` : "엑셀 다운로드"}
         </button>
       </div>
 
@@ -204,6 +209,17 @@ export default function StockHistoryClient({ mode, initial }: Props) {
         <table className="w-full min-w-[640px] text-sm">
           <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
             <tr>
+              <th className="px-3 py-3 w-8">
+                <input type="checkbox"
+                  checked={sorted.length > 0 && sorted.every(t => selectedIds.has(t.id))}
+                  onChange={() => {
+                    if (sorted.length > 0 && sorted.every(t => selectedIds.has(t.id)))
+                      setSelectedIds(new Set());
+                    else setSelectedIds(new Set(sorted.map(t => t.id)));
+                  }}
+                  className="h-3.5 w-3.5 rounded cursor-pointer"
+                />
+              </th>
               {COLUMNS.map(c => {
                 const active = c.sortable && c.key === sortKey;
                 return (
@@ -226,7 +242,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
           <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={admin ? 9 : 8} className="text-center py-16 text-gray-400 dark:text-gray-500">
+                <td colSpan={admin ? 10 : 9} className="text-center py-16 text-gray-400 dark:text-gray-500">
                   {transactions.length === 0
                     ? `${mode} 내역이 없습니다.`
                     : "조건에 맞는 내역이 없습니다."}
@@ -234,6 +250,17 @@ export default function StockHistoryClient({ mode, initial }: Props) {
               </tr>
             ) : sorted.map(t => (
               <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                <td className="px-3 py-3">
+                  <input type="checkbox"
+                    checked={selectedIds.has(t.id)}
+                    onChange={() => setSelectedIds(prev => {
+                      const next = new Set(prev);
+                      if (next.has(t.id)) next.delete(t.id); else next.add(t.id);
+                      return next;
+                    })}
+                    className="h-3.5 w-3.5 rounded cursor-pointer"
+                  />
+                </td>
                 <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(t.createdAt)}</td>
                 <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200 max-w-[200px] truncate">{t.materialName}</td>
                 <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{t.materialId}</td>

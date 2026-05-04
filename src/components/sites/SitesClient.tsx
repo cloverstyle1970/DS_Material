@@ -383,6 +383,15 @@ export default function SitesClient({ initial, elevators }: Props) {
   const [editElevator, setEditElevator]             = useState<ElevatorRecord | null>(null);
   const [deleteElevatorTarget, setDeleteElevatorTarget] = useState<ElevatorRecord | null>(null);
   const [page, setPage] = useState(1);
+  const [checkedSiteIds, setCheckedSiteIds] = useState<Set<number>>(new Set());
+
+  function toggleSiteCheck(id: number) {
+    setCheckedSiteIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
 
   const { user } = useAuth();
   const viewOnly = user ? isViewOnly(user) : true;
@@ -451,7 +460,10 @@ export default function SitesClient({ initial, elevators }: Props) {
   );
 
   function downloadExcel() {
-    const list = q ? displaySites : sites;
+    const list = checkedSiteIds.size > 0
+      ? sites.filter(s => checkedSiteIds.has(s.id))
+      : sites;
+    const label = checkedSiteIds.size > 0 ? `선택${checkedSiteIds.size}건` : "전체";
     const rows = list.map(s => ({
       현장명: s.name, 회사구분: s.companyType ?? "", 계약구분: s.contractType ?? "",
       계약일자: s.contractDate ?? "", 계약시작: s.contractStart ?? "", 계약만료: s.contractEnd ?? "",
@@ -467,7 +479,7 @@ export default function SitesClient({ initial, elevators }: Props) {
     const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     const blob = new Blob([buf], { type: "application/octet-stream" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `현장목록_${stamp}.xlsx`; a.click();
+    const a = document.createElement("a"); a.href = url; a.download = `현장목록_${label}_${stamp}.xlsx`; a.click();
     URL.revokeObjectURL(url);
   }
 
@@ -514,7 +526,7 @@ export default function SitesClient({ initial, elevators }: Props) {
         <div className="flex items-center gap-2">
           <button onClick={downloadExcel}
             className="px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1.5">
-            <span className="text-xs">📥</span> 엑셀 다운로드
+            <span className="text-xs">📥</span> {checkedSiteIds.size > 0 ? `선택 ${checkedSiteIds.size}건` : "엑셀 다운로드"}
           </button>
           {canEdit && (
             <button onClick={() => setShowAdd(true)}
@@ -558,7 +570,19 @@ export default function SitesClient({ initial, elevators }: Props) {
               ))}
             </div>
             <div className={`mt-1.5 flex items-center justify-between text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-              <span>{filteredSites.length.toLocaleString()}건</span>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={filteredSites.length > 0 && filteredSites.every(s => checkedSiteIds.has(s.id))}
+                  onChange={() => {
+                    if (filteredSites.length > 0 && filteredSites.every(s => checkedSiteIds.has(s.id)))
+                      setCheckedSiteIds(new Set());
+                    else setCheckedSiteIds(new Set(filteredSites.map(s => s.id)));
+                  }}
+                  className="h-3.5 w-3.5 rounded cursor-pointer"
+                />
+                <span>{checkedSiteIds.size > 0 ? `${checkedSiteIds.size}건 선택` : `${filteredSites.length.toLocaleString()}건`}</span>
+              </label>
               {totalPages > 1 && (
                 <div className="flex items-center gap-0.5">
                   <button onClick={() => changePage(safePage - 1)} disabled={safePage === 1}
@@ -596,47 +620,55 @@ export default function SitesClient({ initial, elevators }: Props) {
                 const unitCount = elevators.filter(e => e.siteName === site.name).length;
                 const isSelected = selected?.id === site.id;
                 return (
-                  <button
-                    key={site.id}
-                    onClick={() => setSelected(isSelected ? null : site)}
-                    className={`w-full text-left px-4 py-3 transition-colors ${isDark ? "border-b border-gray-700" : "border-b border-gray-50"} ${
-                      isSelected
-                        ? isDark ? "bg-gray-700 border-l-2 border-l-gray-400" : "bg-blue-50 border-l-2 border-l-blue-500"
-                        : isDark ? "hover:bg-gray-800 border-l-2 border-l-transparent" : "hover:bg-gray-50 border-l-2 border-l-transparent"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className={`text-sm font-medium truncate ${isSelected ? isDark ? "text-white" : "text-blue-700" : isDark ? "text-gray-200" : "text-gray-800"}`}>
-                          {site.name}
-                        </p>
-                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                          {companyBadge(site.companyType, isDark)}
-                          {site.contractType && (
-                            <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                              site.contractType.includes("FM")
-                                ? isDark ? "bg-gray-700 text-red-400" : "bg-gray-100 text-red-600"
-                                : isDark ? "bg-gray-700 text-gray-400" : "bg-gray-100 text-gray-500"
-                            }`}>
-                              {site.contractType}
+                  <div key={site.id} className={`flex items-center ${isDark ? "border-b border-gray-700" : "border-b border-gray-50"}`}>
+                    <input
+                      type="checkbox"
+                      checked={checkedSiteIds.has(site.id)}
+                      onChange={() => toggleSiteCheck(site.id)}
+                      onClick={e => e.stopPropagation()}
+                      className="ml-3 h-3.5 w-3.5 rounded shrink-0 cursor-pointer"
+                    />
+                    <button
+                      onClick={() => setSelected(isSelected ? null : site)}
+                      className={`flex-1 text-left px-3 py-3 transition-colors ${
+                        isSelected
+                          ? isDark ? "bg-gray-700 border-l-2 border-l-gray-400" : "bg-blue-50 border-l-2 border-l-blue-500"
+                          : isDark ? "hover:bg-gray-800 border-l-2 border-l-transparent" : "hover:bg-gray-50 border-l-2 border-l-transparent"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-sm font-medium truncate ${isSelected ? isDark ? "text-white" : "text-blue-700" : isDark ? "text-gray-200" : "text-gray-800"}`}>
+                            {site.name}
+                          </p>
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            {companyBadge(site.companyType, isDark)}
+                            {site.contractType && (
+                              <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                                site.contractType.includes("FM")
+                                  ? isDark ? "bg-gray-700 text-red-400" : "bg-gray-100 text-red-600"
+                                  : isDark ? "bg-gray-700 text-gray-400" : "bg-gray-100 text-gray-500"
+                              }`}>
+                                {site.contractType}
+                              </span>
+                            )}
+                            {site.primaryInspector && (
+                              <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>{site.primaryInspector}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          {unitCount > 0 ? (
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isDark ? "bg-gray-600 text-gray-200" : "bg-slate-100 text-slate-600"}`}>
+                              {unitCount}대
                             </span>
-                          )}
-                          {site.primaryInspector && (
-                            <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>{site.primaryInspector}</span>
+                          ) : (
+                            <span className={`text-xs ${isDark ? "text-gray-600" : "text-gray-300"}`}>호기 없음</span>
                           )}
                         </div>
                       </div>
-                      <div className="shrink-0 text-right">
-                        {unitCount > 0 ? (
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isDark ? "bg-gray-600 text-gray-200" : "bg-slate-100 text-slate-600"}`}>
-                            {unitCount}대
-                          </span>
-                        ) : (
-                          <span className={`text-xs ${isDark ? "text-gray-600" : "text-gray-300"}`}>호기 없음</span>
-                        )}
-                      </div>
-                    </div>
-                  </button>
+                    </button>
+                  </div>
                 );
               })
             )}
