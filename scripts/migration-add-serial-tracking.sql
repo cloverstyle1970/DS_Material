@@ -188,8 +188,7 @@ CREATE OR REPLACE FUNCTION mark_return_completed(
 LANGUAGE plpgsql
 AS $$
 DECLARE
-  v_record  record;
-  v_unit_id integer;
+  v_record record;
 BEGIN
   UPDATE transactions
      SET return_status         = 'returned',
@@ -199,18 +198,18 @@ BEGIN
    WHERE id              = p_transaction_id
      AND requires_return = true
      AND return_status   = 'pending'
-   RETURNING *, material_unit_id INTO v_record, v_unit_id;
+   RETURNING * INTO v_record;
 
   IF v_record.id IS NULL THEN
     RETURN json_build_object('error', '대상 트랜잭션을 찾을 수 없거나 이미 반납 처리됨');
   END IF;
 
   -- 추적 자재면 unit 상태도 반납완료로
-  IF v_unit_id IS NOT NULL THEN
+  IF v_record.material_unit_id IS NOT NULL THEN
     UPDATE material_units
        SET status        = '반납완료',
            last_event_at = now()
-     WHERE id = v_unit_id;
+     WHERE id = v_record.material_unit_id;
   END IF;
 
   RETURN json_build_object('record', row_to_json(v_record));
