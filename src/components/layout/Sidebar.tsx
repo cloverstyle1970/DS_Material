@@ -261,7 +261,7 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
                   </span>
                 </button>
 
-                <div className={`overflow-hidden transition-all duration-200 ${isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}>
+                <div className={`overflow-hidden transition-all duration-200 ${isExpanded ? "max-h-[720px] opacity-100" : "max-h-0 opacity-0"}`}>
                   <div className="space-y-0.5 pb-1">
                     {visibleItems.map(item => {
                       const active = isActive(item.href);
