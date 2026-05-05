@@ -123,12 +123,15 @@ export default function InboundEntry() {
       orders.forEach(o => {
         const mat = mats.find(m => m.id === o.materialId);
         const spec = mat?.modelNo || "";
+        const trackSerial = !!mat?.trackSerial;
+        const qty = trackSerial ? 0 : o.qty;
         const patch = {
           materialId: o.materialId, materialName: o.materialName,
           spec,
-          qty: o.qty, unitPrice: o.unitPrice ?? 0,
-          vat: Math.round(o.qty * (o.unitPrice ?? 0) * VAT_RATE),
+          qty, unitPrice: o.unitPrice ?? 0,
+          vat: Math.round(qty * (o.unitPrice ?? 0) * VAT_RATE),
           siteName: o.siteName ?? "", remark: `발주#${o.id}`, orderId: o.id,
+          trackSerial, serialNos: [] as string[],
         };
         
         if (emptyIdx >= 0 && emptyIdx < next.length) {
