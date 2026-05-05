@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useAuth, isViewOnly, isAdmin } from "@/context/AuthContext";
+import { useAuth, isViewOnly, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 
 type NavItem = {
   href: string;
@@ -234,7 +234,14 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
 
           {/* 그룹 메뉴 */}
           {NAV_GROUPS.map((group, gi) => {
-            const visibleItems = group.items.filter(item => !item.adminOnly || admin);
+            const visibleItems = group.items
+              .filter(item => !item.adminOnly || admin)
+              .filter(item => {
+                // 외부/플레이스홀더 링크(#로 시작)는 권한 체크 제외
+                if (item.href.startsWith("#")) return true;
+                // admin이면 모두 허용, 아니면 read 권한 보유한 메뉴만 노출
+                return user ? hasMenuPermission(user, item.href, "read") : false;
+              });
             if (visibleItems.length === 0) return null;
             const isExpanded = expanded.has(group.id);
 

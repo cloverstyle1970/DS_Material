@@ -66,8 +66,13 @@ export default function InboundEntry() {
     setRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const next = { ...r, ...patch };
-      if (patch.serialNos !== undefined && patch.serialNos.length > 0) {
+      // S/N 갯수가 늘어나면 수량은 최소 그만큼 자동 보정 (사용자가 늘려둔 qty는 보존)
+      if (patch.serialNos !== undefined && patch.serialNos.length > next.qty) {
         next.qty = patch.serialNos.length;
+      }
+      // 수량을 직접 줄이는 경우 S/N 갯수 미만으로는 못 내려감
+      if (patch.qty !== undefined && patch.qty < next.serialNos.length) {
+        next.qty = next.serialNos.length;
       }
       if (patch.qty !== undefined || patch.unitPrice !== undefined || patch.serialNos !== undefined)
         next.vat = Math.round(next.qty * next.unitPrice * VAT_RATE);
@@ -152,9 +157,9 @@ export default function InboundEntry() {
     if (!user) return;
     const valid = rows.filter(r => r.materialId && r.qty > 0);
     if (valid.length === 0) { alert("품목을 1개 이상 입력해 주세요."); return; }
-    const mismatch = valid.find(r => r.serialNos.length > 0 && r.serialNos.length !== r.qty);
-    if (mismatch) {
-      alert(`${mismatch.materialName}: 수량(${mismatch.qty})과 S/N 갯수(${mismatch.serialNos.length})가 일치해야 합니다.`);
+    const overflow = valid.find(r => r.serialNos.length > r.qty);
+    if (overflow) {
+      alert(`${overflow.materialName}: S/N 갯수(${overflow.serialNos.length})가 수량(${overflow.qty})보다 많습니다.`);
       return;
     }
     setSaving(true);
@@ -265,15 +270,19 @@ export default function InboundEntry() {
                 <Td right>
                   <input type="text" inputMode="numeric" value={r.qty === 0 ? "" : String(r.qty)}
                     onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); patchRow(r.id, { qty: v === "" ? 0 : Number(v) }); }}
-                    readOnly={r.serialNos.length > 0}
-                    title={r.serialNos.length > 0 ? "S/N 입력값으로 수량 결정 (변경하려면 S/N 비우기)" : undefined}
-                    className={cellInput + " text-right" + (r.serialNos.length > 0 ? " bg-gray-50 dark:bg-gray-700/30 cursor-not-allowed" : "")} />
+                    title={r.serialNos.length > 0 ? `S/N ${r.serialNos.length}건 입력됨 — 수량은 ${r.serialNos.length} 이상이어야 함` : undefined}
+                    className={cellInput + " text-right"} />
                 </Td>
                 <Td>
                   {r.materialId ? (
                     <button type="button" onClick={() => setSerialEditRowId(r.id)}
-                      className={`w-full text-xs px-2 py-1 rounded border font-medium transition-colors ${r.serialNos.length === 0 ? "border-gray-300 text-gray-500 bg-white hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600" : "border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:bg-blue-900/30"}`}>
-                      {r.serialNos.length === 0 ? "S/N (선택) ▾" : `S/N ${r.serialNos.length}건 ▾`}
+                      title={r.serialNos.length > 0 && r.serialNos.length < r.qty ? `${r.serialNos.length}건 추적 + ${r.qty - r.serialNos.length}건 비추적` : undefined}
+                      className={`w-full text-xs px-2 py-1 rounded border font-medium transition-colors ${r.serialNos.length === 0 ? "border-gray-300 text-gray-500 bg-white hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600" : r.serialNos.length === r.qty ? "border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:bg-blue-900/30" : "border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:bg-amber-900/30"}`}>
+                      {r.serialNos.length === 0
+                        ? "S/N (선택) ▾"
+                        : r.serialNos.length === r.qty
+                          ? `S/N ${r.serialNos.length}건 ▾`
+                          : `S/N ${r.serialNos.length}/${r.qty}건 ▾`}
                     </button>
                   ) : (
                     <span className="text-gray-300 dark:text-gray-600 text-xs px-2">—</span>

@@ -28,6 +28,16 @@ export function canManageSites(user: AuthUser): boolean {
   return isAdmin(user) || perms(user).includes("site_manage");
 }
 
+export function hasMenuPermission(
+  user: AuthUser | null,
+  href: string,
+  type: "read" | "create" | "update" = "read"
+): boolean {
+  if (!user) return false;
+  if (isAdmin(user)) return true;
+  return perms(user).includes(`menu:${href}:${type}`);
+}
+
 interface AuthContextType {
   user: AuthUser | null;
   isAuthenticated: boolean;

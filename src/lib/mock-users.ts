@@ -1,6 +1,7 @@
 import usersJson from "@/data/users.json";
 
-export type Permission = "admin" | "site_manage" | "view_only";
+// 정적 권한 + 메뉴별 권한(`menu:/path:read|create|update`)
+export type Permission = "admin" | "site_manage" | "view_only" | string;
 
 export interface UserRecord {
   id: number;
