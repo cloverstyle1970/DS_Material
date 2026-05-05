@@ -710,6 +710,25 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
     if (error) throw new MockApiError(error.message, 500);
     return dbToMaterial(data);
   }
+
+  // 자재실사: S/N 폐기 처리
+  {
+    const m = path.match(/^\/api\/material-units\/(\d+)\/scrap$/);
+    if (m) {
+      const numId = Number(m[1]);
+      const { userId, userName, note } = body;
+      const { data: result, error } = await supabase.rpc("scrap_material_unit", {
+        p_unit_id:   numId,
+        p_user_id:   userId,
+        p_user_name: userName,
+        p_note:      note ?? "재고실사 손실",
+      });
+      if (error) throw new MockApiError(error.message, 500);
+      if (result?.error) throw new MockApiError(result.error, 400);
+      return dbToTransaction(result.record);
+    }
+  }
+
   if (path === "/api/categories") {
     const { level, majorCode, midCode, label } = body;
     if (level === "major") {
