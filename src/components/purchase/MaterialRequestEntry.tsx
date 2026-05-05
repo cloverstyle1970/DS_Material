@@ -507,7 +507,7 @@ function SiteInlineSearch({ value, onChange, sites }: {
 
   return (
     <div ref={ref} className="relative">
-      <input type="text" value={value}
+      <input type="text" lang="ko" value={value}
         onChange={e => { onChange(e.target.value); setOpen(true); }}
         onFocus={() => value.trim() && setOpen(true)}
         onKeyDown={handleKeyDown}

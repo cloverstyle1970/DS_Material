@@ -423,7 +423,7 @@ export default function PurchaseOrderModal({ vendors, sites, pendingRequests, us
           {/* 신청자 */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">신청자</label>
-            <input type="text" value={requesterName} onChange={e => setRequesterName(e.target.value)}
+            <input type="text" lang="ko" value={requesterName} onChange={e => setRequesterName(e.target.value)}
               placeholder="자재를 신청한 담당자 이름"
               className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-slate-400" />
           </div>

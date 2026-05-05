@@ -255,6 +255,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
           <div className="relative flex-1 min-w-48">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
             <input
+              lang="ko"
               value={query}
               onChange={e => { setQuery(e.target.value); resetPage(); }}
               placeholder="부품명, 코드, 규격, 별칭, 보관장소 검색"

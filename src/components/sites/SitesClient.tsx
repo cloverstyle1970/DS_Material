@@ -547,6 +547,7 @@ export default function SitesClient({ initial, elevators }: Props) {
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
               <input
+                lang="ko"
                 value={query}
                 onChange={e => { setQuery(e.target.value); setPage(1); }}
                 placeholder="현장명, 점검자, 소재지, 비상통화장치, 승강기번호 검색"

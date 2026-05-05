@@ -138,7 +138,7 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
         {/* 검색 */}
         <div className="relative flex-1 min-w-48">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
-          <input value={query} onChange={e => { setQuery(e.target.value); resetPage(); }}
+          <input lang="ko" value={query} onChange={e => { setQuery(e.target.value); resetPage(); }}
             placeholder="이름, 부서, 직급, 전화번호 검색"
             className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white" />
           {query && (

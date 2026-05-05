@@ -192,7 +192,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
             <option value="">현장 전체</option>
             {sites.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
           </select>
-          <input type="text" placeholder="처리자" value={search.userName}
+          <input type="text" lang="ko" placeholder="처리자" value={search.userName}
             onChange={e => setSearch(p => ({ ...p, userName: e.target.value }))}
             className={`${inputCls()} w-24`} />
           {hasFilter && (

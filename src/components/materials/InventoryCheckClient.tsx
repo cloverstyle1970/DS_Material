@@ -287,6 +287,7 @@ export default function InventoryCheckClient() {
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
             <input
               value={query}
+              lang="ko"
               onChange={e => { setQuery(e.target.value); resetPage(); }}
               placeholder="부품명, 코드, 규격 검색"
               className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white dark:bg-gray-700"

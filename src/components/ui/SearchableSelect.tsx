@@ -50,6 +50,7 @@ export default function SearchableSelect({ options, value, onChange, placeholder
     <div ref={ref} className={`relative ${className}`}>
       <input
         type="text"
+        lang="ko"
         value={query}
         onChange={e => handleChange(e.target.value)}
         onFocus={() => setOpen(true)}

@@ -425,7 +425,7 @@ function SiteInlineSearch({ value, onChange, sites }: { value: string; onChange:
 
   return (
     <div ref={ref} className="relative">
-      <input type="text" value={value} onChange={e => { onChange(e.target.value); setOpen(true); }} onFocus={() => value.trim() && setOpen(true)} onKeyDown={handleKeyDown} className={inputCls} />
+      <input type="text" lang="ko" value={value} onChange={e => { onChange(e.target.value); setOpen(true); }} onFocus={() => value.trim() && setOpen(true)} onKeyDown={handleKeyDown} className={inputCls} />
       {open && suggestions.length > 0 && (
         <ul ref={ulRef} className="absolute z-50 top-full left-0 mt-0.5 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-52 overflow-y-auto">
           {suggestions.map((s, idx) => (
@@ -488,7 +488,7 @@ function VendorInlineSearch({ value, onChange, vendors }: { value: string; onCha
 
   return (
     <div ref={ref} className="relative">
-      <input type="text" value={value} onChange={e => { onChange(e.target.value); setOpen(true); }} onFocus={() => value.trim() && setOpen(true)} onKeyDown={handleKeyDown} className={inputCls} />
+      <input type="text" lang="ko" value={value} onChange={e => { onChange(e.target.value); setOpen(true); }} onFocus={() => value.trim() && setOpen(true)} onKeyDown={handleKeyDown} className={inputCls} />
       {open && suggestions.length > 0 && (
         <ul ref={ulRef} className="absolute z-50 top-full left-0 mt-0.5 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-52 overflow-y-auto">
           {suggestions.map((v, idx) => (
@@ -567,7 +567,7 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
 
   return (
     <div ref={ref} className="relative">
-      <input type="text" value={value} onChange={e => { onChange(e.target.value); setChecked(new Set()); }} onFocus={() => results.length > 0 && setOpen(true)} onKeyDown={handleKeyDown} className={cellInput} />
+      <input type="text" lang="ko" value={value} onChange={e => { onChange(e.target.value); setChecked(new Set()); }} onFocus={() => results.length > 0 && setOpen(true)} onKeyDown={handleKeyDown} className={cellInput} />
       {open && results.length > 0 && (
         <div className="absolute z-50 top-full left-0 mt-0.5 w-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl">
           <ul ref={ulRef} className="max-h-52 overflow-y-auto">

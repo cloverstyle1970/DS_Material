@@ -137,6 +137,7 @@ function MaterialAutocomplete({ value, onChange }: {
     <div ref={ref} className="relative">
       <input
         type="text"
+        lang="ko"
         placeholder="자재명·코드·규격·별칭"
         value={value}
         onChange={e => { onChange(e.target.value); }}
@@ -706,7 +707,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
               <option value="">거래처 전체</option>
               {vendors.map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
             </select>
-            <input type="text" placeholder="자재명·코드·규격" value={ordDraft.material}
+            <input type="text" lang="ko" placeholder="자재명·코드·규격" value={ordDraft.material}
               onChange={e => setOrdDraft(p => ({...p, material: e.target.value}))} className={`${inputCls()} w-32`} />
             <input type="text" placeholder="신청자" value={ordDraft.requesterName}
               onChange={e => setOrdDraft(p => ({...p, requesterName: e.target.value}))} className={`${inputCls()} w-24`} />

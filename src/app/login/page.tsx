@@ -84,6 +84,7 @@ export default function LoginPage() {
             <label className="text-sm font-medium text-gray-700">이름</label>
             <input
               type="text"
+              lang="ko"
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="홍길동"
