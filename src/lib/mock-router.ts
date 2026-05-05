@@ -1086,10 +1086,43 @@ async function routeDELETE(path: string, body: AnyBody): Promise<unknown> {
     const { data: tx, error: fetchErr } = await supabase.from("transactions").select("*").eq("id", numId).single();
     if (fetchErr || !tx) throw new MockApiError("not found", 404);
 
+    // 추적 자재(unit 연결) 트랜잭션은 unit 상태 정합성을 먼저 검증·복구
+    if (tx.material_unit_id) {
+      const { data: unit, error: uErr } = await supabase.from("material_units")
+        .select("*").eq("id", tx.material_unit_id).single();
+      if (uErr) throw new MockApiError(uErr.message, 500);
+
+      if (unit) {
+        if (tx.type === "입고") {
+          // 입고 취소: unit이 아직 '재고' 상태일 때만 허용 (이후 사용된 unit은 차단)
+          if (unit.status !== "재고") {
+            throw new MockApiError(
+              `이 입고는 취소할 수 없습니다 — S/N ${unit.serial_no}이(가) 이미 '${unit.status}' 상태로 사용 중입니다.`,
+              400
+            );
+          }
+          const { error: delErr } = await supabase.from("material_units").delete().eq("id", tx.material_unit_id);
+          if (delErr) throw new MockApiError(delErr.message, 500);
+        } else if (tx.type === "출고") {
+          // 출고 취소: 출고/반납대기 상태인 unit을 '재고'로 되돌림
+          if (unit.status === "출고" || unit.status === "반납대기") {
+            const { error: updErr } = await supabase.from("material_units").update({
+              status:           "재고",
+              current_site:     null,
+              current_elevator: null,
+              last_event_at:    new Date().toISOString(),
+            }).eq("id", tx.material_unit_id);
+            if (updErr) throw new MockApiError(updErr.message, 500);
+          }
+          // 반납완료/폐기 상태면 사이클 종료된 unit이라 손대지 않음
+        }
+      }
+    }
+
     // 재고 원복
     const { data: mat, error: mErr } = await supabase.from("materials").select("stock_qty").eq("id", tx.material_id).single();
     if (mErr || !mat) throw new MockApiError("material not found", 404);
-    
+
     let newStock = mat.stock_qty;
     if (tx.type === "입고") newStock -= tx.qty;
     else if (tx.type === "출고") newStock += tx.qty;
