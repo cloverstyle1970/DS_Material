@@ -12,6 +12,7 @@ export interface MaterialRecord {
   storageLoc: string | null;
   stockQty: number;
   isRepair: boolean;
+  trackSerial: boolean;
   eCountCd: string | null;
   createdAt: string;
 }

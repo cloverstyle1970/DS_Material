@@ -16,6 +16,7 @@ export interface TransactionRecord {
   returnedAt: string | null;
   returnedByUserId: number | null;
   returnedByUserName: string | null;
+  materialUnitId: number | null;
   note: string | null;
   userId: number;
   userName: string;
@@ -71,6 +72,7 @@ export function addTransaction(data: AddTransactionInput): { record?: Transactio
     returnedAt:         null,
     returnedByUserId:   null,
     returnedByUserName: null,
+    materialUnitId:     null,
     note:               data.note,
     userId:             data.userId,
     userName:           data.userName,

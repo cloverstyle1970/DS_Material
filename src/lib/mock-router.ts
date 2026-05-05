@@ -207,19 +207,20 @@ function userToDb(d: any): Record<string, unknown> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function dbToMaterial(r: any): MaterialRecord {
   return {
-    id:          r.id,
+    id:           r.id,
     categoryCode: r.category_code,
-    name:        r.name,
-    alias:       r.alias       ?? null,
-    modelNo:     r.model_no    ?? null,
-    unit:        r.unit        ?? null,
-    buyPrice:    r.buy_price   ?? null,
-    sellPrice:   r.sell_price  ?? null,
-    storageLoc:  r.storage_loc ?? null,
-    stockQty:    r.stock_qty,
-    isRepair:    r.is_repair,
-    eCountCd:    r.e_count_cd  ?? null,
-    createdAt:   r.created_at,
+    name:         r.name,
+    alias:        r.alias        ?? null,
+    modelNo:      r.model_no     ?? null,
+    unit:         r.unit         ?? null,
+    buyPrice:     r.buy_price    ?? null,
+    sellPrice:    r.sell_price   ?? null,
+    storageLoc:   r.storage_loc  ?? null,
+    stockQty:     r.stock_qty,
+    isRepair:     r.is_repair,
+    trackSerial:  r.track_serial ?? false,
+    eCountCd:     r.e_count_cd   ?? null,
+    createdAt:    r.created_at,
   };
 }
 
@@ -237,6 +238,7 @@ function materialToDb(d: any): Record<string, unknown> {
   if (d.storageLoc   !== undefined) obj.storage_loc  = d.storageLoc;
   if (d.stockQty     !== undefined) obj.stock_qty    = d.stockQty;
   if (d.isRepair     !== undefined) obj.is_repair    = d.isRepair;
+  if (d.trackSerial  !== undefined) obj.track_serial = d.trackSerial;
   if (d.eCountCd     !== undefined) obj.e_count_cd   = d.eCountCd;
   if (d.createdAt    !== undefined) obj.created_at   = d.createdAt;
   return obj;
@@ -260,6 +262,7 @@ function dbToTransaction(r: any): TransactionRecord {
     returnedAt:         r.returned_at            ?? null,
     returnedByUserId:   r.returned_by_user_id    ?? null,
     returnedByUserName: r.returned_by_user_name  ?? null,
+    materialUnitId:     r.material_unit_id       ?? null,
     note:               r.note                   ?? null,
     userId:             r.user_id,
     userName:           r.user_name,
@@ -273,9 +276,9 @@ async function supabaseAddTransaction(data: {
   siteName: string | null; note: string | null;
   userId: number; userName: string;
   elevatorName?: string | null;
-  serialNo?: string | null;
+  serialNos?: string[] | null;
   requiresReturn?: boolean;
-}): Promise<{ record?: TransactionRecord; error?: string }> {
+}): Promise<{ records?: TransactionRecord[]; error?: string }> {
   const { data: result, error } = await supabase.rpc("add_transaction", {
     p_type:            data.type,
     p_material_id:     data.materialId,
@@ -286,12 +289,14 @@ async function supabaseAddTransaction(data: {
     p_user_id:         data.userId,
     p_user_name:       data.userName,
     p_elevator_name:   data.elevatorName ?? null,
-    p_serial_no:       data.serialNo ?? null,
+    p_serial_nos:      data.serialNos && data.serialNos.length > 0 ? data.serialNos : null,
     p_requires_return: data.requiresReturn ?? false,
   });
   if (error) return { error: error.message };
   if (result?.error) return { error: result.error };
-  return { record: dbToTransaction(result.record) };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const records: TransactionRecord[] = (result?.records ?? []).map((r: any) => dbToTransaction(r));
+  return { records };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -532,6 +537,39 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
     }
     return all.map(dbToElevator);
   }
+  if (path === "/api/material-units") {
+    const materialId = params.get("materialId");
+    const status     = params.get("status");
+    const serialNo   = params.get("serialNo");
+    let query = supabase.from("material_units").select("*").order("created_at", { ascending: false });
+    if (materialId) query = query.eq("material_id", materialId);
+    if (status)     query = query.eq("status", status);
+    if (serialNo)   query = query.ilike("serial_no", `%${serialNo}%`);
+    const { data, error } = await query;
+    if (error) throw new MockApiError(error.message, 500);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (data ?? []).map((r: any) => ({
+      id:               r.id,
+      materialId:       r.material_id,
+      serialNo:         r.serial_no,
+      status:           r.status,
+      currentSite:      r.current_site     ?? null,
+      currentElevator:  r.current_elevator ?? null,
+      inboundAt:        r.inbound_at,
+      lastEventAt:      r.last_event_at,
+      createdAt:        r.created_at,
+    }));
+  }
+  {
+    const m = path.match(/^\/api\/material-units\/(\d+)\/history$/);
+    if (m) {
+      const numId = Number(m[1]);
+      const { data, error } = await supabase.from("transactions")
+        .select("*").eq("material_unit_id", numId).order("created_at", { ascending: true });
+      if (error) throw new MockApiError(error.message, 500);
+      return (data ?? []).map(dbToTransaction);
+    }
+  }
   if (path === "/api/transactions") {
     const type = params.get("type");
     const requiresReturn = params.get("requiresReturn");
@@ -588,7 +626,7 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
 
 async function routePOST(path: string, body: AnyBody): Promise<unknown> {
   if (path === "/api/materials") {
-    const { sourceId, isDs, major, mid, sub, isRepair, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty } = body;
+    const { sourceId, isDs, major, mid, sub, isRepair, trackSerial, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty } = body;
     if (!major || !mid || !sub) throw new MockApiError("분류 코드(major/mid/sub)가 누락됐습니다", 400);
 
     let id: string;
@@ -622,18 +660,20 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
       if (seq > 9999) throw new MockApiError("일련번호 초과 (최대 9999)", 400);
       id = generateMaterialCode({ isDs, major, mid, sub, seq, isRepair });
     }
+    const trackSerialFlag = !!trackSerial;
     const row = {
       id,
       category_code: `${major}${mid}${sub}`,
       name,
-      alias:       alias      || null,
-      model_no:    modelNo    || null,
-      unit:        unit       || null,
-      buy_price:   buyPrice   !== "" && buyPrice   != null ? Number(buyPrice)  : null,
-      sell_price:  sellPrice  !== "" && sellPrice  != null ? Number(sellPrice) : null,
-      storage_loc: storageLoc || null,
-      stock_qty:   Number(stockQty) || 0,
-      is_repair:   isRepair,
+      alias:        alias      || null,
+      model_no:     modelNo    || null,
+      unit:         unit       || null,
+      buy_price:    buyPrice   !== "" && buyPrice   != null ? Number(buyPrice)  : null,
+      sell_price:   sellPrice  !== "" && sellPrice  != null ? Number(sellPrice) : null,
+      storage_loc:  storageLoc || null,
+      stock_qty:    trackSerialFlag ? 0 : (Number(stockQty) || 0),
+      is_repair:    isRepair,
+      track_serial: trackSerialFlag,
     };
     const { data, error } = await supabase.from("materials").insert(row).select().single();
     if (error) throw new MockApiError(error.message, 500);
@@ -687,9 +727,11 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
     return dbToElevator(data);
   }
   if (path === "/api/transactions") {
-    const { record, error } = await supabaseAddTransaction(body);
+    const { records, error } = await supabaseAddTransaction(body);
     if (error) throw new MockApiError(error, 400);
-    return record;
+    // 단일 트랜잭션이면 record로, 다중이면 records 배열로 반환 (호환성 유지)
+    if (records && records.length === 1) return records[0];
+    return { records };
   }
   if (path === "/api/material-requests") {
     const { data, error } = await supabase.from("material_requests").insert({
@@ -764,16 +806,17 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
       return dbToMaterial(data);
     }
     const patch: Record<string, unknown> = {};
-    const { stockQty, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, isRepair } = body;
-    if (name       !== undefined) patch.name         = name;
-    if (alias      !== undefined) patch.alias        = alias      || null;
-    if (modelNo    !== undefined) patch.model_no     = modelNo    || null;
-    if (unit       !== undefined) patch.unit         = unit       || null;
-    if (buyPrice   !== undefined) patch.buy_price    = buyPrice   !== "" ? Number(buyPrice)  : null;
-    if (sellPrice  !== undefined) patch.sell_price   = sellPrice  !== "" ? Number(sellPrice) : null;
-    if (storageLoc !== undefined) patch.storage_loc  = storageLoc || null;
-    if (stockQty   !== undefined) patch.stock_qty    = Number(stockQty);
-    if (isRepair   !== undefined) patch.is_repair    = isRepair;
+    const { stockQty, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, isRepair, trackSerial } = body;
+    if (name        !== undefined) patch.name          = name;
+    if (alias       !== undefined) patch.alias         = alias      || null;
+    if (modelNo     !== undefined) patch.model_no      = modelNo    || null;
+    if (unit        !== undefined) patch.unit          = unit       || null;
+    if (buyPrice    !== undefined) patch.buy_price     = buyPrice   !== "" ? Number(buyPrice)  : null;
+    if (sellPrice   !== undefined) patch.sell_price    = sellPrice  !== "" ? Number(sellPrice) : null;
+    if (storageLoc  !== undefined) patch.storage_loc   = storageLoc || null;
+    if (stockQty    !== undefined) patch.stock_qty     = Number(stockQty);
+    if (isRepair    !== undefined) patch.is_repair     = isRepair;
+    if (trackSerial !== undefined) patch.track_serial  = !!trackSerial;
     const { data, error } = await supabase.from("materials")
       .update(patch).eq("id", dbId).select().single();
     if (error) throw new MockApiError(error.message, 500);
@@ -833,9 +876,9 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
         .select("*").eq("id", numId).single();
       if (fetchErr || !req) throw new MockApiError("not found", 404);
       const request = dbToRequest(req);
-      const records = [];
+      const records: TransactionRecord[] = [];
       for (const item of request.items) {
-        const { record, error } = await supabaseAddTransaction({
+        const { records: txs, error } = await supabaseAddTransaction({
           type: "출고",
           materialId: item.materialId,
           materialName: item.materialName,
@@ -846,7 +889,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
           userName: processorName,
         });
         if (error) throw new MockApiError(error, 400);
-        records.push(record);
+        if (txs) records.push(...txs);
       }
       const { data: updated, error: updateErr } = await supabase.from("material_requests")
         .update({ status: "완료", processed_at: new Date().toISOString(), processor_id: processorId, processor_name: processorName })
@@ -873,7 +916,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
         .select("*").eq("id", numId).single();
       if (fetchErr || !ord) throw new MockApiError("not found", 404);
       const order = dbToOrder(ord);
-      const { record, error } = await supabaseAddTransaction({
+      const { records: txs, error } = await supabaseAddTransaction({
         type: "입고",
         materialId: order.materialId,
         materialName: order.materialName,
@@ -888,7 +931,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
         .update({ status: "입고완료", received_at: new Date().toISOString() })
         .eq("id", numId).select().single();
       if (updateErr) throw new MockApiError(updateErr.message, 500);
-      return { order: dbToOrder(updated), transaction: record };
+      return { order: dbToOrder(updated), transaction: txs?.[0] ?? null, transactions: txs };
     }
     if (action === "취소") {
       const { data, error } = await supabase.from("purchase_orders")

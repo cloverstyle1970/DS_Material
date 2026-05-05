@@ -32,6 +32,7 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
   const [sellPrice, setSellPrice] = useState(source?.sellPrice != null ? String(source.sellPrice) : "");
   const [storageLoc, setStorageLoc] = useState(source?.storageLoc ?? "");
   const [stockQty, setStockQty] = useState(0);
+  const [trackSerial, setTrackSerial] = useState(source?.trackSerial ?? false);
   const [saving, setSaving] = useState(false);
 
   const skipInitialCascadeRef = useRef(isRepairMode);
@@ -86,7 +87,7 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
     if (!name.trim() || !major || !mid || !sub) return;
     setSaving(true);
     try {
-      await api.post("/api/materials", { sourceId: source?.id, isDs, major, mid, sub, isRepair, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty });
+      await api.post("/api/materials", { sourceId: source?.id, isDs, major, mid, sub, isRepair, trackSerial, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty });
       onSaved();
     } catch (e) {
       alert(getErrorMessage(e));
@@ -209,9 +210,19 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">초기 재고</label>
                 <input type="number" min={0} value={stockQty} onChange={e => setStockQty(Number(e.target.value))}
-                  className="w-full rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+                  disabled={trackSerial}
+                  className="w-full rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:opacity-60 disabled:cursor-not-allowed" />
               </div>
             </div>
+
+            <label className="flex items-start gap-2 px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/40 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/60 transition-colors">
+              <input type="checkbox" checked={trackSerial} onChange={e => setTrackSerial(e.target.checked)}
+                className="w-4 h-4 mt-0.5 accent-slate-700 cursor-pointer" />
+              <div className="flex-1">
+                <div className="text-xs font-medium text-gray-700 dark:text-gray-200">S/N 단위 추적 사용</div>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">체크 시 입고/출고 때 시리얼 번호를 수량만큼 입력해야 하며, 각 인스턴스의 입출고·반납 이력이 개별 추적됩니다. 활성화하면 초기 재고는 0으로 시작하고 입고 등록 시 unit이 생성됩니다.</p>
+              </div>
+            </label>
 
             <div className="flex gap-3 pt-2">
               <button type="button" onClick={onClose}

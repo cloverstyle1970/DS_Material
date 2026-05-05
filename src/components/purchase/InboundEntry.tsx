@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { PurchaseOrderRecord } from "@/lib/mock-purchase-orders";
 import { api, getErrorMessage } from "@/lib/api-client";
+import SerialEntryModal from "./SerialEntryModal";
 
 interface SiteOption   { id: number; name: string }
 interface VendorOption { id: number; name: string }
@@ -21,12 +22,14 @@ interface Row {
   siteName: string;
   remark: string;
   orderId: number | null;
+  trackSerial: boolean;
+  serialNos: string[];
 }
 
 const VAT_RATE = 0.1;
 
 function newRow(seed: Partial<Row> = {}): Row {
-  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, vat: 0, siteName: "", remark: "", orderId: null, ...seed };
+  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, vat: 0, siteName: "", remark: "", orderId: null, trackSerial: false, serialNos: [], ...seed };
 }
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
@@ -58,12 +61,16 @@ export default function InboundEntry() {
   const [rows,  setRows]  = useState<Row[]>([newRow(), newRow(), newRow(), newRow(), newRow()]);
   const [saving, setSaving] = useState(false);
   const [popup,  setPopup]  = useState<null | "order">(null);
+  const [serialEditRowId, setSerialEditRowId] = useState<string | null>(null);
 
   function patchRow(id: string, patch: Partial<Row>) {
     setRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const next = { ...r, ...patch };
-      if (patch.qty !== undefined || patch.unitPrice !== undefined)
+      if (patch.serialNos !== undefined && next.trackSerial) {
+        next.qty = patch.serialNos.length;
+      }
+      if (patch.qty !== undefined || patch.unitPrice !== undefined || patch.serialNos !== undefined)
         next.vat = Math.round(next.qty * next.unitPrice * VAT_RATE);
       return next;
     }));
@@ -84,7 +91,13 @@ export default function InboundEntry() {
       materials.forEach((m, i) => {
         const idx = startIdx + i;
         const unitPrice = m.buyPrice ?? 0;
-        const patch = { materialId: m.id, materialName: m.name, spec: m.modelNo ?? "", qty: 1, unitPrice, vat: Math.round(unitPrice * VAT_RATE) };
+        const trackSerial = !!m.trackSerial;
+        const patch = {
+          materialId: m.id, materialName: m.name, spec: m.modelNo ?? "",
+          qty: trackSerial ? 0 : 1,
+          unitPrice, vat: Math.round((trackSerial ? 0 : 1) * unitPrice * VAT_RATE),
+          trackSerial, serialNos: [] as string[],
+        };
         if (idx < next.length) next[idx] = { ...next[idx], ...patch };
         else next.push(newRow(patch));
       });
@@ -140,12 +153,18 @@ export default function InboundEntry() {
     if (!user) return;
     const valid = rows.filter(r => r.materialId && r.qty > 0);
     if (valid.length === 0) { alert("품목을 1개 이상 입력해 주세요."); return; }
+    const missingSerial = valid.find(r => r.trackSerial && r.serialNos.length !== r.qty);
+    if (missingSerial) {
+      alert(`${missingSerial.materialName}: S/N ${missingSerial.qty}개 입력이 필요합니다 (현재 ${missingSerial.serialNos.length}개).`);
+      return;
+    }
     setSaving(true);
     try {
       for (const r of valid) {
         await api.post("/api/transactions", {
           type: "입고", materialId: r.materialId, materialName: r.materialName,
           qty: r.qty, siteName: r.siteName || null,
+          serialNos: r.trackSerial ? r.serialNos : null,
           note: r.remark || reference || null, userId: user.id, userName: user.name,
         });
       }
@@ -205,13 +224,14 @@ export default function InboundEntry() {
             <tr className="bg-[#e9ecef] dark:bg-gray-700 text-gray-700 dark:text-gray-300">
               <Th w="32">No</Th>
               <Th w="120">품목코드</Th>
-              <Th w="220">품목명</Th>
-              <Th w="120">규격</Th>
-              <Th w="70">수량</Th>
-              <Th w="100">단가</Th>
-              <Th w="110">공급가액</Th>
-              <Th w="90">부가세</Th>
-              <Th w="160">현장</Th>
+              <Th w="200">품목명</Th>
+              <Th w="110">규격</Th>
+              <Th w="60">수량</Th>
+              <Th w="120">S/N</Th>
+              <Th w="90">단가</Th>
+              <Th w="100">공급가액</Th>
+              <Th w="80">부가세</Th>
+              <Th w="140">현장</Th>
               <Th>적요</Th>
               <Th w="36"></Th>
             </tr>
@@ -246,7 +266,19 @@ export default function InboundEntry() {
                 <Td right>
                   <input type="text" inputMode="numeric" value={r.qty === 0 ? "" : String(r.qty)}
                     onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); patchRow(r.id, { qty: v === "" ? 0 : Number(v) }); }}
-                    className={cellInput + " text-right"} />
+                    readOnly={r.trackSerial}
+                    title={r.trackSerial ? "S/N 추적 자재 — 시리얼 입력 갯수로 수량 결정" : undefined}
+                    className={cellInput + " text-right" + (r.trackSerial ? " bg-gray-50 dark:bg-gray-700/30 cursor-not-allowed" : "")} />
+                </Td>
+                <Td>
+                  {r.trackSerial && r.materialId ? (
+                    <button type="button" onClick={() => setSerialEditRowId(r.id)}
+                      className={`w-full text-xs px-2 py-1 rounded border font-medium transition-colors ${r.serialNos.length === 0 ? "border-orange-300 text-orange-600 bg-orange-50 hover:bg-orange-100 dark:border-orange-700 dark:text-orange-300 dark:bg-orange-900/30" : "border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:bg-blue-900/30"}`}>
+                      {r.serialNos.length === 0 ? "S/N 입력 필요" : `S/N ${r.serialNos.length}건 ▾`}
+                    </button>
+                  ) : (
+                    <span className="text-gray-300 dark:text-gray-600 text-xs px-2">—</span>
+                  )}
                 </Td>
                 <Td right>
                   <input type="text" inputMode="numeric" value={r.unitPrice === 0 ? "" : String(r.unitPrice)}
@@ -271,6 +303,7 @@ export default function InboundEntry() {
             <tr className="bg-[#e9ecef] dark:bg-gray-700 font-semibold border-t-2 border-gray-300 dark:border-gray-600">
               <Td colSpan={4} center className="text-gray-600 dark:text-gray-400">합 계</Td>
               <Td right className="tabular-nums dark:text-gray-300">{fmtNum(totals.qty)}</Td>
+              <Td></Td>
               <Td></Td>
               <Td right className="tabular-nums dark:text-gray-300">{fmtNum(totals.supply)}</Td>
               <Td right className="tabular-nums dark:text-gray-300">{fmtNum(totals.vat)}</Td>
@@ -301,6 +334,21 @@ export default function InboundEntry() {
       {popup === "order" && (
         <OrderPopup onClose={() => setPopup(null)} onMultiSelect={applyMultipleOrders} />
       )}
+
+      {serialEditRowId && (() => {
+        const row = rows.find(r => r.id === serialEditRowId);
+        if (!row) return null;
+        return (
+          <SerialEntryModal
+            mode="inbound"
+            materialId={row.materialId}
+            materialName={row.materialName}
+            initial={row.serialNos}
+            onClose={() => setSerialEditRowId(null)}
+            onSave={list => { patchRow(row.id, { serialNos: list }); setSerialEditRowId(null); }}
+          />
+        );
+      })()}
     </div>
   );
 }
