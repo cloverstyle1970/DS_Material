@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
+import * as XLSX from "xlsx";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { MaterialUnitRecord, MaterialUnitStatus } from "@/lib/mock-material-units";
 import { TransactionRecord } from "@/lib/mock-transactions";
@@ -34,7 +35,8 @@ function statusBadge(status: MaterialUnitStatus) {
 export default function SerialHistoryClient() {
   const [units,    setUnits]    = useState<MaterialUnitRecord[]>([]);
   const [loading,  setLoading]  = useState(false);
-  const [query,    setQuery]    = useState("");
+  const [snQuery,  setSnQuery]  = useState("");
+  const [matQuery, setMatQuery] = useState("");
   const [status,   setStatus]   = useState<MaterialUnitStatus | "전체">("전체");
   const [openId,   setOpenId]   = useState<number | null>(null);
   const [history,  setHistory]  = useState<Record<number, TransactionRecord[]>>({});
@@ -46,14 +48,41 @@ export default function SerialHistoryClient() {
       setLoading(true);
       const params = new URLSearchParams();
       if (status !== "전체") params.set("status", status);
-      if (query.trim()) params.set("serialNo", query.trim());
+      if (snQuery.trim()) params.set("serialNo", snQuery.trim());
+      if (matQuery.trim()) params.set("matQuery", matQuery.trim());
       api.get<MaterialUnitRecord[]>(`/api/material-units?${params.toString()}`)
         .then(rows => { if (!cancelled) setUnits(rows); })
         .catch(e => { if (!cancelled) alert(getErrorMessage(e)); })
         .finally(() => { if (!cancelled) setLoading(false); });
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [status, query]);
+  }, [status, snQuery, matQuery]);
+
+  function downloadExcel() {
+    const stamp = new Date().toISOString().slice(0,10).replace(/-/g, "");
+    const rows = units.map(u => ({
+      "S/N":      u.serialNo,
+      자재명:     u.materialName ?? "",
+      자재코드:   u.materialId,
+      규격:       u.materialModelNo ?? "",
+      상태:       u.status,
+      현재현장:   u.currentSite ?? "",
+      현재호기:   u.currentElevator ?? "",
+      입고일시:   fmtDate(u.inboundAt),
+      "최근 이벤트": fmtDate(u.lastEventAt),
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "S/N이력");
+    const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([buf], { type: "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `SN이력_${status === "전체" ? "전체" : status}_${stamp}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   async function toggleOpen(unit: MaterialUnitRecord) {
     if (openId === unit.id) { setOpenId(null); return; }
@@ -92,14 +121,34 @@ export default function SerialHistoryClient() {
           ))}
         </div>
 
-        <div className="relative flex-1 min-w-48">
+        <div className="relative flex-1 min-w-44">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
-          <input value={query} onChange={e => setQuery(e.target.value)}
+          <input value={matQuery} onChange={e => setMatQuery(e.target.value)}
+            placeholder="자재명·코드·규격 검색"
+            className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white dark:bg-gray-700" />
+          {matQuery && (
+            <button type="button" onClick={() => setMatQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+          )}
+        </div>
+
+        <div className="relative flex-1 min-w-44">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🏷️</span>
+          <input value={snQuery} onChange={e => setSnQuery(e.target.value)}
             placeholder="S/N 검색"
             className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white dark:bg-gray-700" />
+          {snQuery && (
+            <button type="button" onClick={() => setSnQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+          )}
         </div>
 
         <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">{units.length.toLocaleString()}건</span>
+
+        <button type="button" onClick={downloadExcel} disabled={units.length === 0}
+          className="bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors shrink-0">
+          엑셀 다운로드
+        </button>
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -108,21 +157,23 @@ export default function SerialHistoryClient() {
           <table className="w-full min-w-[860px] text-sm">
             <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
               <tr>
-                {["", "S/N", "자재코드", "상태", "현재 위치", "입고일", "최근 이벤트"].map(h => (
+                {["", "S/N", "자재명", "자재코드", "규격", "상태", "현재 위치", "입고일", "최근 이벤트"].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
               {units.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-16 text-gray-400 dark:text-gray-500">조건에 맞는 S/N이 없습니다.</td></tr>
+                <tr><td colSpan={9} className="text-center py-16 text-gray-400 dark:text-gray-500">조건에 맞는 S/N이 없습니다.</td></tr>
               ) : units.map(u => (
                 <Fragment key={u.id}>
                   <tr onClick={() => toggleOpen(u)}
                     className="hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer transition-colors">
                     <td className="px-4 py-3 text-gray-300 dark:text-gray-600">{openId === u.id ? "▾" : "▸"}</td>
                     <td className="px-4 py-3 font-mono text-xs text-gray-800 dark:text-gray-200 whitespace-nowrap">{u.serialNo}</td>
+                    <td className="px-4 py-3 text-xs font-medium text-gray-800 dark:text-gray-200 max-w-[220px] truncate">{u.materialName ?? "-"}</td>
                     <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{u.materialId}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{u.materialModelNo ?? "-"}</td>
                     <td className="px-4 py-3">{statusBadge(u.status)}</td>
                     <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
                       {u.currentSite ?? "-"}{u.currentElevator ? <span className="text-gray-400 ml-1">({u.currentElevator})</span> : null}
@@ -132,7 +183,7 @@ export default function SerialHistoryClient() {
                   </tr>
                   {openId === u.id && (
                     <tr className="bg-slate-50/60 dark:bg-slate-900/30">
-                      <td colSpan={7} className="px-8 py-4">
+                      <td colSpan={9} className="px-8 py-4">
                         {historyLoading === u.id ? (
                           <p className="text-xs text-gray-400 text-center py-2">이력 불러오는 중...</p>
                         ) : !history[u.id] ? null : history[u.id].length === 0 ? (

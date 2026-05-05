@@ -541,24 +541,55 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
     const materialId = params.get("materialId");
     const status     = params.get("status");
     const serialNo   = params.get("serialNo");
+    const matQuery   = params.get("matQuery"); // 자재명/코드/규격 검색
     let query = supabase.from("material_units").select("*").order("created_at", { ascending: false });
     if (materialId) query = query.eq("material_id", materialId);
     if (status)     query = query.eq("status", status);
     if (serialNo)   query = query.ilike("serial_no", `%${serialNo}%`);
     const { data, error } = await query;
     if (error) throw new MockApiError(error.message, 500);
+    const rows = data ?? [];
+
+    // 연결된 자재 정보를 한 번에 조회해서 unit에 합쳐 반환
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (data ?? []).map((r: any) => ({
-      id:               r.id,
-      materialId:       r.material_id,
-      serialNo:         r.serial_no,
-      status:           r.status,
-      currentSite:      r.current_site     ?? null,
-      currentElevator:  r.current_elevator ?? null,
-      inboundAt:        r.inbound_at,
-      lastEventAt:      r.last_event_at,
-      createdAt:        r.created_at,
-    }));
+    const matIds = Array.from(new Set(rows.map((r: any) => r.material_id))) as string[];
+    let materialsMap = new Map<string, { name: string; modelNo: string | null }>();
+    if (matIds.length > 0) {
+      const { data: mats, error: matErr } = await supabase.from("materials")
+        .select("id, name, model_no").in("id", matIds);
+      if (matErr) throw new MockApiError(matErr.message, 500);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      materialsMap = new Map((mats ?? []).map((m: any) => [m.id, { name: m.name, modelNo: m.model_no ?? null }]));
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let mapped = rows.map((r: any) => {
+      const meta = materialsMap.get(r.material_id);
+      return {
+        id:               r.id,
+        materialId:       r.material_id,
+        materialName:     meta?.name ?? null,
+        materialModelNo:  meta?.modelNo ?? null,
+        serialNo:         r.serial_no,
+        status:           r.status,
+        currentSite:      r.current_site     ?? null,
+        currentElevator:  r.current_elevator ?? null,
+        inboundAt:        r.inbound_at,
+        lastEventAt:      r.last_event_at,
+        createdAt:        r.created_at,
+      };
+    });
+
+    // 자재명/코드/규격 부분 일치 필터 (서버측 join 후 클라이언트 필터 형태)
+    if (matQuery) {
+      const q = matQuery.toLowerCase();
+      mapped = mapped.filter(u =>
+        u.materialId.toLowerCase().includes(q) ||
+        (u.materialName?.toLowerCase().includes(q) ?? false) ||
+        (u.materialModelNo?.toLowerCase().includes(q) ?? false)
+      );
+    }
+    return mapped;
   }
   {
     const m = path.match(/^\/api\/material-units\/(\d+)\/history$/);
