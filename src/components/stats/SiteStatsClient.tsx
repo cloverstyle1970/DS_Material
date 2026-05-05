@@ -292,7 +292,7 @@ export default function SiteStatsClient() {
                     <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200 max-w-[180px] truncate">{t.materialName}</td>
                     <td className="px-4 py-3 text-right tabular-nums">
                       <span className={t.type === "입고" ? "text-blue-600" : "text-orange-500"}>
-                        {t.type === "입고" ? "+" : "-"}{t.qty}
+                        {t.qty}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{t.siteName ?? "—"}</td>

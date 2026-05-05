@@ -74,7 +74,6 @@ export default function StockHistoryClient({ mode, initial }: Props) {
   const admin = user ? !isViewOnly(user) : false;
 
   const isInbound = mode === "입고";
-  const sign      = isInbound ? "+"                               : "-";
   const signColor = isInbound ? "text-blue-600"                   : "text-orange-500";
 
   const filtered = transactions.filter(t => {
@@ -277,7 +276,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                 <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200 max-w-[200px] truncate">{t.materialName}</td>
                 <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{t.materialId}</td>
                 <td className="px-4 py-3 text-right tabular-nums">
-                  <span className={signColor}>{sign}{t.qty}</span>
+                  <span className={signColor}>{t.qty}</span>
                 </td>
                 <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">
                   {t.prevStock} → <span className="text-gray-700 dark:text-gray-300 font-medium">{t.afterStock}</span>

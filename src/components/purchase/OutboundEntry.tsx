@@ -8,6 +8,7 @@ import { ElevatorRecord } from "@/lib/mock-elevators";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { api, getErrorMessage } from "@/lib/api-client";
 import SerialEntryModal from "./SerialEntryModal";
+import ElevatorPicker from "@/components/common/ElevatorPicker";
 
 interface SiteOption { id: number; name: string }
 
@@ -247,10 +248,8 @@ export default function OutboundEntry() {
                 </Td>
                 <Td>
                   {elevators.length > 0 ? (
-                    <select value={r.elevatorName} onChange={e => patchRow(r.id, { elevatorName: e.target.value })} className={cellInput}>
-                      <option value=""></option>
-                      {elevators.map(e => <option key={e.id} value={e.unitName ?? ""}>{e.unitName}</option>)}
-                    </select>
+                    <ElevatorPicker value={r.elevatorName} elevators={elevators}
+                      onChange={v => patchRow(r.id, { elevatorName: v })} />
                   ) : (
                     <input type="text" value={r.elevatorName} onChange={e => patchRow(r.id, { elevatorName: e.target.value })} className={cellInput} />
                   )}
@@ -578,7 +577,7 @@ function InboundRefPopup({ onSelect, onClose }: { onSelect: (t: TransactionRecor
                   <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400">{t.createdAt.slice(0, 10)}</td>
                   <td className="px-2 py-1.5 font-medium dark:text-gray-200">{t.materialName}</td>
                   <td className="px-2 py-1.5 font-mono text-slate-500 dark:text-slate-400">{t.materialId}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums text-blue-600">+{t.qty}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums text-blue-600">{t.qty}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums font-semibold dark:text-gray-300">{t.afterStock}</td>
                   <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400">{t.siteName ?? "—"}</td>
                 </tr>

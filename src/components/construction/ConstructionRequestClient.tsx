@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { useAuth, isAdmin } from "@/context/AuthContext";
+import ElevatorPicker from "@/components/common/ElevatorPicker";
 
 export interface ConstructionRequest {
   id: number;
@@ -212,14 +213,8 @@ export default function ConstructionRequestClient() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">호기 정보</label>
                 {elevators.length > 0 ? (
-                  <select 
-                    value={elevatorName} 
-                    onChange={e => setElevatorName(e.target.value)} 
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  >
-                    <option value="">호기 선택 (생략 가능)</option>
-                    {elevators.map(e => <option key={e.id} value={e.unitName}>{e.unitName}</option>)}
-                  </select>
+                  <ElevatorPicker value={elevatorName ?? ""} elevators={elevators}
+                    onChange={setElevatorName} placeholder="호기 선택 (생략 가능)" inline={false} />
                 ) : (
                   <input 
                     type="text" 

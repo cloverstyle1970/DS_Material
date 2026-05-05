@@ -7,6 +7,7 @@ import { MaterialRecord } from "@/lib/mock-materials";
 import { MaterialRequestRecord } from "@/lib/mock-material-requests";
 import { ElevatorRecord } from "@/lib/mock-elevators";
 import { api, getErrorMessage } from "@/lib/api-client";
+import ElevatorPicker from "@/components/common/ElevatorPicker";
 
 interface SiteOption   { id: number; name: string }
 interface VendorOption { id: number; name: string }
@@ -193,10 +194,8 @@ export default function PurchaseOrderEntry() {
           </FormField>
           <FormField label="호기">
             {elevators.length > 0 ? (
-              <select value={topElevatorName} onChange={e => setTopElevatorName(e.target.value)} className={inputCls}>
-                <option value="">(선택)</option>
-                {elevators.map(e => <option key={e.id} value={e.unitName ?? ""}>{e.unitName}</option>)}
-              </select>
+              <ElevatorPicker value={topElevatorName} elevators={elevators}
+                onChange={setTopElevatorName} inline={false} />
             ) : (
               <input type="text" value={topElevatorName} onChange={e => setTopElevatorName(e.target.value)} className={inputCls} />
             )}
@@ -286,10 +285,8 @@ export default function PurchaseOrderEntry() {
                 <Td right className="text-gray-600 dark:text-gray-400 tabular-nums">{fmtNum(r.vat)}</Td>
                 <Td>
                   {elevators.length > 0 ? (
-                    <select value={r.elevatorName} onChange={e => patchRow(r.id, { elevatorName: e.target.value })} className={cellInput}>
-                      <option value=""></option>
-                      {elevators.map(e => <option key={e.id} value={e.unitName ?? ""}>{e.unitName}</option>)}
-                    </select>
+                    <ElevatorPicker value={r.elevatorName} elevators={elevators}
+                      onChange={v => patchRow(r.id, { elevatorName: v })} />
                   ) : (
                     <input type="text" value={r.elevatorName} onChange={e => patchRow(r.id, { elevatorName: e.target.value })} className={cellInput} />
                   )}

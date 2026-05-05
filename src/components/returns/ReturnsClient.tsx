@@ -188,7 +188,7 @@ export default function ReturnsClient() {
                   <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(t.createdAt)}</td>
                   <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200 max-w-[220px] truncate">{t.materialName}</td>
                   <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{t.materialId}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-orange-500">-{t.qty}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-orange-500">{t.qty}</td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">
                     {t.siteName ?? "-"}{t.elevatorName ? <span className="text-gray-400 ml-1">({t.elevatorName})</span> : null}
                   </td>
