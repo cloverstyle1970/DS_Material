@@ -9,6 +9,13 @@ export interface TransactionRecord {
   prevStock: number;
   afterStock: number;
   siteName: string | null;
+  elevatorName: string | null;
+  serialNo: string | null;
+  requiresReturn: boolean;
+  returnStatus: "pending" | "returned" | null;
+  returnedAt: string | null;
+  returnedByUserId: number | null;
+  returnedByUserName: string | null;
   note: string | null;
   userId: number;
   userName: string;
@@ -30,6 +37,9 @@ export interface AddTransactionInput {
   materialName: string;
   qty: number;
   siteName: string | null;
+  elevatorName?: string | null;
+  serialNo?: string | null;
+  requiresReturn?: boolean;
   note: string | null;
   userId: number;
   userName: string;
@@ -49,10 +59,24 @@ export function addTransaction(data: AddTransactionInput): { record?: Transactio
 
   const record: TransactionRecord = {
     id: nextId++,
-    ...data,
-    prevStock: result.prevStock,
-    afterStock: result.afterStock,
-    createdAt: new Date().toISOString(),
+    type:               data.type,
+    materialId:         data.materialId,
+    materialName:       data.materialName,
+    qty:                data.qty,
+    siteName:           data.siteName,
+    elevatorName:       data.elevatorName ?? null,
+    serialNo:           data.serialNo ?? null,
+    requiresReturn:     data.requiresReturn ?? false,
+    returnStatus:       data.requiresReturn && data.type === "출고" ? "pending" : null,
+    returnedAt:         null,
+    returnedByUserId:   null,
+    returnedByUserName: null,
+    note:               data.note,
+    userId:             data.userId,
+    userName:           data.userName,
+    prevStock:          result.prevStock,
+    afterStock:         result.afterStock,
+    createdAt:          new Date().toISOString(),
   };
   transactions.push(record);
   return { record };

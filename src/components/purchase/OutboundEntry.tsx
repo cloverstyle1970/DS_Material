@@ -17,12 +17,14 @@ interface Row {
   spec: string;
   qty: number;
   elevatorName: string;
+  serialNo: string;
+  requiresReturn: boolean;
   remark: string;
   inboundRef: number | null;
 }
 
 function newRow(seed: Partial<Row> = {}): Row {
-  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, elevatorName: "", remark: "", inboundRef: null, ...seed };
+  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, elevatorName: "", serialNo: "", requiresReturn: false, remark: "", inboundRef: null, ...seed };
 }
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
@@ -118,6 +120,9 @@ export default function OutboundEntry() {
         await api.post("/api/transactions", {
           type: "출고", materialId: r.materialId, materialName: r.materialName,
           qty: r.qty, siteName: siteName || null,
+          elevatorName: r.elevatorName || null,
+          serialNo: r.serialNo || null,
+          requiresReturn: r.requiresReturn,
           note: r.remark || reference || null, userId: user.id, userName: user.name,
         });
       }
@@ -176,10 +181,12 @@ export default function OutboundEntry() {
             <tr className="bg-[#e9ecef] dark:bg-gray-700 text-gray-700 dark:text-gray-300">
               <Th w="32">No</Th>
               <Th w="120">품목코드</Th>
-              <Th w="240">품목명</Th>
-              <Th w="140">규격</Th>
-              <Th w="80">수량</Th>
-              <Th w="130">호기</Th>
+              <Th w="220">품목명</Th>
+              <Th w="130">규격</Th>
+              <Th w="70">수량</Th>
+              <Th w="120">호기</Th>
+              <Th w="120">S/N</Th>
+              <Th w="50">회수</Th>
               <Th>적요</Th>
               <Th w="36"></Th>
             </tr>
@@ -227,6 +234,13 @@ export default function OutboundEntry() {
                   )}
                 </Td>
                 <Td>
+                  <input type="text" value={r.serialNo} onChange={e => patchRow(r.id, { serialNo: e.target.value })} placeholder="시리얼번호" className={cellInput} />
+                </Td>
+                <Td center>
+                  <input type="checkbox" checked={r.requiresReturn} onChange={e => patchRow(r.id, { requiresReturn: e.target.checked })}
+                    className="w-4 h-4 accent-orange-500 cursor-pointer" />
+                </Td>
+                <Td>
                   <input type="text" value={r.remark} onChange={e => patchRow(r.id, { remark: e.target.value })} className={cellInput} />
                 </Td>
                 <Td center>
@@ -239,7 +253,7 @@ export default function OutboundEntry() {
             <tr className="bg-[#e9ecef] dark:bg-gray-700 font-semibold border-t-2 border-gray-300 dark:border-gray-600">
               <Td colSpan={4} center className="text-gray-600 dark:text-gray-400">합 계</Td>
               <Td right className="tabular-nums dark:text-gray-300">{fmtNum(totals.qty)}</Td>
-              <Td colSpan={3} right className="tabular-nums text-orange-600">총 {totals.rows}품목</Td>
+              <Td colSpan={5} right className="tabular-nums text-orange-600">총 {totals.rows}품목</Td>
             </tr>
           </tfoot>
         </table>

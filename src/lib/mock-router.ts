@@ -245,18 +245,25 @@ function materialToDb(d: any): Record<string, unknown> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function dbToTransaction(r: any): TransactionRecord {
   return {
-    id:           r.id,
-    type:         r.type,
-    materialId:   r.material_id,
-    materialName: r.material_name,
-    qty:          r.qty,
-    prevStock:    r.prev_stock,
-    afterStock:   r.after_stock,
-    siteName:     r.site_name ?? null,
-    note:         r.note      ?? null,
-    userId:       r.user_id,
-    userName:     r.user_name,
-    createdAt:    r.created_at,
+    id:                 r.id,
+    type:               r.type,
+    materialId:         r.material_id,
+    materialName:       r.material_name,
+    qty:                r.qty,
+    prevStock:          r.prev_stock,
+    afterStock:         r.after_stock,
+    siteName:           r.site_name              ?? null,
+    elevatorName:       r.elevator_name          ?? null,
+    serialNo:           r.serial_no              ?? null,
+    requiresReturn:     r.requires_return        ?? false,
+    returnStatus:       r.return_status          ?? null,
+    returnedAt:         r.returned_at            ?? null,
+    returnedByUserId:   r.returned_by_user_id    ?? null,
+    returnedByUserName: r.returned_by_user_name  ?? null,
+    note:               r.note                   ?? null,
+    userId:             r.user_id,
+    userName:           r.user_name,
+    createdAt:          r.created_at,
   };
 }
 
@@ -265,16 +272,22 @@ async function supabaseAddTransaction(data: {
   materialId: string; materialName: string; qty: number;
   siteName: string | null; note: string | null;
   userId: number; userName: string;
+  elevatorName?: string | null;
+  serialNo?: string | null;
+  requiresReturn?: boolean;
 }): Promise<{ record?: TransactionRecord; error?: string }> {
   const { data: result, error } = await supabase.rpc("add_transaction", {
-    p_type:          data.type,
-    p_material_id:   data.materialId,
-    p_material_name: data.materialName,
-    p_qty:           data.qty,
-    p_site_name:     data.siteName,
-    p_note:          data.note,
-    p_user_id:       data.userId,
-    p_user_name:     data.userName,
+    p_type:            data.type,
+    p_material_id:     data.materialId,
+    p_material_name:   data.materialName,
+    p_qty:             data.qty,
+    p_site_name:       data.siteName,
+    p_note:            data.note,
+    p_user_id:         data.userId,
+    p_user_name:       data.userName,
+    p_elevator_name:   data.elevatorName ?? null,
+    p_serial_no:       data.serialNo ?? null,
+    p_requires_return: data.requiresReturn ?? false,
   });
   if (error) return { error: error.message };
   if (result?.error) return { error: result.error };
@@ -521,8 +534,15 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
   }
   if (path === "/api/transactions") {
     const type = params.get("type");
+    const requiresReturn = params.get("requiresReturn");
+    const returnStatus   = params.get("returnStatus");
     let query = supabase.from("transactions").select("*").order("created_at", { ascending: false });
     if (type === "입고" || type === "출고") query = query.eq("type", type);
+    if (requiresReturn === "true")  query = query.eq("requires_return", true);
+    if (requiresReturn === "false") query = query.eq("requires_return", false);
+    if (returnStatus === "pending" || returnStatus === "returned") {
+      query = query.eq("return_status", returnStatus);
+    }
     const { data, error } = await query;
     if (error) throw new MockApiError(error.message, 500);
     return (data ?? []).map(dbToTransaction);
@@ -906,10 +926,22 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
   const txId = extractId(path, "/api/transactions");
   if (txId) {
     const numId = Number(txId);
-    const { qty, siteName, note, userName } = body;
+    const { action, qty, siteName, note, userName, userId } = body;
+
+    if (action === "반납등록") {
+      const { data: result, error } = await supabase.rpc("mark_return_completed", {
+        p_transaction_id: numId,
+        p_user_id:        userId,
+        p_user_name:      userName,
+      });
+      if (error) throw new MockApiError(error.message, 500);
+      if (result?.error) throw new MockApiError(result.error, 400);
+      return dbToTransaction(result.record);
+    }
+
     const { data: tx, error: fetchErr } = await supabase.from("transactions").select("*").eq("id", numId).single();
     if (fetchErr || !tx) throw new MockApiError("not found", 404);
-    
+
     const patch: Record<string, unknown> = {};
     if (siteName !== undefined) patch.site_name = siteName || null;
     if (note !== undefined) patch.note = note || null;

@@ -47,6 +47,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/purchase-orders",  label: "발주 관리",          icon: "📑" },
       { href: "/inbound",          label: "입고 관리",          icon: "📥" },
       { href: "/outbound",         label: "출고 관리",          icon: "📤" },
+      { href: "/returns",          label: "회수/반납 관리",     icon: "↩️" },
       { href: "/stats/period",     label: "기간별 입출고 내역", icon: "📅" },
       { href: "/stats/sites",      label: "현장/호기별 현황",   icon: "📍" },
       { href: "/inventory-check",  label: "재고실사",           icon: "📊", adminOnly: true },
@@ -111,6 +112,7 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
     if (href === "/purchase-orders") return pathname === "/purchase-orders" || pathname.startsWith("/purchase-orders/");
     if (href === "/inbound") return pathname === "/inbound" || pathname.startsWith("/inbound/");
     if (href === "/outbound") return pathname === "/outbound" || pathname.startsWith("/outbound/");
+    if (href === "/returns")  return pathname === "/returns"  || pathname.startsWith("/returns/");
     if (href === "/stats/period") return pathname === "/stats/period";
     if (href === "/stats/sites")  return pathname === "/stats/sites";
     if (href === "/inventory-check") return pathname === "/inventory-check";

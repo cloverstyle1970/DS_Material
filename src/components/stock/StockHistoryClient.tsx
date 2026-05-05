@@ -19,13 +19,17 @@ interface Search { dateFrom: string; dateTo: string; siteName: string; userName:
 type SortKey = "createdAt" | "materialName" | "materialId" | "qty" | "siteName" | "userName";
 type SortDir = "asc" | "desc";
 
-const COLUMNS: { key: SortKey | null; label: string; sortable: boolean }[] = [
+type ColDef = { key: SortKey | null; label: string; sortable: boolean; outboundOnly?: boolean };
+
+const COLUMNS: ColDef[] = [
   { key: "createdAt",    label: "일시",     sortable: true  },
   { key: "materialName", label: "자재명",   sortable: true  },
   { key: "materialId",   label: "자재코드", sortable: true  },
   { key: "qty",          label: "수량",     sortable: true  },
   { key: null,           label: "재고변동", sortable: false },
   { key: "siteName",     label: "현장",     sortable: true  },
+  { key: null,           label: "S/N",      sortable: false, outboundOnly: true },
+  { key: null,           label: "회수",     sortable: false, outboundOnly: true },
   { key: "userName",     label: "처리자",   sortable: true  },
   { key: null,           label: "비고",     sortable: false },
 ];
@@ -134,17 +138,25 @@ export default function StockHistoryClient({ mode, initial }: Props) {
       ? transactions.filter(t => selectedIds.has(t.id))
       : transactions;
     const label = selectedIds.size > 0 ? `선택${selectedIds.size}건` : "전체";
-    const rows = list.map(t => ({
-      일시: fmtDate(t.createdAt),
-      자재명: t.materialName,
-      자재코드: t.materialId,
-      수량: t.qty,
-      이전재고: t.prevStock,
-      이후재고: t.afterStock,
-      현장: t.siteName ?? "",
-      처리자: t.userName,
-      비고: t.note ?? "",
-    }));
+    const rows = list.map(t => {
+      const base: Record<string, string | number> = {
+        일시: fmtDate(t.createdAt),
+        자재명: t.materialName,
+        자재코드: t.materialId,
+        수량: t.qty,
+        이전재고: t.prevStock,
+        이후재고: t.afterStock,
+        현장: t.siteName ?? "",
+      };
+      if (!isInbound) {
+        base["호기"] = t.elevatorName ?? "";
+        base["S/N"] = t.serialNo ?? "";
+        base["회수"] = !t.requiresReturn ? "" : t.returnStatus === "returned" ? "반납완료" : "대기";
+      }
+      base["처리자"] = t.userName;
+      base["비고"]   = t.note ?? "";
+      return base;
+    });
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, mode);
@@ -220,7 +232,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                   className="h-3.5 w-3.5 rounded cursor-pointer"
                 />
               </th>
-              {COLUMNS.map(c => {
+              {COLUMNS.filter(c => !c.outboundOnly || !isInbound).map(c => {
                 const active = c.sortable && c.key === sortKey;
                 return (
                   <th key={c.label} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
@@ -242,7 +254,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
           <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={admin ? 10 : 9} className="text-center py-16 text-gray-400 dark:text-gray-500">
+                <td colSpan={(isInbound ? 8 : 10) + (admin ? 1 : 0) + 1} className="text-center py-16 text-gray-400 dark:text-gray-500">
                   {transactions.length === 0
                     ? `${mode} 내역이 없습니다.`
                     : "조건에 맞는 내역이 없습니다."}
@@ -270,7 +282,25 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                 <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">
                   {t.prevStock} → <span className="text-gray-700 dark:text-gray-300 font-medium">{t.afterStock}</span>
                 </td>
-                <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{t.siteName ?? "-"}</td>
+                <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">
+                  {t.siteName ?? "-"}{t.elevatorName ? <span className="text-gray-400 ml-1">({t.elevatorName})</span> : null}
+                </td>
+                {!isInbound && (
+                  <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap max-w-[140px] truncate">
+                    {t.serialNo || "-"}
+                  </td>
+                )}
+                {!isInbound && (
+                  <td className="px-4 py-3 text-xs whitespace-nowrap">
+                    {!t.requiresReturn ? <span className="text-gray-300 dark:text-gray-600">—</span>
+                      : t.returnStatus === "returned" ? (
+                          <span className="px-2 py-0.5 rounded-full bg-green-50 text-green-700 dark:bg-green-900/40 dark:text-green-300">반납완료</span>
+                        )
+                      : (
+                          <span className="px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">대기</span>
+                        )}
+                  </td>
+                )}
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{t.userName}</td>
                 <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs max-w-[140px] truncate">{t.note ?? "-"}</td>
                 {admin && (
