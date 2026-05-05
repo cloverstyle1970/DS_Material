@@ -18,16 +18,14 @@ interface Row {
   spec: string;
   qty: number;
   elevatorName: string;
-  serialNo: string;
   requiresReturn: boolean;
   remark: string;
   inboundRef: number | null;
-  trackSerial: boolean;
   serialNos: string[];
 }
 
 function newRow(seed: Partial<Row> = {}): Row {
-  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, elevatorName: "", serialNo: "", requiresReturn: false, remark: "", inboundRef: null, trackSerial: false, serialNos: [], ...seed };
+  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, elevatorName: "", requiresReturn: false, remark: "", inboundRef: null, serialNos: [], ...seed };
 }
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
@@ -73,7 +71,7 @@ export default function OutboundEntry() {
     setRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const next = { ...r, ...patch };
-      if (patch.serialNos !== undefined && next.trackSerial) {
+      if (patch.serialNos !== undefined && patch.serialNos.length > 0) {
         next.qty = patch.serialNos.length;
       }
       return next;
@@ -94,11 +92,10 @@ export default function OutboundEntry() {
       const startIdx = next.findIndex(r => r.id === startRowId);
       materials.forEach((m, i) => {
         const idx = startIdx + i;
-        const trackSerial = !!m.trackSerial;
         const patch = {
           materialId: m.id, materialName: m.name, spec: m.modelNo ?? "",
-          qty: trackSerial ? 0 : 1,
-          trackSerial, serialNos: [] as string[],
+          qty: 1,
+          serialNos: [] as string[],
         };
         if (idx < next.length) next[idx] = { ...next[idx], ...patch };
         else next.push(newRow(patch));
@@ -130,9 +127,9 @@ export default function OutboundEntry() {
     if (!user) return;
     const valid = rows.filter(r => r.materialId && r.qty > 0);
     if (valid.length === 0) { alert("품목을 1개 이상 입력해 주세요."); return; }
-    const missingSerial = valid.find(r => r.trackSerial && r.serialNos.length !== r.qty);
-    if (missingSerial) {
-      alert(`${missingSerial.materialName}: S/N ${missingSerial.qty}건 선택 필요 (현재 ${missingSerial.serialNos.length}건).`);
+    const mismatch = valid.find(r => r.serialNos.length > 0 && r.serialNos.length !== r.qty);
+    if (mismatch) {
+      alert(`${mismatch.materialName}: 수량(${mismatch.qty})과 S/N 갯수(${mismatch.serialNos.length})가 일치해야 합니다.`);
       return;
     }
     setSaving(true);
@@ -142,7 +139,7 @@ export default function OutboundEntry() {
           type: "출고", materialId: r.materialId, materialName: r.materialName,
           qty: r.qty, siteName: siteName || null,
           elevatorName: r.elevatorName || null,
-          serialNos: r.trackSerial ? r.serialNos : (r.serialNo ? [r.serialNo] : null),
+          serialNos: r.serialNos.length > 0 ? r.serialNos : null,
           requiresReturn: r.requiresReturn,
           note: r.remark || reference || null, userId: user.id, userName: user.name,
         });
@@ -242,9 +239,9 @@ export default function OutboundEntry() {
                 <Td right>
                   <input type="text" inputMode="numeric" value={r.qty === 0 ? "" : String(r.qty)}
                     onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); patchRow(r.id, { qty: v === "" ? 0 : Number(v) }); }}
-                    readOnly={r.trackSerial}
-                    title={r.trackSerial ? "S/N 추적 자재 — 시리얼 선택 갯수로 수량 결정" : undefined}
-                    className={cellInput + " text-right" + (r.trackSerial ? " bg-gray-50 dark:bg-gray-700/30 cursor-not-allowed" : "")} />
+                    readOnly={r.serialNos.length > 0}
+                    title={r.serialNos.length > 0 ? "S/N 선택값으로 수량 결정 (변경하려면 S/N 비우기)" : undefined}
+                    className={cellInput + " text-right" + (r.serialNos.length > 0 ? " bg-gray-50 dark:bg-gray-700/30 cursor-not-allowed" : "")} />
                 </Td>
                 <Td>
                   {elevators.length > 0 ? (
@@ -257,13 +254,13 @@ export default function OutboundEntry() {
                   )}
                 </Td>
                 <Td>
-                  {r.trackSerial && r.materialId ? (
+                  {r.materialId ? (
                     <button type="button" onClick={() => setSerialEditRowId(r.id)}
-                      className={`w-full text-xs px-2 py-1 rounded border font-medium transition-colors ${r.serialNos.length === 0 ? "border-orange-300 text-orange-600 bg-orange-50 hover:bg-orange-100 dark:border-orange-700 dark:text-orange-300 dark:bg-orange-900/30" : "border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:bg-blue-900/30"}`}>
-                      {r.serialNos.length === 0 ? "S/N 선택" : `S/N ${r.serialNos.length}건 ▾`}
+                      className={`w-full text-xs px-2 py-1 rounded border font-medium transition-colors ${r.serialNos.length === 0 ? "border-gray-300 text-gray-500 bg-white hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600" : "border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:bg-blue-900/30"}`}>
+                      {r.serialNos.length === 0 ? "S/N (선택) ▾" : `S/N ${r.serialNos.length}건 ▾`}
                     </button>
                   ) : (
-                    <input type="text" value={r.serialNo} onChange={e => patchRow(r.id, { serialNo: e.target.value })} placeholder="시리얼번호" className={cellInput} />
+                    <span className="text-gray-300 dark:text-gray-600 text-xs px-2">—</span>
                   )}
                 </Td>
                 <Td center>

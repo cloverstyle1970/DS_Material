@@ -21,7 +21,6 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
   const [storageLoc, setStorageLoc] = useState(material.storageLoc ?? "");
   const [stockQty,   setStockQty]   = useState(material.stockQty);
   const [isRepair,   setIsRepair]   = useState(material.isRepair);
-  const [trackSerial, setTrackSerial] = useState(material.trackSerial);
   const [saving,       setSaving]       = useState(false);
   const [error,        setError]        = useState("");
   const [showRepair,   setShowRepair]   = useState(false);
@@ -34,7 +33,7 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
     if (!name.trim()) { setError("부품명을 입력해 주세요."); return; }
     setSaving(true);
     try {
-      await api.patch(`/api/materials/${encodeURIComponent(material.id)}`, { name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty, isRepair, trackSerial });
+      await api.patch(`/api/materials/${encodeURIComponent(material.id)}`, { name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty, isRepair });
       onSaved();
     } catch (e) {
       setError(getErrorMessage(e));
@@ -132,19 +131,9 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">재고</label>
               <input type="number" min={0} value={stockQty} onChange={e => setStockQty(Number(e.target.value))}
-                disabled={trackSerial}
-                className={`${field} disabled:opacity-60 disabled:cursor-not-allowed`} />
+                className={field} />
             </div>
           </div>
-
-          <label className="flex items-start gap-2 px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/40 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/60 transition-colors">
-            <input type="checkbox" checked={trackSerial} onChange={e => setTrackSerial(e.target.checked)}
-              className="w-4 h-4 mt-0.5 accent-slate-700 cursor-pointer" />
-            <div className="flex-1">
-              <div className="text-xs font-medium text-gray-700 dark:text-gray-200">S/N 단위 추적 사용</div>
-              <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">활성화 시 입고/출고에 시리얼 번호 입력이 필요합니다. 기존 누적 재고 수량은 추적되지 않으며 신규 입고분부터 unit이 생성됩니다.</p>
-            </div>
-          </label>
 
           {error && <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/30 rounded-lg px-4 py-2.5">{error}</p>}
 
