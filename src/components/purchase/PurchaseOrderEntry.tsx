@@ -468,13 +468,24 @@ function VendorInlineSearch({ value, onChange, vendors }: { value: string; onCha
   }, []);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      if (suggestions.length === 1) {
+        e.preventDefault();
+        onChange(suggestions[0].name);
+        setOpen(false);
+        return;
+      }
+      if (open && focusedIndex >= 0 && suggestions.length > 0) {
+        e.preventDefault();
+        onChange(suggestions[focusedIndex].name);
+        setOpen(false);
+        return;
+      }
+      return;
+    }
     if (!open || suggestions.length === 0) return;
     if (e.key === "ArrowDown") { e.preventDefault(); setFocusedIndex(i => (i < suggestions.length - 1 ? i + 1 : i)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setFocusedIndex(i => (i > 0 ? i - 1 : 0)); }
-    else if (e.key === "Enter") {
-      e.preventDefault();
-      if (focusedIndex >= 0) { onChange(suggestions[focusedIndex].name); setOpen(false); }
-    }
     else if (e.key === "Escape") setOpen(false);
   }
 
