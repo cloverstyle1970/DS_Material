@@ -272,6 +272,20 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
     }
   }
 
+  async function handleOrdDelete(id: number) {
+    if (!user) return;
+    if (!confirm("이 발주 내역을 삭제하시겠습니까? 삭제 후에는 복구할 수 없습니다.")) return;
+    setActionLoading(id);
+    try {
+      await api.delete(`/api/purchase-orders/${id}`);
+      setOrders(await api.get<PurchaseOrderRecord[]>("/api/purchase-orders"));
+    } catch (e) {
+      alert(getErrorMessage(e));
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   // ── 필터 ────────────────────────────────────────────────────────
   const filteredReqs = requests.filter(r => {
     if (reqStatus !== "전체" && r.status !== reqStatus) return false;
@@ -775,8 +789,8 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                               className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 whitespace-nowrap">수정</button>
                             <button type="button" disabled={actionLoading === o.id} onClick={() => handleOrdAction(o.id, "입고완료")}
                               className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 whitespace-nowrap">입고완료</button>
-                            <button type="button" disabled={actionLoading === o.id} onClick={() => handleOrdAction(o.id, "취소")}
-                              className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">취소</button>
+                            <button type="button" disabled={actionLoading === o.id} onClick={() => handleOrdDelete(o.id)}
+                              className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100">삭제</button>
                           </div>
                         )}
                         {o.status !== "발주" && <span className="text-xs text-gray-300 dark:text-gray-600">-</span>}

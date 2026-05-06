@@ -1223,6 +1223,13 @@ async function routeDELETE(path: string, body: AnyBody): Promise<unknown> {
     return { ok: true };
   }
 
+  const purchOrdId = extractId(path, "/api/purchase-orders");
+  if (purchOrdId) {
+    const { error } = await supabase.from("purchase_orders").delete().eq("id", Number(purchOrdId));
+    if (error) throw new MockApiError(error.message, 500);
+    return { ok: true };
+  }
+
   const vendorId = extractId(path, "/api/vendors");
   if (vendorId) {
     const { error } = await supabase.from("vendors").delete().eq("id", Number(vendorId));
