@@ -31,6 +31,10 @@ function fmtDate(iso: string) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
 }
 
+function fmtDateOnly(iso: string) {
+  return iso.substring(0, 10);
+}
+
 function today() { return new Date().toISOString().substring(0, 10); }
 
 interface ReqSearch { dateFrom: string; dateTo: string; siteName: string; elevatorName: string; userName: string; material: string }
@@ -160,9 +164,9 @@ const REQ_COLS: { key: ReqSortKey | null; label: string; sortable: boolean }[] =
 ];
 
 const ORD_COLS: { key: OrdSortKey | null; label: string; sortable: boolean }[] = [
-  { key: "orderedAt",     label: "발주일시", sortable: true  },
-  { key: "status",        label: "상태",     sortable: true  },
-  { key: "materialName",  label: "자재명",   sortable: true  },
+  { key: "orderedAt",     label: "발주일자",      sortable: true  },
+  { key: null,            label: "발주참조번호", sortable: false },
+  { key: "materialName",  label: "자재명",        sortable: true  },
   { key: "materialId",    label: "코드",     sortable: true  },
   { key: "qty",           label: "수량",     sortable: true  },
   { key: "siteName",      label: "현장",     sortable: true  },
@@ -369,8 +373,8 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
       : orders;
     const label = selectedOrdIds.size > 0 ? `선택${selectedOrdIds.size}건` : "전체";
     const rows = list.map(o => ({
-      발주일시: fmtDate(o.orderedAt),
-      상태: o.status,
+      발주일자: fmtDateOnly(o.orderedAt),
+      발주참조번호: o.note?.match(/^\[(.*?)\]/)?.[1] ?? "",
       자재명: o.materialName,
       자재코드: o.materialId,
       수량: o.qty,
@@ -747,9 +751,9 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                         className="h-3.5 w-3.5 rounded cursor-pointer"
                       />
                     </td>
-                    <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(o.orderedAt)}</td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ORD_STATUS_STYLE[o.status]}`}>{o.status}</span>
+                    <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDateOnly(o.orderedAt)}</td>
+                    <td className="px-4 py-3 text-blue-600 dark:text-blue-400 text-xs font-medium whitespace-nowrap">
+                      {o.note?.match(/^\[(.*?)\]/)?.[1] || "-"}
                     </td>
                     <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200 max-w-[160px] truncate">{o.materialName}</td>
                     <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{o.materialId}</td>

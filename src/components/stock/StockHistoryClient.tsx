@@ -23,7 +23,7 @@ type SortDir = "asc" | "desc";
 type ColDef = { key: SortKey | null; label: string; sortable: boolean; outboundOnly?: boolean };
 
 const COLUMNS: ColDef[] = [
-  { key: "createdAt",    label: "일시",     sortable: true  },
+  { key: "createdAt",    label: "일자",     sortable: true  },
   { key: "materialName", label: "자재명",   sortable: true  },
   { key: "materialId",   label: "자재코드", sortable: true  },
   { key: "qty",          label: "수량",     sortable: true  },
@@ -48,6 +48,10 @@ function inRange(iso: string, from: string, to: string) {
 function fmtDate(iso: string) {
   const d = new Date(iso);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+}
+
+function fmtDateOnly(iso: string) {
+  return iso.substring(0, 10);
 }
 
 function inputCls() {
@@ -144,7 +148,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
     const label = selectedIds.size > 0 ? `선택${selectedIds.size}건` : "전체";
     const rows = list.map(t => {
       const base: Record<string, string | number> = {
-        일시: fmtDate(t.createdAt),
+        일자: fmtDateOnly(t.createdAt),
         자재명: t.materialName,
         자재코드: t.materialId,
         수량: t.qty,
@@ -282,7 +286,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                     className="h-3.5 w-3.5 rounded cursor-pointer"
                   />
                 </td>
-                <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(t.createdAt)}</td>
+                <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDateOnly(t.createdAt)}</td>
                 <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200 max-w-[200px] truncate">{t.materialName}</td>
                 <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{t.materialId}</td>
                 <td className="px-4 py-3 text-right tabular-nums">

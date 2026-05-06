@@ -653,13 +653,19 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
     }).catch(() => {});
   }, []);
 
-  const filtered = orders.filter(o =>
-    !q || o.materialName.toLowerCase().includes(q.toLowerCase()) ||
-    o.materialId.toLowerCase().includes(q.toLowerCase()) ||
-    (o.vendorName?.toLowerCase().includes(q.toLowerCase()) ?? false) ||
-    (o.siteName?.toLowerCase().includes(q.toLowerCase()) ?? false) ||
-    (o.note?.toLowerCase().includes(q.toLowerCase()) ?? false)
-  );
+  const filtered = orders.filter(o => {
+    if (!q) return true;
+    const ql = q.toLowerCase();
+    const refNo = o.note?.match(/^\[(.*?)\]/)?.[1] ?? "";
+    return (
+      o.materialName.toLowerCase().includes(ql) ||
+      o.materialId.toLowerCase().includes(ql) ||
+      (o.vendorName?.toLowerCase().includes(ql) ?? false) ||
+      (o.siteName?.toLowerCase().includes(ql) ?? false) ||
+      (o.note?.toLowerCase().includes(ql) ?? false) ||
+      refNo.toLowerCase().includes(ql)
+    );
+  });
 
   function toggle(id: number) {
     setChecked(prev => {
@@ -691,7 +697,7 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
         </div>
         <div className="p-3">
           <input type="text" value={q} onChange={e => { setQ(e.target.value); setChecked(new Set()); }} autoFocus
-            placeholder="자재명, 코드, 거래처, 현장 검색"
+            placeholder="자재명, 코드, 거래처, 현장, 주문참조번호 검색"
             className="w-full px-3 py-2 text-sm font-medium text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-500 placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:font-normal" />
         </div>
         <div className="flex-1 overflow-y-auto">
