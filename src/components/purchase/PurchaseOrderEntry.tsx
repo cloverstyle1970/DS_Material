@@ -45,7 +45,6 @@ export default function PurchaseOrderEntry() {
   const [vendorName,  setVendorName]  = useState("");
   const [managerName, setManagerName] = useState(user?.name ?? "");
   const [siteName,    setSiteName]    = useState("");
-  const [topElevatorName, setTopElevatorName] = useState("");
   const [elevators,   setElevators]   = useState<ElevatorRecord[]>([]);
   const [reference,   setReference]   = useState("");
   const [matType,     setMatType]     = useState<"전체" | "DS" | "TK">("전체");
@@ -96,7 +95,7 @@ export default function PurchaseOrderEntry() {
   }
   function clearAll() {
     setRows([newRow(), newRow(), newRow(), newRow(), newRow()]);
-    setVendorName(""); setSiteName(""); setTopElevatorName(""); setReference(""); setOrderRefNo(""); setFiles([]);
+    setVendorName(""); setSiteName(""); setReference(""); setOrderRefNo(""); setFiles([]);
   }
 
   function applyMultipleMaterials(startRowId: string, materials: MaterialRecord[]) {
@@ -144,7 +143,7 @@ export default function PurchaseOrderEntry() {
         await api.post("/api/purchase-orders", {
           materialId: r.materialId, materialName: r.materialName, qty: r.qty,
           vendorName: vendorName || null, unitPrice: r.unitPrice || null, requestId: r.reqId,
-          siteName: siteName || null, elevatorName: r.elevatorName || topElevatorName || null,
+          siteName: siteName || null, elevatorName: r.elevatorName || null,
           requesterName: managerName || null, note: [orderRefNo ? `[${orderRefNo}]` : "", r.remark || reference || ""].filter(Boolean).join(" ") || null,
           userId: user.id, userName: user.name,
         });
@@ -192,22 +191,14 @@ export default function PurchaseOrderEntry() {
           <FormField label="현장">
             <SiteInlineSearch value={siteName} onChange={setSiteName} sites={sites} />
           </FormField>
-          <FormField label="호기">
-            {elevators.length > 0 ? (
-              <ElevatorPicker value={topElevatorName} elevators={elevators}
-                onChange={setTopElevatorName} inline={false} />
-            ) : (
-              <input type="text" value={topElevatorName} onChange={e => setTopElevatorName(e.target.value)} className={inputCls} />
-            )}
+          <FormField label="주문참조번호">
+            <input type="text" value={orderRefNo} onChange={e => setOrderRefNo(e.target.value)} className={inputCls} />
           </FormField>
           <FormField label="참조" wide>
             <div className="flex items-center gap-2">
               <input type="text" value={reference} onChange={e => setReference(e.target.value)} className={`${inputCls} flex-1`} />
               <MatTypeToggle value={matType} onChange={setMatType} />
             </div>
-          </FormField>
-          <FormField label="주문참조번호" wide>
-            <input type="text" value={orderRefNo} onChange={e => setOrderRefNo(e.target.value)} className={inputCls} />
           </FormField>
         </div>
         <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
