@@ -1,9 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth, isViewOnly, isAdmin, hasMenuPermission } from "@/context/AuthContext";
+import { useTabs, MAX_TABS } from "@/context/TabsContext";
+import { PAGE_REGISTRY } from "@/lib/page-registry";
 
 type NavItem = {
   href: string;
@@ -99,6 +100,7 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
   const pathname = usePathname();
   const router   = useRouter();
   const { user, logout } = useAuth();
+  const { tabs, openTab } = useTabs();
   const viewOnly = user ? isViewOnly(user) : false;
   const admin    = !viewOnly;
 
@@ -106,6 +108,26 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
     if (typeof window !== "undefined" && window.innerWidth < 768) {
       onClose();
     }
+  }
+
+  function handleMenuOpen(href: string, fallbackLabel: string) {
+    if (href.startsWith("#")) return;
+    const entry = PAGE_REGISTRY[href];
+    const label = entry?.label ?? fallbackLabel;
+    // 등록되지 않은 경로는 일반 라우팅 fallback
+    if (!entry) {
+      router.push(href);
+      handleNavClick();
+      return;
+    }
+    // 이미 열려있지 않고 탭 한도 초과 시 차단
+    const alreadyOpen = tabs.some(t => t.href === href);
+    if (!alreadyOpen && tabs.length >= MAX_TABS) {
+      alert(`탭은 최대 ${MAX_TABS}개까지 열 수 있습니다. 다른 탭을 닫고 다시 시도해주세요.`);
+      return;
+    }
+    openTab(href, label);
+    handleNavClick();
   }
 
   function isActive(href: string) {
@@ -218,8 +240,10 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
 
           {/* 대시보드 */}
           <div className="px-2 mb-4">
-            <Link href="/dashboard" onClick={handleNavClick}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors whitespace-nowrap ${
+            <button
+              type="button"
+              onClick={() => handleMenuOpen("/dashboard", "대시보드")}
+              className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors whitespace-nowrap ${
                 pathname === "/dashboard"
                   ? "bg-white/10 text-white font-medium"
                   : "text-slate-200 hover:bg-white/5 hover:text-white"
@@ -229,7 +253,7 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
               {pathname === "/dashboard" && (
                 <span className="ml-auto w-1 h-4 rounded-full bg-blue-400 shrink-0" />
               )}
-            </Link>
+            </button>
           </div>
 
           {/* 그룹 메뉴 */}
@@ -266,8 +290,11 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
                     {visibleItems.map(item => {
                       const active = isActive(item.href);
                       return (
-                        <Link key={item.href} href={item.href} onClick={handleNavClick}
-                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors whitespace-nowrap ${
+                        <button
+                          key={item.href}
+                          type="button"
+                          onClick={() => handleMenuOpen(item.href, item.label)}
+                          className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors whitespace-nowrap ${
                             active
                               ? "bg-white/10 text-white font-medium"
                               : "text-slate-200 hover:bg-white/5 hover:text-white"
@@ -277,7 +304,7 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
                           {active && (
                             <span className="ml-auto w-1 h-4 rounded-full bg-blue-400 shrink-0" />
                           )}
-                        </Link>
+                        </button>
                       );
                     })}
                   </div>
@@ -289,8 +316,10 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
 
         {/* 환경설정 */}
         <div className="px-2 pb-2">
-          <Link href="/settings" onClick={handleNavClick}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors whitespace-nowrap ${
+          <button
+            type="button"
+            onClick={() => handleMenuOpen("/settings", "환경설정")}
+            className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors whitespace-nowrap ${
               pathname === "/settings"
                 ? "bg-white/10 text-white font-medium"
                 : "text-slate-200 hover:bg-white/5 hover:text-white"
@@ -298,7 +327,7 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
             <span className="text-base w-5 text-center shrink-0">⚙️</span>
             <span className="flex-1">환경설정</span>
             {pathname === "/settings" && <span className="ml-auto w-1 h-4 rounded-full bg-blue-400 shrink-0" />}
-          </Link>
+          </button>
         </div>
       </aside>
 

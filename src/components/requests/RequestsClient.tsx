@@ -9,6 +9,7 @@ import { TransactionRecord } from "@/lib/mock-transactions";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import StockHistoryClient from "@/components/stock/StockHistoryClient";
 import { api, getErrorMessage } from "@/lib/api-client";
+import Autocomplete from "@/components/common/Autocomplete";
 
 interface SiteOption   { id: number; name: string }
 interface VendorOption { id: number; name: string }
@@ -47,59 +48,6 @@ function inRange(iso: string, from: string, to: string) {
 
 function inputCls() {
   return "px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-xs text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-slate-400 bg-white dark:bg-gray-700";
-}
-
-// ── 공통 자동완성 컴포넌트 ──────────────────────────────────
-function Autocomplete({ value, onChange, items, placeholder, width = "w-36" }: {
-  value: string;
-  onChange: (v: string) => void;
-  items: string[];
-  placeholder: string;
-  width?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  const suggestions = value.trim()
-    ? items.filter(i => i.toLowerCase().includes(value.toLowerCase())).slice(0, 10)
-    : [];
-
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  return (
-    <div ref={ref} className="relative">
-      <input
-        type="text"
-        placeholder={placeholder}
-        value={value}
-        onChange={e => { onChange(e.target.value); setOpen(true); }}
-        onFocus={() => value.trim() && setOpen(true)}
-        className={`${inputCls()} ${width}`}
-      />
-      {open && suggestions.length > 0 && (
-        <ul className="absolute z-50 top-full left-0 mt-1 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-52 overflow-y-auto">
-          {suggestions.map((s, i) => (
-            <li key={i}>
-              <button
-                type="button"
-                onMouseDown={e => e.preventDefault()}
-                onClick={() => { onChange(s); setOpen(false); }}
-                className="w-full text-left px-3 py-2 text-xs text-gray-800 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-              >
-                {s}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
 }
 
 // 자재명 자동완성 (API 검색)
@@ -243,6 +191,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
   const [sites, setSites] = useState<SiteOption[]>([]);
   const [vendors, setVendors] = useState<VendorOption[]>([]);
   const [requesterNames, setRequesterNames] = useState<string[]>([]);
+  const [userNames, setUserNames] = useState<string[]>([]);
   const [orders,   setOrders]   = useState(initialOrders);
 
   useEffect(() => {
@@ -251,7 +200,11 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
     api.get<VendorOption[]>("/api/vendors").then(setVendors).catch(() => {});
     api.get<{ name: string; status: string | null }[]>("/api/users")
-      .then(data => setRequesterNames(data.filter(u => u.status === "재직").map(u => u.name).sort()))
+      .then(data => {
+        const active = data.filter(u => u.status === "재직").map(u => u.name).sort();
+        setRequesterNames(active);
+        setUserNames(active);
+      })
       .catch(() => {});
   }, []);
 
@@ -699,20 +652,36 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
               <span className="text-gray-300 dark:text-gray-600 text-xs">~</span>
               <input type="date" value={ordDraft.dateTo}   onChange={e => setOrdDraft(p => ({...p, dateTo: e.target.value}))}   className={inputCls()} />
             </div>
-            <select value={ordDraft.siteName} onChange={e => setOrdDraft(p => ({...p, siteName: e.target.value}))} className={inputCls()}>
-              <option value="">현장 전체</option>
-              {sites.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-            </select>
-            <select value={ordDraft.vendorName} onChange={e => setOrdDraft(p => ({...p, vendorName: e.target.value}))} className={inputCls()}>
-              <option value="">거래처 전체</option>
-              {vendors.map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
-            </select>
+            <Autocomplete
+              value={ordDraft.siteName}
+              onChange={v => setOrdDraft(p => ({...p, siteName: v}))}
+              items={sites.map(s => s.name)}
+              placeholder="현장명"
+              width="w-44"
+            />
+            <Autocomplete
+              value={ordDraft.vendorName}
+              onChange={v => setOrdDraft(p => ({...p, vendorName: v}))}
+              items={vendors.map(v => v.name)}
+              placeholder="거래처"
+              width="w-36"
+            />
             <input type="text" lang="ko" placeholder="자재명·코드·규격" value={ordDraft.material}
               onChange={e => setOrdDraft(p => ({...p, material: e.target.value}))} className={`${inputCls()} w-32`} />
-            <input type="text" placeholder="신청자" value={ordDraft.requesterName}
-              onChange={e => setOrdDraft(p => ({...p, requesterName: e.target.value}))} className={`${inputCls()} w-24`} />
-            <input type="text" placeholder="담당자" value={ordDraft.userName}
-              onChange={e => setOrdDraft(p => ({...p, userName: e.target.value}))} className={`${inputCls()} w-24`} />
+            <Autocomplete
+              value={ordDraft.requesterName}
+              onChange={v => setOrdDraft(p => ({...p, requesterName: v}))}
+              items={requesterNames}
+              placeholder="신청자"
+              width="w-28"
+            />
+            <Autocomplete
+              value={ordDraft.userName}
+              onChange={v => setOrdDraft(p => ({...p, userName: v}))}
+              items={userNames}
+              placeholder="담당자"
+              width="w-28"
+            />
             <button type="submit"
               className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 transition-colors">
               검색

@@ -6,6 +6,7 @@ import * as XLSX from "xlsx";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { api } from "@/lib/api-client";
+import Autocomplete from "@/components/common/Autocomplete";
 
 interface SiteOption { id: number; name: string }
 
@@ -56,6 +57,7 @@ function inputCls() {
 export default function StockHistoryClient({ mode, initial }: Props) {
   const [transactions, setTransactions] = useState(initial);
   const [sites, setSites] = useState<SiteOption[]>([]);
+  const [userNames, setUserNames] = useState<string[]>([]);
 
   useEffect(() => {
     api.get<TransactionRecord[]>(`/api/transactions?type=${encodeURIComponent(mode)}`)
@@ -63,6 +65,9 @@ export default function StockHistoryClient({ mode, initial }: Props) {
   }, [mode]);
   useEffect(() => {
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
+    api.get<{ name: string; status: string | null }[]>("/api/users")
+      .then(data => setUserNames(data.filter(u => u.status === "재직").map(u => u.name).sort()))
+      .catch(() => {});
   }, []);
   const [search, setSearch] = useState<Search>(defaultSearch);
   const [sortKey, setSortKey] = useState<SortKey>("createdAt");
@@ -186,15 +191,20 @@ export default function StockHistoryClient({ mode, initial }: Props) {
               onChange={e => setSearch(p => ({ ...p, dateTo: e.target.value }))}
               className={inputCls()} />
           </div>
-          <select value={search.siteName}
-            onChange={e => setSearch(p => ({ ...p, siteName: e.target.value }))}
-            className={inputCls()}>
-            <option value="">현장 전체</option>
-            {sites.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-          </select>
-          <input type="text" lang="ko" placeholder="처리자" value={search.userName}
-            onChange={e => setSearch(p => ({ ...p, userName: e.target.value }))}
-            className={`${inputCls()} w-24`} />
+          <Autocomplete
+            value={search.siteName}
+            onChange={v => setSearch(p => ({ ...p, siteName: v }))}
+            items={sites.map(s => s.name)}
+            placeholder="현장명"
+            width="w-44"
+          />
+          <Autocomplete
+            value={search.userName}
+            onChange={v => setSearch(p => ({ ...p, userName: v }))}
+            items={userNames}
+            placeholder="처리자"
+            width="w-28"
+          />
           {hasFilter && (
             <button type="button" onClick={() => setSearch(defaultSearch())}
               className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 underline">초기화</button>
