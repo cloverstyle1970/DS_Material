@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { api, getErrorMessage } from "@/lib/api-client";
-import { useAuth, isAdmin } from "@/context/AuthContext";
+import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 
 export interface ConstructionRequest {
@@ -137,7 +137,17 @@ export default function ConstructionRequestClient() {
   }
 
   // 권한 체크
-  const canSchedule = user && (isAdmin(user) || user.name === "송영권" || user.name === "이종선");
+  const canSchedule = user && (isAdmin(user) || hasMenuPermission(user, "/construction/schedule", "create"));
+  const canUpdateAny = user && (isAdmin(user) || hasMenuPermission(user, "/construction/requests", "update"));
+
+  // 일정등록됨·완료 상태는 수정/삭제 불가
+  // 그 외 상태에서 본인 요청이거나 수정 권한이 있으면 가능
+  function canEditReq(req: ConstructionRequest) {
+    if (req.status === "일정등록됨" || req.status === "완료") return false;
+    if (!user) return false;
+    if (canUpdateAny) return true;
+    return req.requesterName === user.name;
+  }
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
@@ -184,14 +194,32 @@ export default function ConstructionRequestClient() {
                 <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-3 mb-3">{req.details}</p>
                 <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-3">
                   <span>신청자: {req.requesterName}</span>
-                  {canSchedule && req.status === "요청" && (
-                    <Link 
-                      href={`/construction/schedule?reqId=${req.id}&site=${encodeURIComponent(req.siteName)}&elevator=${encodeURIComponent(req.elevatorName)}&details=${encodeURIComponent(req.details)}`}
-                      className="text-orange-600 dark:text-orange-400 font-medium hover:underline"
-                    >
-                      일정으로 등록 →
-                    </Link>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {canEditReq(req) && (
+                      <>
+                        <button
+                          onClick={() => handleEdit(req)}
+                          className="text-blue-600 dark:text-blue-400 font-medium hover:underline"
+                        >
+                          수정
+                        </button>
+                        <button
+                          onClick={() => handleDelete(req.id)}
+                          className="text-red-500 dark:text-red-400 font-medium hover:underline"
+                        >
+                          삭제
+                        </button>
+                      </>
+                    )}
+                    {canSchedule && req.status === "요청" && (
+                      <Link
+                        href={`/construction/schedule?reqId=${req.id}&site=${encodeURIComponent(req.siteName)}&elevator=${encodeURIComponent(req.elevatorName)}&details=${encodeURIComponent(req.details)}&manager=${encodeURIComponent(req.manager || "")}&managerPhone=${encodeURIComponent(req.managerPhone || "")}`}
+                        className="text-orange-600 dark:text-orange-400 font-medium hover:underline"
+                      >
+                        일정으로 등록 →
+                      </Link>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

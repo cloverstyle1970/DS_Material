@@ -42,10 +42,38 @@ export interface ConstructionSchedule {
   managerPhone: string;
 }
 
-let nextConstReqId = 1;
-let nextConstSchedId = 1;
-export const mockConstRequests: ConstructionRequest[] = [];
-export const mockConstSchedules: ConstructionSchedule[] = [];
+// ── construction 헬퍼 ─────────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function dbToConstReq(r: any): ConstructionRequest {
+  return {
+    id:            r.id,
+    status:        r.status,
+    siteName:      r.site_name      ?? "",
+    elevatorName:  r.elevator_name  ?? "",
+    manager:       r.manager        ?? "",
+    managerPhone:  r.manager_phone  ?? "",
+    requesterName: r.requester_name ?? "",
+    details:       r.details        ?? "",
+    requestedAt:   r.requested_at,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function dbToConstSched(r: any): ConstructionSchedule {
+  return {
+    id:            r.id,
+    requestId:     r.request_id     ?? null,
+    startDate:     r.start_date,
+    endDate:       r.end_date,
+    startTime:     r.start_time     ?? "",
+    siteName:      r.site_name      ?? "",
+    elevatorName:  r.elevator_name  ?? "",
+    details:       r.details        ?? "",
+    workers:       r.workers        ?? "",
+    manager:       r.manager        ?? "",
+    managerPhone:  r.manager_phone  ?? "",
+  };
+}
 
 // ── 연간일정 모듈 (In-Memory Mock) ─────────────────────────────────
 export interface AnnualEvent {
@@ -665,10 +693,16 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
     return list;
   }
   if (path === "/api/construction-requests") {
-    return [...mockConstRequests].reverse();
+    const { data, error } = await supabase.from("construction_requests")
+      .select("*").order("requested_at", { ascending: false });
+    if (error) throw new MockApiError(error.message, 500);
+    return (data ?? []).map(dbToConstReq);
   }
   if (path === "/api/construction-schedules") {
-    return [...mockConstSchedules];
+    const { data, error } = await supabase.from("construction_schedules")
+      .select("*").order("start_date");
+    if (error) throw new MockApiError(error.message, 500);
+    return (data ?? []).map(dbToConstSched);
   }
   if (path === "/api/annual-events") {
     const year = params.get("year");
@@ -833,42 +867,38 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
     return dbToUser(data);
   }
   if (path === "/api/construction-requests") {
-    const record: ConstructionRequest = {
-      id: nextConstReqId++,
-      status: "요청",
-      siteName: body.siteName || "",
-      elevatorName: body.elevatorName || "",
-      manager: body.manager || "",
-      managerPhone: body.managerPhone || "",
-      requesterName: body.requesterName || "",
-      details: body.details || "",
-      requestedAt: new Date().toISOString(),
-    };
-    mockConstRequests.push(record);
-    return record;
+    const { data, error } = await supabase.from("construction_requests").insert({
+      status:         "요청",
+      site_name:      body.siteName      || "",
+      elevator_name:  body.elevatorName  || "",
+      manager:        body.manager       || "",
+      manager_phone:  body.managerPhone  || "",
+      requester_name: body.requesterName || "",
+      details:        body.details       || "",
+    }).select().single();
+    if (error) throw new MockApiError(error.message, 500);
+    return dbToConstReq(data);
   }
   if (path === "/api/construction-schedules") {
-    const record: ConstructionSchedule = {
-      id: nextConstSchedId++,
-      requestId: body.requestId || null,
-      startDate: body.startDate,
-      endDate: body.endDate || body.startDate,
-      startTime: body.startTime || "",
-      siteName: body.siteName || "",
-      elevatorName: body.elevatorName || "",
-      details: body.details || "",
-      workers: body.workers || "",
-      manager: body.manager || "",
-      managerPhone: body.managerPhone || "",
-    };
-    mockConstSchedules.push(record);
-
-    // 만약 공사요청에서 바로 등록된 경우, 공사요청 상태 변경
-    if (record.requestId) {
-      const req = mockConstRequests.find(r => r.id === record.requestId);
-      if (req) req.status = "일정등록됨";
+    const { data, error } = await supabase.from("construction_schedules").insert({
+      request_id:    body.requestId    || null,
+      start_date:    body.startDate,
+      end_date:      body.endDate      || body.startDate,
+      start_time:    body.startTime    || "",
+      site_name:     body.siteName     || "",
+      elevator_name: body.elevatorName || "",
+      details:       body.details      || "",
+      workers:       body.workers      || "",
+      manager:       body.manager      || "",
+      manager_phone: body.managerPhone || "",
+    }).select().single();
+    if (error) throw new MockApiError(error.message, 500);
+    // 연결된 공사요청 상태 업데이트
+    if (body.requestId) {
+      await supabase.from("construction_requests")
+        .update({ status: "일정등록됨" }).eq("id", body.requestId);
     }
-    return record;
+    return dbToConstSched(data);
   }
   if (path === "/api/annual-events") {
     const record: AnnualEvent = {
@@ -1107,32 +1137,39 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
 
   const constSchedEditId = extractId(path, "/api/construction-schedules");
   if (constSchedEditId) {
-    const idx = mockConstSchedules.findIndex(s => s.id === Number(constSchedEditId));
-    if (idx === -1) throw new MockApiError("not found", 404);
-    const { startDate, endDate, startTime, siteName, elevatorName, details, workers, manager, managerPhone } = body;
-    if (startDate    !== undefined) mockConstSchedules[idx].startDate    = startDate;
-    if (endDate      !== undefined) mockConstSchedules[idx].endDate      = endDate;
-    if (startTime    !== undefined) mockConstSchedules[idx].startTime    = startTime;
-    if (siteName     !== undefined) mockConstSchedules[idx].siteName     = siteName;
-    if (elevatorName !== undefined) mockConstSchedules[idx].elevatorName = elevatorName;
-    if (details      !== undefined) mockConstSchedules[idx].details      = details;
-    if (workers      !== undefined) mockConstSchedules[idx].workers      = workers;
-    if (manager      !== undefined) mockConstSchedules[idx].manager      = manager;
-    if (managerPhone !== undefined) mockConstSchedules[idx].managerPhone = managerPhone;
-    return mockConstSchedules[idx];
+    const numId = Number(constSchedEditId);
+    const patch: Record<string, unknown> = {};
+    if (body.startDate    !== undefined) patch.start_date    = body.startDate;
+    if (body.endDate      !== undefined) patch.end_date      = body.endDate;
+    if (body.startTime    !== undefined) patch.start_time    = body.startTime;
+    if (body.siteName     !== undefined) patch.site_name     = body.siteName;
+    if (body.elevatorName !== undefined) patch.elevator_name = body.elevatorName;
+    if (body.details      !== undefined) patch.details       = body.details;
+    if (body.workers      !== undefined) patch.workers       = body.workers;
+    if (body.manager      !== undefined) patch.manager       = body.manager;
+    if (body.managerPhone !== undefined) patch.manager_phone = body.managerPhone;
+    const { data, error } = await supabase.from("construction_schedules")
+      .update(patch).eq("id", numId).select().single();
+    if (error) throw new MockApiError(error.message, 500);
+    if (!data) throw new MockApiError("not found", 404);
+    return dbToConstSched(data);
   }
 
   const constReqEditId = extractId(path, "/api/construction-requests");
   if (constReqEditId) {
-    const idx = mockConstRequests.findIndex(r => r.id === Number(constReqEditId));
-    if (idx === -1) throw new MockApiError("not found", 404);
-    const { siteName, elevatorName, manager, managerPhone, details } = body;
-    if (siteName     !== undefined) mockConstRequests[idx].siteName     = siteName;
-    if (elevatorName !== undefined) mockConstRequests[idx].elevatorName = elevatorName;
-    if (manager      !== undefined) mockConstRequests[idx].manager      = manager;
-    if (managerPhone !== undefined) mockConstRequests[idx].managerPhone = managerPhone;
-    if (details      !== undefined) mockConstRequests[idx].details      = details;
-    return mockConstRequests[idx];
+    const numId = Number(constReqEditId);
+    const patch: Record<string, unknown> = {};
+    if (body.siteName     !== undefined) patch.site_name     = body.siteName;
+    if (body.elevatorName !== undefined) patch.elevator_name = body.elevatorName;
+    if (body.manager      !== undefined) patch.manager       = body.manager;
+    if (body.managerPhone !== undefined) patch.manager_phone = body.managerPhone;
+    if (body.details      !== undefined) patch.details       = body.details;
+    if (body.status       !== undefined) patch.status        = body.status;
+    const { data, error } = await supabase.from("construction_requests")
+      .update(patch).eq("id", numId).select().single();
+    if (error) throw new MockApiError(error.message, 500);
+    if (!data) throw new MockApiError("not found", 404);
+    return dbToConstReq(data);
   }
 
   const annualEventId = extractId(path, "/api/annual-events");
@@ -1281,20 +1318,22 @@ async function routeDELETE(path: string, body: AnyBody): Promise<unknown> {
 
   const constSchedId = extractId(path, "/api/construction-schedules");
   if (constSchedId) {
-    const idx = mockConstSchedules.findIndex(s => s.id === Number(constSchedId));
-    if (idx === -1) throw new MockApiError("not found", 404);
-    const deleted = mockConstSchedules.splice(idx, 1)[0];
-    if (deleted.requestId) {
-      const req = mockConstRequests.find(r => r.id === deleted.requestId);
-      if (req && req.status === "일정등록됨") req.status = "요청";
+    const numId = Number(constSchedId);
+    // 연결된 공사요청 상태 '요청'으로 복구
+    const { data: sched } = await supabase.from("construction_schedules")
+      .select("request_id").eq("id", numId).single();
+    if (sched?.request_id) {
+      await supabase.from("construction_requests")
+        .update({ status: "요청" }).eq("id", sched.request_id).eq("status", "일정등록됨");
     }
+    const { error } = await supabase.from("construction_schedules").delete().eq("id", numId);
+    if (error) throw new MockApiError(error.message, 500);
     return { ok: true };
   }
   const constReqId = extractId(path, "/api/construction-requests");
   if (constReqId) {
-    const idx = mockConstRequests.findIndex(r => r.id === Number(constReqId));
-    if (idx === -1) throw new MockApiError("not found", 404);
-    mockConstRequests.splice(idx, 1);
+    const { error } = await supabase.from("construction_requests").delete().eq("id", Number(constReqId));
+    if (error) throw new MockApiError(error.message, 500);
     return { ok: true };
   }
 

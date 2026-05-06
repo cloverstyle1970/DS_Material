@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, getErrorMessage } from "@/lib/api-client";
-import { useAuth, isAdmin } from "@/context/AuthContext";
+import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 import { getHolidaysForYear } from "@/lib/korean-holidays";
 
@@ -78,7 +78,7 @@ function CalendarContent() {
   const [evNote, setEvNote] = useState("");
   const [evSaving, setEvSaving] = useState(false);
 
-  const canSchedule = user && (isAdmin(user) || user.name === "송영권" || user.name === "이종선");
+  const canSchedule = user && (isAdmin(user) || hasMenuPermission(user, "/construction/schedule", "create"));
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -117,6 +117,8 @@ function CalendarContent() {
       setSiteName(searchParams.get("site") || "");
       setElevatorName(searchParams.get("elevator") || "");
       setDetails(searchParams.get("details") || "");
+      setManager(searchParams.get("manager") || "");
+      setManagerPhone(searchParams.get("managerPhone") || "");
       setStartDate(new Date().toISOString().slice(0, 10));
       setEndDate(new Date().toISOString().slice(0, 10));
       setShowModal(true);
@@ -367,12 +369,18 @@ function CalendarContent() {
                     <div
                       key={`sch-${sch.id}`}
                       onClick={(e) => { e.stopPropagation(); openEditModal(sch); }}
-                      className={`text-xs px-2 py-1.5 rounded cursor-pointer leading-tight flex flex-col gap-1 shadow-sm ${sch.endDate > sch.startDate ? "bg-orange-500 text-white" : "bg-orange-100 text-orange-900 dark:bg-orange-900/60 dark:text-orange-100"}`}
+                      className="text-xs px-2 py-1.5 rounded cursor-pointer leading-tight flex flex-col gap-0.5 shadow-sm bg-orange-100 dark:bg-orange-900/50 border border-orange-300 dark:border-orange-700 text-gray-900 dark:text-white"
                       title={`${sch.siteName} ${sch.elevatorName ? `(${sch.elevatorName})` : ""}${sch.startTime ? ` ${sch.startTime}` : ""} / ${sch.details} / ${sch.workers}${sch.manager ? ` / 담당: ${sch.manager}${sch.managerPhone ? ` ${sch.managerPhone}` : ""}` : ""}`}
                     >
-                      <div className="font-bold truncate text-[13px]">{sch.siteName}{sch.elevatorName ? ` ${sch.elevatorName}` : ""}</div>
-                      <div className="truncate opacity-95">{sch.details}</div>
-                      {sch.workers && <div className="truncate opacity-80 text-[11px] mt-0.5">{sch.workers}</div>}
+                      <div className="font-bold truncate text-[12px]">
+                        {sch.siteName}{sch.elevatorName ? ` · ${sch.elevatorName}` : ""}
+                      </div>
+                      {sch.startTime && (
+                        <div className="truncate text-[11px] font-medium">{sch.startTime}</div>
+                      )}
+                      {sch.details && (
+                        <div className="truncate text-[11px] opacity-80">{sch.details}</div>
+                      )}
                     </div>
                   ))}
                 </div>
