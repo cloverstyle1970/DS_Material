@@ -156,6 +156,17 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
     });
   }
 
+  async function deleteMaterials(ids: string[]) {
+    if (!confirm(`자재 ${ids.length}건을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+    try {
+      await Promise.all(ids.map(id => api.delete(`/api/materials/${encodeURIComponent(id)}`)));
+      setSelected(new Set());
+      await reload();
+    } catch (e) {
+      alert(getErrorMessage(e));
+    }
+  }
+
   function downloadExcel() {
     const list = selected.size > 0
       ? materials.filter(m => selected.has(m.id))
@@ -277,12 +288,20 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
             {selected.size > 0 && <span className="ml-2 text-slate-600 font-medium">(선택 {selected.size}개)</span>}
           </span>
 
-          {/* 선택 해제 */}
+          {/* 선택 해제 / 선택 삭제 */}
           {selected.size > 0 && (
-            <button type="button" onClick={() => setSelected(new Set())}
-              className="text-xs text-gray-400 hover:text-gray-600 underline shrink-0">
-              선택 해제
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button type="button" onClick={() => setSelected(new Set())}
+                className="text-xs text-gray-400 hover:text-gray-600 underline">
+                선택 해제
+              </button>
+              {!viewOnly && (
+                <button type="button" onClick={() => deleteMaterials([...selected])}
+                  className="flex items-center gap-1.5 bg-red-600 text-white px-3 py-2 rounded-xl text-xs font-medium hover:bg-red-700 transition-colors">
+                  선택 삭제 ({selected.size})
+                </button>
+              )}
+            </div>
           )}
 
           <button type="button" onClick={downloadExcel}
@@ -346,7 +365,13 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
                   </th>
                 );
               })}
-              {!viewOnly && <th className="px-4 py-3" />}
+              {!viewOnly && (
+                <th className={`px-4 py-3 sticky right-0 z-20 ${
+                  matType === "DS" ? isDark ? "bg-gray-800" : "bg-red-50"
+                  : matType === "TK" ? isDark ? "bg-gray-800" : "bg-blue-50"
+                  : isDark ? "bg-gray-800" : "bg-gray-50"
+                }`} />
+              )}
             </tr>
           </thead>
           <tbody className={`divide-y ${isDark ? "divide-gray-700" : "divide-gray-100"}`}>
@@ -393,7 +418,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
                     <StockCell material={m} editable={!viewOnly} />
                   </td>
                   {!viewOnly && (
-                    <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                    <td className={`px-4 py-3 sticky right-0 z-10 ${isChecked ? isDark ? "bg-gray-700" : "bg-slate-50" : isDark ? "bg-gray-900" : "bg-white"}`} onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
@@ -412,6 +437,14 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
                             R
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => deleteMaterials([m.id])}
+                          title="자재 삭제"
+                          className="text-xs px-2.5 py-1 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors whitespace-nowrap font-medium"
+                        >
+                          삭제
+                        </button>
                       </div>
                     </td>
                   )}

@@ -1077,6 +1077,14 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
 }
 
 async function routeDELETE(path: string, body: AnyBody): Promise<unknown> {
+  const materialId = extractId(path, "/api/materials");
+  if (materialId) {
+    const id = decodeURIComponent(materialId);
+    const { error } = await supabase.from("materials").delete().eq("id", id);
+    if (error) throw new MockApiError(error.message, 500);
+    return { ok: true };
+  }
+
   if (path === "/api/categories") {
     const { level, majorCode, midCode, code } = body ?? {};
     if (level === "major") {

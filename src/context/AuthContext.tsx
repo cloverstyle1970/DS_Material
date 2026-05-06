@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Permission } from "@/lib/mock-users";
+import { supabase } from "@/lib/supabase";
 
 export interface AuthUser {
   id: number;
@@ -61,13 +62,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const t = setTimeout(() => {
+    const t = setTimeout(async () => {
       try {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
           const parsed = JSON.parse(stored);
-          // 구버전 localStorage에 permissions 없을 경우 보정
-          setUser({ ...parsed, permissions: parsed.permissions ?? [] });
+          // Supabase에서 최신 권한·부서 갱신 (권한 변경 시 재로그인 없이 반영)
+          const { data } = await supabase
+            .from("users")
+            .select("permissions, dept")
+            .eq("id", parsed.id)
+            .eq("status", "재직")
+            .single();
+          const freshUser: AuthUser = {
+            ...parsed,
+            permissions: (data?.permissions ?? parsed.permissions ?? []) as Permission[],
+            dept: data?.dept ?? parsed.dept ?? "",
+          };
+          setUser(freshUser);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
         }
       } catch {}
       setIsLoading(false);

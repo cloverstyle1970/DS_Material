@@ -13,9 +13,9 @@ interface Props {
 }
 
 export default function PermissionsModal({ user, onClose, onSave }: Props) {
-  // admin 권한이 있으면 모든 권한을 가진 것으로 처리
-  const isAdminUser = user.permissions.includes("admin");
   const [permissions, setPermissions] = useState<Set<string>>(new Set(user.permissions));
+  // permissions state 기반으로 계산 — toggleAdmin 후 즉시 반영
+  const isAdminUser = permissions.has("admin");
   const [saving, setSaving] = useState(false);
 
   function togglePermission(href: string, type: "read" | "create" | "update", checked: boolean) {
