@@ -11,6 +11,8 @@ export interface ConstructionRequest {
   status: "요청" | "접수" | "일정등록됨" | "완료";
   siteName: string;
   elevatorName: string;
+  manager: string;
+  managerPhone: string;
   requesterName: string;
   details: string;
   requestedAt: string;
@@ -27,6 +29,8 @@ export default function ConstructionRequestClient() {
   // Modal State
   const [siteName, setSiteName] = useState("");
   const [elevatorName, setElevatorName] = useState("");
+  const [manager, setManager] = useState("");
+  const [managerPhone, setManagerPhone] = useState("");
   const [details, setDetails] = useState("");
   const [sites, setSites] = useState<SiteOption[]>([]);
   const [elevators, setElevators] = useState<{ id: number; unitName: string }[]>([]);
@@ -38,6 +42,8 @@ export default function ConstructionRequestClient() {
     setEditId(req.id);
     setSiteName(req.siteName);
     setElevatorName(req.elevatorName || "");
+    setManager(req.manager || "");
+    setManagerPhone(req.managerPhone || "");
     setDetails(req.details);
     setShowModal(true);
   }
@@ -87,6 +93,15 @@ export default function ConstructionRequestClient() {
     }
   }
 
+  function resetForm() {
+    setEditId(null);
+    setSiteName("");
+    setElevatorName("");
+    setManager("");
+    setManagerPhone("");
+    setDetails("");
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!siteName || !details) return alert("현장명과 공사내역을 입력해주세요.");
@@ -97,21 +112,22 @@ export default function ConstructionRequestClient() {
           action: "수정",
           siteName,
           elevatorName,
-          details
+          manager,
+          managerPhone,
+          details,
         });
       } else {
         await api.post("/api/construction-requests", {
           siteName,
           elevatorName,
+          manager,
+          managerPhone,
           details,
           requesterName: user?.name || "익명",
         });
       }
       setShowModal(false);
-      setEditId(null);
-      setSiteName("");
-      setElevatorName("");
-      setDetails("");
+      resetForm();
       fetchRequests();
     } catch (e) {
       alert(getErrorMessage(e));
@@ -160,6 +176,11 @@ export default function ConstructionRequestClient() {
                   <span className="text-xs text-gray-500 dark:text-gray-400">{new Date(req.requestedAt).toLocaleDateString()}</span>
                 </div>
                 <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-1">{req.siteName} {req.elevatorName && <span className="text-gray-500 text-sm font-normal">({req.elevatorName})</span>}</h3>
+                {(req.manager || req.managerPhone) && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                    담당: {req.manager}{req.managerPhone ? ` · ${req.managerPhone}` : ""}
+                  </p>
+                )}
                 <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-3 mb-3">{req.details}</p>
                 <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-3">
                   <span>신청자: {req.requesterName}</span>
@@ -183,7 +204,7 @@ export default function ConstructionRequestClient() {
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
             <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">{editId ? "공사 요청 수정" : "공사 요청 등록"}</h3>
-              <button onClick={() => { setShowModal(false); setEditId(null); setSiteName(""); setElevatorName(""); setDetails(""); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
+              <button onClick={() => { setShowModal(false); resetForm(); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
             </div>
             <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
               <div>
@@ -217,14 +238,24 @@ export default function ConstructionRequestClient() {
                   <ElevatorPicker value={elevatorName ?? ""} elevators={elevators}
                     onChange={setElevatorName} placeholder="호기 선택 (생략 가능)" inline={false} />
                 ) : (
-                  <input 
-                    type="text" 
-                    value={elevatorName} 
-                    onChange={e => setElevatorName(e.target.value)} 
-                    placeholder="예: 1호기, 2호기 (생략 가능)" 
+                  <input
+                    type="text"
+                    value={elevatorName}
+                    onChange={e => setElevatorName(e.target.value)}
+                    placeholder="예: 1호기, 2호기 (생략 가능)"
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
                 )}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">담당자</label>
+                  <input type="text" value={manager} onChange={e => setManager(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">담당자 연락처</label>
+                  <input type="tel" value={managerPhone} onChange={e => setManagerPhone(e.target.value)} placeholder="010-0000-0000" lang="ko" inputMode="tel" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">공사 내역 <span className="text-red-500">*</span></label>
@@ -237,7 +268,7 @@ export default function ConstructionRequestClient() {
                 />
               </div>
               <div className="pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-2">
-                <button type="button" onClick={() => { setShowModal(false); setEditId(null); setSiteName(""); setElevatorName(""); setDetails(""); }} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600">취소</button>
+                <button type="button" onClick={() => { setShowModal(false); resetForm(); }} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600">취소</button>
                 <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded hover:bg-orange-700 disabled:opacity-50">등록하기</button>
               </div>
             </form>

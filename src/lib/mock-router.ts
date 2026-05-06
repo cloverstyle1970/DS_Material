@@ -21,6 +21,8 @@ export interface ConstructionRequest {
   status: "요청" | "접수" | "일정등록됨" | "완료";
   siteName: string;
   elevatorName: string;
+  manager: string;
+  managerPhone: string;
   requesterName: string;
   details: string;
   requestedAt: string;
@@ -31,17 +33,33 @@ export interface ConstructionSchedule {
   requestId: number | null;
   startDate: string; // YYYY-MM-DD
   endDate: string; // YYYY-MM-DD
+  startTime: string; // HH:MM
   siteName: string;
   elevatorName: string;
   details: string;
   workers: string;
   manager: string;
+  managerPhone: string;
 }
 
 let nextConstReqId = 1;
 let nextConstSchedId = 1;
 export const mockConstRequests: ConstructionRequest[] = [];
 export const mockConstSchedules: ConstructionSchedule[] = [];
+
+// ── 연간일정 모듈 (In-Memory Mock) ─────────────────────────────────
+export interface AnnualEvent {
+  id: number;
+  year: number;
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD
+  type: "연차" | "휴무" | "행사" | "기타";
+  title: string;
+  note: string;
+}
+
+let nextAnnualEventId = 1;
+export const mockAnnualEvents: AnnualEvent[] = [];
 
 // ── Supabase 변환 헬퍼 ────────────────────────────────────────────
 
@@ -652,6 +670,14 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
   if (path === "/api/construction-schedules") {
     return [...mockConstSchedules];
   }
+  if (path === "/api/annual-events") {
+    const year = params.get("year");
+    if (year) {
+      const y = Number(year);
+      return mockAnnualEvents.filter(ev => ev.year === y).sort((a, b) => a.startDate.localeCompare(b.startDate));
+    }
+    return [...mockAnnualEvents].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  }
   throw new MockApiError("Not found", 404);
 }
 
@@ -812,9 +838,11 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
       status: "요청",
       siteName: body.siteName || "",
       elevatorName: body.elevatorName || "",
+      manager: body.manager || "",
+      managerPhone: body.managerPhone || "",
       requesterName: body.requesterName || "",
       details: body.details || "",
-      requestedAt: new Date().toISOString()
+      requestedAt: new Date().toISOString(),
     };
     mockConstRequests.push(record);
     return record;
@@ -825,19 +853,34 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
       requestId: body.requestId || null,
       startDate: body.startDate,
       endDate: body.endDate || body.startDate,
+      startTime: body.startTime || "",
       siteName: body.siteName || "",
       elevatorName: body.elevatorName || "",
       details: body.details || "",
       workers: body.workers || "",
       manager: body.manager || "",
+      managerPhone: body.managerPhone || "",
     };
     mockConstSchedules.push(record);
-    
+
     // 만약 공사요청에서 바로 등록된 경우, 공사요청 상태 변경
     if (record.requestId) {
       const req = mockConstRequests.find(r => r.id === record.requestId);
       if (req) req.status = "일정등록됨";
     }
+    return record;
+  }
+  if (path === "/api/annual-events") {
+    const record: AnnualEvent = {
+      id: nextAnnualEventId++,
+      year: Number(body.year) || new Date().getFullYear(),
+      startDate: body.startDate,
+      endDate: body.endDate || body.startDate,
+      type: body.type || "기타",
+      title: body.title || "",
+      note: body.note || "",
+    };
+    mockAnnualEvents.push(record);
     return record;
   }
   throw new MockApiError("Not found", 404);
@@ -1062,15 +1105,48 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
     return dbToTransaction(data);
   }
 
+  const constSchedEditId = extractId(path, "/api/construction-schedules");
+  if (constSchedEditId) {
+    const idx = mockConstSchedules.findIndex(s => s.id === Number(constSchedEditId));
+    if (idx === -1) throw new MockApiError("not found", 404);
+    const { startDate, endDate, startTime, siteName, elevatorName, details, workers, manager, managerPhone } = body;
+    if (startDate    !== undefined) mockConstSchedules[idx].startDate    = startDate;
+    if (endDate      !== undefined) mockConstSchedules[idx].endDate      = endDate;
+    if (startTime    !== undefined) mockConstSchedules[idx].startTime    = startTime;
+    if (siteName     !== undefined) mockConstSchedules[idx].siteName     = siteName;
+    if (elevatorName !== undefined) mockConstSchedules[idx].elevatorName = elevatorName;
+    if (details      !== undefined) mockConstSchedules[idx].details      = details;
+    if (workers      !== undefined) mockConstSchedules[idx].workers      = workers;
+    if (manager      !== undefined) mockConstSchedules[idx].manager      = manager;
+    if (managerPhone !== undefined) mockConstSchedules[idx].managerPhone = managerPhone;
+    return mockConstSchedules[idx];
+  }
+
   const constReqEditId = extractId(path, "/api/construction-requests");
   if (constReqEditId) {
     const idx = mockConstRequests.findIndex(r => r.id === Number(constReqEditId));
     if (idx === -1) throw new MockApiError("not found", 404);
-    const { siteName, elevatorName, details } = body;
-    if (siteName !== undefined) mockConstRequests[idx].siteName = siteName;
+    const { siteName, elevatorName, manager, managerPhone, details } = body;
+    if (siteName     !== undefined) mockConstRequests[idx].siteName     = siteName;
     if (elevatorName !== undefined) mockConstRequests[idx].elevatorName = elevatorName;
-    if (details !== undefined) mockConstRequests[idx].details = details;
+    if (manager      !== undefined) mockConstRequests[idx].manager      = manager;
+    if (managerPhone !== undefined) mockConstRequests[idx].managerPhone = managerPhone;
+    if (details      !== undefined) mockConstRequests[idx].details      = details;
     return mockConstRequests[idx];
+  }
+
+  const annualEventId = extractId(path, "/api/annual-events");
+  if (annualEventId) {
+    const idx = mockAnnualEvents.findIndex(ev => ev.id === Number(annualEventId));
+    if (idx === -1) throw new MockApiError("not found", 404);
+    const { startDate, endDate, type, title, note, year } = body;
+    if (year      !== undefined) mockAnnualEvents[idx].year      = Number(year);
+    if (startDate !== undefined) mockAnnualEvents[idx].startDate = startDate;
+    if (endDate   !== undefined) mockAnnualEvents[idx].endDate   = endDate;
+    if (type      !== undefined) mockAnnualEvents[idx].type      = type;
+    if (title     !== undefined) mockAnnualEvents[idx].title     = title;
+    if (note      !== undefined) mockAnnualEvents[idx].note      = note;
+    return mockAnnualEvents[idx];
   }
 
   throw new MockApiError("Not found", 404);
@@ -1219,6 +1295,14 @@ async function routeDELETE(path: string, body: AnyBody): Promise<unknown> {
     const idx = mockConstRequests.findIndex(r => r.id === Number(constReqId));
     if (idx === -1) throw new MockApiError("not found", 404);
     mockConstRequests.splice(idx, 1);
+    return { ok: true };
+  }
+
+  const annualEventDelId = extractId(path, "/api/annual-events");
+  if (annualEventDelId) {
+    const idx = mockAnnualEvents.findIndex(ev => ev.id === Number(annualEventDelId));
+    if (idx === -1) throw new MockApiError("not found", 404);
+    mockAnnualEvents.splice(idx, 1);
     return { ok: true };
   }
 
