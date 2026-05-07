@@ -18,6 +18,7 @@ interface Row {
   materialName: string;
   spec: string;
   qty: number;
+  unitPrice: number;
   elevatorName: string;
   requiresReturn: boolean;
   remark: string;
@@ -26,11 +27,12 @@ interface Row {
 }
 
 function newRow(seed: Partial<Row> = {}): Row {
-  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, elevatorName: "", requiresReturn: false, remark: "", inboundRef: null, serialNos: [], ...seed };
+  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, elevatorName: "", requiresReturn: false, remark: "", inboundRef: null, serialNos: [], ...seed };
 }
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 function fmtNum(n: number) { return n.toLocaleString(); }
+function parseNum(s: string) { const v = s.replace(/[^0-9]/g, ""); return v === "" ? 0 : Number(v); }
 
 export default function OutboundEntry() {
   const router   = useRouter();
@@ -99,6 +101,7 @@ export default function OutboundEntry() {
         const patch = {
           materialId: m.id, materialName: m.name, spec: m.modelNo ?? "",
           qty: 1,
+          unitPrice: m.sellPrice ?? 0,
           serialNos: [] as string[],
         };
         if (idx < next.length) next[idx] = { ...next[idx], ...patch };
@@ -124,7 +127,9 @@ export default function OutboundEntry() {
 
   const totals = useMemo(() => {
     const valid = rows.filter(r => r.materialId);
-    return { rows: valid.length, qty: valid.reduce((s, r) => s + r.qty, 0) };
+    let qty = 0, supply = 0;
+    for (const r of valid) { qty += r.qty; supply += r.qty * r.unitPrice; }
+    return { rows: valid.length, qty, supply };
   }, [rows]);
 
   async function save(goList: boolean) {
@@ -194,7 +199,7 @@ export default function OutboundEntry() {
 
       <div className="bg-[#f0f2f5] dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 px-5 py-1.5 flex items-center gap-1 flex-wrap text-xs shrink-0">
         <ToolBtn onClick={() => setPopup("inbound")}>입고내역 참조</ToolBtn>
-        <span className="ml-auto text-gray-500 dark:text-gray-400">{totals.rows}품목 / 총 {fmtNum(totals.qty)}개</span>
+        <span className="ml-auto text-gray-500 dark:text-gray-400">{totals.rows}품목 / 총 {fmtNum(totals.qty)}개 / 공급가액 {fmtNum(totals.supply)}원</span>
       </div>
 
       <div className="flex-1 overflow-auto bg-white dark:bg-gray-800">
@@ -203,11 +208,13 @@ export default function OutboundEntry() {
             <tr className="bg-[#e9ecef] dark:bg-gray-700 text-gray-700 dark:text-gray-300">
               <Th w="32">No</Th>
               <Th w="120">품목코드</Th>
-              <Th w="220">품목명</Th>
-              <Th w="130">규격</Th>
+              <Th w="200">품목명</Th>
+              <Th w="120">규격</Th>
               <Th w="70">수량</Th>
-              <Th w="120">호기</Th>
-              <Th w="120">S/N</Th>
+              <Th w="100">단가</Th>
+              <Th w="110">공급가액</Th>
+              <Th w="110">호기</Th>
+              <Th w="110">S/N</Th>
               <Th w="50">회수</Th>
               <Th>적요</Th>
               <Th w="36"></Th>
@@ -246,6 +253,12 @@ export default function OutboundEntry() {
                     title={r.serialNos.length > 0 ? `S/N ${r.serialNos.length}건 선택됨 — 수량은 ${r.serialNos.length} 이상이어야 함` : undefined}
                     className={cellInput + " text-right"} />
                 </Td>
+                <Td right>
+                  <input type="text" inputMode="numeric" value={r.unitPrice === 0 ? "" : fmtNum(r.unitPrice)}
+                    onChange={e => patchRow(r.id, { unitPrice: parseNum(e.target.value) })}
+                    className={cellInput + " text-right"} />
+                </Td>
+                <Td right className="text-gray-700 dark:text-gray-300 tabular-nums">{fmtNum(r.qty * r.unitPrice)}</Td>
                 <Td>
                   {elevators.length > 0 ? (
                     <ElevatorPicker value={r.elevatorName} elevators={elevators}
@@ -286,6 +299,8 @@ export default function OutboundEntry() {
             <tr className="bg-[#e9ecef] dark:bg-gray-700 font-semibold border-t-2 border-gray-300 dark:border-gray-600">
               <Td colSpan={4} center className="text-gray-600 dark:text-gray-400">합 계</Td>
               <Td right className="tabular-nums dark:text-gray-300">{fmtNum(totals.qty)}</Td>
+              <Td></Td>
+              <Td right className="tabular-nums text-orange-600">{fmtNum(totals.supply)}</Td>
               <Td colSpan={5} right className="tabular-nums text-orange-600">총 {totals.rows}품목</Td>
             </tr>
           </tfoot>

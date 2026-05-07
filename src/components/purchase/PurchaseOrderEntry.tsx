@@ -19,19 +19,17 @@ interface Row {
   spec: string;
   qty: number;
   unitPrice: number;
-  vat: number;
   elevatorName: string;
   remark: string;
   reqId: number | null;
 }
 
-const VAT_RATE = 0.1;
-
 function newRow(seed: Partial<Row> = {}): Row {
-  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, vat: 0, elevatorName: "", remark: "", reqId: null, ...seed };
+  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, elevatorName: "", remark: "", reqId: null, ...seed };
 }
 
 function fmtNum(n: number) { return n.toLocaleString(); }
+function parseNum(s: string) { const v = s.replace(/[^0-9]/g, ""); return v === "" ? 0 : Number(v); }
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
 export default function PurchaseOrderEntry() {
@@ -80,13 +78,7 @@ export default function PurchaseOrderEntry() {
   }, [siteName]);
 
   function patchRow(id: string, patch: Partial<Row>) {
-    setRows(prev => prev.map(r => {
-      if (r.id !== id) return r;
-      const next = { ...r, ...patch };
-      if (patch.qty !== undefined || patch.unitPrice !== undefined)
-        next.vat = Math.round(next.qty * next.unitPrice * VAT_RATE);
-      return next;
-    }));
+    setRows(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
   }
 
   function addRow() { setRows(prev => [...prev, newRow()]); }
@@ -105,7 +97,7 @@ export default function PurchaseOrderEntry() {
       materials.forEach((m, i) => {
         const idx = startIdx + i;
         const unitPrice = m.buyPrice ?? 0;
-        const patch = { materialId: m.id, materialName: m.name, spec: m.modelNo ?? "", qty: 1, unitPrice, vat: Math.round(unitPrice * VAT_RATE) };
+        const patch = { materialId: m.id, materialName: m.name, spec: m.modelNo ?? "", qty: 1, unitPrice };
         if (idx < next.length) next[idx] = { ...next[idx], ...patch };
         else next.push(newRow(patch));
       });
@@ -121,16 +113,16 @@ export default function PurchaseOrderEntry() {
       const list = await api.get<MaterialRecord[]>(`/api/materials?q=${encodeURIComponent(item.materialId)}`).catch(() => [] as MaterialRecord[]);
       const m = list.find(x => x.id === item.materialId);
       const unitPrice = m?.buyPrice ?? 0;
-      newRows.push(newRow({ materialId: item.materialId, materialName: item.materialName, spec: m?.modelNo ?? "", qty: item.qty, unitPrice, vat: Math.round(item.qty * unitPrice * VAT_RATE), elevatorName: item.elevatorName ?? "", remark: `신청#${req.id}`, reqId: req.id }));
+      newRows.push(newRow({ materialId: item.materialId, materialName: item.materialName, spec: m?.modelNo ?? "", qty: item.qty, unitPrice, elevatorName: item.elevatorName ?? "", remark: `신청#${req.id}`, reqId: req.id }));
     }
     setRows([...newRows, newRow()]);
     setPopup(null);
   }
 
   const totals = useMemo(() => {
-    let qty = 0, supply = 0, vat = 0;
-    for (const r of rows) { qty += r.qty; supply += r.qty * r.unitPrice; vat += r.vat; }
-    return { qty, supply, vat, total: supply + vat };
+    let qty = 0, supply = 0;
+    for (const r of rows) { qty += r.qty; supply += r.qty * r.unitPrice; }
+    return { qty, supply };
   }, [rows]);
 
   async function save(goList: boolean) {
@@ -229,9 +221,8 @@ export default function PurchaseOrderEntry() {
               <Th w="220">품목명</Th>
               <Th w="120">규격</Th>
               <Th w="80">수량</Th>
-              <Th w="100">단가</Th>
-              <Th w="110">공급가액</Th>
-              <Th w="90">부가세</Th>
+              <Th w="110">단가</Th>
+              <Th w="120">공급가액</Th>
               <Th w="100">호기</Th>
               <Th w="160">적요</Th>
               <Th w="40"></Th>
@@ -268,12 +259,11 @@ export default function PurchaseOrderEntry() {
                     className={cellInput + " text-right"} />
                 </Td>
                 <Td right>
-                  <input type="text" inputMode="numeric" value={r.unitPrice === 0 ? "" : String(r.unitPrice)}
-                    onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); patchRow(r.id, { unitPrice: v === "" ? 0 : Number(v) }); }}
+                  <input type="text" inputMode="numeric" value={r.unitPrice === 0 ? "" : fmtNum(r.unitPrice)}
+                    onChange={e => patchRow(r.id, { unitPrice: parseNum(e.target.value) })}
                     className={cellInput + " text-right"} />
                 </Td>
                 <Td right className="text-gray-700 dark:text-gray-300 tabular-nums">{fmtNum(r.qty * r.unitPrice)}</Td>
-                <Td right className="text-gray-600 dark:text-gray-400 tabular-nums">{fmtNum(r.vat)}</Td>
                 <Td>
                   {elevators.length > 0 ? (
                     <ElevatorPicker value={r.elevatorName} elevators={elevators}
@@ -296,9 +286,8 @@ export default function PurchaseOrderEntry() {
               <Td colSpan={4} center className="text-gray-600 dark:text-gray-400">합 계</Td>
               <Td right className="tabular-nums dark:text-gray-300">{fmtNum(totals.qty)}</Td>
               <Td></Td>
-              <Td right className="tabular-nums dark:text-gray-300">{fmtNum(totals.supply)}</Td>
-              <Td right className="tabular-nums dark:text-gray-300">{fmtNum(totals.vat)}</Td>
-              <Td colSpan={3} right className="tabular-nums text-blue-700">총액 {fmtNum(totals.total)}</Td>
+              <Td right className="tabular-nums text-blue-700">{fmtNum(totals.supply)}</Td>
+              <Td colSpan={3}></Td>
             </tr>
           </tfoot>
         </table>

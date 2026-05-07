@@ -18,21 +18,19 @@ interface Row {
   spec: string;
   qty: number;
   unitPrice: number;
-  vat: number;
   siteName: string;
   remark: string;
   orderId: number | null;
   serialNos: string[];
 }
 
-const VAT_RATE = 0.1;
-
 function newRow(seed: Partial<Row> = {}): Row {
-  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, vat: 0, siteName: "", remark: "", orderId: null, serialNos: [], ...seed };
+  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, siteName: "", remark: "", orderId: null, serialNos: [], ...seed };
 }
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 function fmtNum(n: number) { return n.toLocaleString(); }
+function parseNum(s: string) { const v = s.replace(/[^0-9]/g, ""); return v === "" ? 0 : Number(v); }
 
 export default function InboundEntry() {
   const router = useRouter();
@@ -66,16 +64,12 @@ export default function InboundEntry() {
     setRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const next = { ...r, ...patch };
-      // S/N 갯수가 늘어나면 수량은 최소 그만큼 자동 보정 (사용자가 늘려둔 qty는 보존)
       if (patch.serialNos !== undefined && patch.serialNos.length > next.qty) {
         next.qty = patch.serialNos.length;
       }
-      // 수량을 직접 줄이는 경우 S/N 갯수 미만으로는 못 내려감
       if (patch.qty !== undefined && patch.qty < next.serialNos.length) {
         next.qty = next.serialNos.length;
       }
-      if (patch.qty !== undefined || patch.unitPrice !== undefined || patch.serialNos !== undefined)
-        next.vat = Math.round(next.qty * next.unitPrice * VAT_RATE);
       return next;
     }));
   }
@@ -98,7 +92,7 @@ export default function InboundEntry() {
         const patch = {
           materialId: m.id, materialName: m.name, spec: m.modelNo ?? "",
           qty: 1,
-          unitPrice, vat: Math.round(1 * unitPrice * VAT_RATE),
+          unitPrice,
           serialNos: [] as string[],
         };
         if (idx < next.length) next[idx] = { ...next[idx], ...patch };
@@ -130,7 +124,6 @@ export default function InboundEntry() {
           materialId: o.materialId, materialName: o.materialName,
           spec,
           qty: o.qty, unitPrice: o.unitPrice ?? 0,
-          vat: Math.round(o.qty * (o.unitPrice ?? 0) * VAT_RATE),
           siteName: o.siteName ?? "", remark: `발주#${o.id}`, orderId: o.id,
           serialNos: [] as string[],
         };
@@ -148,9 +141,9 @@ export default function InboundEntry() {
   }
 
   const totals = useMemo(() => {
-    let qty = 0, supply = 0, vat = 0;
-    for (const r of rows) { qty += r.qty; supply += r.qty * r.unitPrice; vat += r.vat; }
-    return { qty, supply, vat, total: supply + vat };
+    let qty = 0, supply = 0;
+    for (const r of rows) { qty += r.qty; supply += r.qty * r.unitPrice; }
+    return { qty, supply };
   }, [rows]);
 
   async function save(goList: boolean) {
@@ -219,7 +212,7 @@ export default function InboundEntry() {
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
           발주서 참조 (불러오기)
         </button>
-        <span className="ml-auto text-gray-500 dark:text-gray-400">{rows.filter(r => r.materialId).length}품목 / 총액 {fmtNum(totals.total)}원</span>
+        <span className="ml-auto text-gray-500 dark:text-gray-400">{rows.filter(r => r.materialId).length}품목 / 공급가액 {fmtNum(totals.supply)}원</span>
       </div>
 
       <div className="flex-1 overflow-auto bg-white dark:bg-gray-800">
@@ -232,9 +225,8 @@ export default function InboundEntry() {
               <Th w="110">규격</Th>
               <Th w="60">수량</Th>
               <Th w="120">S/N</Th>
-              <Th w="90">단가</Th>
-              <Th w="100">공급가액</Th>
-              <Th w="80">부가세</Th>
+              <Th w="100">단가</Th>
+              <Th w="110">공급가액</Th>
               <Th w="140">현장</Th>
               <Th>적요</Th>
               <Th w="36"></Th>
@@ -289,12 +281,11 @@ export default function InboundEntry() {
                   )}
                 </Td>
                 <Td right>
-                  <input type="text" inputMode="numeric" value={r.unitPrice === 0 ? "" : String(r.unitPrice)}
-                    onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); patchRow(r.id, { unitPrice: v === "" ? 0 : Number(v) }); }}
+                  <input type="text" inputMode="numeric" value={r.unitPrice === 0 ? "" : fmtNum(r.unitPrice)}
+                    onChange={e => patchRow(r.id, { unitPrice: parseNum(e.target.value) })}
                     className={cellInput + " text-right"} />
                 </Td>
                 <Td right className="text-gray-700 dark:text-gray-300 tabular-nums">{fmtNum(r.qty * r.unitPrice)}</Td>
-                <Td right className="text-gray-600 dark:text-gray-400 tabular-nums">{fmtNum(r.vat)}</Td>
                 <Td>
                   <SiteInlineSearch value={r.siteName} onChange={v => patchRow(r.id, { siteName: v })} sites={sites} cls={cellInput} />
                 </Td>
@@ -313,9 +304,8 @@ export default function InboundEntry() {
               <Td right className="tabular-nums dark:text-gray-300">{fmtNum(totals.qty)}</Td>
               <Td></Td>
               <Td></Td>
-              <Td right className="tabular-nums dark:text-gray-300">{fmtNum(totals.supply)}</Td>
-              <Td right className="tabular-nums dark:text-gray-300">{fmtNum(totals.vat)}</Td>
-              <Td colSpan={3} right className="tabular-nums text-blue-700">총액 {fmtNum(totals.total)}</Td>
+              <Td right className="tabular-nums text-blue-700">{fmtNum(totals.supply)}</Td>
+              <Td colSpan={3}></Td>
             </tr>
           </tfoot>
         </table>
