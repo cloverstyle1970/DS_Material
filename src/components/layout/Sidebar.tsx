@@ -36,6 +36,7 @@ const NAV_GROUPS: NavGroup[] = [
     color: "text-emerald-400",
     items: [
       { href: "/site/units",     label: "현장/호기 관리",  icon: "🏢" },
+      { href: "#site-quotes",    label: "견적관리",         icon: "💰" },
     ],
   },
   {
@@ -60,7 +61,9 @@ const NAV_GROUPS: NavGroup[] = [
     label: "산업안전",
     color: "text-rose-400",
     items: [
-      { href: "#safety", label: "준비중", icon: "🛡️" }
+      { href: "#safety-tmb",     label: "TMB",                       icon: "🛡️" },
+      { href: "#safety-risk",    label: "위험성평가",                 icon: "⚠️" },
+      { href: "#safety-uniform", label: "근무복 및 개인안전장구 신청", icon: "🦺" },
     ],
   },
   {
