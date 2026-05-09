@@ -16,6 +16,7 @@ import SiteStatsClient from "@/components/stats/SiteStatsClient";
 import InventoryCheckClient from "@/components/materials/InventoryCheckClient";
 import ConstructionCalendarClient from "@/components/construction/ConstructionCalendarClient";
 import ConstructionRequestClient from "@/components/construction/ConstructionRequestClient";
+import TBMClient from "@/components/tbm/TBMClient";
 
 export interface PageEntry {
   label: string;
@@ -26,6 +27,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/dashboard": {
     label: "대시보드",
     render: () => <DashboardContent />,
+  },
+  "/safety/tbm": {
+    label: "TBM",
+    render: () => <TBMClient />,
   },
   "/data/users": {
     label: "사용자 관리",

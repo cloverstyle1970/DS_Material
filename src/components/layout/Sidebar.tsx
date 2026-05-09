@@ -61,7 +61,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "산업안전",
     color: "text-rose-400",
     items: [
-      { href: "#safety-tmb",     label: "TMB",                       icon: "🛡️" },
+      { href: "/safety/tbm",     label: "TBM",                       icon: "🛡️" },
       { href: "#safety-risk",    label: "위험성평가",                 icon: "⚠️" },
       { href: "#safety-uniform", label: "근무복 및 개인안전장구 신청", icon: "🦺" },
     ],
