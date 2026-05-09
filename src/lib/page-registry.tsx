@@ -21,6 +21,7 @@ import TBMAdminClient from "@/components/tbm/TBMAdminClient";
 import TBMMasterClient from "@/components/tbm/TBMMasterClient";
 import EmployeeRegisterClient from "@/components/hr/EmployeeRegisterClient";
 import DeptRankClient from "@/components/hr/DeptRankClient";
+import CompanyVehiclesClient from "@/components/hr/CompanyVehiclesClient";
 import MyProfileClient from "@/components/data/MyProfileClient";
 
 export interface PageEntry {
@@ -52,6 +53,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/hr/dept-rank": {
     label: "부서/직급관리",
     render: () => <DeptRankClient />,
+  },
+  "/hr/company-vehicles": {
+    label: "회사차량관리",
+    render: () => <CompanyVehiclesClient />,
   },
   "/data/profile": {
     label: "개인정보수정",
