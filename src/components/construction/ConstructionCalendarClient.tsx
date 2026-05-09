@@ -431,8 +431,23 @@ function CalendarContent() {
                   <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} required className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">작업시작시간</label>
-                  <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">작업시작시간 (24h)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={startTime}
+                    onChange={e => {
+                      // 숫자만 추출 후 자동 포맷: 0830 → 08:30
+                      const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
+                      const formatted = digits.length <= 2 ? digits : digits.slice(0, 2) + ":" + digits.slice(2);
+                      setStartTime(formatted);
+                    }}
+                    placeholder="HHMM (예: 0830 → 08:30)"
+                    pattern="^([01]\d|2[0-3]):[0-5]\d$"
+                    title="24시간 형식 HHMM 입력 시 자동으로 HH:MM (예: 0830 → 08:30)"
+                    maxLength={5}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
