@@ -56,6 +56,7 @@ export const PERMISSION_MENUS: PermissionMenuGroup[] = [
     group: "관리/인사",
     items: [
       { href: "/hr/employee-register", label: "사원등록" },
+      { href: "/hr/dept-rank",         label: "부서/직급관리" },
     ],
   },
 ];
