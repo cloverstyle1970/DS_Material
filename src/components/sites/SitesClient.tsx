@@ -8,6 +8,7 @@ import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
+import { useAutoPageSize } from "@/lib/useAutoPageSize";
 
 // ── 배지 ────────────────────────────────────────────────────────
 const COMPANY_STYLES: Record<string, string> = {
@@ -368,9 +369,8 @@ interface Props {
   elevators: ElevatorRecord[];
 }
 
-const PAGE_SIZE = 20;
-
 export default function SitesClient({ initial, elevators }: Props) {
+  const PAGE_SIZE = useAutoPageSize();
   const [sites, setSites]       = useState(initial);
   const [allElevators, setAllElevators] = useState(elevators);
   const [query, setQuery]       = useState("");

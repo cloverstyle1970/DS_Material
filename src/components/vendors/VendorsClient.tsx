@@ -5,6 +5,7 @@ import { VendorRecord, VendorType } from "@/lib/mock-vendors";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { useAutoPageSize } from "@/lib/useAutoPageSize";
 
 // ── 공통 필드 입력 스타일 ───────────────────────────────────
 const field = "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-slate-400";
@@ -200,12 +201,11 @@ const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "address",        label: "주소"       },
 ];
 
-const PAGE_SIZE = 20;
-
 // ── 메인 컴포넌트 ───────────────────────────────────────────
 interface Props { initial: VendorRecord[] }
 
 export default function VendorsClient({ initial }: Props) {
+  const PAGE_SIZE = useAutoPageSize();
   const [vendors, setVendors] = useState(initial);
   const [query, setQuery]     = useState("");
   const [typeFilter, setTypeFilter] = useState<VendorType | "전체">("전체");

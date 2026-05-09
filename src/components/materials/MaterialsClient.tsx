@@ -8,6 +8,7 @@ import EditMaterialModal from "./EditMaterialModal";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { useAutoPageSize } from "@/lib/useAutoPageSize";
 
 const LOW_STOCK_THRESHOLD = 5;
 
@@ -57,11 +58,10 @@ function StockCell({ material, editable }: { material: MaterialRecord; editable:
   );
 }
 
-const PAGE_SIZE = 20;
-
 type MatType = "전체" | "DS" | "TK";
 
 export default function MaterialsClient({ initial }: { initial: MaterialRecord[] }) {
+  const PAGE_SIZE = useAutoPageSize();
   const [materials, setMaterials] = useState(initial);
   const [query, setQuery] = useState("");
   const [matType, setMatType] = useState<MatType>("전체");

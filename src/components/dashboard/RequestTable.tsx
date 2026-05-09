@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { RecentRequest, RequestStatus } from "@/lib/types";
+import { useAutoPageSize } from "@/lib/useAutoPageSize";
 import TimeAgo from "./TimeAgo";
 
 const STATUS_LABEL: Record<RequestStatus, string> = {
@@ -29,9 +30,8 @@ const COLUMNS: { key: SortKey; label: string; sortable: boolean }[] = [
   { key: "requestedAt",  label: "시각",   sortable: true  },
 ];
 
-const PAGE_SIZE = 20;
-
 export default function RequestTable({ requests }: { requests: RecentRequest[] }) {
+  const PAGE_SIZE = useAutoPageSize();
   const [sortKey, setSortKey] = useState<SortKey>("requestedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);

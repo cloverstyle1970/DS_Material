@@ -5,6 +5,7 @@ import { UserRecord, Permission } from "@/lib/mock-users";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { useAutoPageSize } from "@/lib/useAutoPageSize";
 import PermissionsModal from "./PermissionsModal";
 
 type SortKey = "id" | "name" | "dept" | "rank" | "cert" | "hireDate" | "phone" | "status";
@@ -54,9 +55,8 @@ function maskSsn(ssn: string | null): string {
   return s;
 }
 
-const PAGE_SIZE = 20;
-
 export default function UsersClient({ initial }: { initial: UserRecord[] }) {
+  const PAGE_SIZE = useAutoPageSize();
   const [users, setUsers]           = useState(initial);
   const [query, setQuery]           = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("재직");

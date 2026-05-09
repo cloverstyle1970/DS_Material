@@ -7,12 +7,13 @@ import { useAuth, isAdmin } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
+import { useAutoPageSize } from "@/lib/useAutoPageSize";
 
-const PAGE_SIZE = 20;
 type MatType = "전체" | "DS" | "TK";
 type CheckMode = "qty" | "sn";
 
 export default function InventoryCheckClient() {
+  const PAGE_SIZE = useAutoPageSize();
   const [mode, setMode] = useState<CheckMode>("qty");
   const [materials, setMaterials] = useState<MaterialRecord[]>([]);
   const [query, setQuery] = useState("");
