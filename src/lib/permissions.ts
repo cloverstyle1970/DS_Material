@@ -52,6 +52,12 @@ export const PERMISSION_MENUS: PermissionMenuGroup[] = [
       { href: "/safety/tbm/master", label: "TBM 마스터(PC)" },
     ],
   },
+  {
+    group: "관리/인사",
+    items: [
+      { href: "/hr/employee-register", label: "사원등록" },
+    ],
+  },
 ];
 
 const ALL_HREFS: string[] = PERMISSION_MENUS.flatMap(g => g.items.map(i => i.href));

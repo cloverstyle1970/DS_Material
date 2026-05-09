@@ -19,6 +19,7 @@ import ConstructionRequestClient from "@/components/construction/ConstructionReq
 import TBMClient from "@/components/tbm/TBMClient";
 import TBMAdminClient from "@/components/tbm/TBMAdminClient";
 import TBMMasterClient from "@/components/tbm/TBMMasterClient";
+import EmployeeRegisterClient from "@/components/hr/EmployeeRegisterClient";
 
 export interface PageEntry {
   label: string;
@@ -41,6 +42,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/safety/tbm/master": {
     label: "TBM 마스터",
     render: () => <TBMMasterClient />,
+  },
+  "/hr/employee-register": {
+    label: "사원등록",
+    render: () => <EmployeeRegisterClient />,
   },
   "/data/users": {
     label: "사원 관리",

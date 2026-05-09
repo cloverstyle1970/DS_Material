@@ -83,9 +83,9 @@ const NAV_GROUPS: NavGroup[] = [
     label: "관리/인사",
     color: "text-purple-400",
     items: [
-      { href: "#mgmt",                 label: "준비중",    icon: "📋", section: "관리" },
-      { href: "#hr-employee-register", label: "사원등록",  icon: "🧑‍💼", section: "인사" },
-      { href: "#hr-transfer",          label: "인사 이동", icon: "🔄", section: "인사" },
+      { href: "#mgmt",                  label: "준비중",    icon: "📋", section: "관리" },
+      { href: "/hr/employee-register",  label: "사원등록",  icon: "🧑‍💼", section: "인사", adminOnly: true },
+      { href: "#hr-transfer",           label: "인사 이동", icon: "🔄", section: "인사" },
     ],
   },
   {
