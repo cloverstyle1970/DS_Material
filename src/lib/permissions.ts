@@ -44,6 +44,14 @@ export const PERMISSION_MENUS: PermissionMenuGroup[] = [
       { href: "/construction/requests", label: "공사 요청" },
     ],
   },
+  {
+    group: "산업안전",
+    items: [
+      { href: "/safety/tbm",        label: "TBM등록" },
+      { href: "/safety/tbm/admin",  label: "TBM 관리(PC)" },
+      { href: "/safety/tbm/master", label: "TBM 마스터(PC)" },
+    ],
+  },
 ];
 
 const ALL_HREFS: string[] = PERMISSION_MENUS.flatMap(g => g.items.map(i => i.href));
