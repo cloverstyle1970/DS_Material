@@ -245,8 +245,8 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
       if (recErr) throw recErr;
       const tbmId = rec.id as number;
 
-      // 3. 부속 데이터 일괄 insert
-      const tasks: Promise<unknown>[] = [];
+      // 3. 부속 데이터 일괄 insert (supabase 빌더는 thenable이므로 PromiseLike로 처리)
+      const tasks: Array<PromiseLike<{ error: { message: string } | null }>> = [];
 
       if (participants.length > 0) {
         tasks.push(supabase.from("tbm_participants").insert(
@@ -279,8 +279,8 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
       }
 
       const results = await Promise.all(tasks);
-      const insertErr = results.find(r => (r as { error?: unknown })?.error);
-      if (insertErr) throw (insertErr as { error: Error }).error;
+      const insertErr = results.find(r => r.error);
+      if (insertErr?.error) throw new Error(insertErr.error.message);
 
       resetForm();
       onSaved();
