@@ -11,6 +11,7 @@ type NavItem = {
   label: string;
   icon: string;
   adminOnly?: boolean;
+  section?: string;  // 그룹 내 서브섹션 라벨 (선택)
 };
 
 type NavGroup = {
@@ -26,7 +27,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "데이터관리",
     color: "text-sky-400",
     items: [
-      { href: "/data/users",     label: "사용자 관리",    icon: "👤", adminOnly: true },
+      { href: "/data/users",     label: "사원 관리",      icon: "👤", adminOnly: true },
       { href: "/data/vendors",   label: "거래처 관리",    icon: "🤝" },
     ],
   },
@@ -82,7 +83,9 @@ const NAV_GROUPS: NavGroup[] = [
     label: "관리/인사",
     color: "text-purple-400",
     items: [
-      { href: "#hr", label: "준비중", icon: "👥" }
+      { href: "#mgmt",                 label: "준비중",    icon: "📋", section: "관리" },
+      { href: "#hr-employee-register", label: "사원등록",  icon: "🧑‍💼", section: "인사" },
+      { href: "#hr-transfer",          label: "인사 이동", icon: "🔄", section: "인사" },
     ],
   },
   {
@@ -292,26 +295,43 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
 
                 <div className={`overflow-hidden transition-all duration-200 ${isExpanded ? "max-h-[720px] opacity-100" : "max-h-0 opacity-0"}`}>
                   <div className="space-y-0.5 pb-1">
-                    {visibleItems.map(item => {
-                      const active = isActive(item.href);
-                      return (
-                        <button
-                          key={item.href}
-                          type="button"
-                          onClick={() => handleMenuOpen(item.href, item.label)}
-                          className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors whitespace-nowrap ${
-                            active
-                              ? "bg-white/10 text-white font-medium"
-                              : "text-slate-200 hover:bg-white/5 hover:text-white"
-                          }`}>
-                          <span className="text-base w-5 text-center shrink-0">{item.icon}</span>
-                          <span className="flex-1">{item.label}</span>
-                          {active && (
-                            <span className="ml-auto w-1 h-4 rounded-full bg-blue-400 shrink-0" />
-                          )}
-                        </button>
-                      );
-                    })}
+                    {(() => {
+                      // 섹션 라벨 변경 시점에 헤더 삽입
+                      let lastSection: string | undefined = "__init";
+                      const elems: React.ReactNode[] = [];
+                      visibleItems.forEach(item => {
+                        if (item.section !== lastSection) {
+                          if (item.section) {
+                            elems.push(
+                              <div key={`sec-${item.section}-${item.href}`}
+                                className="px-3 pt-2 pb-1 text-[10px] font-bold tracking-widest text-white/40 uppercase">
+                                {item.section}
+                              </div>
+                            );
+                          }
+                          lastSection = item.section;
+                        }
+                        const active = isActive(item.href);
+                        elems.push(
+                          <button
+                            key={item.href}
+                            type="button"
+                            onClick={() => handleMenuOpen(item.href, item.label)}
+                            className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors whitespace-nowrap ${
+                              active
+                                ? "bg-white/10 text-white font-medium"
+                                : "text-slate-200 hover:bg-white/5 hover:text-white"
+                            }`}>
+                            <span className="text-base w-5 text-center shrink-0">{item.icon}</span>
+                            <span className="flex-1">{item.label}</span>
+                            {active && (
+                              <span className="ml-auto w-1 h-4 rounded-full bg-blue-400 shrink-0" />
+                            )}
+                          </button>
+                        );
+                      });
+                      return elems;
+                    })()}
                   </div>
                 </div>
               </div>

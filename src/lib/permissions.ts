@@ -12,7 +12,7 @@ export const PERMISSION_MENUS: PermissionMenuGroup[] = [
   {
     group: "데이터관리",
     items: [
-      { href: "/data/users",   label: "사용자 관리" },
+      { href: "/data/users",   label: "사원 관리" },
       { href: "/data/vendors", label: "거래처 관리" },
     ],
   },
