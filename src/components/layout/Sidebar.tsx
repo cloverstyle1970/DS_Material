@@ -61,9 +61,11 @@ const NAV_GROUPS: NavGroup[] = [
     label: "산업안전",
     color: "text-rose-400",
     items: [
-      { href: "/safety/tbm",     label: "TBM",                       icon: "🛡️" },
-      { href: "#safety-risk",    label: "위험성평가",                 icon: "⚠️" },
-      { href: "#safety-uniform", label: "근무복 및 개인안전장구 신청", icon: "🦺" },
+      { href: "/safety/tbm",        label: "TBM",                       icon: "🛡️" },
+      { href: "/safety/tbm/admin",  label: "TBM 관리(PC)",              icon: "🗂️", adminOnly: true },
+      { href: "/safety/tbm/master", label: "TBM 마스터(PC)",            icon: "⚙️", adminOnly: true },
+      { href: "#safety-risk",      label: "위험성평가",                 icon: "⚠️" },
+      { href: "#safety-uniform",   label: "근무복 및 개인안전장구 신청", icon: "🦺" },
     ],
   },
   {
@@ -105,7 +107,7 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
   const { user, logout } = useAuth();
   const { tabs, openTab } = useTabs();
   const viewOnly = user ? isViewOnly(user) : false;
-  const admin    = !viewOnly;
+  const admin    = user ? isAdmin(user) : false;
 
   function handleNavClick() {
     if (typeof window !== "undefined" && window.innerWidth < 768) {
@@ -266,6 +268,8 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
               .filter(item => {
                 // 외부/플레이스홀더 링크(#로 시작)는 권한 체크 제외
                 if (item.href.startsWith("#")) return true;
+                // 공통 페이지(dashboard/settings/TBM 작성)는 모든 사용자에게 노출
+                if (item.href === "/safety/tbm") return true;
                 // admin이면 모두 허용, 아니면 read 권한 보유한 메뉴만 노출
                 return user ? hasMenuPermission(user, item.href, "read") : false;
               });

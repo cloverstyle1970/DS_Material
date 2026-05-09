@@ -17,6 +17,8 @@ import InventoryCheckClient from "@/components/materials/InventoryCheckClient";
 import ConstructionCalendarClient from "@/components/construction/ConstructionCalendarClient";
 import ConstructionRequestClient from "@/components/construction/ConstructionRequestClient";
 import TBMClient from "@/components/tbm/TBMClient";
+import TBMAdminClient from "@/components/tbm/TBMAdminClient";
+import TBMMasterClient from "@/components/tbm/TBMMasterClient";
 
 export interface PageEntry {
   label: string;
@@ -31,6 +33,14 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/safety/tbm": {
     label: "TBM",
     render: () => <TBMClient />,
+  },
+  "/safety/tbm/admin": {
+    label: "TBM 관리",
+    render: () => <TBMAdminClient />,
+  },
+  "/safety/tbm/master": {
+    label: "TBM 마스터",
+    render: () => <TBMMasterClient />,
   },
   "/data/users": {
     label: "사용자 관리",
