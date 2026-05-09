@@ -717,11 +717,17 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
 
 async function routePOST(path: string, body: AnyBody): Promise<unknown> {
   if (path === "/api/materials") {
-    const { sourceId, isDs, major, mid, sub, isRepair, trackSerial, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty } = body;
+    const { sourceId, directId, isDs, major, mid, sub, isRepair, trackSerial, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty } = body;
     if (!major || !mid || !sub) throw new MockApiError("분류 코드(major/mid/sub)가 누락됐습니다", 400);
 
     let id: string;
-    if (sourceId) {
+    if (directId) {
+      // 직접 입력 코드: 사용자가 자재코드를 수기 입력한 경우
+      if (typeof directId !== "string" || !directId.trim()) throw new MockApiError("자재코드가 유효하지 않습니다", 400);
+      id = directId.trim();
+      const { data: dup } = await supabase.from("materials").select("id").eq("id", id).maybeSingle();
+      if (dup) throw new MockApiError(`이미 존재하는 자재코드입니다: ${id}`, 409);
+    } else if (sourceId) {
       // 수리품: 원본 자재코드 뒤에 "R"을 붙여 13자리 ID로 사용
       if (typeof sourceId !== "string" || !sourceId) throw new MockApiError("원본 자재코드가 유효하지 않습니다", 400);
       id = `${sourceId}R`;
