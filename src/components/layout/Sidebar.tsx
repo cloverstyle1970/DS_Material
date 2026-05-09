@@ -28,6 +28,7 @@ const NAV_GROUPS: NavGroup[] = [
     color: "text-sky-400",
     items: [
       { href: "/data/users",     label: "사원 관리",      icon: "👤", adminOnly: true },
+      { href: "/data/profile",   label: "개인정보수정",   icon: "🪪" },
       { href: "/data/vendors",   label: "거래처 관리",    icon: "🤝" },
     ],
   },
@@ -272,6 +273,8 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
               .filter(item => {
                 // 외부/플레이스홀더 링크(#로 시작)는 권한 체크 제외
                 if (item.href.startsWith("#")) return true;
+                // 개인정보수정은 모든 사용자가 본인 정보 관리용으로 사용
+                if (item.href === "/data/profile") return true;
                 // admin이면 모두 허용, 아니면 read 권한 보유한 메뉴만 노출
                 return user ? hasMenuPermission(user, item.href, "read") : false;
               });

@@ -419,10 +419,10 @@ export default function EmployeeRegisterClient() {
         className="p-4 lg:p-6 max-w-6xl mx-auto space-y-4">
         {/* PC: 좌측 사진 + 우측 기본정보 / 모바일: 세로 스택 */}
         <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
-          {/* 사진 — 우측 기본정보 높이에 맞춰 flex로 자동 신축 */}
+          {/* 사진 — 증명사진 3:4 비율 고정 */}
           <div className={sectionCls + " flex flex-col"}>
-            <label className={labelCls}>📷 프로필 사진</label>
-            <div className="flex-1 w-full min-h-[180px] rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 overflow-hidden flex items-center justify-center mb-3">
+            <label className={labelCls}>📷 프로필 사진 <span className="text-[10px] text-gray-400">(증명사진 3:4)</span></label>
+            <div className="w-full aspect-[3/4] rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 overflow-hidden flex items-center justify-center mb-3 mx-auto">
               {photoPreview ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={photoPreview} alt="미리보기" className="w-full h-full object-cover" />

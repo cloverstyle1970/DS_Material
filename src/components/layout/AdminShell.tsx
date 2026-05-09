@@ -47,8 +47,8 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
     const entry = PAGE_REGISTRY[pathname];
     if (!entry) return;
     if (tabs.some(t => t.href === pathname)) return; // 이미 열려있으면 종료 (idempotent)
-    // dashboard/settings는 메뉴 외 공통 페이지 — 권한 체크 우회
-    const isAlwaysAllowed = pathname === "/dashboard" || pathname === "/settings";
+    // dashboard/settings/profile는 메뉴 외 공통 페이지 — 권한 체크 우회
+    const isAlwaysAllowed = pathname === "/dashboard" || pathname === "/settings" || pathname === "/data/profile";
     const allowed = isAlwaysAllowed || isAdmin(user) || hasMenuPermission(user, pathname, "read");
     if (!allowed) return;
     if (isLimitReached) {
