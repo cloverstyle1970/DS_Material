@@ -86,20 +86,29 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
     })();
   }, []);
 
-  // ------- 공사일정 로드 (오늘±30일) -------
+  // ------- 공사일정 로드 (오늘±30일, TBM 미작성 + 공사휴무 제외) -------
   useEffect(() => {
     (async () => {
       const today = new Date();
       const start = new Date(today); start.setDate(today.getDate() - 30);
       const end = new Date(today); end.setDate(today.getDate() + 30);
       const fmt = (d: Date) => d.toISOString().slice(0, 10);
+
+      // 이미 TBM이 작성된 schedule_id 집합
+      const { data: tbmRows } = await supabase.from("tbm_records")
+        .select("schedule_id")
+        .not("schedule_id", "is", null);
+      const usedIds = new Set(((tbmRows ?? []) as { schedule_id: number }[]).map(r => r.schedule_id));
+
       const { data } = await supabase.from("construction_schedules")
         .select("id, site_name, elevator_name, start_date, end_date, details")
         .gte("end_date", fmt(start))
         .lte("start_date", fmt(end))
         .neq("site_name", "공사휴무")  // 공사휴무 제외
         .order("start_date", { ascending: false });
-      if (data) setSchedules(data as Schedule[]);
+      // TBM이 이미 작성된 일정 제외
+      const filtered = ((data ?? []) as Schedule[]).filter(s => !usedIds.has(s.id));
+      setSchedules(filtered);
     })();
   }, []);
 
