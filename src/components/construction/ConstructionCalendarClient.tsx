@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { supabase } from "@/lib/supabase";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 import { getHolidaysForYear } from "@/lib/korean-holidays";
@@ -47,6 +48,7 @@ function CalendarContent() {
 
   const [schedules, setSchedules] = useState<ConstructionSchedule[]>([]);
   const [annualEvents, setAnnualEvents] = useState<AnnualEvent[]>([]);
+  const [tbmScheduleIds, setTbmScheduleIds] = useState<Set<number>>(new Set());
   const [sites, setSites] = useState<SiteOption[]>([]);
   const [elevators, setElevators] = useState<{ id: number; unitName: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,6 +132,11 @@ function CalendarContent() {
     try {
       const data = await api.get<ConstructionSchedule[]>("/api/construction-schedules");
       setSchedules(data);
+      // TBM이 작성된 schedule_id 집합 로드
+      const { data: tbmRows } = await supabase.from("tbm_records")
+        .select("schedule_id")
+        .not("schedule_id", "is", null);
+      setTbmScheduleIds(new Set(((tbmRows ?? []) as { schedule_id: number }[]).map(r => r.schedule_id)));
     } catch (e) {
       console.error(e);
     } finally {
@@ -365,24 +372,34 @@ function CalendarContent() {
                       {ev.title}
                     </div>
                   ))}
-                  {daySchedules.map(sch => (
-                    <div
-                      key={`sch-${sch.id}`}
-                      onClick={(e) => { e.stopPropagation(); openEditModal(sch); }}
-                      className="text-xs px-2 py-1.5 rounded cursor-pointer leading-tight flex flex-col gap-0.5 shadow-sm bg-orange-100 dark:bg-orange-900/50 border border-orange-300 dark:border-orange-700 text-gray-900 dark:text-white"
-                      title={`${sch.siteName} ${sch.elevatorName ? `(${sch.elevatorName})` : ""}${sch.startTime ? ` ${sch.startTime}` : ""} / ${sch.details} / ${sch.workers}${sch.manager ? ` / 담당: ${sch.manager}${sch.managerPhone ? ` ${sch.managerPhone}` : ""}` : ""}`}
-                    >
-                      <div className="font-bold truncate text-[12px]">
-                        {sch.siteName}{sch.elevatorName ? ` · ${sch.elevatorName}` : ""}
+                  {daySchedules.map(sch => {
+                    const hasTbm = tbmScheduleIds.has(sch.id);
+                    // 공사휴무는 기존 색감 유지 (휴무는 TBM 대상 아님)
+                    const isHoliday = sch.siteName === "공사휴무";
+                    const borderCls = isHoliday
+                      ? "border-orange-400 dark:border-orange-500"
+                      : hasTbm
+                        ? "border-blue-500 dark:border-white"        // TBM 작성됨
+                        : "border-red-500 dark:border-red-500";      // TBM 미작성
+                    return (
+                      <div
+                        key={`sch-${sch.id}`}
+                        onClick={(e) => { e.stopPropagation(); openEditModal(sch); }}
+                        className={`text-xs px-2 py-1.5 rounded cursor-pointer leading-tight flex flex-col gap-0.5 bg-transparent border-2 text-gray-900 dark:text-gray-100 ${borderCls}`}
+                        title={`${sch.siteName} ${sch.elevatorName ? `(${sch.elevatorName})` : ""}${sch.startTime ? ` ${sch.startTime}` : ""} / ${sch.details} / ${sch.workers}${sch.manager ? ` / 담당: ${sch.manager}${sch.managerPhone ? ` ${sch.managerPhone}` : ""}` : ""}${!isHoliday ? (hasTbm ? " · TBM 작성됨" : " · TBM 미작성") : ""}`}
+                      >
+                        <div className="font-bold truncate text-[12px]">
+                          {sch.siteName}{sch.elevatorName ? ` · ${sch.elevatorName}` : ""}
+                        </div>
+                        {sch.startTime && (
+                          <div className="truncate text-[11px] font-medium">{sch.startTime}</div>
+                        )}
+                        {sch.details && (
+                          <div className="truncate text-[11px] opacity-80">{sch.details}</div>
+                        )}
                       </div>
-                      {sch.startTime && (
-                        <div className="truncate text-[11px] font-medium">{sch.startTime}</div>
-                      )}
-                      {sch.details && (
-                        <div className="truncate text-[11px] opacity-80">{sch.details}</div>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );

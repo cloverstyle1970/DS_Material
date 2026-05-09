@@ -32,6 +32,7 @@ export default function TBMAdminClient() {
   const [openDetail, setOpenDetail] = useState<TBMRecord | null>(null);
   const [detail, setDetail] = useState<DetailData | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [participantStats, setParticipantStats] = useState<Map<number, { total: number; confirmed: number }>>(new Map());
 
   const [editing, setEditing] = useState<TBMRecord | null>(null);
   const [editForm, setEditForm] = useState({
@@ -79,6 +80,25 @@ export default function TBMAdminClient() {
     }
     setRecords(rows);
     setTotal(count ?? 0);
+
+    // 참가자 확인 통계 로드
+    if (rows.length > 0) {
+      const ids = rows.map(r => r.id);
+      const { data: parts } = await supabase.from("tbm_participants")
+        .select("tbm_id, confirmed_at")
+        .in("tbm_id", ids);
+      const stats = new Map<number, { total: number; confirmed: number }>();
+      (parts ?? []).forEach((p: { tbm_id: number; confirmed_at: string | null }) => {
+        const cur = stats.get(p.tbm_id) ?? { total: 0, confirmed: 0 };
+        cur.total++;
+        if (p.confirmed_at) cur.confirmed++;
+        stats.set(p.tbm_id, cur);
+      });
+      setParticipantStats(stats);
+    } else {
+      setParticipantStats(new Map());
+    }
+
     setLoading(false);
   }
 
@@ -232,42 +252,63 @@ export default function TBMAdminClient() {
                   <th className="px-4 py-2.5">구분</th>
                   <th className="px-4 py-2.5">현장 / 호기</th>
                   <th className="px-4 py-2.5">작업 내용</th>
+                  <th className="px-4 py-2.5">참가자 확인</th>
                   <th className="px-4 py-2.5 text-right">액션</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {loading && (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-xs text-gray-500">로딩 중...</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-xs text-gray-500">로딩 중...</td></tr>
                 )}
                 {!loading && records.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-12 text-center text-xs text-gray-500">조건에 해당하는 기록이 없습니다.</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-12 text-center text-xs text-gray-500">조건에 해당하는 기록이 없습니다.</td></tr>
                 )}
-                {!loading && records.map(r => (
-                  <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                    <td className="px-4 py-2.5 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">{fmtDt(r.created_at)}</td>
-                    <td className="px-4 py-2.5 text-xs font-semibold text-gray-800 dark:text-gray-100 whitespace-nowrap">{r.user_name}</td>
-                    <td className="px-4 py-2.5 whitespace-nowrap">{modeBadge(r)}</td>
-                    <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-200 whitespace-nowrap">
-                      <div className="font-semibold">{r.site_name}</div>
-                      {r.elevator_name && <div className="text-gray-500 dark:text-gray-400">{r.elevator_name}</div>}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-gray-600 dark:text-gray-300 max-w-md truncate">{r.work_content}</td>
-                    <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                      <button type="button" onClick={() => loadDetail(r)}
-                        className="px-2 py-1 text-[11px] rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600">
-                        상세
-                      </button>
-                      <button type="button" onClick={() => startEdit(r)}
-                        className="ml-1 px-2 py-1 text-[11px] rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/70">
-                        수정
-                      </button>
-                      <button type="button" onClick={() => deleteTbm(r.id)}
-                        className="ml-1 px-2 py-1 text-[11px] rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/70">
-                        삭제
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {!loading && records.map(r => {
+                  const stats = participantStats.get(r.id);
+                  const hasPending = !!stats && stats.total > 0 && stats.confirmed < stats.total;
+                  // 참가자 미확인 시 빨간 글씨 (다크/라이트 동일)
+                  const rowText = hasPending
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-gray-700 dark:text-gray-200";
+                  const rowMutedText = hasPending
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-gray-600 dark:text-gray-300";
+                  return (
+                    <tr key={r.id} className={`hover:bg-gray-50 dark:hover:bg-gray-700/30 ${hasPending ? "bg-red-50/50 dark:bg-red-900/10" : ""}`}>
+                      <td className={`px-4 py-2.5 text-xs whitespace-nowrap ${rowMutedText}`}>{fmtDt(r.created_at)}</td>
+                      <td className={`px-4 py-2.5 text-xs font-semibold whitespace-nowrap ${hasPending ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-gray-100"}`}>{r.user_name}</td>
+                      <td className="px-4 py-2.5 whitespace-nowrap">{modeBadge(r)}</td>
+                      <td className={`px-4 py-2.5 text-xs whitespace-nowrap ${rowText}`}>
+                        <div className="font-semibold">{r.site_name}</div>
+                        {r.elevator_name && <div className={hasPending ? "" : "text-gray-500 dark:text-gray-400"}>{r.elevator_name}</div>}
+                      </td>
+                      <td className={`px-4 py-2.5 text-xs max-w-md truncate ${rowMutedText}`}>{r.work_content}</td>
+                      <td className="px-4 py-2.5 whitespace-nowrap">
+                        {stats && stats.total > 0 ? (
+                          <span className={`text-[11px] font-bold ${hasPending ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
+                            {stats.confirmed}/{stats.total}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                        <button type="button" onClick={() => loadDetail(r)}
+                          className="px-2 py-1 text-[11px] rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600">
+                          상세
+                        </button>
+                        <button type="button" onClick={() => startEdit(r)}
+                          className="ml-1 px-2 py-1 text-[11px] rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/70">
+                          수정
+                        </button>
+                        <button type="button" onClick={() => deleteTbm(r.id)}
+                          className="ml-1 px-2 py-1 text-[11px] rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/70">
+                          삭제
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
