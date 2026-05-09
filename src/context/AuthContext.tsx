@@ -9,6 +9,14 @@ export interface AuthUser {
   name: string;
   dept: string;
   permissions: Permission[];
+  theme?: "light" | "dark";
+}
+
+function applyTheme(theme: "light" | "dark" | null | undefined) {
+  if (typeof document === "undefined") return;
+  const t = theme === "dark" ? "dark" : "light";
+  localStorage.setItem("app-theme", t);
+  document.documentElement.classList.toggle("dark", t === "dark");
 }
 
 function perms(user: AuthUser): Permission[] {
@@ -67,20 +75,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
           const parsed = JSON.parse(stored);
-          // Supabase에서 최신 권한·부서 갱신 (권한 변경 시 재로그인 없이 반영)
+          // Supabase에서 최신 권한·부서·테마 갱신 (권한·테마 변경 시 재로그인 없이 반영)
           const { data } = await supabase
             .from("users")
-            .select("permissions, dept")
+            .select("permissions, dept, theme")
             .eq("id", parsed.id)
             .eq("status", "재직")
             .single();
+          const dbTheme = (data as { theme?: string } | null)?.theme;
+          const theme = dbTheme === "dark" ? "dark" : dbTheme === "light" ? "light" : parsed.theme;
           const freshUser: AuthUser = {
             ...parsed,
             permissions: (data?.permissions ?? parsed.permissions ?? []) as Permission[],
             dept: data?.dept ?? parsed.dept ?? "",
+            theme,
           };
           setUser(freshUser);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
+          applyTheme(theme);
         }
       } catch {}
       setIsLoading(false);
@@ -91,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   function login(u: AuthUser) {
     setUser(u);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
+    applyTheme(u.theme);
   }
 
   function logout() {

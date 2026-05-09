@@ -29,7 +29,7 @@ export default function LoginPage() {
     const trimmed = name.trim();
     const { data: user, error: dbError } = await supabase
       .from("users")
-      .select("id, name, dept, permissions, status")
+      .select("id, name, dept, permissions, status, theme")
       .eq("name", trimmed)
       .eq("status", "재직")
       .single();
@@ -57,11 +57,13 @@ export default function LoginPage() {
       }
     }
 
+    const userTheme = (user as { theme?: string }).theme;
     login({
       id: user.id,
       name: user.name,
       dept: user.dept ?? "",
       permissions: (user.permissions ?? []) as import("@/lib/mock-users").Permission[],
+      theme: userTheme === "dark" ? "dark" : userTheme === "light" ? "light" : undefined,
     });
     router.replace("/dashboard");
   }

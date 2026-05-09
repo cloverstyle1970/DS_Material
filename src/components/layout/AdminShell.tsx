@@ -40,24 +40,25 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
     }
   }, [pathname, user, isLoading, isAuthenticated, router]);
 
-  // pathname → 탭 자동 동기화 (URL 직접 진입, 뒤로가기 등)
+  // pathname → 탭 자동 동기화 (URL 직접 진입, 뒤로가기, hydration 후 등)
+  // tabs를 deps에 포함해 TabsProvider의 localStorage 복원 이후에도 재실행되도록 함
   useEffect(() => {
     if (!isAuthenticated || !user) return;
     const entry = PAGE_REGISTRY[pathname];
-    if (entry) {
-      const allowed = isAdmin(user) || hasMenuPermission(user, pathname, "read");
-      if (allowed) {
-        const alreadyOpen = tabs.some(t => t.href === pathname);
-        if (!alreadyOpen && isLimitReached) {
-          alert(`탭은 최대 ${MAX_TABS}개까지 열 수 있습니다. 다른 탭을 닫고 다시 시도해주세요.`);
-          router.replace(activeHref || "/dashboard");
-          return;
-        }
-        openTab(pathname, entry.label);
-      }
+    if (!entry) return;
+    if (tabs.some(t => t.href === pathname)) return; // 이미 열려있으면 종료 (idempotent)
+    // dashboard/settings는 메뉴 외 공통 페이지 — 권한 체크 우회
+    const isAlwaysAllowed = pathname === "/dashboard" || pathname === "/settings";
+    const allowed = isAlwaysAllowed || isAdmin(user) || hasMenuPermission(user, pathname, "read");
+    if (!allowed) return;
+    if (isLimitReached) {
+      alert(`탭은 최대 ${MAX_TABS}개까지 열 수 있습니다. 다른 탭을 닫고 다시 시도해주세요.`);
+      router.replace(activeHref || "/dashboard");
+      return;
     }
+    openTab(pathname, entry.label);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, isAuthenticated, user]);
+  }, [pathname, isAuthenticated, user, tabs]);
 
   // activeHref → URL 동기화 (TabBar 탭 클릭으로 활성이 바뀐 경우)
   useEffect(() => {

@@ -11,6 +11,13 @@ export default function SettingsContent() {
   const isDark = theme === "dark";
   const { user } = useAuth();
 
+  async function handleThemeChange(t: "light" | "dark") {
+    setTheme(t);
+    if (!user) return;
+    // DB 저장 실패해도 UI 적용은 유지 (재로그인 시 DB 값으로 복원)
+    await supabase.from("users").update({ theme: t }).eq("id", user.id);
+  }
+
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
@@ -86,7 +93,7 @@ export default function SettingsContent() {
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => setTheme("light")}
+              onClick={() => handleThemeChange("light")}
               className={`relative rounded-xl border-2 p-4 text-left transition-all ${
                 theme === "light"
                   ? "border-blue-500 " + (isDark ? "bg-blue-900/20" : "bg-blue-50")
@@ -123,7 +130,7 @@ export default function SettingsContent() {
 
             <button
               type="button"
-              onClick={() => setTheme("dark")}
+              onClick={() => handleThemeChange("dark")}
               className={`relative rounded-xl border-2 p-4 text-left transition-all ${
                 theme === "dark"
                   ? "border-blue-500 bg-blue-900/20"
