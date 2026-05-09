@@ -10,64 +10,107 @@ export interface SignaturePadHandle {
 
 const SignaturePad = forwardRef<SignaturePadHandle>(function SignaturePad(_, ref) {
   const cvRef = useRef<HTMLCanvasElement>(null);
-  const isDrawingRef = useRef(false);
   const hasInkRef = useRef(false);
-  const lastPosRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     const cv = cvRef.current;
     if (!cv) return;
-    // 컨테이너 크기에 맞춰 캔버스 크기 설정 (DPR 보정)
-    const rect = cv.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    cv.width = Math.max(1, Math.round(rect.width * dpr));
-    cv.height = Math.max(1, Math.round(rect.height * dpr));
-    const ctx = cv.getContext("2d");
-    if (!ctx) return;
-    ctx.scale(dpr, dpr);
-    ctx.lineWidth = 2.2;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.strokeStyle = "#1e293b";
+
+    let isDrawing = false;
+    let dpr = window.devicePixelRatio || 1;
+
+    function setupCanvas() {
+      if (!cv) return;
+      const rect = cv.getBoundingClientRect();
+      const w = Math.max(1, Math.round(rect.width));
+      const h = Math.max(1, Math.round(rect.height));
+      // 기존 그림 보존을 위해 임시 캡처 (캔버스 크기 변경 시 컨텐츠 소실)
+      let snapshot: ImageData | null = null;
+      const prevCtx = cv.getContext("2d");
+      if (prevCtx && cv.width > 0 && cv.height > 0 && hasInkRef.current) {
+        try { snapshot = prevCtx.getImageData(0, 0, cv.width, cv.height); } catch { snapshot = null; }
+      }
+      cv.width = w * dpr;
+      cv.height = h * dpr;
+      cv.style.touchAction = "none";
+      const ctx = cv.getContext("2d");
+      if (!ctx) return;
+      ctx.scale(dpr, dpr);
+      ctx.lineWidth = 2.4;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "#1e293b";
+      if (snapshot) {
+        try { ctx.putImageData(snapshot, 0, 0); } catch {}
+      }
+    }
+
+    setupCanvas();
+
+    function getPos(clientX: number, clientY: number) {
+      const rect = cv!.getBoundingClientRect();
+      return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
+    function onDown(e: PointerEvent) {
+      e.preventDefault();
+      try { cv!.setPointerCapture(e.pointerId); } catch {}
+      isDrawing = true;
+      const p = getPos(e.clientX, e.clientY);
+      const ctx = cv!.getContext("2d");
+      if (!ctx) return;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      // 단일 클릭(점)도 보이도록 점 찍기
+      ctx.lineTo(p.x + 0.1, p.y + 0.1);
+      ctx.stroke();
+      hasInkRef.current = true;
+    }
+
+    function onMove(e: PointerEvent) {
+      if (!isDrawing) return;
+      e.preventDefault();
+      const ctx = cv!.getContext("2d");
+      if (!ctx) return;
+      const p = getPos(e.clientX, e.clientY);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      hasInkRef.current = true;
+    }
+
+    function onUp(e: PointerEvent) {
+      isDrawing = false;
+      try { cv!.releasePointerCapture(e.pointerId); } catch {}
+    }
+
+    cv.addEventListener("pointerdown", onDown);
+    cv.addEventListener("pointermove", onMove);
+    cv.addEventListener("pointerup", onUp);
+    cv.addEventListener("pointercancel", onUp);
+    cv.addEventListener("pointerleave", onUp);
+
+    // 리사이즈 시 캔버스 재구성 (그림 유지)
+    const ro = new ResizeObserver(() => {
+      dpr = window.devicePixelRatio || 1;
+      setupCanvas();
+    });
+    ro.observe(cv);
+
+    return () => {
+      cv.removeEventListener("pointerdown", onDown);
+      cv.removeEventListener("pointermove", onMove);
+      cv.removeEventListener("pointerup", onUp);
+      cv.removeEventListener("pointercancel", onUp);
+      cv.removeEventListener("pointerleave", onUp);
+      ro.disconnect();
+    };
   }, []);
 
-  function getPos(e: PointerEvent | React.PointerEvent): { x: number; y: number } {
-    const cv = cvRef.current!;
-    const rect = cv.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  }
-
-  function start(e: React.PointerEvent) {
-    const cv = cvRef.current; if (!cv) return;
-    cv.setPointerCapture(e.pointerId);
-    isDrawingRef.current = true;
-    const p = getPos(e);
-    lastPosRef.current = p;
-    const ctx = cv.getContext("2d"); if (!ctx) return;
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y);
-  }
-
-  function move(e: React.PointerEvent) {
-    if (!isDrawingRef.current) return;
-    const cv = cvRef.current; if (!cv) return;
-    const ctx = cv.getContext("2d"); if (!ctx) return;
-    const p = getPos(e);
-    ctx.lineTo(p.x, p.y);
-    ctx.stroke();
-    lastPosRef.current = p;
-    hasInkRef.current = true;
-  }
-
-  function end(e: React.PointerEvent) {
-    isDrawingRef.current = false;
-    const cv = cvRef.current; if (!cv) return;
-    try { cv.releasePointerCapture(e.pointerId); } catch {}
-  }
-
   function clear() {
-    const cv = cvRef.current; if (!cv) return;
-    const ctx = cv.getContext("2d"); if (!ctx) return;
+    const cv = cvRef.current;
+    if (!cv) return;
+    const ctx = cv.getContext("2d");
+    if (!ctx) return;
     ctx.clearRect(0, 0, cv.width, cv.height);
     hasInkRef.current = false;
   }
@@ -82,11 +125,8 @@ const SignaturePad = forwardRef<SignaturePadHandle>(function SignaturePad(_, ref
     <div className="relative w-full">
       <canvas
         ref={cvRef}
-        onPointerDown={start}
-        onPointerMove={move}
-        onPointerUp={end}
-        onPointerCancel={end}
-        className="w-full h-32 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 touch-none"
+        className="block w-full h-32 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+        style={{ touchAction: "none" }}
       />
       <button
         type="button"
