@@ -64,6 +64,30 @@ export interface TBMParticipant {
   tbm_id: number;
   user_id: number;
   user_name: string;
+  signature_url: string | null;
+  confirmed_at: string | null;
+}
+
+export interface TBMParticipantChecklist {
+  tbm_id: number;
+  user_id: number;
+  item_id: number;
+  is_checked: boolean;
+}
+
+export interface TBMParticipantSafety {
+  tbm_id: number;
+  user_id: number;
+  rule_id: number;
+  acknowledged: boolean;
+}
+
+export interface TBMParticipantPhoto {
+  id: number;
+  tbm_id: number;
+  user_id: number;
+  photo_url: string;
+  uploaded_at: string;
 }
 
 export interface TBMRecordSafetyRule {

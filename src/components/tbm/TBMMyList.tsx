@@ -7,6 +7,7 @@ import {
   TBMRecord, TBMParticipant, TBMRecordSafetyRule, TBMChecklistResult, TBMPhoto,
   MODE_LABELS, SUB_TYPE_LABELS,
 } from "@/lib/tbm";
+import TBMParticipantConfirmModal from "./TBMParticipantConfirmModal";
 
 interface DetailData {
   participants: TBMParticipant[];
@@ -15,27 +16,64 @@ interface DetailData {
   photos: TBMPhoto[];
 }
 
+type Role = "writer" | "participant";
+
+interface MyTBM extends TBMRecord {
+  role: Role;
+  myConfirmedAt: string | null; // 참가자일 때만 의미
+}
+
 export default function TBMMyList() {
   const { user } = useAuth();
-  const [records, setRecords] = useState<TBMRecord[]>([]);
+  const [records, setRecords] = useState<MyTBM[]>([]);
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState<number | null>(null);
   const [detail, setDetail] = useState<DetailData | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [confirming, setConfirming] = useState<MyTBM | null>(null);
 
   async function load() {
     if (!user) return;
     setLoading(true);
-    const { data } = await supabase.from("tbm_records")
-      .select("*")
+
+    // 1) 본인이 작성한 TBM
+    const writerRes = await supabase.from("tbm_records").select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(100);
-    setRecords((data ?? []) as TBMRecord[]);
+    const writerRows = ((writerRes.data ?? []) as TBMRecord[]).map(r => ({
+      ...r, role: "writer" as Role, myConfirmedAt: null,
+    }));
+
+    // 2) 참가자로 등록된 TBM
+    const partRes = await supabase.from("tbm_participants")
+      .select("tbm_id, confirmed_at")
+      .eq("user_id", user.id);
+    const partRows = (partRes.data ?? []) as { tbm_id: number; confirmed_at: string | null }[];
+    const partTbmIds = partRows.map(p => p.tbm_id);
+    let partTbms: MyTBM[] = [];
+    if (partTbmIds.length > 0) {
+      const partTbmRes = await supabase.from("tbm_records").select("*")
+        .in("id", partTbmIds)
+        .order("created_at", { ascending: false });
+      partTbms = ((partTbmRes.data ?? []) as TBMRecord[]).map(r => {
+        const me = partRows.find(p => p.tbm_id === r.id);
+        return { ...r, role: "participant" as Role, myConfirmedAt: me?.confirmed_at ?? null };
+      });
+    }
+
+    // 합치기 (본인이 작성한 것이면 writer 우선)
+    const writerIds = new Set(writerRows.map(r => r.id));
+    const merged = [
+      ...writerRows,
+      ...partTbms.filter(p => !writerIds.has(p.id)),
+    ].sort((a, b) => b.created_at.localeCompare(a.created_at));
+
+    setRecords(merged);
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, [user]);
+  useEffect(() => { load(); }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadDetail(id: number) {
     if (openId === id) {
@@ -70,7 +108,7 @@ export default function TBMMyList() {
     return (
       <div className="p-12 text-center">
         <div className="text-5xl mb-3">📋</div>
-        <div className="text-sm text-gray-500 dark:text-gray-400">아직 작성한 TBM이 없습니다.</div>
+        <div className="text-sm text-gray-500 dark:text-gray-400">아직 작성하거나 참가한 TBM이 없습니다.</div>
       </div>
     );
   }
@@ -81,24 +119,46 @@ export default function TBMMyList() {
         const opened = openId === r.id;
         const dt = new Date(r.created_at);
         const dtStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")} ${String(dt.getHours()).padStart(2,"0")}:${String(dt.getMinutes()).padStart(2,"0")}`;
-        const modeColor = r.mode === "repair" ? "bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300" : "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300";
+        const modeColor = r.mode === "repair"
+          ? "bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300"
+          : "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300";
 
         return (
           <div key={r.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => loadDetail(r.id)}
-              className="w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-            >
-              <div className="flex items-center gap-2 mb-1.5">
+            <button type="button" onClick={() => loadDetail(r.id)}
+              className="w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${modeColor}`}>
                   {MODE_LABELS[r.mode]}{r.sub_type ? ` · ${SUB_TYPE_LABELS[r.sub_type]}` : ""}
                 </span>
+                {r.role === "writer" ? (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300">
+                    작성자
+                  </span>
+                ) : (
+                  <>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
+                      참가자
+                    </span>
+                    {r.myConfirmedAt ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300">
+                        ✓ 확인 완료
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">
+                        ⚠️ 미확인
+                      </span>
+                    )}
+                  </>
+                )}
                 <span className="text-[11px] text-gray-400 ml-auto">{dtStr}</span>
               </div>
               <div className="text-sm font-bold text-gray-900 dark:text-white">
                 {r.site_name} {r.elevator_name && <span className="text-gray-500 dark:text-gray-400 font-normal">{r.elevator_name}</span>}
               </div>
+              {r.role === "participant" && (
+                <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">작성: {r.user_name}</div>
+              )}
               <div className="text-xs text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">{r.work_content}</div>
             </button>
 
@@ -138,8 +198,13 @@ export default function TBMMyList() {
                       <Section title={`참가자 (${detail.participants.length})`}>
                         <div className="flex flex-wrap gap-1">
                           {detail.participants.map(p => (
-                            <span key={p.user_id} className="text-[11px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
-                              {p.user_name}
+                            <span key={p.user_id}
+                              className={`text-[11px] px-2 py-0.5 rounded-full ${
+                                p.confirmed_at
+                                  ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300"
+                                  : "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+                              }`}>
+                              {p.confirmed_at && "✓ "}{p.user_name}
                             </span>
                           ))}
                         </div>
@@ -158,18 +223,23 @@ export default function TBMMyList() {
                       </Section>
                     )}
                     {r.signature_url && (
-                      <Section title="서명">
+                      <Section title="작성자 서명">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={r.signature_url} alt="서명" className="h-20 bg-white rounded border border-gray-200" />
+                        <img src={r.signature_url} alt="작성자 서명" className="h-20 bg-white rounded border border-gray-200" />
                       </Section>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => deleteTbm(r.id)}
-                      className="w-full py-2 rounded-lg text-xs font-semibold text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20"
-                    >
-                      🗑️ 이 TBM 삭제
-                    </button>
+
+                    {r.role === "writer" ? (
+                      <button type="button" onClick={() => deleteTbm(r.id)}
+                        className="w-full py-2 rounded-lg text-xs font-semibold text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20">
+                        🗑️ 이 TBM 삭제
+                      </button>
+                    ) : (
+                      <button type="button" onClick={() => setConfirming(r)}
+                        className="w-full py-2.5 rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-700">
+                        ✍️ {r.myConfirmedAt ? "참가자 재확인" : "참가자 확인하기"}
+                      </button>
+                    )}
                   </>
                 ) : null}
               </div>
@@ -177,6 +247,14 @@ export default function TBMMyList() {
           </div>
         );
       })}
+
+      {confirming && (
+        <TBMParticipantConfirmModal
+          record={confirming}
+          onClose={() => setConfirming(null)}
+          onSaved={() => { setConfirming(null); load(); }}
+        />
+      )}
     </div>
   );
 }

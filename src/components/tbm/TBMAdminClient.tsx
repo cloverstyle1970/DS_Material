@@ -355,17 +355,43 @@ export default function TBMAdminClient() {
                       </ul>
                     </DetailRow>
                   )}
-                  {detail.participants.length > 0 && (
-                    <DetailRow label={`참가자 (${detail.participants.length})`}>
-                      <div className="flex flex-wrap gap-1">
-                        {detail.participants.map(p => (
-                          <span key={p.user_id} className="text-[11px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
-                            {p.user_name}
-                          </span>
-                        ))}
-                      </div>
-                    </DetailRow>
-                  )}
+                  {detail.participants.length > 0 && (() => {
+                    const confirmedCount = detail.participants.filter(p => p.confirmed_at).length;
+                    return (
+                      <DetailRow label={`참가자 ${confirmedCount}/${detail.participants.length} 확인 완료`}>
+                        <div className="space-y-1.5">
+                          {detail.participants.map(p => {
+                            const dt = p.confirmed_at ? new Date(p.confirmed_at) : null;
+                            const dtStr = dt
+                              ? `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")} ${String(dt.getHours()).padStart(2,"0")}:${String(dt.getMinutes()).padStart(2,"0")}`
+                              : null;
+                            return (
+                              <div key={p.user_id}
+                                className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border ${
+                                  p.confirmed_at
+                                    ? "border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20"
+                                    : "border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/30"
+                                }`}>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  p.confirmed_at
+                                    ? "bg-green-500 text-white"
+                                    : "bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-300"
+                                }`}>
+                                  {p.confirmed_at ? "✓ 확인" : "미확인"}
+                                </span>
+                                <span className="text-xs font-semibold text-gray-800 dark:text-gray-100">{p.user_name}</span>
+                                {dtStr && <span className="text-[10px] text-gray-500 dark:text-gray-400 ml-auto">{dtStr}</span>}
+                                {p.signature_url && (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={p.signature_url} alt="서명" className="h-6 bg-white rounded border border-gray-200" />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </DetailRow>
+                    );
+                  })()}
                   {detail.photos.length > 0 && (
                     <DetailRow label={`사진 (${detail.photos.length})`}>
                       <div className="grid grid-cols-4 gap-2">

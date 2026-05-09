@@ -97,6 +97,7 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
         .select("id, site_name, elevator_name, start_date, end_date, details")
         .gte("end_date", fmt(start))
         .lte("start_date", fmt(end))
+        .neq("site_name", "공사휴무")  // 공사휴무 제외
         .order("start_date", { ascending: false });
       if (data) setSchedules(data as Schedule[]);
     })();
