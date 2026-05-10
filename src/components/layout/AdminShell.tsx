@@ -14,7 +14,7 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const { tabs, activeHref, openTab, isLimitReached } = useTabs();
+  const { tabs, activeHref, openTab, setActive, isLimitReached } = useTabs();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -46,7 +46,11 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
     if (!isAuthenticated || !user) return;
     const entry = PAGE_REGISTRY[pathname];
     if (!entry) return;
-    if (tabs.some(t => t.href === pathname)) return; // 이미 열려있으면 종료 (idempotent)
+    // 이미 열려 있으면 activeHref만 동기화 (새로고침 후 active 표시 복원)
+    if (tabs.some(t => t.href === pathname)) {
+      if (activeHref !== pathname) setActive(pathname);
+      return;
+    }
     // dashboard/settings/profile는 메뉴 외 공통 페이지 — 권한 체크 우회
     const isAlwaysAllowed = pathname === "/dashboard" || pathname === "/settings" || pathname === "/data/profile";
     const allowed = isAlwaysAllowed || isAdmin(user) || hasMenuPermission(user, pathname, "read");
