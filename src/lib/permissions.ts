@@ -47,9 +47,11 @@ export const PERMISSION_MENUS: PermissionMenuGroup[] = [
   {
     group: "산업안전",
     items: [
-      { href: "/safety/tbm",        label: "TBM등록" },
-      { href: "/safety/tbm/admin",  label: "TBM 관리(PC)" },
-      { href: "/safety/tbm/master", label: "TBM 마스터(PC)" },
+      { href: "/safety/tbm",          label: "TBM등록" },
+      { href: "/safety/tbm/admin",    label: "TBM 관리(PC)" },
+      { href: "/safety/tbm/master",   label: "TBM 마스터(PC)" },
+      { href: "/uniform-safety",      label: "근무복·안전장구 신청" },
+      { href: "/uniform-safety/admin", label: "근무복·안전장구 관리" },
     ],
   },
   {

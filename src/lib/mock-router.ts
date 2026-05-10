@@ -797,26 +797,32 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
 
   if (path === "/api/categories") {
     const { level, majorCode, midCode, label } = body;
+    // 다음 번호: 99(범용 등 예약)는 제외하고 01-98 범위에서 max+1.
+    // 채번 가능한 최댓값은 98 (99 도달 시 error).
+    const nextCode = (existing: string[]): string => {
+      const nums = existing.map(c => parseInt(c, 10)).filter(n => Number.isFinite(n) && n !== 99);
+      const next = (nums.length ? Math.max(...nums) : 0) + 1;
+      if (next >= 99) throw new MockApiError("분류 코드가 가득 찼습니다 (최대 98개, 99는 예약).", 400);
+      return String(next).padStart(2, "0");
+    };
+
     if (level === "major") {
       const { data: ex } = await supabase.from("categories").select("code").eq("level", "major");
-      const nums = (ex ?? []).map((r: {code: string}) => parseInt(r.code, 10)).filter(Number.isFinite);
-      const code = String((nums.length ? Math.max(...nums) : 0) + 1).padStart(2, "0");
+      const code = nextCode((ex ?? []).map((r: {code: string}) => r.code));
       const { data, error } = await supabase.from("categories").insert({ level, code, label, major_code: null, mid_code: null }).select().single();
       if (error) throw new MockApiError(error.message, 500);
       return { code: data.code, label: data.label };
     }
     if (level === "mid") {
       const { data: ex } = await supabase.from("categories").select("code").eq("level", "mid").eq("major_code", majorCode);
-      const nums = (ex ?? []).map((r: {code: string}) => parseInt(r.code, 10)).filter(Number.isFinite);
-      const code = String((nums.length ? Math.max(...nums) : 0) + 1).padStart(2, "0");
+      const code = nextCode((ex ?? []).map((r: {code: string}) => r.code));
       const { data, error } = await supabase.from("categories").insert({ level, code, label, major_code: majorCode, mid_code: null }).select().single();
       if (error) throw new MockApiError(error.message, 500);
       return { code: data.code, label: data.label };
     }
     if (level === "sub") {
       const { data: ex } = await supabase.from("categories").select("code").eq("level", "sub").eq("major_code", majorCode).eq("mid_code", midCode);
-      const nums = (ex ?? []).map((r: {code: string}) => parseInt(r.code, 10)).filter(Number.isFinite);
-      const code = String((nums.length ? Math.max(...nums) : 0) + 1).padStart(2, "0");
+      const code = nextCode((ex ?? []).map((r: {code: string}) => r.code));
       const { data, error } = await supabase.from("categories").insert({ level, code, label, major_code: majorCode, mid_code: midCode }).select().single();
       if (error) throw new MockApiError(error.message, 500);
       return { code: data.code, label: data.label };

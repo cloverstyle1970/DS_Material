@@ -23,6 +23,8 @@ import EmployeeRegisterClient from "@/components/hr/EmployeeRegisterClient";
 import DeptRankClient from "@/components/hr/DeptRankClient";
 import CompanyVehiclesClient from "@/components/hr/CompanyVehiclesClient";
 import MyProfileClient from "@/components/data/MyProfileClient";
+import UniformSafetyClient from "@/components/uniform-safety/UniformSafetyClient";
+import UniformSafetyAdminClient from "@/components/uniform-safety/UniformSafetyAdminClient";
 
 export interface PageEntry {
   label: string;
@@ -57,6 +59,14 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/hr/company-vehicles": {
     label: "회사차량관리",
     render: () => <CompanyVehiclesClient />,
+  },
+  "/uniform-safety": {
+    label: "근무복·안전장구 신청",
+    render: () => <UniformSafetyClient />,
+  },
+  "/uniform-safety/admin": {
+    label: "근무복·안전장구 관리",
+    render: () => <UniformSafetyAdminClient />,
   },
   "/data/profile": {
     label: "개인정보수정",

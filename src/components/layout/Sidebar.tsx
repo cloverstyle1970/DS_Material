@@ -63,11 +63,12 @@ const NAV_GROUPS: NavGroup[] = [
     label: "산업안전",
     color: "text-rose-400",
     items: [
-      { href: "/safety/tbm",        label: "TBM등록",                   icon: "🛡️" },
-      { href: "/safety/tbm/admin",  label: "TBM 관리(PC)",              icon: "🗂️", adminOnly: true },
-      { href: "/safety/tbm/master", label: "TBM 마스터(PC)",            icon: "⚙️", adminOnly: true },
-      { href: "#safety-risk",      label: "위험성평가",                 icon: "⚠️" },
-      { href: "#safety-uniform",   label: "근무복 및 개인안전장구 신청", icon: "🦺" },
+      { href: "/safety/tbm",         label: "TBM등록",                   icon: "🛡️" },
+      { href: "/safety/tbm/admin",   label: "TBM 관리(PC)",              icon: "🗂️", adminOnly: true },
+      { href: "/safety/tbm/master",  label: "TBM 마스터(PC)",            icon: "⚙️", adminOnly: true },
+      { href: "#safety-risk",        label: "위험성평가",                 icon: "⚠️" },
+      { href: "/uniform-safety",     label: "근무복·안전장구 신청",       icon: "🦺" },
+      { href: "/uniform-safety/admin", label: "근무복·안전장구 관리",     icon: "🗃️", adminOnly: true },
     ],
   },
   {
@@ -152,6 +153,8 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
     if (href === "/inventory-check") return pathname === "/inventory-check";
     if (href === "/construction/schedule") return pathname === "/construction/schedule";
     if (href === "/construction/requests") return pathname === "/construction/requests";
+    if (href === "/uniform-safety") return pathname === "/uniform-safety";
+    if (href === "/uniform-safety/admin") return pathname === "/uniform-safety/admin";
     return pathname === href || (href !== "/" && pathname.startsWith(href + "/"));
   }
 
