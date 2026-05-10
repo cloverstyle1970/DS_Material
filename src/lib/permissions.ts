@@ -20,6 +20,7 @@ export const PERMISSION_MENUS: PermissionMenuGroup[] = [
     group: "현장관리",
     items: [
       { href: "/site/units",   label: "현장/호기 관리" },
+      { href: "/quotes/new",   label: "견적서 작성" },
     ],
   },
   {

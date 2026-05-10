@@ -38,7 +38,7 @@ const NAV_GROUPS: NavGroup[] = [
     color: "text-emerald-400",
     items: [
       { href: "/site/units",     label: "현장/호기 관리",  icon: "🏢" },
-      { href: "#site-quotes",    label: "견적관리",         icon: "💰" },
+      { href: "/quotes/new",     label: "견적서 작성",      icon: "💰" },
     ],
   },
   {
@@ -155,6 +155,7 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
     if (href === "/construction/requests") return pathname === "/construction/requests";
     if (href === "/uniform-safety") return pathname === "/uniform-safety";
     if (href === "/uniform-safety/admin") return pathname === "/uniform-safety/admin";
+    if (href === "/quotes/new") return pathname === "/quotes/new" || pathname.startsWith("/quotes/");
     return pathname === href || (href !== "/" && pathname.startsWith(href + "/"));
   }
 

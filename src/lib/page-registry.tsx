@@ -25,6 +25,7 @@ import CompanyVehiclesClient from "@/components/hr/CompanyVehiclesClient";
 import MyProfileClient from "@/components/data/MyProfileClient";
 import UniformSafetyClient from "@/components/uniform-safety/UniformSafetyClient";
 import UniformSafetyAdminClient from "@/components/uniform-safety/UniformSafetyAdminClient";
+import QuoteEntryClient from "@/components/quotes/QuoteEntryClient";
 
 export interface PageEntry {
   label: string;
@@ -67,6 +68,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/uniform-safety/admin": {
     label: "근무복·안전장구 관리",
     render: () => <UniformSafetyAdminClient />,
+  },
+  "/quotes/new": {
+    label: "견적서 작성",
+    render: () => <QuoteEntryClient />,
   },
   "/data/profile": {
     label: "개인정보수정",
