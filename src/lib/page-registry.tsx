@@ -26,6 +26,7 @@ import MyProfileClient from "@/components/data/MyProfileClient";
 import UniformSafetyClient from "@/components/uniform-safety/UniformSafetyClient";
 import UniformSafetyAdminClient from "@/components/uniform-safety/UniformSafetyAdminClient";
 import QuoteEntryClient from "@/components/quotes/QuoteEntryClient";
+import QuoteSettingsClient from "@/components/quotes/QuoteSettingsClient";
 
 export interface PageEntry {
   label: string;
@@ -72,6 +73,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/quotes/new": {
     label: "견적서 작성",
     render: () => <QuoteEntryClient />,
+  },
+  "/quotes/settings": {
+    label: "견적 기본 설정",
+    render: () => <QuoteSettingsClient />,
   },
   "/data/profile": {
     label: "개인정보수정",
