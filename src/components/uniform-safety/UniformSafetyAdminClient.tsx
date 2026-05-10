@@ -124,14 +124,13 @@ export default function UniformSafetyAdminClient() {
       const { error: e1 } = await supabase.from("uniform_safety_requests").update(patch).eq("id", row.id);
       if (e1) throw e1;
 
-      // 근무복 + 수령완료: users 사이즈 동기화
+      // 근무복 + 수령완료: users 사이즈 동기화 (상의/하의)
       if (next === "수령완료" && row.request_type === "근무복") {
         const update: Record<string, string> = {};
         for (const it of row.items) {
           if (!it.size) continue;
-          if (it.category_label === "상의")   update.uniform_top_size    = it.size;
-          if (it.category_label === "하의")   update.uniform_bottom_size = it.size;
-          if (it.category_label === "안전화") update.safety_shoes_size   = it.size;
+          if (it.category_label === "상의") update.uniform_top_size    = it.size;
+          if (it.category_label === "하의") update.uniform_bottom_size = it.size;
         }
         if (Object.keys(update).length > 0) {
           const { error: e2 } = await supabase.from("users").update(update).eq("id", row.user_id);

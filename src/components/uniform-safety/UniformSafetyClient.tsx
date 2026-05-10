@@ -40,7 +40,7 @@ interface ReqRow {
 type Tab = "uniform" | "safety";
 
 interface UniformSlot {
-  category: "상의" | "하의" | "안전화";
+  category: "상의" | "하의";
   enabled: boolean;
   material_id: string;
   size: string;
@@ -54,12 +54,11 @@ interface SafetyLine {
 }
 
 // ============================================================
-// 분류 코드 헬퍼
+// 자재 풀: 근무복=D990201부터(D9902%), 안전장구=D990301부터(D9903%)
 // ============================================================
-// 자재 풀: D9903 (D990301부터) — 근무복·안전장구 공통
 
-function subCode(id: string): string {
-  // D9903XX____ → XX
+// 소분류 코드 추출: D9902XX____ → "XX"
+function subCodeOf(id: string): string {
   return id.length >= 7 ? id.substring(5, 7) : "";
 }
 
@@ -71,20 +70,22 @@ export default function UniformSafetyClient() {
   const { user } = useAuth();
   const [tab, setTab] = useState<Tab>("uniform");
 
-  // 자재 풀
-  const [materials, setMaterials] = useState<MaterialMini[]>([]);
+  // 자재 풀 (탭별 분리)
+  const [uniformList, setUniformList] = useState<MaterialMini[]>([]); // 근무복: D9902
+  const [safetyList,  setSafetyList]  = useState<MaterialMini[]>([]); // 안전장구: D9903
+  // 소분류 라벨 맵: subCode → label (탭별)
+  const [uniformSubLabels, setUniformSubLabels] = useState<Map<string, string>>(new Map());
+  const [safetySubLabels,  setSafetySubLabels]  = useState<Map<string, string>>(new Map());
   const [matLoading, setMatLoading] = useState(true);
 
   // 사용자 프로필 사이즈
   const [topSize, setTopSize]       = useState("");
   const [bottomSize, setBottomSize] = useState("");
-  const [shoesSize, setShoesSize]   = useState("");
 
   // 근무복 슬롯
   const [slots, setSlots] = useState<UniformSlot[]>([
-    { category: "상의",  enabled: false, material_id: "", size: "", qty: 1 },
-    { category: "하의",  enabled: false, material_id: "", size: "", qty: 1 },
-    { category: "안전화", enabled: false, material_id: "", size: "", qty: 1 },
+    { category: "상의", enabled: false, material_id: "", size: "", qty: 1 },
+    { category: "하의", enabled: false, material_id: "", size: "", qty: 1 },
   ]);
 
   // 안전장구 라인
@@ -109,22 +110,31 @@ export default function UniformSafetyClient() {
     if (!user) return;
     (async () => {
       setMatLoading(true);
-      const [matRes, userRes, reqRes] = await Promise.all([
+      const [uniRes, safRes, uniSubRes, safSubRes, userRes, reqRes] = await Promise.all([
+        supabase.from("materials").select("id, name, unit").like("id", "D9902%").order("id"),
         supabase.from("materials").select("id, name, unit").like("id", "D9903%").order("id"),
-        supabase.from("users").select("uniform_top_size, uniform_bottom_size, safety_shoes_size").eq("id", user.id).single(),
+        supabase.from("categories").select("code, label").eq("level", "sub").eq("major_code", "99").eq("mid_code", "02"),
+        supabase.from("categories").select("code, label").eq("level", "sub").eq("major_code", "99").eq("mid_code", "03"),
+        supabase.from("users").select("uniform_top_size, uniform_bottom_size").eq("id", user.id).single(),
         supabase.from("uniform_safety_requests").select("*, items:uniform_safety_request_items(*)").eq("user_id", user.id).order("requested_at", { ascending: false }).limit(50),
       ]);
-      const mats = (matRes.data ?? []) as MaterialMini[];
-      console.log(`[uniform-safety] D9903 자재 ${mats.length}건 로드`, matRes.error || "");
-      setMaterials(mats);
+      const unis = (uniRes.data ?? []) as MaterialMini[];
+      const safs = (safRes.data ?? []) as MaterialMini[];
+      const uMap = new Map<string, string>();
+      ((uniSubRes.data ?? []) as {code: string; label: string}[]).forEach(r => uMap.set(r.code, r.label));
+      const sMap = new Map<string, string>();
+      ((safSubRes.data ?? []) as {code: string; label: string}[]).forEach(r => sMap.set(r.code, r.label));
+      console.log(`[uniform-safety] 근무복(D9902) 자재 ${unis.length}건/소분류 ${uMap.size}종, 안전장구(D9903) 자재 ${safs.length}건/소분류 ${sMap.size}종`);
+      setUniformList(unis);
+      setSafetyList(safs);
+      setUniformSubLabels(uMap);
+      setSafetySubLabels(sMap);
       if (userRes.data) {
         setTopSize(userRes.data.uniform_top_size ?? "");
         setBottomSize(userRes.data.uniform_bottom_size ?? "");
-        setShoesSize(userRes.data.safety_shoes_size ?? "");
         setSlots(prev => prev.map(s =>
-          s.category === "상의"   ? { ...s, size: userRes.data!.uniform_top_size    ?? "" } :
-          s.category === "하의"   ? { ...s, size: userRes.data!.uniform_bottom_size ?? "" } :
-          s.category === "안전화" ? { ...s, size: userRes.data!.safety_shoes_size   ?? "" } : s
+          s.category === "상의" ? { ...s, size: userRes.data!.uniform_top_size    ?? "" } :
+          s.category === "하의" ? { ...s, size: userRes.data!.uniform_bottom_size ?? "" } : s
         ));
       }
       const reqs = (reqRes.data ?? []) as ReqRow[];
@@ -149,12 +159,27 @@ export default function UniformSafetyClient() {
   const canCreate = admin || hasMenuPermission(user, MENU_HREF, "create");
 
   // ============================================================
-  // 자재 그룹
+  // 자재 그룹: 소분류별로 첫 자재만 대표로 사용 (소분류명만 표시)
   // ============================================================
 
-  // 근무복·안전장구 모두 D9903 전체 (sub 01부터)에서 선택
-  const uniformList = materials.filter(m => subCode(m.id) >= "01");
-  const safetyList  = materials.filter(m => subCode(m.id) >= "01");
+  // 등록된 소분류 전체 노출. 자재가 없는 소분류는 material=null 로 표시 (선택 불가)
+  function buildSubOptions(
+    list: MaterialMini[],
+    subLabels: Map<string, string>,
+  ): Array<{ subCode: string; label: string; material: MaterialMini | null }> {
+    const seen = new Map<string, MaterialMini>();
+    for (const m of list) {
+      const s = subCodeOf(m.id);
+      if (!seen.has(s)) seen.set(s, m);
+    }
+    return Array.from(subLabels.entries())
+      .filter(([s]) => s !== "99") // "기타" 소분류는 제외
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([s, label]) => ({ subCode: s, label, material: seen.get(s) ?? null }));
+  }
+
+  const uniformOptions = buildSubOptions(uniformList, uniformSubLabels);
+  const safetyOptions  = buildSubOptions(safetyList,  safetySubLabels);
 
   // ============================================================
   // 핸들러
@@ -182,7 +207,7 @@ export default function UniformSafetyClient() {
         if (s.qty < 1) { setMessage({ type: "error", text: `${s.category}: 수량은 1 이상이어야 합니다.` }); return; }
       }
       payloadItems = enabled.map((s, i) => {
-        const m = materials.find(x => x.id === s.material_id);
+        const m = uniformList.find(x => x.id === s.material_id);
         return {
           material_id: s.material_id,
           material_name: m?.name ?? "",
@@ -199,11 +224,12 @@ export default function UniformSafetyClient() {
         if (l.qty < 1) { setMessage({ type: "error", text: "수량은 1 이상이어야 합니다." }); return; }
       }
       payloadItems = valid.map((l, i) => {
-        const m = materials.find(x => x.id === l.material_id);
+        const m = safetyList.find(x => x.id === l.material_id);
+        const subLabel = safetySubLabels.get(subCodeOf(l.material_id));
         return {
           material_id: l.material_id,
           material_name: m?.name ?? "",
-          category_label: "안전장구",
+          category_label: subLabel ?? "안전장구",
           size: null,
           qty: l.qty,
           sort_order: (i + 1) * 10,
@@ -281,17 +307,21 @@ export default function UniformSafetyClient() {
               <span className="text-[11px] text-gray-500">{matLoading ? "로딩 중..." : `자재 ${uniformList.length}건`}</span>
             </div>
             <div className="text-[11px] text-gray-500 dark:text-gray-400 mb-3">
-              현재 등록된 사이즈: 상의 <span className="font-bold">{topSize || "-"}</span> · 하의 <span className="font-bold">{bottomSize || "-"}</span> · 안전화 <span className="font-bold">{shoesSize || "-"}</span>
+              현재 등록된 사이즈: 상의 <span className="font-bold">{topSize || "-"}</span> · 하의 <span className="font-bold">{bottomSize || "-"}</span>
             </div>
             {!matLoading && uniformList.length === 0 && (
               <div className="mb-3 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded p-2">
-                ⚠ 등록된 D9903 분류 자재가 없습니다. 자재품목 관리에서 먼저 등록해주세요. (예: D990301XXXX_)
+                ⚠ 등록된 근무복 자재가 없습니다 (대분류 99 / 중분류 02). 자재품목 관리에서 먼저 등록해주세요.
               </div>
             )}
             <div className="space-y-3">
               {slots.map((s, i) => {
-                const list = uniformList;
                 const lastRecv = s.material_id ? lastReceivedMap.get(s.material_id) : null;
+                // 상의: '하의'·'바지' 포함 라벨 제외 / 하의: '하의'·'바지' 포함 라벨만
+                const isBottom = (label: string) => /하의|바지/.test(label);
+                const slotOptions = s.category === "상의"
+                  ? uniformOptions.filter(o => !isBottom(o.label))
+                  : uniformOptions.filter(o =>  isBottom(o.label));
                 return (
                   <div key={s.category} className={`rounded-lg border p-3 transition-colors ${s.enabled ? "border-blue-300 bg-blue-50/40 dark:bg-blue-900/10" : "border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/30"}`}>
                     <div className="flex items-center gap-2 mb-2">
@@ -306,8 +336,12 @@ export default function UniformSafetyClient() {
                       <div>
                         <label className={labelCls}>품목</label>
                         <select value={s.material_id} onChange={e => updateSlot(i, { material_id: e.target.value })} disabled={!s.enabled} className={inputCls}>
-                          <option value="">{list.length === 0 ? "(자재 없음)" : "선택"}</option>
-                          {list.map(m => <option key={m.id} value={m.id}>{m.name} ({m.id})</option>)}
+                          <option value="">{slotOptions.length === 0 ? "(소분류 없음)" : "선택"}</option>
+                          {slotOptions.map(o => (
+                            <option key={o.subCode} value={o.material?.id ?? ""} disabled={!o.material}>
+                              {o.label}{!o.material ? " (자재 미등록)" : ""}
+                            </option>
+                          ))}
                         </select>
                       </div>
                       <div>
@@ -354,8 +388,12 @@ export default function UniformSafetyClient() {
                       <div className="sm:col-span-2">
                         <label className={labelCls}>품목 *</label>
                         <select value={l.material_id} onChange={e => updateLine(i, { material_id: e.target.value })} className={inputCls}>
-                          <option value="">선택</option>
-                          {safetyList.map(m => <option key={m.id} value={m.id}>{m.name} <span className="text-gray-400">({m.id})</span></option>)}
+                          <option value="">{safetyOptions.length === 0 ? "(소분류 없음)" : "선택"}</option>
+                          {safetyOptions.map(o => (
+                            <option key={o.subCode} value={o.material?.id ?? ""} disabled={!o.material}>
+                              {o.label}{!o.material ? " (자재 미등록)" : ""}
+                            </option>
+                          ))}
                         </select>
                         {lastRecv && <div className="text-[11px] text-gray-500 mt-1">최근 수령: {lastRecv.slice(0, 10)}</div>}
                       </div>
@@ -370,7 +408,7 @@ export default function UniformSafetyClient() {
             </div>
             {matLoading && <div className="mt-3 text-xs text-gray-500">자재 정보 로딩 중...</div>}
             {!matLoading && safetyList.length === 0 && (
-              <div className="mt-3 text-xs text-amber-600 dark:text-amber-400">⚠ 등록된 자재(D990301 이상)가 없습니다. 먼저 자재품목 관리에서 등록해주세요.</div>
+              <div className="mt-3 text-xs text-amber-600 dark:text-amber-400">⚠ 등록된 안전장구 자재가 없습니다 (대분류 99 / 중분류 03). 자재품목 관리에서 먼저 등록해주세요.</div>
             )}
           </div>
         )}
