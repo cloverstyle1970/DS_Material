@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import * as XLSX from "xlsx";
 import { TransactionRecord } from "@/lib/mock-transactions";
+import { MaterialRecord } from "@/lib/mock-materials";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { api } from "@/lib/api-client";
 import { useBackdropClose } from "@/lib/useBackdropClose";
@@ -16,7 +17,7 @@ interface Props {
   initial: TransactionRecord[];
 }
 
-interface Search { dateFrom: string; dateTo: string; siteName: string; userName: string }
+interface Search { dateFrom: string; dateTo: string; siteName: string; userName: string; matQuery: string }
 
 type SortKey = "createdAt" | "materialName" | "materialId" | "qty" | "siteName" | "userName";
 type SortDir = "asc" | "desc";
@@ -37,7 +38,7 @@ const COLUMNS: ColDef[] = [
 ];
 
 function today() { return new Date().toISOString().substring(0, 10); }
-function defaultSearch(): Search { return { dateFrom: today(), dateTo: today(), siteName: "", userName: "" }; }
+function defaultSearch(): Search { return { dateFrom: today(), dateTo: today(), siteName: "", userName: "", matQuery: "" }; }
 
 function inRange(iso: string, from: string, to: string) {
   const d = iso.substring(0, 10);
@@ -63,6 +64,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
   const [transactions, setTransactions] = useState(initial);
   const [sites, setSites] = useState<SiteOption[]>([]);
   const [userNames, setUserNames] = useState<string[]>([]);
+  const [matMap, setMatMap] = useState<Map<string, string>>(new Map()); // materialId → modelNo(규격)
 
   useEffect(() => {
     api.get<TransactionRecord[]>(`/api/transactions?type=${encodeURIComponent(mode)}`)
@@ -72,6 +74,13 @@ export default function StockHistoryClient({ mode, initial }: Props) {
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
     api.get<{ name: string; status: string | null }[]>("/api/users")
       .then(data => setUserNames(data.filter(u => u.status === "재직").map(u => u.name).sort()))
+      .catch(() => {});
+    api.get<MaterialRecord[]>("/api/materials")
+      .then(data => {
+        const m = new Map<string, string>();
+        data.forEach(x => m.set(x.id, x.modelNo ?? ""));
+        setMatMap(m);
+      })
       .catch(() => {});
   }, []);
   const [search, setSearch] = useState<Search>(defaultSearch);
@@ -90,6 +99,16 @@ export default function StockHistoryClient({ mode, initial }: Props) {
     if (!inRange(t.createdAt, search.dateFrom, search.dateTo)) return false;
     if (search.siteName && !(t.siteName?.toLowerCase().includes(search.siteName.toLowerCase()))) return false;
     if (search.userName && !t.userName.toLowerCase().includes(search.userName.toLowerCase())) return false;
+    if (search.matQuery) {
+      const q = search.matQuery.trim().toLowerCase();
+      const modelNo = (matMap.get(t.materialId) ?? "").toLowerCase();
+      if (
+        !t.materialId.toLowerCase().includes(q) &&
+        !t.materialName.toLowerCase().includes(q) &&
+        !modelNo.includes(q) &&
+        !((t.serialNo ?? "").toLowerCase().includes(q))
+      ) return false;
+    }
     return true;
   });
 
@@ -196,7 +215,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
   }
 
 
-  const hasFilter = search.dateFrom !== today() || search.dateTo !== today() || search.siteName || search.userName;
+  const hasFilter = search.dateFrom !== today() || search.dateTo !== today() || search.siteName || search.userName || search.matQuery;
 
   return (
     <>
@@ -214,6 +233,11 @@ export default function StockHistoryClient({ mode, initial }: Props) {
               onChange={e => setSearch(p => ({ ...p, dateTo: e.target.value }))}
               className={inputCls()} />
           </div>
+          <input type="text" lang="ko"
+            value={search.matQuery}
+            onChange={e => setSearch(p => ({ ...p, matQuery: e.target.value }))}
+            placeholder="품목코드·자재명·규격·S/N"
+            className={inputCls() + " w-56"} />
           <Autocomplete
             value={search.siteName}
             onChange={v => setSearch(p => ({ ...p, siteName: v }))}
