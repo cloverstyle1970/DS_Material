@@ -69,10 +69,10 @@ function AddRow({ onAdd }: { onAdd: (label: string) => Promise<void> }) {
   }
 
   return (
-    <div className="flex items-center gap-2 mt-2 shrink-0">
+    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 shrink-0 min-w-0">
       <input value={label} onChange={e => setLabel(e.target.value)} placeholder="새 항목 이름"
         onKeyDown={e => e.key === "Enter" && submit()}
-        className="flex-1 text-sm text-gray-800 dark:text-gray-100 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-700 placeholder-gray-300 dark:placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-slate-400" />
+        className="min-w-0 flex-1 text-sm text-gray-800 dark:text-gray-100 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-700 placeholder-gray-300 dark:placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-slate-400" />
       <button type="button" onClick={submit} disabled={busy || !label.trim()}
         className="text-xs bg-slate-700 text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 disabled:opacity-40 transition-colors shrink-0">
         추가
@@ -116,7 +116,7 @@ export default function CategoryManagerModal({ onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-2xl mx-4 flex flex-col max-h-[85vh]">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-[900px] mx-4 flex flex-col max-h-[85vh]">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 shrink-0">
           <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">분류 관리</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">×</button>
@@ -124,7 +124,7 @@ export default function CategoryManagerModal({ onClose }: Props) {
 
         <div className="flex flex-1 min-h-0 divide-x divide-gray-100 dark:divide-gray-700 overflow-hidden">
           {/* 대분류 */}
-          <div className="w-1/3 flex flex-col min-h-0 p-4">
+          <div className="w-1/3 flex flex-col min-h-0 p-4 overflow-hidden">
             <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 shrink-0">대분류</p>
             <div className="flex-1 overflow-y-auto space-y-0.5 min-h-0">
               {store.major.map(m => (
@@ -141,7 +141,7 @@ export default function CategoryManagerModal({ onClose }: Props) {
           </div>
 
           {/* 중분류 */}
-          <div className="w-1/3 flex flex-col min-h-0 p-4">
+          <div className="w-1/3 flex flex-col min-h-0 p-4 overflow-hidden">
             <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 shrink-0">
               중분류 {selMajor ? <span className="text-slate-400 dark:text-slate-500 font-normal normal-case">({store.major.find(m => m.code === selMajor)?.label})</span> : ""}
             </p>
@@ -166,7 +166,7 @@ export default function CategoryManagerModal({ onClose }: Props) {
           </div>
 
           {/* 소분류 */}
-          <div className="w-1/3 flex flex-col min-h-0 p-4">
+          <div className="w-1/3 flex flex-col min-h-0 p-4 overflow-hidden">
             <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 shrink-0">
               소분류 {selMid ? <span className="text-slate-400 dark:text-slate-500 font-normal normal-case">({midList.find(m => m.code === selMid)?.label})</span> : ""}
             </p>
