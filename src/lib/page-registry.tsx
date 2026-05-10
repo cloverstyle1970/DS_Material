@@ -27,6 +27,9 @@ import UniformSafetyClient from "@/components/uniform-safety/UniformSafetyClient
 import UniformSafetyAdminClient from "@/components/uniform-safety/UniformSafetyAdminClient";
 import QuoteEntryClient from "@/components/quotes/QuoteEntryClient";
 import QuoteSettingsClient from "@/components/quotes/QuoteSettingsClient";
+import QuotesListClient from "@/components/quotes/QuotesListClient";
+import LaborRatesClient from "@/components/quotes/LaborRatesClient";
+import QuoteDetailClient from "@/components/quotes/QuoteDetailClient";
 
 export interface PageEntry {
   label: string;
@@ -70,9 +73,21 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
     label: "근무복·안전장구 관리",
     render: () => <UniformSafetyAdminClient />,
   },
+  "/quotes": {
+    label: "견적서 목록",
+    render: () => <QuotesListClient />,
+  },
   "/quotes/new": {
     label: "견적서 작성",
     render: () => <QuoteEntryClient />,
+  },
+  "/quotes/detail": {
+    label: "견적서 상세",
+    render: () => <QuoteDetailClient />,
+  },
+  "/quotes/labor-rates": {
+    label: "공임 단가표",
+    render: () => <LaborRatesClient />,
   },
   "/quotes/settings": {
     label: "견적 기본 설정",

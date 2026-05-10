@@ -4,7 +4,10 @@ import { useState, FormEvent } from "react";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { useBackdropClose } from "@/lib/useBackdropClose";
+import { supabase } from "@/lib/supabase";
 import RegisterRepairModal from "./RegisterRepairModal";
+
+const OPINION_BUCKET = "material-opinions";
 
 interface Props {
   material: MaterialRecord;
@@ -22,6 +25,10 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
   const [storageLoc, setStorageLoc] = useState(material.storageLoc ?? "");
   const [stockQty,   setStockQty]   = useState(material.stockQty);
   const [isRepair,   setIsRepair]   = useState(material.isRepair);
+  const [opinionText,     setOpinionText]     = useState(material.opinionText ?? "");
+  const [opinionImageUrl, setOpinionImageUrl] = useState(material.opinionImageUrl ?? "");
+  const [opinionFile,     setOpinionFile]     = useState<File | null>(null);
+  const [opinionUploading, setOpinionUploading] = useState(false);
   const [saving,       setSaving]       = useState(false);
   const [error,        setError]        = useState("");
   const [showRepair,   setShowRepair]   = useState(false);
@@ -30,12 +37,35 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
   const canRegisterRepair = isDs && !material.isRepair;
   const backdrop = useBackdropClose(onClose);
 
+  async function uploadOpinionImage(file: File): Promise<string> {
+    setOpinionUploading(true);
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
+      const path = `${material.id}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await supabase.storage.from(OPINION_BUCKET).upload(path, file, { cacheControl: "3600", upsert: false });
+      if (upErr) throw upErr;
+      const { data } = supabase.storage.from(OPINION_BUCKET).getPublicUrl(path);
+      return data.publicUrl;
+    } finally {
+      setOpinionUploading(false);
+    }
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!name.trim()) { setError("부품명을 입력해 주세요."); return; }
     setSaving(true);
     try {
-      await api.patch(`/api/materials/${encodeURIComponent(material.id)}`, { name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty, isRepair });
+      // 새 이미지 파일이 있으면 먼저 업로드
+      let finalImageUrl = opinionImageUrl;
+      if (opinionFile) {
+        finalImageUrl = await uploadOpinionImage(opinionFile);
+      }
+      await api.patch(`/api/materials/${encodeURIComponent(material.id)}`, {
+        name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty, isRepair,
+        opinionText: opinionText.trim(),
+        opinionImageUrl: finalImageUrl || "",
+      });
       onSaved();
     } catch (e) {
       setError(getErrorMessage(e));
@@ -134,6 +164,39 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">재고</label>
               <input type="number" min={0} value={stockQty} onChange={e => setStockQty(Number(e.target.value))}
                 className={field} />
+            </div>
+          </div>
+
+          {/* 소견서 (견적서 작성 시 자동 첨부) */}
+          <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+              📝 소견서 <span className="text-[10px] text-gray-400">(견적서 작성 시 자동 첨부)</span>
+            </label>
+            <textarea value={opinionText} onChange={e => setOpinionText(e.target.value)} rows={3} lang="ko"
+              placeholder="이 자재에 대한 소견 (역할, 점검 권장 시점, 교체 사유 등)"
+              className={field + " resize-none"} />
+            <div className="mt-2">
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">소견서 이미지 (선택)</label>
+              <div className="flex items-center gap-2">
+                <input id="opinion-img" type="file" accept="image/*"
+                  onChange={e => setOpinionFile(e.target.files?.[0] ?? null)} className="hidden" />
+                <label htmlFor="opinion-img" className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold cursor-pointer hover:bg-blue-700 whitespace-nowrap">
+                  📁 파일 선택
+                </label>
+                {opinionImageUrl && !opinionFile && (
+                  <a href={opinionImageUrl} target="_blank" rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:underline whitespace-nowrap">현재 이미지 보기</a>
+                )}
+                <span className="text-xs text-gray-600 dark:text-gray-300 truncate flex-1">
+                  {opinionFile ? opinionFile.name : (opinionImageUrl ? "기존 이미지 등록됨" : "선택된 파일 없음")}
+                </span>
+                {(opinionFile || opinionImageUrl) && (
+                  <button type="button"
+                    onClick={() => { setOpinionFile(null); setOpinionImageUrl(""); }}
+                    className="text-xs text-red-500">지우기</button>
+                )}
+              </div>
+              {opinionUploading && <div className="text-[11px] text-gray-500 mt-1">이미지 업로드 중...</div>}
             </div>
           </div>
 

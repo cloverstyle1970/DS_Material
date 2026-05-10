@@ -14,6 +14,8 @@ export interface MaterialRecord {
   isRepair: boolean;
   trackSerial: boolean;
   eCountCd: string | null;
+  opinionText: string | null;
+  opinionImageUrl: string | null;
   createdAt: string;
 }
 

@@ -38,7 +38,9 @@ const NAV_GROUPS: NavGroup[] = [
     color: "text-emerald-400",
     items: [
       { href: "/site/units",     label: "현장/호기 관리",  icon: "🏢" },
+      { href: "/quotes",         label: "견적서 목록",      icon: "📃" },
       { href: "/quotes/new",     label: "견적서 작성",      icon: "💰" },
+      { href: "/quotes/labor-rates", label: "공임 단가표",   icon: "🛠️" },
       { href: "/quotes/settings", label: "견적 기본 설정",  icon: "⚙️", adminOnly: true },
     ],
   },
@@ -156,7 +158,9 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
     if (href === "/construction/requests") return pathname === "/construction/requests";
     if (href === "/uniform-safety") return pathname === "/uniform-safety";
     if (href === "/uniform-safety/admin") return pathname === "/uniform-safety/admin";
+    if (href === "/quotes") return pathname === "/quotes" || pathname === "/quotes/detail";
     if (href === "/quotes/new") return pathname === "/quotes/new";
+    if (href === "/quotes/labor-rates") return pathname === "/quotes/labor-rates";
     if (href === "/quotes/settings") return pathname === "/quotes/settings";
     return pathname === href || (href !== "/" && pathname.startsWith(href + "/"));
   }

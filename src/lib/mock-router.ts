@@ -266,6 +266,8 @@ function dbToMaterial(r: any): MaterialRecord {
     isRepair:     r.is_repair,
     trackSerial:  r.track_serial ?? false,
     eCountCd:     r.e_count_cd   ?? null,
+    opinionText:     r.opinion_text      ?? null,
+    opinionImageUrl: r.opinion_image_url ?? null,
     createdAt:    r.created_at,
   };
 }
@@ -951,7 +953,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
       return dbToMaterial(data);
     }
     const patch: Record<string, unknown> = {};
-    const { stockQty, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, isRepair, trackSerial } = body;
+    const { stockQty, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, isRepair, trackSerial, opinionText, opinionImageUrl } = body;
     if (name        !== undefined) patch.name          = name;
     if (alias       !== undefined) patch.alias         = alias      || null;
     if (modelNo     !== undefined) patch.model_no      = modelNo    || null;
@@ -962,6 +964,8 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
     if (stockQty    !== undefined) patch.stock_qty     = Number(stockQty);
     if (isRepair    !== undefined) patch.is_repair     = isRepair;
     if (trackSerial !== undefined) patch.track_serial  = !!trackSerial;
+    if (opinionText     !== undefined) patch.opinion_text      = opinionText     || null;
+    if (opinionImageUrl !== undefined) patch.opinion_image_url = opinionImageUrl || null;
     const { data, error } = await supabase.from("materials")
       .update(patch).eq("id", dbId).select().single();
     if (error) throw new MockApiError(error.message, 500);
