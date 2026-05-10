@@ -16,10 +16,10 @@ export default function TabBar() {
             key={tab.href}
             onClick={() => setActive(tab.href)}
             className={[
-              "group flex items-center gap-1.5 px-3 py-1.5 rounded-t-md cursor-pointer transition-colors min-w-0 max-w-[200px] border border-b-0",
+              "group flex items-center justify-between px-3 py-1.5 rounded-t-md cursor-pointer transition-colors w-[160px] shrink-0 border border-b-0 border-black dark:border-white",
               active
-                ? "bg-slate-800 dark:bg-white border-slate-700 dark:border-gray-300 text-white dark:text-gray-900 shadow-sm"
-                : "bg-gray-200/60 dark:bg-slate-800/40 border-transparent text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-slate-800/70",
+                ? "bg-slate-800 dark:bg-white text-white dark:text-gray-900 shadow-sm"
+                : "bg-gray-200/60 dark:bg-slate-800/40 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-slate-800/70",
             ].join(" ")}
             title={tab.href}
           >
@@ -33,10 +33,10 @@ export default function TabBar() {
                 closeTab(tab.href);
               }}
               className={[
-                "shrink-0 w-4 h-4 rounded flex items-center justify-center text-xs leading-none transition-colors",
+                "shrink-0 w-5 h-5 rounded flex items-center justify-center text-base leading-none transition-colors ml-1",
                 active
-                  ? "text-gray-300 dark:text-gray-400 hover:bg-slate-700 dark:hover:bg-gray-200 hover:text-white dark:hover:text-gray-700"
-                  : "text-gray-400 opacity-0 group-hover:opacity-100 hover:bg-gray-300 dark:hover:bg-slate-700 hover:text-gray-700 dark:hover:text-white",
+                  ? "text-gray-300 dark:text-gray-500 hover:bg-slate-700 dark:hover:bg-gray-200 hover:text-white dark:hover:text-gray-700"
+                  : "text-gray-400 dark:text-gray-500 hover:bg-gray-300 dark:hover:bg-slate-700 hover:text-gray-700 dark:hover:text-white",
               ].join(" ")}
               aria-label="탭 닫기"
             >
