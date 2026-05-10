@@ -99,6 +99,23 @@ export default function EmployeeRegisterClient() {
   const [family, setFamily] = useState<FamilyMember[]>([{ ...EMPTY_FAMILY }]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [certs, setCerts] = useState<Certification[]>([]);
+
+  // 회사차량 목록 (회사차량 구분 선택 시 lazy load)
+  const [companyVehicles, setCompanyVehicles] = useState<{id: number; plate_number: string; model: string; fuel_type: string; year_made: string | null}[]>([]);
+  const [cvLoading, setCvLoading] = useState(false);
+
+  async function loadCompanyVehicles() {
+    if (companyVehicles.length > 0) return;
+    setCvLoading(true);
+    const { data } = await supabase
+      .from("user_vehicles")
+      .select("id, plate_number, model, fuel_type, year_made")
+      .eq("vehicle_type", "회사차량")
+      .eq("status", "active")
+      .order("plate_number");
+    setCompanyVehicles((data ?? []) as typeof companyVehicles);
+    setCvLoading(false);
+  }
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>("");
   const [saving, setSaving] = useState(false);
@@ -708,7 +725,11 @@ export default function EmployeeRegisterClient() {
                   <div>
                     <label className={labelCls}>구분 <span className="text-red-500">*</span></label>
                     <select value={v.vehicle_type}
-                      onChange={e => setVehicles(prev => prev.map((x, idx) => idx === i ? { ...x, vehicle_type: e.target.value as Vehicle["vehicle_type"] } : x))}
+                      onChange={e => {
+                        const t = e.target.value as Vehicle["vehicle_type"];
+                        setVehicles(prev => prev.map((x, idx) => idx === i ? { ...x, vehicle_type: t, plate_number: "", model: "", fuel_type: "", year_made: "" } : x));
+                        if (t === "회사차량") loadCompanyVehicles();
+                      }}
                       className={inputCls}>
                       <option value="">선택</option>
                       <option value="자차">자차</option>
@@ -719,27 +740,50 @@ export default function EmployeeRegisterClient() {
                   </div>
                   <div>
                     <label className={labelCls}>차량번호 <span className="text-red-500">*</span></label>
-                    <input type="text" value={v.plate_number}
-                      onChange={e => setVehicles(prev => prev.map((x, idx) => idx === i ? { ...x, plate_number: e.target.value } : x))}
-                      placeholder="예: 12가 3456" lang="ko" className={inputCls} />
+                    {v.vehicle_type === "회사차량" ? (
+                      <select value={v.plate_number} onChange={e => {
+                        const cv = companyVehicles.find(c => c.plate_number === e.target.value);
+                        setVehicles(prev => prev.map((x, idx) => idx === i ? {
+                          ...x,
+                          plate_number: e.target.value,
+                          model: cv?.model ?? "",
+                          fuel_type: (cv?.fuel_type ?? "") as Vehicle["fuel_type"],
+                          year_made: cv?.year_made ?? "",
+                        } : x));
+                      }} className={inputCls}>
+                        <option value="">{cvLoading ? "로딩 중..." : "차량 선택"}</option>
+                        {companyVehicles.map(cv => (
+                          <option key={cv.id} value={cv.plate_number}>{cv.plate_number} ({cv.model})</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input type="text" value={v.plate_number}
+                        onChange={e => setVehicles(prev => prev.map((x, idx) => idx === i ? { ...x, plate_number: e.target.value } : x))}
+                        placeholder="예: 12가 3456" lang="ko" className={inputCls} />
+                    )}
                   </div>
                   <div>
                     <label className={labelCls}>차종 <span className="text-red-500">*</span></label>
                     <input type="text" value={v.model}
                       onChange={e => setVehicles(prev => prev.map((x, idx) => idx === i ? { ...x, model: e.target.value } : x))}
-                      placeholder="예: 쏘나타, 포터" lang="ko" className={inputCls} />
+                      readOnly={v.vehicle_type === "회사차량"}
+                      placeholder="예: 쏘나타, 포터" lang="ko"
+                      className={inputCls + (v.vehicle_type === "회사차량" ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")} />
                   </div>
                   <div>
                     <label className={labelCls}>년식</label>
                     <input type="text" value={v.year_made}
                       onChange={e => setVehicles(prev => prev.map((x, idx) => idx === i ? { ...x, year_made: e.target.value.replace(/\D/g, "").slice(0, 4) } : x))}
-                      placeholder="예: 2023" inputMode="numeric" maxLength={4} className={inputCls + " font-mono"} />
+                      readOnly={v.vehicle_type === "회사차량"}
+                      placeholder="예: 2023" inputMode="numeric" maxLength={4}
+                      className={inputCls + " font-mono" + (v.vehicle_type === "회사차량" ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")} />
                   </div>
                   <div>
                     <label className={labelCls}>유종 <span className="text-red-500">*</span></label>
                     <select value={v.fuel_type}
                       onChange={e => setVehicles(prev => prev.map((x, idx) => idx === i ? { ...x, fuel_type: e.target.value as Vehicle["fuel_type"] } : x))}
-                      className={inputCls}>
+                      disabled={v.vehicle_type === "회사차량"}
+                      className={inputCls + (v.vehicle_type === "회사차량" ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")}>
                       <option value="">선택</option>
                       <option value="가솔린">가솔린</option>
                       <option value="디젤">디젤</option>
