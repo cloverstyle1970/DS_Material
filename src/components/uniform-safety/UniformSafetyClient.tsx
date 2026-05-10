@@ -195,7 +195,7 @@ export default function UniformSafetyClient() {
 
   async function submit() {
     setMessage(null);
-    if (!canCreate) { setMessage({ type: "error", text: "신청 권한이 없습니다." }); return; }
+    if (!canCreate || !user) { setMessage({ type: "error", text: "신청 권한이 없습니다." }); return; }
 
     let payloadItems: Array<{material_id: string; material_name: string; category_label: string; size: string | null; qty: number; sort_order: number}> = [];
 

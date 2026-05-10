@@ -100,7 +100,7 @@ export default function UniformSafetyAdminClient() {
   // ============================================================
 
   async function setStatus(row: ReqRow, next: Status, opts: { reason?: string } = {}) {
-    if (!canUpdate) return;
+    if (!canUpdate || !user) return;
     setProcessingId(row.id);
     try {
       const patch: Partial<ReqRow> & { processor_id?: number; processor_name?: string; cancel_reason?: string | null } = { status: next };

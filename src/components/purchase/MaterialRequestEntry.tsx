@@ -211,7 +211,7 @@ export default function MaterialRequestEntry() {
                     value={r.materialId}
                     matType={matType}
                     onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
-                    onChange={v => patchRow(r.id, { materialId: v })}
+                    onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })}
                   />
                 </Td>
                 <Td>
@@ -219,7 +219,7 @@ export default function MaterialRequestEntry() {
                     value={r.materialName}
                     matType={matType}
                     onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
-                    onChange={v => patchRow(r.id, { materialName: v })}
+                    onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })}
                   />
                 </Td>
                 <Td>
@@ -227,7 +227,7 @@ export default function MaterialRequestEntry() {
                     value={r.spec}
                     matType={matType}
                     onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
-                    onChange={v => patchRow(r.id, { spec: v })}
+                    onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })}
                   />
                 </Td>
                 <Td right>
@@ -313,6 +313,7 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
   const [checked, setChecked]   = useState<Set<string>>(new Set());
   const [open, setOpen]         = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
+  const [hasFocus, setHasFocus] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const ulRef = useRef<HTMLUListElement>(null);
 
@@ -330,13 +331,14 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
       if (matType !== "전체") params.set("matType", matType);
       try {
         const data = await api.get<MaterialRecord[]>(`/api/materials?${params}`);
-        setResults(data.slice(0, 15));
-        setOpen(data.length > 0);
-        setFocusedIndex(-1);
+        const sliced = data.slice(0, 15);
+        setResults(sliced);
+        if (hasFocus) setOpen(sliced.length > 0);
+        setFocusedIndex(sliced.length === 1 ? 0 : -1);
       } catch { setResults([]); setOpen(false); }
     }, value.trim() ? 150 : 0);
     return () => clearTimeout(t);
-  }, [value, matType]);
+  }, [value, matType, hasFocus]);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -373,6 +375,7 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
     else if (e.key === "Enter") {
       e.preventDefault();
       if (checked.size > 0) applyChecked();
+      else if (results.length === 1) { onMultiSelect([results[0]]); setChecked(new Set()); setOpen(false); }
       else if (focusedIndex >= 0) { onMultiSelect([results[focusedIndex]]); setChecked(new Set()); setOpen(false); }
     }
     else if (e.key === "Escape") setOpen(false);
@@ -382,9 +385,11 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
     <div ref={ref} className="relative">
       <input
         type="text"
+        lang="ko"
         value={value}
         onChange={e => { onChange(e.target.value); setChecked(new Set()); }}
-        onFocus={() => results.length > 0 && setOpen(true)}
+        onFocus={() => { setHasFocus(true); if (results.length > 0) setOpen(true); }}
+        onBlur={() => setHasFocus(false)}
         onKeyDown={handleKeyDown}
         className={cellInput}
       />
