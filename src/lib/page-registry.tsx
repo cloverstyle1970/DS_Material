@@ -23,6 +23,7 @@ import EmployeeRegisterClient from "@/components/hr/EmployeeRegisterClient";
 import DeptRankClient from "@/components/hr/DeptRankClient";
 import CompanyVehiclesClient from "@/components/hr/CompanyVehiclesClient";
 import MyProfileClient from "@/components/data/MyProfileClient";
+import CompanyInfoClient from "@/components/data/CompanyInfoClient";
 import UniformSafetyClient from "@/components/uniform-safety/UniformSafetyClient";
 import UniformSafetyAdminClient from "@/components/uniform-safety/UniformSafetyAdminClient";
 import QuoteEntryClient from "@/components/quotes/QuoteEntryClient";
@@ -96,6 +97,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/data/profile": {
     label: "개인정보수정",
     render: () => <MyProfileClient />,
+  },
+  "/data/company-info": {
+    label: "회사 정보 관리",
+    render: () => <CompanyInfoClient />,
   },
   "/data/users": {
     label: "사원 관리",

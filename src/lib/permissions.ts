@@ -12,18 +12,24 @@ export const PERMISSION_MENUS: PermissionMenuGroup[] = [
   {
     group: "데이터관리",
     items: [
-      { href: "/data/users",   label: "사원 관리" },
-      { href: "/data/vendors", label: "거래처 관리" },
+      { href: "/data/users",        label: "사원 관리" },
+      { href: "/data/company-info", label: "회사 정보 관리" },
     ],
   },
   {
     group: "현장관리",
     items: [
-      { href: "/site/units",     label: "현장/호기 관리" },
-      { href: "/quotes",         label: "견적서 목록" },
-      { href: "/quotes/new",     label: "견적서 작성" },
+      { href: "/site/units",   label: "현장/호기 관리" },
+      { href: "/data/vendors", label: "거래처 관리" },
+    ],
+  },
+  {
+    group: "견적관리",
+    items: [
+      { href: "/quotes",             label: "견적서 목록" },
+      { href: "/quotes/new",         label: "견적서 작성" },
       { href: "/quotes/labor-rates", label: "공임 단가표" },
-      { href: "/quotes/settings", label: "견적 기본 설정" },
+      { href: "/quotes/settings",    label: "견적 기본 설정" },
     ],
   },
   {

@@ -27,9 +27,9 @@ const NAV_GROUPS: NavGroup[] = [
     label: "데이터관리",
     color: "text-sky-400",
     items: [
-      { href: "/data/users",     label: "사원 관리",      icon: "👤", adminOnly: true },
-      { href: "/data/profile",   label: "개인정보수정",   icon: "🪪" },
-      { href: "/data/vendors",   label: "거래처 관리",    icon: "🤝" },
+      { href: "/data/users",        label: "사원 관리",      icon: "👤", adminOnly: true },
+      { href: "/data/profile",      label: "개인정보수정",   icon: "🪪" },
+      { href: "/data/company-info", label: "회사 정보 관리", icon: "🏢", adminOnly: true },
     ],
   },
   {
@@ -38,6 +38,14 @@ const NAV_GROUPS: NavGroup[] = [
     color: "text-emerald-400",
     items: [
       { href: "/site/units",     label: "현장/호기 관리",  icon: "🏢" },
+      { href: "/data/vendors",   label: "거래처 관리",    icon: "🤝" },
+    ],
+  },
+  {
+    id: "quotes",
+    label: "견적관리",
+    color: "text-yellow-400",
+    items: [
       { href: "/quotes",         label: "견적서 목록",      icon: "📃" },
       { href: "/quotes/new",     label: "견적서 작성",      icon: "💰" },
       { href: "/quotes/labor-rates", label: "공임 단가표",   icon: "🛠️" },
@@ -160,6 +168,7 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
     if (href === "/uniform-safety/admin") return pathname === "/uniform-safety/admin";
     if (href === "/quotes") return pathname === "/quotes" || pathname === "/quotes/detail";
     if (href === "/quotes/new") return pathname === "/quotes/new";
+    if (href === "/data/company-info") return pathname === "/data/company-info";
     if (href === "/quotes/labor-rates") return pathname === "/quotes/labor-rates";
     if (href === "/quotes/settings") return pathname === "/quotes/settings";
     return pathname === href || (href !== "/" && pathname.startsWith(href + "/"));

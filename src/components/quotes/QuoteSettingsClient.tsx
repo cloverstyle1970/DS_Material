@@ -11,12 +11,6 @@ interface Settings {
   indirect_labor_rate: number;
   overhead_rate: number;
   profit_rate: number;
-  company_name: string;
-  company_biz_no: string;
-  company_address: string;
-  company_phone: string;
-  company_email: string;
-  company_ceo: string;
 }
 
 const EMPTY: Settings = {
@@ -24,12 +18,6 @@ const EMPTY: Settings = {
   indirect_labor_rate: 8,
   overhead_rate: 10,
   profit_rate: 8,
-  company_name: "",
-  company_biz_no: "",
-  company_address: "",
-  company_phone: "",
-  company_email: "",
-  company_ceo: "",
 };
 
 function fmtNum(n: number): string {
@@ -49,19 +37,16 @@ export default function QuoteSettingsClient() {
 
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase.from("quote_settings").select("*").eq("id", 1).single();
+      const { data, error } = await supabase
+        .from("quote_settings")
+        .select("default_direct_labor, indirect_labor_rate, overhead_rate, profit_rate")
+        .eq("id", 1).single();
       if (data) {
         setS({
           default_direct_labor: data.default_direct_labor ?? 0,
           indirect_labor_rate:  Number(data.indirect_labor_rate ?? 8),
           overhead_rate:        Number(data.overhead_rate ?? 10),
           profit_rate:          Number(data.profit_rate ?? 8),
-          company_name:    data.company_name ?? "",
-          company_biz_no:  data.company_biz_no ?? "",
-          company_address: data.company_address ?? "",
-          company_phone:   data.company_phone ?? "",
-          company_email:   data.company_email ?? "",
-          company_ceo:     data.company_ceo ?? "",
         });
       } else if (error) {
         setMessage({ type: "error", text: `로드 실패: ${error.message}` });
@@ -97,12 +82,6 @@ export default function QuoteSettingsClient() {
         indirect_labor_rate:  s.indirect_labor_rate,
         overhead_rate:        s.overhead_rate,
         profit_rate:          s.profit_rate,
-        company_name:    s.company_name    || null,
-        company_biz_no:  s.company_biz_no  || null,
-        company_address: s.company_address || null,
-        company_phone:   s.company_phone   || null,
-        company_email:   s.company_email   || null,
-        company_ceo:     s.company_ceo     || null,
         updated_at: new Date().toISOString(),
       }).eq("id", 1);
       if (error) throw error;
@@ -176,35 +155,9 @@ export default function QuoteSettingsClient() {
               </div>
             </div>
 
-            {/* 회사 정보 */}
-            <div className={sectionCls}>
-              <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3">🏢 회사 정보 (견적서 출력 시 표시)</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className={labelCls}>회사명</label>
-                  <input type="text" lang="ko" value={s.company_name} onChange={e => patch({ company_name: e.target.value })} className={inputCls} />
-                </div>
-                <div>
-                  <label className={labelCls}>사업자등록번호</label>
-                  <input type="text" value={s.company_biz_no} onChange={e => patch({ company_biz_no: e.target.value })} placeholder="000-00-00000" className={inputCls + " font-mono"} />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className={labelCls}>주소</label>
-                  <input type="text" lang="ko" value={s.company_address} onChange={e => patch({ company_address: e.target.value })} className={inputCls} />
-                </div>
-                <div>
-                  <label className={labelCls}>전화번호</label>
-                  <input type="text" value={s.company_phone} onChange={e => patch({ company_phone: e.target.value })} className={inputCls} />
-                </div>
-                <div>
-                  <label className={labelCls}>이메일</label>
-                  <input type="email" value={s.company_email} onChange={e => patch({ company_email: e.target.value })} className={inputCls + " font-mono"} />
-                </div>
-                <div>
-                  <label className={labelCls}>대표자명</label>
-                  <input type="text" lang="ko" value={s.company_ceo} onChange={e => patch({ company_ceo: e.target.value })} className={inputCls} />
-                </div>
-              </div>
+            {/* 안내 */}
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl px-4 py-3 text-xs text-blue-700 dark:text-blue-300">
+              💡 회사 정보(상호·사업자번호·주소·연락처·대표자)는 <span className="font-semibold">데이터관리 → 회사 정보 관리</span> 메뉴에서 수정합니다.
             </div>
 
             {/* 저장 */}
