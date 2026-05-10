@@ -6,6 +6,7 @@ import * as XLSX from "xlsx";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { api } from "@/lib/api-client";
+import { useBackdropClose } from "@/lib/useBackdropClose";
 import Autocomplete from "@/components/common/Autocomplete";
 
 interface SiteOption { id: number; name: string }
@@ -248,7 +249,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
               {COLUMNS.filter(c => !c.outboundOnly || !isInbound).map(c => {
                 const active = c.sortable && c.key === sortKey;
                 return (
-                  <th key={c.label} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                  <th key={c.label} className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
                     {c.sortable && c.key ? (
                       <button type="button" onClick={() => toggleSort(c.key as SortKey)}
                         className={`flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ${active ? "text-gray-700 dark:text-gray-100 font-semibold" : ""}`}>
@@ -261,7 +262,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                   </th>
                 );
               })}
-              {admin && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">처리</th>}
+              {admin && <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">처리</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
@@ -286,25 +287,25 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                     className="h-3.5 w-3.5 rounded cursor-pointer"
                   />
                 </td>
-                <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDateOnly(t.createdAt)}</td>
-                <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200 max-w-[200px] truncate">{t.materialName}</td>
-                <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{t.materialId}</td>
-                <td className="px-4 py-3 text-right tabular-nums">
+                <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDateOnly(t.createdAt)}</td>
+                <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[200px] truncate">{t.materialName}</td>
+                <td className="px-4 py-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{t.materialId}</td>
+                <td className="px-4 py-3 text-center tabular-nums">
                   <span className={signColor}>{t.qty}</span>
                 </td>
-                <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">
+                <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">
                   {t.prevStock} → <span className="text-gray-700 dark:text-gray-300 font-medium">{t.afterStock}</span>
                 </td>
-                <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">
+                <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">
                   {t.siteName ?? "-"}{t.elevatorName ? <span className="text-gray-400 ml-1">({t.elevatorName})</span> : null}
                 </td>
                 {!isInbound && (
-                  <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap max-w-[140px] truncate">
+                  <td className="px-4 py-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap max-w-[140px] truncate">
                     {t.serialNo || "-"}
                   </td>
                 )}
                 {!isInbound && (
-                  <td className="px-4 py-3 text-xs whitespace-nowrap">
+                  <td className="px-4 py-3 text-center text-xs whitespace-nowrap">
                     {!t.requiresReturn ? <span className="text-gray-300 dark:text-gray-600">—</span>
                       : t.returnStatus === "returned" ? (
                           <span className="px-2 py-0.5 rounded-full bg-green-50 text-green-700 dark:bg-green-900/40 dark:text-green-300">반납완료</span>
@@ -314,8 +315,8 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                         )}
                   </td>
                 )}
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{t.userName}</td>
-                <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs max-w-[140px] truncate">{t.note ?? "-"}</td>
+                <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{t.userName}</td>
+                <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs max-w-[140px] truncate">{t.note ?? "-"}</td>
                 {admin && (
                   <td className="px-4 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                     <div className="flex gap-1">
@@ -356,6 +357,7 @@ function EditTransactionModal({
   onSave: (data: Record<string, unknown>) => void;
   sites: SiteOption[];
 }) {
+  const backdrop = useBackdropClose(onClose);
   const [qty, setQty] = useState(tx.qty.toString());
   const [siteName, setSiteName] = useState(tx.siteName ?? "");
   const [note, setNote] = useState(tx.note ?? "");
@@ -370,7 +372,7 @@ function EditTransactionModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" {...backdrop}>
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-[400px] overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
           <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">내역 수정</h3>

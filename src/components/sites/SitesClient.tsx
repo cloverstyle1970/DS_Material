@@ -8,6 +8,7 @@ import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
+import { useBackdropClose } from "@/lib/useBackdropClose";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
 
 // ── 배지 ────────────────────────────────────────────────────────
@@ -42,6 +43,7 @@ interface ElevatorFormModalProps {
 function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: ElevatorFormModalProps) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const backdrop = useBackdropClose(onClose);
   const fieldCls = `w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 ${isDark ? "border-gray-600 bg-gray-700 text-gray-100 placeholder:text-gray-400" : "border-gray-200 bg-white text-gray-900"}`;
   const labelCls = `block text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`;
   const isEdit = !!editElevator;
@@ -67,7 +69,7 @@ function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: Elevato
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" {...backdrop}>
       <div className={`rounded-2xl shadow-xl w-full max-w-sm mx-4 ${isDark ? "bg-gray-800" : "bg-white"}`} onClick={e => e.stopPropagation()}>
         <div className={`flex items-center justify-between px-6 py-4 border-b ${isDark ? "border-gray-700" : "border-gray-200"}`}>
           <h2 className={`text-base font-semibold ${isDark ? "text-gray-100" : "text-gray-800"}`}>{isEdit ? "호기 수정" : "호기 등록"}</h2>
@@ -110,6 +112,7 @@ interface AddSiteModalProps { onClose: () => void; onSaved: () => void; editSite
 function AddSiteModal({ onClose, onSaved, editSite }: AddSiteModalProps) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const backdrop = useBackdropClose(onClose);
   const fieldCls = `w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 ${isDark ? "border-gray-600 bg-gray-700 text-gray-100 placeholder:text-gray-400" : "border-gray-200 bg-white text-gray-900"}`;
   const labelCls = `block text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`;
   const isEdit = !!editSite;
@@ -186,7 +189,7 @@ function AddSiteModal({ onClose, onSaved, editSite }: AddSiteModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" {...backdrop}>
       <div className={`rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col ${isDark ? "bg-gray-800" : "bg-white"}`} onClick={e => e.stopPropagation()}>
         <div className={`flex items-center justify-between px-6 py-4 border-b shrink-0 ${isDark ? "border-gray-700" : "border-gray-200"}`}>
           <h2 className={`text-base font-semibold ${isDark ? "text-gray-100" : "text-gray-800"}`}>{isEdit ? "현장 수정" : "현장 등록"}</h2>
@@ -382,6 +385,7 @@ export default function SitesClient({ initial, elevators }: Props) {
   const [showElevatorForm, setShowElevatorForm]     = useState(false);
   const [editElevator, setEditElevator]             = useState<ElevatorRecord | null>(null);
   const [deleteElevatorTarget, setDeleteElevatorTarget] = useState<ElevatorRecord | null>(null);
+  const deleteBackdrop = useBackdropClose(() => setDeleteElevatorTarget(null));
   const [page, setPage] = useState(1);
   const [checkedSiteIds, setCheckedSiteIds] = useState<Set<number>>(new Set());
 
@@ -903,7 +907,7 @@ export default function SitesClient({ initial, elevators }: Props) {
       {/* 호기 삭제 확인 */}
       {deleteElevatorTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          onClick={() => setDeleteElevatorTarget(null)}>
+          {...deleteBackdrop}>
           <div className={`rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6 ${isDark ? "bg-gray-800" : "bg-white"}`}
             onClick={e => e.stopPropagation()}>
             <h3 className={`text-base font-semibold mb-2 ${isDark ? "text-gray-100" : "text-gray-800"}`}>호기 삭제</h3>

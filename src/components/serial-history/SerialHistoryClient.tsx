@@ -158,7 +158,7 @@ export default function SerialHistoryClient() {
             <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
               <tr>
                 {["", "S/N", "자재명", "자재코드", "규격", "상태", "현재 위치", "입고일", "최근 이벤트"].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{h}</th>
+                  <th key={h} className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -169,17 +169,17 @@ export default function SerialHistoryClient() {
                 <Fragment key={u.id}>
                   <tr onClick={() => toggleOpen(u)}
                     className="hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer transition-colors">
-                    <td className="px-4 py-3 text-gray-300 dark:text-gray-600">{openId === u.id ? "▾" : "▸"}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-800 dark:text-gray-200 whitespace-nowrap">{u.serialNo}</td>
-                    <td className="px-4 py-3 text-xs font-medium text-gray-800 dark:text-gray-200 max-w-[220px] truncate">{u.materialName ?? "-"}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{u.materialId}</td>
-                    <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{u.materialModelNo ?? "-"}</td>
-                    <td className="px-4 py-3">{statusBadge(u.status)}</td>
-                    <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                    <td className="px-4 py-3 text-center text-gray-300 dark:text-gray-600">{openId === u.id ? "▾" : "▸"}</td>
+                    <td className="px-4 py-3 text-center font-mono text-xs text-gray-800 dark:text-gray-200 whitespace-nowrap">{u.serialNo}</td>
+                    <td className="px-4 py-3 text-center text-xs font-medium text-gray-800 dark:text-gray-200 max-w-[220px] truncate">{u.materialName ?? "-"}</td>
+                    <td className="px-4 py-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{u.materialId}</td>
+                    <td className="px-4 py-3 text-center text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{u.materialModelNo ?? "-"}</td>
+                    <td className="px-4 py-3 text-center">{statusBadge(u.status)}</td>
+                    <td className="px-4 py-3 text-center text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
                       {u.currentSite ?? "-"}{u.currentElevator ? <span className="text-gray-400 ml-1">({u.currentElevator})</span> : null}
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{fmtDate(u.inboundAt)}</td>
-                    <td className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{fmtDate(u.lastEventAt)}</td>
+                    <td className="px-4 py-3 text-center text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{fmtDate(u.inboundAt)}</td>
+                    <td className="px-4 py-3 text-center text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{fmtDate(u.lastEventAt)}</td>
                   </tr>
                   {openId === u.id && (
                     <tr className="bg-slate-50/60 dark:bg-slate-900/30">

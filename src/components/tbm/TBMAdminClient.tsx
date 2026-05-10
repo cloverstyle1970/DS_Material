@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { useBackdropClose } from "@/lib/useBackdropClose";
 import {
   TBMRecord, TBMParticipant, TBMRecordSafetyRule, TBMChecklistResult, TBMPhoto,
   TBMMode, MODE_LABELS, SUB_TYPE_LABELS,
@@ -33,8 +34,10 @@ export default function TBMAdminClient() {
   const [detail, setDetail] = useState<DetailData | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [participantStats, setParticipantStats] = useState<Map<number, { total: number; confirmed: number }>>(new Map());
+  const detailBackdrop = useBackdropClose(() => setOpenDetail(null));
 
   const [editing, setEditing] = useState<TBMRecord | null>(null);
+  const editingBackdrop = useBackdropClose(() => setEditing(null));
   const [editForm, setEditForm] = useState({
     site_name: "", elevator_name: "", work_content: "", risk_assessment: "",
     parts_name: "", passenger_trapped: false,
@@ -246,14 +249,14 @@ export default function TBMAdminClient() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
-                <tr className="text-left text-[11px] font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                <tr className="text-center text-[11px] font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
                   <th className="px-4 py-2.5">일시</th>
                   <th className="px-4 py-2.5">작성자</th>
                   <th className="px-4 py-2.5">구분</th>
                   <th className="px-4 py-2.5">현장 / 호기</th>
                   <th className="px-4 py-2.5">작업 내용</th>
                   <th className="px-4 py-2.5">참가자 확인</th>
-                  <th className="px-4 py-2.5 text-right">액션</th>
+                  <th className="px-4 py-2.5">액션</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -275,15 +278,15 @@ export default function TBMAdminClient() {
                     : "text-gray-600 dark:text-gray-300";
                   return (
                     <tr key={r.id} className={`hover:bg-gray-50 dark:hover:bg-gray-700/30 ${hasPending ? "bg-red-50/50 dark:bg-red-900/10" : ""}`}>
-                      <td className={`px-4 py-2.5 text-xs whitespace-nowrap ${rowMutedText}`}>{fmtDt(r.created_at)}</td>
-                      <td className={`px-4 py-2.5 text-xs font-semibold whitespace-nowrap ${hasPending ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-gray-100"}`}>{r.user_name}</td>
-                      <td className="px-4 py-2.5 whitespace-nowrap">{modeBadge(r)}</td>
-                      <td className={`px-4 py-2.5 text-xs whitespace-nowrap ${rowText}`}>
+                      <td className={`px-4 py-2.5 text-center text-xs whitespace-nowrap ${rowMutedText}`}>{fmtDt(r.created_at)}</td>
+                      <td className={`px-4 py-2.5 text-center text-xs font-semibold whitespace-nowrap ${hasPending ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-gray-100"}`}>{r.user_name}</td>
+                      <td className="px-4 py-2.5 text-center whitespace-nowrap">{modeBadge(r)}</td>
+                      <td className={`px-4 py-2.5 text-center text-xs whitespace-nowrap ${rowText}`}>
                         <div className="font-semibold">{r.site_name}</div>
                         {r.elevator_name && <div className={hasPending ? "" : "text-gray-500 dark:text-gray-400"}>{r.elevator_name}</div>}
                       </td>
-                      <td className={`px-4 py-2.5 text-xs max-w-md truncate ${rowMutedText}`}>{r.work_content}</td>
-                      <td className="px-4 py-2.5 whitespace-nowrap">
+                      <td className={`px-4 py-2.5 text-center text-xs max-w-md truncate ${rowMutedText}`}>{r.work_content}</td>
+                      <td className="px-4 py-2.5 text-center whitespace-nowrap">
                         {stats && stats.total > 0 ? (
                           <span className={`text-[11px] font-bold ${hasPending ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
                             {stats.confirmed}/{stats.total}
@@ -292,7 +295,7 @@ export default function TBMAdminClient() {
                           <span className="text-[11px] text-gray-400">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                      <td className="px-4 py-2.5 text-center whitespace-nowrap">
                         <button type="button" onClick={() => loadDetail(r)}
                           className="px-2 py-1 text-[11px] rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600">
                           상세
@@ -332,7 +335,7 @@ export default function TBMAdminClient() {
 
       {/* 상세 모달 */}
       {openDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setOpenDetail(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" {...detailBackdrop}>
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <div>
@@ -475,7 +478,7 @@ export default function TBMAdminClient() {
 
       {/* 수정 모달 */}
       {editing && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={() => setEditing(null)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" {...editingBackdrop}>
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <div className="text-base font-bold text-gray-900 dark:text-white">TBM 기본정보 수정</div>

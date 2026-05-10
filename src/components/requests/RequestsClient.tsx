@@ -9,6 +9,7 @@ import { TransactionRecord } from "@/lib/mock-transactions";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import StockHistoryClient from "@/components/stock/StockHistoryClient";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { useBackdropClose } from "@/lib/useBackdropClose";
 import Autocomplete from "@/components/common/Autocomplete";
 
 interface SiteOption   { id: number; name: string }
@@ -504,7 +505,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                   {REQ_COLS.map((c, idx) => {
                     const active = c.sortable && c.key === reqSortKey;
                     return (
-                      <th key={idx} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      <th key={idx} className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
                         {c.sortable && c.key ? (
                           <button type="button" onClick={() => toggleReqSort(c.key as ReqSortKey)}
                             className={`flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ${active ? "text-gray-700 dark:text-gray-100 font-semibold" : ""}`}>
@@ -517,7 +518,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                       </th>
                     );
                   })}
-                  {admin && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">처리</th>}
+                  {admin && <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">처리</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
@@ -544,28 +545,28 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                             className="h-3.5 w-3.5 rounded cursor-pointer"
                           />
                         </td>
-                        <td className="px-4 py-3 w-8 text-gray-400 dark:text-gray-500 text-xs">
+                        <td className="px-4 py-3 text-center w-8 text-gray-400 dark:text-gray-500 text-xs">
                           <span className={`inline-block transition-transform ${isOpen ? "rotate-90" : ""}`}>▶</span>
                         </td>
-                        <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(r.requestedAt)}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(r.requestedAt)}</td>
+                        <td className="px-4 py-3 text-center">
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${reqStatusCls(r.status, kind)}`}>
                             {r.status === "신청" ? kind : r.status}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-gray-700 dark:text-gray-300 text-xs whitespace-nowrap">
+                        <td className="px-4 py-3 text-center text-gray-700 dark:text-gray-300 text-xs whitespace-nowrap">
                           {r.siteName ?? "-"}
                           {elevators.length > 0 && (
                             <span className="ml-1 text-gray-400 dark:text-gray-500">({elevators.length}호기)</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-gray-700 dark:text-gray-300 text-xs">
+                        <td className="px-4 py-3 text-center text-gray-700 dark:text-gray-300 text-xs">
                           <span className="font-medium">{r.items[0]?.materialName ?? "-"}</span>
                           {r.items.length > 1 && <span className="text-gray-400 dark:text-gray-500"> 외 {r.items.length - 1}건</span>}
                         </td>
-                        <td className="px-4 py-3 text-gray-700 dark:text-gray-300 text-right tabular-nums">{totalQty}</td>
-                        <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{r.requesterName} <span className="text-gray-400 dark:text-gray-500">({r.requesterDept})</span></td>
-                        <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs max-w-[120px] truncate">{r.note ?? "-"}</td>
+                        <td className="px-4 py-3 text-center tabular-nums text-gray-700 dark:text-gray-300">{totalQty}</td>
+                        <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{r.requesterName} <span className="text-gray-400 dark:text-gray-500">({r.requesterDept})</span></td>
+                        <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs max-w-[120px] truncate">{r.note ?? "-"}</td>
                         {admin && (
                           <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                             {r.status === "신청" && (
@@ -600,7 +601,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                                 <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50">
                                   <tr>
                                     {["호기", "자재명", "코드", "구분", "수량"].map(h => (
-                                      <th key={h} className="px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">{h}</th>
+                                      <th key={h} className="px-3 py-2 text-center font-medium text-gray-500 dark:text-gray-400">{h}</th>
                                     ))}
                                   </tr>
                                 </thead>
@@ -609,13 +610,13 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                                     const itemKind = matKind([item.materialId]);
                                     return (
                                       <tr key={idx}>
-                                        <td className="px-3 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">{item.elevatorName ?? "-"}</td>
-                                        <td className="px-3 py-2 font-medium text-gray-800 dark:text-gray-200">{item.materialName}</td>
-                                        <td className="px-3 py-2 font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">{item.materialId}</td>
-                                        <td className="px-3 py-2">
+                                        <td className="px-3 py-2 text-center text-gray-600 dark:text-gray-400 whitespace-nowrap">{item.elevatorName ?? "-"}</td>
+                                        <td className="px-3 py-2 text-center font-medium text-gray-800 dark:text-gray-200">{item.materialName}</td>
+                                        <td className="px-3 py-2 text-center font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">{item.materialId}</td>
+                                        <td className="px-3 py-2 text-center">
                                           <span className={`px-1.5 py-0.5 rounded font-medium ${KIND_CLS[itemKind]}`}>{itemKind}</span>
                                         </td>
-                                        <td className="px-3 py-2 text-gray-700 dark:text-gray-300 text-right tabular-nums">{item.qty}</td>
+                                        <td className="px-3 py-2 text-center tabular-nums text-gray-700 dark:text-gray-300">{item.qty}</td>
                                       </tr>
                                     );
                                   })}
@@ -731,7 +732,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                   {ORD_COLS.map((c, idx) => {
                     const active = c.sortable && c.key === ordSortKey;
                     return (
-                      <th key={idx} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      <th key={idx} className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
                         {c.sortable && c.key ? (
                           <button type="button" onClick={() => toggleOrdSort(c.key as OrdSortKey)}
                             className={`flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ${active ? "text-gray-700 dark:text-gray-100 font-semibold" : ""}`}>
@@ -744,7 +745,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                       </th>
                     );
                   })}
-                  {admin && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">처리</th>}
+                  {admin && <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">처리</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
@@ -765,22 +766,22 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                         className="h-3.5 w-3.5 rounded cursor-pointer"
                       />
                     </td>
-                    <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDateOnly(o.orderedAt)}</td>
-                    <td className="px-4 py-3 text-blue-600 dark:text-blue-400 text-xs font-medium whitespace-nowrap">
+                    <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDateOnly(o.orderedAt)}</td>
+                    <td className="px-4 py-3 text-center text-blue-600 dark:text-blue-400 text-xs font-medium whitespace-nowrap">
                       {o.note?.match(/^\[(.*?)\]/)?.[1] || "-"}
                     </td>
-                    <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200 max-w-[160px] truncate">{o.materialName}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{o.materialId}</td>
-                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300 text-right tabular-nums">{o.qty}</td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{o.siteName ?? "-"}</td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{o.elevatorName ?? "-"}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{o.requesterName ?? "-"}</td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{o.vendorName ?? "-"}</td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-right tabular-nums text-xs">
+                    <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[160px] truncate">{o.materialName}</td>
+                    <td className="px-4 py-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{o.materialId}</td>
+                    <td className="px-4 py-3 text-center tabular-nums text-gray-700 dark:text-gray-300">{o.qty}</td>
+                    <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{o.siteName ?? "-"}</td>
+                    <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{o.elevatorName ?? "-"}</td>
+                    <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{o.requesterName ?? "-"}</td>
+                    <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{o.vendorName ?? "-"}</td>
+                    <td className="px-4 py-3 text-center tabular-nums text-gray-500 dark:text-gray-400 text-xs">
                       {o.unitPrice != null ? o.unitPrice.toLocaleString() : "-"}
                     </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{o.userName}</td>
-                    <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs max-w-[120px] truncate">{o.note ?? "-"}</td>
+                    <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{o.userName}</td>
+                    <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs max-w-[120px] truncate">{o.note ?? "-"}</td>
                     {admin && (
                       <td className="px-4 py-3">
                         {o.status === "발주" && (
@@ -848,6 +849,7 @@ function EditOrderModal({
   sites: SiteOption[];
   vendors: VendorOption[];
 }) {
+  const backdrop = useBackdropClose(onClose);
   const [qty, setQty] = useState(order.qty.toString());
   const [unitPrice, setUnitPrice] = useState(order.unitPrice?.toString() ?? "");
   const [siteName, setSiteName] = useState(order.siteName ?? "");
@@ -874,7 +876,7 @@ function EditOrderModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" {...backdrop}>
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-[480px] overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
           <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">발주 내역 수정</h3>

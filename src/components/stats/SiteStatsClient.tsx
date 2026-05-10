@@ -202,18 +202,18 @@ export default function SiteStatsClient() {
               <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
                 <tr>
                   {["현장명", "입고", "출고", "자재종수", "최종처리일"].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{h}</th>
+                    <th key={h} className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                 {siteStats.map(s => (
                   <tr key={s.site} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                    <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200 max-w-[160px] truncate">{s.site}</td>
-                    <td className="px-4 py-3 text-blue-600 font-medium tabular-nums">+{s.inQty}</td>
-                    <td className="px-4 py-3 text-orange-500 font-medium tabular-nums">-{s.outQty}</td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400 tabular-nums">{s.materials.size}</td>
-                    <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(s.lastDate)}</td>
+                    <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[160px] truncate">{s.site}</td>
+                    <td className="px-4 py-3 text-center text-blue-600 font-medium tabular-nums">+{s.inQty}</td>
+                    <td className="px-4 py-3 text-center text-orange-500 font-medium tabular-nums">-{s.outQty}</td>
+                    <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 tabular-nums">{s.materials.size}</td>
+                    <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(s.lastDate)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -243,18 +243,18 @@ export default function SiteStatsClient() {
                 <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700 sticky top-0">
                   <tr>
                     {["자재명", "코드", "입고", "출고", "최종처리일"].map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{h}</th>
+                      <th key={h} className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                   {materialStats.map(m => (
                     <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                      <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200 max-w-[150px] truncate">{m.name}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{m.id}</td>
-                      <td className="px-4 py-3 text-blue-600 tabular-nums">{m.inQty > 0 ? `+${m.inQty}` : "—"}</td>
-                      <td className="px-4 py-3 text-orange-500 tabular-nums">{m.outQty > 0 ? `-${m.outQty}` : "—"}</td>
-                      <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(m.lastDate)}</td>
+                      <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[150px] truncate">{m.name}</td>
+                      <td className="px-4 py-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{m.id}</td>
+                      <td className="px-4 py-3 text-center text-blue-600 tabular-nums">{m.inQty > 0 ? `+${m.inQty}` : "—"}</td>
+                      <td className="px-4 py-3 text-center text-orange-500 tabular-nums">{m.outQty > 0 ? `-${m.outQty}` : "—"}</td>
+                      <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(m.lastDate)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -276,27 +276,27 @@ export default function SiteStatsClient() {
               <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700 sticky top-0">
                 <tr>
                   {["일시", "구분", "자재명", "수량", "현장", "처리자"].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{h}</th>
+                    <th key={h} className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                 {filtered.slice(0, 100).map(t => (
                   <tr key={`${t.type}-${t.id}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                    <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(t.createdAt)}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(t.createdAt)}</td>
+                    <td className="px-4 py-3 text-center">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                         t.type === "입고" ? "bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400" : "bg-orange-50 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400"
                       }`}>{t.type}</span>
                     </td>
-                    <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200 max-w-[180px] truncate">{t.materialName}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">
+                    <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[180px] truncate">{t.materialName}</td>
+                    <td className="px-4 py-3 text-center tabular-nums">
                       <span className={t.type === "입고" ? "text-blue-600" : "text-orange-500"}>
                         {t.qty}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{t.siteName ?? "—"}</td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{t.userName}</td>
+                    <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{t.siteName ?? "—"}</td>
+                    <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{t.userName}</td>
                   </tr>
                 ))}
               </tbody>

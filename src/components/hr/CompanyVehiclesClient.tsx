@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import Combobox from "@/components/tbm/Combobox";
+import { useBackdropClose } from "@/lib/useBackdropClose";
 
 const MENU_HREF = "/hr/company-vehicles";
 const VEHICLE_DOCS_BUCKET = "vehicle-docs";
@@ -192,7 +193,7 @@ export default function CompanyVehiclesClient() {
           onSaved={() => { setShowNew(false); load(); }} />
       )}
       {editing && (
-        <EditModal users={users} vehicle={editing} actor={user}
+        <EditModal users={users} vehicle={editing} actor={user} isAdmin={admin}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); load(); }} />
       )}
@@ -230,6 +231,13 @@ function addOneYear(ymd: string): string {
   if (isNaN(d.getTime())) return "";
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+function extractStoragePath(publicUrl: string): string | null {
+  const marker = `/object/public/${VEHICLE_DOCS_BUCKET}/`;
+  const i = publicUrl.indexOf(marker);
+  if (i < 0) return null;
+  return decodeURIComponent(publicUrl.slice(i + marker.length));
+}
+
 async function uploadDoc(file: File, userId: number): Promise<string> {
   const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
   const path = `${userId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
@@ -342,14 +350,15 @@ function CreateModal({ users, onClose, onSaved }: { users: UserMini[]; onClose: 
 // 수정 모달 (3 모드: 사용자변경 / 보험정보변경 / 폐차)
 // ============================================================
 
-type EditMode = "user" | "insurance" | "scrap";
+type EditMode = "user" | "insurance" | "scrap" | "delete";
 
 function EditModal({
-  users, vehicle, actor, onClose, onSaved,
+  users, vehicle, actor, isAdmin, onClose, onSaved,
 }: {
   users: UserMini[];
   vehicle: Row;
   actor: { id: number; name: string };
+  isAdmin: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -434,6 +443,21 @@ function EditModal({
           scrapped_note: note || null,
         }).eq("id", vehicle.id);
         if (e) throw e;
+      } else if (mode === "delete") {
+        if (!isAdmin) { setError("완전삭제는 관리자만 가능합니다."); return; }
+        if (!confirm(`[${vehicle.plate_number}] 차량을 완전삭제합니다.\n\n· 차량 정보, 사용자/보험 이력, 첨부 파일이 모두 영구 삭제됩니다.\n· 복구할 수 없습니다.\n\n계속하시겠습니까?`)) return;
+        // 1) Storage 첨부 파일 정리 (실패해도 진행)
+        const docUrls = [vehicle.registration_doc_url, vehicle.insurance_doc_url].filter(Boolean) as string[];
+        for (const url of docUrls) {
+          const path = extractStoragePath(url);
+          if (path) {
+            const { error: se } = await supabase.storage.from(VEHICLE_DOCS_BUCKET).remove([path]);
+            if (se) console.warn("[company-vehicle-delete] storage remove failed:", se, path);
+          }
+        }
+        // 2) 차량 레코드 삭제 (이력 테이블은 ON DELETE CASCADE)
+        const { error: de } = await supabase.from("user_vehicles").delete().eq("id", vehicle.id);
+        if (de) throw de;
       }
       onSaved();
     } catch (e) {
@@ -450,18 +474,26 @@ function EditModal({
 
       <div>
         <label className={labelCls}>변경 유형</label>
-        <div className="grid grid-cols-3 gap-2">
-          {([["user","🔄 사용자 변경"],["insurance","🛡️ 보험정보 변경"],["scrap","🚫 폐차 처리"]] as [EditMode, string][]).map(([m, label]) => (
-            <button key={m} type="button" onClick={() => setMode(m)}
-              className={`py-2.5 rounded-lg border-2 text-xs font-bold transition-all ${
-                mode === m
-                  ? (m === "scrap" ? "border-red-500 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300"
-                                   : "border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300")
-                  : "border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400"
-              }`}>
-              {label}
-            </button>
-          ))}
+        <div className={`grid ${isAdmin ? "grid-cols-4" : "grid-cols-3"} gap-2`}>
+          {(([
+            ["user","🔄 사용자 변경"],
+            ["insurance","🛡️ 보험정보 변경"],
+            ["scrap","🚫 폐차 처리"],
+            ...(isAdmin ? [["delete","🗑️ 완전삭제"]] as [EditMode, string][] : []),
+          ]) as [EditMode, string][]).map(([m, label]) => {
+            const isDestructive = m === "scrap" || m === "delete";
+            return (
+              <button key={m} type="button" onClick={() => setMode(m)}
+                className={`py-2.5 rounded-lg border-2 text-xs font-bold transition-all ${
+                  mode === m
+                    ? (isDestructive ? "border-red-500 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300"
+                                     : "border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300")
+                    : "border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400"
+                }`}>
+                {label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -498,6 +530,14 @@ function EditModal({
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-xs text-red-700 dark:text-red-300">
           폐차 처리 시 차량 상태가 <span className="font-bold">[폐차]</span>로 변경되며 활성 목록에서 사라집니다.
           이력은 그대로 보존되며, 필터를 [폐차/전체]로 두면 다시 조회할 수 있습니다.
+        </div>
+      )}
+
+      {mode === "delete" && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg p-3 text-xs text-red-700 dark:text-red-300 space-y-1">
+          <div className="font-bold text-sm">⚠️ 완전삭제 (복구 불가)</div>
+          <div>차량 정보, 사용자/보험 변경 이력, 등록증·보험증권 첨부 파일이 모두 영구 삭제됩니다.</div>
+          <div>일반적으로는 <span className="font-bold">[폐차 처리]</span>를 권장합니다. 잘못 등록된 데이터를 정리할 때만 사용하세요.</div>
         </div>
       )}
 
@@ -541,6 +581,7 @@ function HistoryModal({ vehicle, onClose }: { vehicle: Row; onClose: () => void 
   const [userHist, setUserHist] = useState<UserHistRow[]>([]);
   const [insHist, setInsHist] = useState<InsHistRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const backdrop = useBackdropClose(onClose);
 
   useEffect(() => {
     (async () => {
@@ -560,7 +601,7 @@ function HistoryModal({ vehicle, onClose }: { vehicle: Row; onClose: () => void 
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" {...backdrop}>
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div>
@@ -633,8 +674,9 @@ function HistoryModal({ vehicle, onClose }: { vehicle: Row; onClose: () => void 
 function Modal({ title, children, onClose, onSave, saving, error }: {
   title: string; children: React.ReactNode; onClose: () => void; onSave: () => void; saving: boolean; error: string;
 }) {
+  const backdrop = useBackdropClose(onClose);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" {...backdrop}>
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div className="text-base font-bold text-gray-900 dark:text-white">{title}</div>

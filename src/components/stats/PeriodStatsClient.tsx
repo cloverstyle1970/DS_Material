@@ -272,8 +272,8 @@ export default function PeriodStatsClient() {
             <table className="w-full min-w-[560px] text-xs">
               <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
                 <tr>
-                  <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap sticky left-0 bg-gray-50 dark:bg-gray-700/50 z-10 min-w-[180px]">자재명</th>
-                  <th className="px-3 py-3 text-left font-medium text-gray-400 dark:text-gray-500 whitespace-nowrap font-mono min-w-[120px]">코드</th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap sticky left-0 bg-gray-50 dark:bg-gray-700/50 z-10 min-w-[180px]">자재명</th>
+                  <th className="px-3 py-3 text-center font-medium text-gray-400 dark:text-gray-500 whitespace-nowrap font-mono min-w-[120px]">코드</th>
                   {periods.map(p => (
                     <th key={p} className="px-3 py-3 text-center font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap min-w-[80px]">
                       {periodDisplay(p, viewMode)}
@@ -287,8 +287,8 @@ export default function PeriodStatsClient() {
                   const rowTotal = Object.values(m.periods).reduce((s, p) => s + p.in + p.out, 0);
                   return (
                     <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                      <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200 whitespace-nowrap sticky left-0 bg-white dark:bg-gray-800">{m.name}</td>
-                      <td className="px-3 py-3 font-mono text-gray-400 dark:text-gray-500 whitespace-nowrap">{m.id}</td>
+                      <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 whitespace-nowrap sticky left-0 bg-white dark:bg-gray-800">{m.name}</td>
+                      <td className="px-3 py-3 text-center font-mono text-gray-400 dark:text-gray-500 whitespace-nowrap">{m.id}</td>
                       {periods.map(p => {
                         const cell = m.periods[p];
                         const hasData = cell && (cell.in > 0 || cell.out > 0);

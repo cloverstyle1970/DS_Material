@@ -7,6 +7,7 @@ import { MaterialRecord } from "@/lib/mock-materials";
 import { ElevatorRecord } from "@/lib/mock-elevators";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { useBackdropClose } from "@/lib/useBackdropClose";
 import SerialEntryModal from "./SerialEntryModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 
@@ -559,6 +560,7 @@ function SiteInlineSearch({ value, onChange, sites }: { value: string; onChange:
 function InboundRefPopup({ onSelect, onClose }: { onSelect: (t: TransactionRecord) => void; onClose: () => void }) {
   const [records, setRecords] = useState<TransactionRecord[]>([]);
   const [q, setQ] = useState("");
+  const backdrop = useBackdropClose(onClose);
   useEffect(() => {
     api.get<TransactionRecord[]>("/api/transactions?type=입고").then(data => setRecords(data.slice(0, 200))).catch(() => setRecords([]));
   }, []);
@@ -568,7 +570,7 @@ function InboundRefPopup({ onSelect, onClose }: { onSelect: (t: TransactionRecor
     (t.siteName?.toLowerCase().includes(q.toLowerCase()) ?? false)
   );
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" {...backdrop}>
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-[700px] max-h-[70vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-700">
           <h3 className="text-sm font-semibold dark:text-gray-100">입고내역 참조 ({records.length}건)</h3>

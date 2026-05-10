@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { useBackdropClose } from "@/lib/useBackdropClose";
 
 interface OrgItem {
   id: number;
@@ -100,9 +101,9 @@ function OrgEditor({ table, title }: { table: "departments" | "ranks"; title: st
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-700/50 text-[11px] font-bold text-gray-600 dark:text-gray-300 uppercase">
             <tr>
-              <th className="px-3 py-2 text-left">{title}명</th>
-              <th className="px-3 py-2 text-left">정렬</th>
-              <th className="px-3 py-2 text-left">상태</th>
+              <th className="px-3 py-2 text-center">{title}명</th>
+              <th className="px-3 py-2 text-center">정렬</th>
+              <th className="px-3 py-2 text-center">상태</th>
               <th className="px-3 py-2 text-right">액션</th>
             </tr>
           </thead>
@@ -112,8 +113,8 @@ function OrgEditor({ table, title }: { table: "departments" | "ranks"; title: st
             )}
             {items.map(r => (
               <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                <td className="px-3 py-2 text-xs font-semibold text-gray-800 dark:text-gray-100">{r.name}</td>
-                <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">{r.sort_order}</td>
+                <td className="px-3 py-2 text-center text-xs font-semibold text-gray-800 dark:text-gray-100">{r.name}</td>
+                <td className="px-3 py-2 text-center text-xs text-gray-500 dark:text-gray-400">{r.sort_order}</td>
                 <td className="px-3 py-2">
                   <button type="button" onClick={() => toggleActive(r.id, !r.is_active)}
                     className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -124,7 +125,7 @@ function OrgEditor({ table, title }: { table: "departments" | "ranks"; title: st
                     {r.is_active ? "활성" : "비활성"}
                   </button>
                 </td>
-                <td className="px-3 py-2 text-right whitespace-nowrap">
+                <td className="px-3 py-2 text-center whitespace-nowrap">
                   <button type="button" onClick={() => setEditing(r)}
                     className="px-2 py-0.5 text-[11px] rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 mr-1">
                     수정
@@ -165,6 +166,7 @@ function OrgEditModal({
   const [name, setName] = useState(initial?.name ?? "");
   const [sortOrder, setSortOrder] = useState(initial?.sort_order ?? 0);
   const [saving, setSaving] = useState(false);
+  const backdrop = useBackdropClose(onClose);
 
   async function save() {
     if (!name.trim()) { alert(`${title}명은 필수입니다.`); return; }
@@ -182,7 +184,7 @@ function OrgEditModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" {...backdrop}>
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div className="text-base font-bold text-gray-900 dark:text-white">{initial ? `${title} 수정` : `${title} 추가`}</div>

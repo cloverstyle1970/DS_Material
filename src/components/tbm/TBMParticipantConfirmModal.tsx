@@ -9,6 +9,7 @@ import {
   MODE_LABELS, SUB_TYPE_LABELS,
 } from "@/lib/tbm";
 import SignaturePad, { SignaturePadHandle } from "./SignaturePad";
+import { useBackdropClose } from "@/lib/useBackdropClose";
 
 interface Props {
   record: TBMRecord;
@@ -20,6 +21,7 @@ const STORAGE_BUCKET = "tbm-photos";
 
 export default function TBMParticipantConfirmModal({ record, onClose, onSaved }: Props) {
   const { user } = useAuth();
+  const backdrop = useBackdropClose(onClose);
 
   const [checklist, setChecklist] = useState<TBMChecklistResult[]>([]);
   const [rules, setRules] = useState<TBMRecordSafetyRule[]>([]);
@@ -181,7 +183,7 @@ export default function TBMParticipantConfirmModal({ record, onClose, onSaved }:
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4" {...backdrop}>
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg max-h-[95vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div>

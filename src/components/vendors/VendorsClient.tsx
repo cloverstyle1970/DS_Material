@@ -6,6 +6,7 @@ import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
+import { useBackdropClose } from "@/lib/useBackdropClose";
 
 // ── 공통 필드 입력 스타일 ───────────────────────────────────
 const field = "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-slate-400";
@@ -67,11 +68,12 @@ interface ModalProps {
 
 function VendorFormModal({ title, initial, saving, error, onSubmit, onClose, submitLabel, submitCls }: ModalProps) {
   const [f, setF] = useState<FormState>(initial);
+  const backdrop = useBackdropClose(onClose);
   const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setF(p => ({ ...p, [k]: e.target.value }));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" {...backdrop}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
           <h2 className="text-base font-semibold text-gray-800">{title}</h2>
@@ -216,6 +218,8 @@ export default function VendorsClient({ initial }: Props) {
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<VendorRecord | null>(null);
+  const selectedBackdrop = useBackdropClose(() => setSelected(null));
+  const deleteConfirmBackdrop = useBackdropClose(() => setDeleteConfirm(null));
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
@@ -380,7 +384,7 @@ export default function VendorsClient({ initial }: Props) {
               {COLUMNS.map(c => {
                 const active = sortKey === c.key;
                 return (
-                  <th key={c.key} className={`px-4 py-3 text-left text-xs font-medium whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-500"}`}>
+                  <th key={c.key} className={`px-4 py-3 text-center text-xs font-medium whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-500"}`}>
                     <button type="button" onClick={() => toggleSort(c.key)}
                       className={`flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ${active ? "text-gray-700 dark:text-gray-100 font-semibold" : ""}`}>
                       {c.label}
@@ -402,11 +406,11 @@ export default function VendorsClient({ initial }: Props) {
             ) : paginated.map(v => (
               <tr key={v.id} onClick={() => setSelected(v)}
                 className={`transition-colors cursor-pointer ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-50"}`}>
-                <td className={`px-4 py-3 font-medium max-w-[200px] truncate whitespace-nowrap ${isDark ? "text-white" : "text-gray-800"}`}>{v.name}</td>
-                <td className={`px-4 py-3 whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"}`}>{v.representative ?? "-"}</td>
-                <td className={`px-4 py-3 font-mono text-xs whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-500"}`}>{v.bizNo ?? "-"}</td>
-                <td className={`px-4 py-3 whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-500"}`}>{v.phone ?? "-"}</td>
-                <td className={`px-4 py-3 text-xs max-w-[200px] truncate ${isDark ? "text-gray-400" : "text-gray-400"}`}>{v.address ?? "-"}</td>
+                <td className={`px-4 py-3 text-center font-medium max-w-[200px] truncate whitespace-nowrap ${isDark ? "text-white" : "text-gray-800"}`}>{v.name}</td>
+                <td className={`px-4 py-3 text-center whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"}`}>{v.representative ?? "-"}</td>
+                <td className={`px-4 py-3 text-center font-mono text-xs whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-500"}`}>{v.bizNo ?? "-"}</td>
+                <td className={`px-4 py-3 text-center whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-500"}`}>{v.phone ?? "-"}</td>
+                <td className={`px-4 py-3 text-center text-xs max-w-[200px] truncate ${isDark ? "text-gray-400" : "text-gray-400"}`}>{v.address ?? "-"}</td>
                 {admin && (
                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                     <div className="flex gap-1">
@@ -458,7 +462,7 @@ export default function VendorsClient({ initial }: Props) {
 
       {/* 상세 보기 */}
       {selected && !editTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setSelected(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" {...selectedBackdrop}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
               <div>
@@ -533,7 +537,7 @@ export default function VendorsClient({ initial }: Props) {
 
       {/* 삭제 확인 */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={() => setDeleteConfirm(null)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" {...deleteConfirmBackdrop}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-gray-800 mb-2">거래처 삭제</h3>
             <p className="text-sm text-gray-600 mb-1">

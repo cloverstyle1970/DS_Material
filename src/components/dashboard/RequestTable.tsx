@@ -85,7 +85,7 @@ export default function RequestTable({ requests }: { requests: RecentRequest[] }
             {COLUMNS.map(c => {
               const active = sortKey === c.key;
               return (
-                <th key={c.key} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
+                <th key={c.key} className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400">
                   {c.sortable ? (
                     <button
                       type="button"
@@ -114,17 +114,17 @@ export default function RequestTable({ requests }: { requests: RecentRequest[] }
             </tr>
           ) : paginated.map(r => (
             <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-              <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{r.userName}</td>
-              <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{r.siteName}</td>
-              <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{r.hoGiNo}</td>
-              <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">{r.materialName}</td>
-              <td className="px-4 py-3 text-gray-600 dark:text-gray-400 tabular-nums">{r.qty}</td>
-              <td className="px-4 py-3">
+              <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400">{r.userName}</td>
+              <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400">{r.siteName}</td>
+              <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400">{r.hoGiNo}</td>
+              <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200">{r.materialName}</td>
+              <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400 tabular-nums">{r.qty}</td>
+              <td className="px-4 py-3 text-center">
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_CLASS[r.status]}`}>
                   {STATUS_LABEL[r.status]}
                 </span>
               </td>
-              <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs"><TimeAgo iso={r.requestedAt} /></td>
+              <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs"><TimeAgo iso={r.requestedAt} /></td>
             </tr>
           ))}
         </tbody>

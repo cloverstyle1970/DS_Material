@@ -6,6 +6,7 @@ import { useAuth, isAdmin } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
+import { useBackdropClose } from "@/lib/useBackdropClose";
 import PermissionsModal from "./PermissionsModal";
 
 type SortKey = "id" | "name" | "dept" | "rank" | "cert" | "hireDate" | "phone" | "status";
@@ -62,6 +63,7 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("재직");
   const [page, setPage]             = useState(1);
   const [selected, setSelected]     = useState<UserRecord | null>(null);
+  const selectedBackdrop = useBackdropClose(() => setSelected(null));
   const [editPerms, setEditPerms]   = useState<UserRecord | null>(null);
   const [sortKey, setSortKey]       = useState<SortKey>("id");
   const [sortDir, setSortDir]       = useState<SortDir>("asc");
@@ -165,7 +167,7 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
                 {COLUMNS.map(c => {
                   const active = c.key === sortKey;
                   return (
-                    <th key={c.key} className={`px-4 py-3 text-left text-xs font-medium whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-500"}`}>
+                    <th key={c.key} className={`px-4 py-3 text-center text-xs font-medium whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-500"}`}>
                       <button type="button" onClick={() => toggleSort(c.key)}
                         className={`flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ${active ? "text-gray-700 dark:text-gray-100 font-semibold" : ""}`}>
                         {c.label}
@@ -187,14 +189,14 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
               ) : paginated.map(u => (
                 <tr key={u.id} onClick={() => setSelected(u)}
                   className={`transition-colors cursor-pointer ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-50"}`}>
-                  <td className={`px-4 py-3 text-xs whitespace-nowrap ${isDark ? "text-gray-400" : "text-gray-400"}`}>{u.id}</td>
-                  <td className={`px-4 py-3 font-medium whitespace-nowrap ${isDark ? "text-white" : "text-gray-800"}`}>{u.name}</td>
-                  <td className={`px-4 py-3 whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"}`}>{u.dept ?? "-"}</td>
-                  <td className={`px-4 py-3 whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"}`}>{u.rank ?? "-"}</td>
-                  <td className={`px-4 py-3 text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>{u.cert ?? "-"}</td>
-                  <td className={`px-4 py-3 whitespace-nowrap ${isDark ? "text-gray-400" : "text-gray-500"}`}>{u.hireDate ?? "-"}</td>
-                  <td className={`px-4 py-3 whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"}`}>{u.phone ?? "-"}</td>
-                  <td className="px-4 py-3">
+                  <td className={`px-4 py-3 text-center text-xs whitespace-nowrap ${isDark ? "text-gray-400" : "text-gray-400"}`}>{u.id}</td>
+                  <td className={`px-4 py-3 text-center font-medium whitespace-nowrap ${isDark ? "text-white" : "text-gray-800"}`}>{u.name}</td>
+                  <td className={`px-4 py-3 text-center whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"}`}>{u.dept ?? "-"}</td>
+                  <td className={`px-4 py-3 text-center whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"}`}>{u.rank ?? "-"}</td>
+                  <td className={`px-4 py-3 text-center text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>{u.cert ?? "-"}</td>
+                  <td className={`px-4 py-3 text-center whitespace-nowrap ${isDark ? "text-gray-400" : "text-gray-500"}`}>{u.hireDate ?? "-"}</td>
+                  <td className={`px-4 py-3 text-center whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"}`}>{u.phone ?? "-"}</td>
+                  <td className="px-4 py-3 text-center">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_CLS[u.status ?? ""] ?? "bg-gray-100 text-gray-500"}`}>
                       {u.status ?? "-"}
                     </span>
@@ -248,7 +250,7 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
 
       {/* 상세 모달 */}
       {selected && !editPerms && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setSelected(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" {...selectedBackdrop}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
               <div>

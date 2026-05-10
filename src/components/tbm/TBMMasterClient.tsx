@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { useBackdropClose } from "@/lib/useBackdropClose";
 import {
   SafetyRule, RepairType, FaultType, ChecklistItem,
   SafetyCategory, SafetySeason, ChecklistType,
@@ -137,25 +138,25 @@ function SafetyRulesEditor() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-700/50 text-[11px] font-bold text-gray-600 dark:text-gray-300 uppercase">
             <tr>
-              <th className="px-3 py-2 text-left">코드</th>
-              <th className="px-3 py-2 text-left">내용</th>
-              <th className="px-3 py-2 text-left">분류</th>
-              <th className="px-3 py-2 text-left">계절</th>
-              <th className="px-3 py-2 text-left">순서</th>
-              <th className="px-3 py-2 text-left">상태</th>
+              <th className="px-3 py-2 text-center">코드</th>
+              <th className="px-3 py-2 text-center">내용</th>
+              <th className="px-3 py-2 text-center">분류</th>
+              <th className="px-3 py-2 text-center">계절</th>
+              <th className="px-3 py-2 text-center">순서</th>
+              <th className="px-3 py-2 text-center">상태</th>
               <th className="px-3 py-2 text-right">액션</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {items.map(r => (
               <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                <td className="px-3 py-2 text-xs font-mono text-gray-700 dark:text-gray-200 whitespace-nowrap">{r.code}</td>
-                <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-200">{r.text}</td>
-                <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{CATEGORY_LABELS[r.category]}</td>
-                <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{SEASON_LABELS[r.season]}</td>
-                <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">{r.sort_order}</td>
-                <td className="px-3 py-2"><ToggleActive value={r.is_active} onChange={v => toggleActive(r.id, v)} /></td>
-                <td className="px-3 py-2"><ActionButtons onEdit={() => setEditing(r)} onDelete={() => remove(r.id)} /></td>
+                <td className="px-3 py-2 text-center text-xs font-mono text-gray-700 dark:text-gray-200 whitespace-nowrap">{r.code}</td>
+                <td className="px-3 py-2 text-center text-xs text-gray-700 dark:text-gray-200">{r.text}</td>
+                <td className="px-3 py-2 text-center text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{CATEGORY_LABELS[r.category]}</td>
+                <td className="px-3 py-2 text-center text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{SEASON_LABELS[r.season]}</td>
+                <td className="px-3 py-2 text-center text-xs text-gray-500 dark:text-gray-400">{r.sort_order}</td>
+                <td className="px-3 py-2 text-center"><ToggleActive value={r.is_active} onChange={v => toggleActive(r.id, v)} /></td>
+                <td className="px-3 py-2 text-center"><ActionButtons onEdit={() => setEditing(r)} onDelete={() => remove(r.id)} /></td>
               </tr>
             ))}
           </tbody>
@@ -184,6 +185,7 @@ function SafetyRuleModal({ initial, onClose, onSaved }: {
   const [season, setSeason] = useState<SafetySeason>(initial?.season ?? "all");
   const [sortOrder, setSortOrder] = useState(initial?.sort_order ?? 0);
   const [saving, setSaving] = useState(false);
+  const backdrop = useBackdropClose(onClose);
 
   async function save() {
     if (!code.trim() || !text.trim()) { alert("코드와 내용은 필수입니다."); return; }
@@ -201,7 +203,7 @@ function SafetyRuleModal({ initial, onClose, onSaved }: {
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" {...backdrop}>
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div className="text-base font-bold text-gray-900 dark:text-white">{initial ? "안전수칙 수정" : "안전수칙 추가"}</div>
@@ -294,21 +296,21 @@ function SimpleTypeEditor({
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-700/50 text-[11px] font-bold text-gray-600 dark:text-gray-300 uppercase">
             <tr>
-              <th className="px-3 py-2 text-left">코드</th>
-              <th className="px-3 py-2 text-left">{title}</th>
-              <th className="px-3 py-2 text-left">순서</th>
-              <th className="px-3 py-2 text-left">상태</th>
+              <th className="px-3 py-2 text-center">코드</th>
+              <th className="px-3 py-2 text-center">{title}</th>
+              <th className="px-3 py-2 text-center">순서</th>
+              <th className="px-3 py-2 text-center">상태</th>
               <th className="px-3 py-2 text-right">액션</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {items.map(r => (
               <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                <td className="px-3 py-2 text-xs font-mono text-gray-700 dark:text-gray-200 whitespace-nowrap">{r.code}</td>
-                <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-200">{r.label}</td>
-                <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">{r.sort_order}</td>
-                <td className="px-3 py-2"><ToggleActive value={r.is_active} onChange={v => toggleActive(r.id, v)} /></td>
-                <td className="px-3 py-2"><ActionButtons onEdit={() => setEditing(r)} onDelete={() => remove(r.id)} /></td>
+                <td className="px-3 py-2 text-center text-xs font-mono text-gray-700 dark:text-gray-200 whitespace-nowrap">{r.code}</td>
+                <td className="px-3 py-2 text-center text-xs text-gray-700 dark:text-gray-200">{r.label}</td>
+                <td className="px-3 py-2 text-center text-xs text-gray-500 dark:text-gray-400">{r.sort_order}</td>
+                <td className="px-3 py-2 text-center"><ToggleActive value={r.is_active} onChange={v => toggleActive(r.id, v)} /></td>
+                <td className="px-3 py-2 text-center"><ActionButtons onEdit={() => setEditing(r)} onDelete={() => remove(r.id)} /></td>
               </tr>
             ))}
           </tbody>
@@ -341,6 +343,7 @@ function SimpleTypeModal({
   const [label, setLabel] = useState(initial?.label ?? "");
   const [sortOrder, setSortOrder] = useState(initial?.sort_order ?? 0);
   const [saving, setSaving] = useState(false);
+  const backdrop = useBackdropClose(onClose);
 
   async function save() {
     if (!code.trim() || !label.trim()) { alert("코드와 이름은 필수입니다."); return; }
@@ -355,7 +358,7 @@ function SimpleTypeModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" {...backdrop}>
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div className="text-base font-bold text-gray-900 dark:text-white">{initial ? `${title} 수정` : `${title} 추가`}</div>
@@ -451,10 +454,10 @@ function ChecklistEditor() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-700/50 text-[11px] font-bold text-gray-600 dark:text-gray-300 uppercase">
             <tr>
-              <th className="px-3 py-2 text-left">유형</th>
-              <th className="px-3 py-2 text-left">항목</th>
-              <th className="px-3 py-2 text-left">순서</th>
-              <th className="px-3 py-2 text-left">상태</th>
+              <th className="px-3 py-2 text-center">유형</th>
+              <th className="px-3 py-2 text-center">항목</th>
+              <th className="px-3 py-2 text-center">순서</th>
+              <th className="px-3 py-2 text-center">상태</th>
               <th className="px-3 py-2 text-right">액션</th>
             </tr>
           </thead>
@@ -470,10 +473,10 @@ function ChecklistEditor() {
                     {r.list_type === "repair" ? "수리" : "자체점검"}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-200">{r.label}</td>
-                <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">{r.sort_order}</td>
-                <td className="px-3 py-2"><ToggleActive value={r.is_active} onChange={v => toggleActive(r.id, v)} /></td>
-                <td className="px-3 py-2"><ActionButtons onEdit={() => setEditing(r)} onDelete={() => remove(r.id)} /></td>
+                <td className="px-3 py-2 text-center text-xs text-gray-700 dark:text-gray-200">{r.label}</td>
+                <td className="px-3 py-2 text-center text-xs text-gray-500 dark:text-gray-400">{r.sort_order}</td>
+                <td className="px-3 py-2 text-center"><ToggleActive value={r.is_active} onChange={v => toggleActive(r.id, v)} /></td>
+                <td className="px-3 py-2 text-center"><ActionButtons onEdit={() => setEditing(r)} onDelete={() => remove(r.id)} /></td>
               </tr>
             ))}
           </tbody>
@@ -500,6 +503,7 @@ function ChecklistModal({ initial, onClose, onSaved }: {
   const [label, setLabel] = useState(initial?.label ?? "");
   const [sortOrder, setSortOrder] = useState(initial?.sort_order ?? 0);
   const [saving, setSaving] = useState(false);
+  const backdrop = useBackdropClose(onClose);
 
   async function save() {
     if (!label.trim()) { alert("항목 내용은 필수입니다."); return; }
@@ -514,7 +518,7 @@ function ChecklistModal({ initial, onClose, onSaved }: {
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" {...backdrop}>
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div className="text-base font-bold text-gray-900 dark:text-white">{initial ? "체크리스트 항목 수정" : "체크리스트 항목 추가"}</div>

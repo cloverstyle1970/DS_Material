@@ -8,6 +8,7 @@ import {
   MODE_LABELS, SUB_TYPE_LABELS,
 } from "@/lib/tbm";
 import TBMParticipantConfirmModal from "./TBMParticipantConfirmModal";
+import { useBackdropClose } from "@/lib/useBackdropClose";
 
 interface DetailData {
   participants: TBMParticipant[];
@@ -365,6 +366,7 @@ function EditTBMModal({
   const [passengerTrapped, setPassengerTrapped] = useState(record.passenger_trapped);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const backdrop = useBackdropClose(onClose);
 
   async function save() {
     if (!siteName.trim() || !workContent.trim()) {
@@ -388,7 +390,7 @@ function EditTBMModal({
   const inputCls = "w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100";
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" {...backdrop}>
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div className="text-base font-bold text-gray-900 dark:text-white">TBM 기본정보 수정</div>

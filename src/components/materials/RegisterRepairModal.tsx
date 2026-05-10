@@ -3,6 +3,7 @@
 import { useState, FormEvent } from "react";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { api, ApiError, getErrorMessage } from "@/lib/api-client";
+import { useBackdropClose } from "@/lib/useBackdropClose";
 
 interface Props {
   parent: MaterialRecord;
@@ -23,6 +24,7 @@ export default function RegisterRepairModal({ parent, onClose, onSaved }: Props)
   const [stockQty,   setStockQty]   = useState(0);
   const [saving,     setSaving]     = useState(false);
   const [error,      setError]      = useState("");
+  const backdrop = useBackdropClose(onClose);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -51,7 +53,7 @@ export default function RegisterRepairModal({ parent, onClose, onSaved }: Props)
   const field = "w-full rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-400";
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" {...backdrop}>
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
           <div>

@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { PurchaseOrderRecord } from "@/lib/mock-purchase-orders";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { useBackdropClose } from "@/lib/useBackdropClose";
 import SerialEntryModal from "./SerialEntryModal";
 
 interface SiteOption   { id: number; name: string }
@@ -633,6 +634,7 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
   const [mats, setMats] = useState<Record<string, string>>({});
   const [q, setQ] = useState("");
   const [checked, setChecked] = useState<Set<number>>(new Set());
+  const backdrop = useBackdropClose(onClose);
 
   useEffect(() => {
     api.get<PurchaseOrderRecord[]>("/api/purchase-orders?status=발주").then(setOrders).catch(() => setOrders([]));
@@ -679,7 +681,7 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" {...backdrop}>
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-[1000px] max-w-[95vw] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-700">
           <h3 className="text-sm font-semibold dark:text-gray-100">발주서 참조 (미입고 {orders.length}건)</h3>

@@ -361,11 +361,11 @@ export default function InventoryCheckClient() {
                     className="w-4 h-4 rounded border-gray-300 accent-slate-700 cursor-pointer"
                   />
                 </th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-300">구분</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-300">자재코드</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-300">부품명</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-300">규격</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-300">보관장소</th>
+                <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-300">구분</th>
+                <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-300">자재코드</th>
+                <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-300">부품명</th>
+                <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-300">규격</th>
+                <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-300">보관장소</th>
                 <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-300">전산 재고</th>
                 <th className="px-4 py-3 text-center font-bold text-blue-600 dark:text-blue-400">실사 재고</th>
               </tr>
@@ -383,7 +383,7 @@ export default function InventoryCheckClient() {
                       <input type="checkbox" checked={isChecked} onChange={() => toggleOne(m.id, m.stockQty)}
                         className="w-4 h-4 rounded border-gray-300 accent-blue-600 cursor-pointer" />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 text-center">
                       {m.isRepair
                         ? <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300">수리품</span>
                         : <span className={`text-xs px-2 py-0.5 rounded-full ${
@@ -395,10 +395,10 @@ export default function InventoryCheckClient() {
                           </span>
                       }
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{m.id}</td>
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{m.name}</td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{m.modelNo ?? "-"}</td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{m.storageLoc ?? "-"}</td>
+                    <td className="px-4 py-3 text-center font-mono text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{m.id}</td>
+                    <td className="px-4 py-3 text-center font-medium text-gray-900 dark:text-gray-100">{m.name}</td>
+                    <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400">{m.modelNo ?? "-"}</td>
+                    <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400">{m.storageLoc ?? "-"}</td>
                     <td className="px-4 py-3 text-center text-gray-700 dark:text-gray-300 font-medium">{m.stockQty}</td>
                     <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
                       {isChecked ? (
@@ -473,11 +473,11 @@ export default function InventoryCheckClient() {
                     className="w-4 h-4 rounded border-gray-300 accent-purple-600 cursor-pointer"
                   />
                 </th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-300">S/N</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-300">자재명</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-300">자재코드</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-300">규격</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-300">입고일</th>
+                <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-300">S/N</th>
+                <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-300">자재명</th>
+                <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-300">자재코드</th>
+                <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-300">규격</th>
+                <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-300">입고일</th>
                 <th className="px-4 py-3 text-center font-bold text-purple-600 dark:text-purple-400">물리적 확인</th>
               </tr>
             </thead>
@@ -494,11 +494,11 @@ export default function InventoryCheckClient() {
                       <input type="checkbox" checked={isConfirmed} onChange={() => toggleUnitConfirmed(u.id)}
                         className="w-4 h-4 rounded border-gray-300 accent-emerald-600 cursor-pointer" />
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-800 dark:text-gray-200 whitespace-nowrap">{u.serialNo}</td>
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100 max-w-[220px] truncate">{u.materialName ?? "-"}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{u.materialId}</td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{u.materialModelNo ?? "-"}</td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{u.inboundAt.slice(0, 10)}</td>
+                    <td className="px-4 py-3 text-center font-mono text-xs text-gray-800 dark:text-gray-200 whitespace-nowrap">{u.serialNo}</td>
+                    <td className="px-4 py-3 text-center font-medium text-gray-900 dark:text-gray-100 max-w-[220px] truncate">{u.materialName ?? "-"}</td>
+                    <td className="px-4 py-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{u.materialId}</td>
+                    <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400">{u.materialModelNo ?? "-"}</td>
+                    <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{u.inboundAt.slice(0, 10)}</td>
                     <td className="px-4 py-3 text-center">
                       {isConfirmed ? (
                         <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 font-semibold">✓ 확인</span>

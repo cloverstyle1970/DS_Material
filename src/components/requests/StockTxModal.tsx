@@ -7,6 +7,7 @@ import { PurchaseOrderRecord } from "@/lib/mock-purchase-orders";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import SiteSearchInput from "@/components/ui/SiteSearchInput";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { useBackdropClose } from "@/lib/useBackdropClose";
 
 interface SiteOption { id: number; name: string }
 
@@ -29,6 +30,7 @@ function fmtDate(iso: string) {
 }
 
 export default function StockTxModal({ initialType, sites, user, onClose, onSaved }: Props) {
+  const backdrop = useBackdropClose(onClose);
   const [txType, setTxType] = useState<"입고" | "출고">(initialType);
 
   // ── 참조 데이터 ──────────────────────────────────────────────
@@ -173,7 +175,7 @@ export default function StockTxModal({ initialType, sites, user, onClose, onSave
   const hasRef = txType === "입고" ? pendingOrders.length > 0 : inboundList.length > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" {...backdrop}>
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
 
         {/* 헤더 */}

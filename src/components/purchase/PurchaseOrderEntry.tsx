@@ -7,6 +7,7 @@ import { MaterialRecord } from "@/lib/mock-materials";
 import { MaterialRequestRecord } from "@/lib/mock-material-requests";
 import { ElevatorRecord } from "@/lib/mock-elevators";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { useBackdropClose } from "@/lib/useBackdropClose";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 
 interface SiteOption   { id: number; name: string }
@@ -584,9 +585,10 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
 
 function RequestPopup({ requests, onSelect, onClose }: { requests: MaterialRequestRecord[]; onSelect: (r: MaterialRequestRecord) => void; onClose: () => void }) {
   const [q, setQ] = useState("");
+  const backdrop = useBackdropClose(onClose);
   const filtered = requests.filter(r => !q || (r.siteName?.toLowerCase().includes(q.toLowerCase()) ?? false) || r.requesterName.toLowerCase().includes(q.toLowerCase()) || r.items.some(i => i.materialName.toLowerCase().includes(q.toLowerCase())));
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" {...backdrop}>
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-[720px] max-h-[75vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-700">
           <h3 className="text-sm font-semibold dark:text-gray-100">자재신청 불러오기</h3>

@@ -168,7 +168,7 @@ export default function ReturnsClient() {
                 {["출고일시", "자재명", "자재코드", "수량", "현장 / 호기", "S/N", "출고자", tab === "returned" ? "반납일시" : null, tab === "returned" ? "반납자" : null, admin && tab === "pending" ? "처리" : null]
                   .filter(Boolean)
                   .map((h, i) => (
-                    <th key={i} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{h as string}</th>
+                    <th key={i} className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{h as string}</th>
                   ))}
               </tr>
             </thead>
@@ -185,20 +185,20 @@ export default function ReturnsClient() {
                         className="w-4 h-4 rounded border-gray-300 accent-emerald-600 cursor-pointer" />
                     </td>
                   )}
-                  <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(t.createdAt)}</td>
-                  <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200 max-w-[220px] truncate">{t.materialName}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{t.materialId}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-orange-500">{t.qty}</td>
-                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">
+                  <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(t.createdAt)}</td>
+                  <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[220px] truncate">{t.materialName}</td>
+                  <td className="px-4 py-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{t.materialId}</td>
+                  <td className="px-4 py-3 text-center tabular-nums text-orange-500">{t.qty}</td>
+                  <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">
                     {t.siteName ?? "-"}{t.elevatorName ? <span className="text-gray-400 ml-1">({t.elevatorName})</span> : null}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap max-w-[160px] truncate">{t.serialNo ?? "-"}</td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{t.userName}</td>
+                  <td className="px-4 py-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap max-w-[160px] truncate">{t.serialNo ?? "-"}</td>
+                  <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{t.userName}</td>
                   {tab === "returned" && (
-                    <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{t.returnedAt ? fmtDate(t.returnedAt) : "-"}</td>
+                    <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{t.returnedAt ? fmtDate(t.returnedAt) : "-"}</td>
                   )}
                   {tab === "returned" && (
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{t.returnedByUserName ?? "-"}</td>
+                    <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{t.returnedByUserName ?? "-"}</td>
                   )}
                   {admin && tab === "pending" && (
                     <td className="px-4 py-3 whitespace-nowrap">

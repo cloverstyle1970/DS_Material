@@ -348,7 +348,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
               </th>
               {COLUMNS.map(c => {
                 const active = c.key !== null && c.key === sortKey;
-                const alignCls = c.align === "right" ? "text-right" : "text-left";
+                const alignCls = "text-center";
                 return (
                   <th key={c.label} className={`px-4 py-3 ${alignCls} text-xs font-medium whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-500"}`}>
                     {c.key ? (
@@ -389,7 +389,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
                     <input type="checkbox" checked={isChecked} onChange={() => toggleOne(m.id)}
                       className="w-4 h-4 rounded border-gray-300 accent-slate-700 cursor-pointer" />
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 text-center">
                     {m.isRepair
                       ? <span className={`text-xs px-2 py-0.5 rounded-full ${isDark ? "bg-purple-900/60 text-purple-300" : "bg-purple-100 text-purple-700"}`}>수리품</span>
                       : <span className={`text-xs px-2 py-0.5 rounded-full ${
@@ -401,19 +401,19 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
                         </span>
                     }
                   </td>
-                  <td className={`px-4 py-3 font-mono text-xs whitespace-nowrap ${isDark ? "text-gray-300" : "text-slate-600"}`}>{m.id}</td>
-                  <td className={`px-4 py-3 font-medium ${isDark ? "text-white" : "text-gray-800"}`}>{m.name}</td>
-                  <td className={`px-4 py-3 ${isDark ? "text-gray-300" : "text-gray-500"}`}>{m.modelNo ?? "-"}</td>
-                  <td className={`px-4 py-3 ${isDark ? "text-gray-300" : "text-gray-500"}`}>{m.unit ?? "-"}</td>
+                  <td className={`px-4 py-3 text-center font-mono text-xs whitespace-nowrap ${isDark ? "text-gray-300" : "text-slate-600"}`}>{m.id}</td>
+                  <td className={`px-4 py-3 text-center font-medium ${isDark ? "text-white" : "text-gray-800"}`}>{m.name}</td>
+                  <td className={`px-4 py-3 text-center ${isDark ? "text-gray-300" : "text-gray-500"}`}>{m.modelNo ?? "-"}</td>
+                  <td className={`px-4 py-3 text-center ${isDark ? "text-gray-300" : "text-gray-500"}`}>{m.unit ?? "-"}</td>
                   {!viewOnly && (
-                    <td className={`px-4 py-3 text-right tabular-nums ${isDark ? "text-gray-300" : "text-gray-500"}`}>
+                    <td className={`px-4 py-3 text-center tabular-nums ${isDark ? "text-gray-300" : "text-gray-500"}`}>
                       {m.buyPrice != null ? m.buyPrice.toLocaleString() : "-"}
                     </td>
                   )}
-                  <td className={`px-4 py-3 text-right tabular-nums font-medium ${isDark ? "text-gray-100" : "text-gray-700"}`}>
+                  <td className={`px-4 py-3 text-center tabular-nums font-medium ${isDark ? "text-gray-100" : "text-gray-700"}`}>
                     {m.sellPrice != null ? m.sellPrice.toLocaleString() : "-"}
                   </td>
-                  <td className={`px-4 py-3 ${isDark ? "text-gray-300" : "text-gray-500"}`}>{m.storageLoc ?? "-"}</td>
+                  <td className={`px-4 py-3 text-center ${isDark ? "text-gray-300" : "text-gray-500"}`}>{m.storageLoc ?? "-"}</td>
                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                     <StockCell material={m} editable={!viewOnly} />
                   </td>
