@@ -19,7 +19,10 @@ interface Row {
   materialName: string;
   spec: string;
   qty: number;
-  unitPrice: number;
+  unitPrice: number;       // 출고 공급가 = 판매단가
+  buyPrice: number;        // 구매단가
+  stockQty: number;        // 현재 재고 (재고조정 후 갱신)
+  storageLoc: string;      // 보관위치 (재고조정 모달 기본값용)
   elevatorName: string;
   requiresReturn: boolean;
   remark: string;
@@ -28,7 +31,7 @@ interface Row {
 }
 
 function newRow(seed: Partial<Row> = {}): Row {
-  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, elevatorName: "", requiresReturn: false, remark: "", inboundRef: null, serialNos: [], ...seed };
+  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, buyPrice: 0, stockQty: 0, storageLoc: "", elevatorName: "", requiresReturn: false, remark: "", inboundRef: null, serialNos: [], ...seed };
 }
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
@@ -62,6 +65,19 @@ export default function OutboundEntry() {
   const [saving, setSaving] = useState(false);
   const [popup,  setPopup]  = useState<null | "inbound">(null);
   const [serialEditRowId, setSerialEditRowId] = useState<string | null>(null);
+  const [adjustRowId, setAdjustRowId] = useState<string | null>(null);
+
+  async function refreshRowStock(rowId: string, materialId: string) {
+    try {
+      const m = await api.get<MaterialRecord>(`/api/materials/${encodeURIComponent(materialId)}`);
+      patchRow(rowId, {
+        stockQty: m.stockQty ?? 0,
+        storageLoc: m.storageLoc ?? "",
+        buyPrice: m.buyPrice ?? 0,
+        unitPrice: m.sellPrice ?? 0,
+      });
+    } catch { /* ignore */ }
+  }
 
   useEffect(() => {
     if (!siteName) {
@@ -103,6 +119,9 @@ export default function OutboundEntry() {
           materialId: m.id, materialName: m.name, spec: m.modelNo ?? "",
           qty: 1,
           unitPrice: m.sellPrice ?? 0,
+          buyPrice: m.buyPrice ?? 0,
+          stockQty: m.stockQty ?? 0,
+          storageLoc: m.storageLoc ?? "",
           serialNos: [] as string[],
         };
         if (idx < next.length) next[idx] = { ...next[idx], ...patch };
@@ -249,10 +268,23 @@ export default function OutboundEntry() {
                   />
                 </Td>
                 <Td right>
-                  <input type="text" inputMode="numeric" value={r.qty === 0 ? "" : String(r.qty)}
-                    onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); patchRow(r.id, { qty: v === "" ? 0 : Number(v) }); }}
-                    title={r.serialNos.length > 0 ? `S/N ${r.serialNos.length}건 선택됨 — 수량은 ${r.serialNos.length} 이상이어야 함` : undefined}
-                    className={cellInput + " text-right"} />
+                  <div className="flex flex-col gap-0.5">
+                    <input type="text" inputMode="numeric" value={r.qty === 0 ? "" : String(r.qty)}
+                      onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); patchRow(r.id, { qty: v === "" ? 0 : Number(v) }); }}
+                      title={r.serialNos.length > 0 ? `S/N ${r.serialNos.length}건 선택됨 — 수량은 ${r.serialNos.length} 이상이어야 함` : undefined}
+                      className={cellInput + " text-right"} />
+                    {r.materialId && (
+                      r.qty > r.stockQty ? (
+                        <button type="button" onClick={() => setAdjustRowId(r.id)}
+                          title={`재고 부족: 보유 ${r.stockQty} / 필요 ${r.qty}`}
+                          className="text-[10px] px-1 py-0.5 rounded bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-300 font-semibold whitespace-nowrap">
+                          ⚠ 재고{r.stockQty} · 조정
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-gray-400 dark:text-gray-500 text-right">재고 {r.stockQty}</span>
+                      )
+                    )}
+                  </div>
                 </Td>
                 <Td right>
                   <input type="text" inputMode="numeric" value={r.unitPrice === 0 ? "" : fmtNum(r.unitPrice)}
@@ -341,6 +373,22 @@ export default function OutboundEntry() {
             initial={row.serialNos}
             onClose={() => setSerialEditRowId(null)}
             onSave={list => { patchRow(row.id, { serialNos: list }); setSerialEditRowId(null); }}
+          />
+        );
+      })()}
+
+      {adjustRowId && user && (() => {
+        const row = rows.find(r => r.id === adjustRowId);
+        if (!row) return null;
+        return (
+          <StockAdjustModal
+            row={row}
+            user={user}
+            onClose={() => setAdjustRowId(null)}
+            onSaved={async () => {
+              await refreshRowStock(row.id, row.materialId);
+              setAdjustRowId(null);
+            }}
           />
         );
       })()}
@@ -602,6 +650,187 @@ function InboundRefPopup({ onSelect, onClose }: { onSelect: (t: TransactionRecor
             </tbody>
           </table>
           {filtered.length === 0 && <p className="text-center py-8 text-xs text-gray-400 dark:text-gray-500">입고 내역 없음</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── 재고조정 (입고 처리) 모달 ─────────────────────────────────────
+function StockAdjustModal({
+  row, user, onClose, onSaved,
+}: {
+  row: Row;
+  user: { id: number; name: string };
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const backdrop = useBackdropClose(onClose);
+  // 오늘 날짜 yyyy-MM-dd
+  function todayLocal() {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+  // 입력 자동 포맷: 숫자만 추출, 8자리까지, 4-2-2로 하이픈 삽입
+  function formatYmd(input: string): string {
+    const d = input.replace(/\D/g, "").slice(0, 8);
+    if (d.length <= 4) return d;
+    if (d.length <= 6) return d.slice(0, 4) + "-" + d.slice(4);
+    return d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6);
+  }
+  const need = Math.max(0, row.qty - row.stockQty);
+  const [adjDate, setAdjDate]    = useState(todayLocal());
+  const [adjQty,  setAdjQty]     = useState<number>(need || 1);
+  const [buyPrice,  setBuyPrice]  = useState<number>(row.buyPrice  || 0);
+  const [sellPrice, setSellPrice] = useState<number>(row.unitPrice || 0);
+  const [storageLoc, setStorageLoc] = useState(row.storageLoc || "");
+  const [serialText, setSerialText] = useState("");
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  // S/N 텍스트 → 배열 (줄바꿈/콤마 구분, trim, 빈줄 제거, 중복 제거)
+  const serialList = serialText
+    .split(/[\r\n,]+/).map(s => s.trim()).filter(Boolean);
+  const dupSerial = serialList.find((s, i) => serialList.indexOf(s) !== i);
+
+  async function handleSave() {
+    setError("");
+    if (adjQty <= 0) { setError("조정수량은 1 이상이어야 합니다."); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(adjDate)) { setError("재고조정 일자는 YYYY-MM-DD 형식이어야 합니다."); return; }
+    if (dupSerial) { setError(`중복된 S/N: ${dupSerial}`); return; }
+    if (serialList.length > 0 && serialList.length !== adjQty) {
+      setError(`S/N 갯수(${serialList.length})와 조정수량(${adjQty})이 일치해야 합니다.`);
+      return;
+    }
+    setSaving(true);
+    try {
+      // 1) 자재 정보 갱신 (단가·보관위치 변경된 경우)
+      const matPatch: Record<string, unknown> = {};
+      if (buyPrice  !== row.buyPrice)  matPatch.buyPrice   = buyPrice;
+      if (sellPrice !== row.unitPrice) matPatch.sellPrice  = sellPrice;
+      if (storageLoc !== row.storageLoc) matPatch.storageLoc = storageLoc;
+      if (Object.keys(matPatch).length > 0) {
+        await api.patch(`/api/materials/${encodeURIComponent(row.materialId)}`, matPatch);
+      }
+      // 2) 재고조정 = 입고 트랜잭션 생성
+      await api.post("/api/transactions", {
+        type: "입고",
+        materialId: row.materialId,
+        materialName: row.materialName,
+        qty: adjQty,
+        siteName: null,
+        elevatorName: null,
+        serialNos: serialList.length > 0 ? serialList : null,
+        requiresReturn: false,
+        note: `[재고조정] ${note || ""}`.trim(),
+        userId: user.id,
+        userName: user.name,
+        adjustedAt: adjDate ? new Date(`${adjDate}T00:00:00`).toISOString() : null,
+      });
+      onSaved();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" {...backdrop}>
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <div>
+            <div className="text-base font-bold text-gray-900 dark:text-white">재고수량 조정</div>
+            <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">입고 처리로 재고 증가</div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+
+        <div className="p-5 space-y-3">
+          <div className="bg-gray-50 dark:bg-gray-700/40 rounded-lg p-3 text-xs space-y-1">
+            <div><span className="text-gray-500">자재명: </span><span className="font-semibold text-gray-800 dark:text-gray-100">{row.materialName}</span></div>
+            <div><span className="text-gray-500">자재코드: </span><span className="font-mono text-gray-700 dark:text-gray-300">{row.materialId}</span></div>
+            {row.spec && <div><span className="text-gray-500">규격: </span><span className="text-gray-700 dark:text-gray-300">{row.spec}</span></div>}
+            <div className="pt-1 border-t border-gray-200 dark:border-gray-600 flex items-center justify-between">
+              <span className="text-gray-500">현재 재고</span>
+              <span className="font-bold text-gray-800 dark:text-gray-100">{row.stockQty}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-gray-500">필요 수량</span>
+              <span className="font-bold text-orange-600 dark:text-orange-400">{row.qty}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-gray-500">부족분</span>
+              <span className="font-bold text-red-600 dark:text-red-400">{need}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">재고조정 일자</label>
+              <input type="text" inputMode="numeric" value={adjDate}
+                onChange={e => setAdjDate(formatYmd(e.target.value))}
+                placeholder="YYYYMMDD" maxLength={10}
+                className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs font-mono text-gray-900 dark:text-gray-100" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">재고조정 수량 *</label>
+              <input type="number" min={1} value={adjQty} onChange={e => setAdjQty(Math.max(0, parseInt(e.target.value) || 0))}
+                className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs text-right tabular-nums text-gray-900 dark:text-gray-100" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">구매단가</label>
+              <input type="text" inputMode="numeric" value={buyPrice === 0 ? "" : fmtNum(buyPrice)}
+                onChange={e => setBuyPrice(parseNum(e.target.value))}
+                className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs text-right tabular-nums text-gray-900 dark:text-gray-100" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">판매단가</label>
+              <input type="text" inputMode="numeric" value={sellPrice === 0 ? "" : fmtNum(sellPrice)}
+                onChange={e => setSellPrice(parseNum(e.target.value))}
+                className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs text-right tabular-nums text-gray-900 dark:text-gray-100" />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">보관위치</label>
+              <input type="text" value={storageLoc} onChange={e => setStorageLoc(e.target.value)} lang="ko"
+                placeholder="예: A-1-3"
+                className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs text-gray-900 dark:text-gray-100" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+              S/N <span className="text-[10px] text-gray-400 font-normal">(선택, 한 줄에 하나씩)</span>
+            </label>
+            <textarea value={serialText} onChange={e => setSerialText(e.target.value)} rows={3}
+              placeholder="S/N을 한 줄씩 입력 (입력 시 조정수량과 갯수 일치 필요)"
+              className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs font-mono text-gray-900 dark:text-gray-100 resize-y" />
+            {serialList.length > 0 && (
+              <div className="mt-1 text-[10px] text-gray-500">
+                {serialList.length}건 입력됨{serialList.length !== adjQty && <span className="text-red-500 ml-1">(수량 {adjQty}와 불일치)</span>}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">비고</label>
+            <input type="text" value={note} onChange={e => setNote(e.target.value)} lang="ko"
+              placeholder="조정 사유 (선택)"
+              className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs text-gray-900 dark:text-gray-100" />
+          </div>
+
+          {error && <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 text-xs px-3 py-2 rounded">{error}</div>}
+        </div>
+
+        <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+          <button type="button" onClick={onClose}
+            className="px-4 py-2 rounded text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">취소</button>
+          <button type="button" onClick={handleSave} disabled={saving}
+            className="px-4 py-2 rounded text-xs font-semibold bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50">
+            {saving ? "처리 중..." : "재고조정 처리"}
+          </button>
         </div>
       </div>
     </div>

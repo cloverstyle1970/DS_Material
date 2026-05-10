@@ -13,6 +13,7 @@ export interface TransactionRecord {
   serialNo: string | null;
   requiresReturn: boolean;
   returnStatus: "pending" | "returned" | null;
+  returnType: "scrap" | "unused" | null;
   returnedAt: string | null;
   returnedByUserId: number | null;
   returnedByUserName: string | null;
@@ -69,6 +70,7 @@ export function addTransaction(data: AddTransactionInput): { record?: Transactio
     serialNo:           data.serialNo ?? null,
     requiresReturn:     data.requiresReturn ?? false,
     returnStatus:       data.requiresReturn && data.type === "출고" ? "pending" : null,
+    returnType:         null,
     returnedAt:         null,
     returnedByUserId:   null,
     returnedByUserName: null,

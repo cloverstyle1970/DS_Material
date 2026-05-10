@@ -305,6 +305,7 @@ function dbToTransaction(r: any): TransactionRecord {
     serialNo:           r.serial_no              ?? null,
     requiresReturn:     r.requires_return        ?? false,
     returnStatus:       r.return_status          ?? null,
+    returnType:         r.return_type            ?? null,
     returnedAt:         r.returned_at            ?? null,
     returnedByUserId:   r.returned_by_user_id    ?? null,
     returnedByUserName: r.returned_by_user_name  ?? null,
@@ -518,6 +519,15 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
       );
     }
     return list;
+  }
+  // GET /api/materials/:id — 단일 자재 조회
+  const matIdGet = extractId(path, "/api/materials");
+  if (matIdGet) {
+    const id = decodeURIComponent(matIdGet);
+    const { data, error } = await supabase.from("materials").select("*").eq("id", id).single();
+    if (error) throw new MockApiError(error.message, error.code === "PGRST116" ? 404 : 500);
+    if (!data) throw new MockApiError("not found", 404);
+    return dbToMaterial(data);
   }
   if (path === "/api/categories") {
     const { data, error } = await supabase.from("categories").select("*").order("major_code").order("mid_code").order("code");
@@ -1115,6 +1125,17 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
       if (error) throw new MockApiError(error.message, 500);
       if (result?.error) throw new MockApiError(result.error, 400);
       return dbToTransaction(result.record);
+    }
+
+    if (action === "미사용반납") {
+      const { data: result, error } = await supabase.rpc("mark_unused_return", {
+        p_transaction_id: numId,
+        p_user_id:        userId,
+        p_user_name:      userName,
+      });
+      if (error) throw new MockApiError(error.message, 500);
+      if (result?.error) throw new MockApiError(result.error, 400);
+      return { ok: true, restoredStock: result?.restored_stock };
     }
 
     const { data: tx, error: fetchErr } = await supabase.from("transactions").select("*").eq("id", numId).single();

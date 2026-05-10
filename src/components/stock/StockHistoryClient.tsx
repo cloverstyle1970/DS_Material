@@ -127,6 +127,24 @@ export default function StockHistoryClient({ mode, initial }: Props) {
     }
   }
 
+  async function handleReturn(t: TransactionRecord, action: "반납등록" | "미사용반납") {
+    if (!user) return;
+    const label = action === "반납등록" ? "폐자재 회수" : "미사용 반납 (재입고)";
+    const confirmMsg = action === "미사용반납"
+      ? `미사용 반납 처리하시겠습니까?\n\n자재: ${t.materialName} (${t.materialId})\n현장: ${t.siteName ?? "-"}${t.elevatorName ? ` / ${t.elevatorName}` : ""}\nS/N: ${t.serialNo ?? "-"}\n수량: ${t.qty}\n\n→ 재고가 ${t.qty}개 자동 복원됩니다.`
+      : `폐자재 회수 처리하시겠습니까?\n\n자재: ${t.materialName} (${t.materialId})\n현장: ${t.siteName ?? "-"}${t.elevatorName ? ` / ${t.elevatorName}` : ""}\nS/N: ${t.serialNo ?? "-"}`;
+    if (!confirm(confirmMsg)) return;
+    setActionLoading(t.id);
+    try {
+      await api.patch(`/api/transactions/${t.id}`, { action, userId: user.id, userName: user.name });
+      setTransactions(await api.get<TransactionRecord[]>(`/api/transactions?type=${encodeURIComponent(mode)}`));
+    } catch (e) {
+      alert(`${label} 실패: ` + (e as Error).message);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   async function handleSaveEdit(data: Record<string, unknown>) {
     if (!editingTx) return;
     setActionLoading(editingTx.id);
@@ -305,14 +323,34 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                   </td>
                 )}
                 {!isInbound && (
-                  <td className="px-4 py-3 text-center text-xs whitespace-nowrap">
-                    {!t.requiresReturn ? <span className="text-gray-300 dark:text-gray-600">—</span>
-                      : t.returnStatus === "returned" ? (
-                          <span className="px-2 py-0.5 rounded-full bg-green-50 text-green-700 dark:bg-green-900/40 dark:text-green-300">반납완료</span>
-                        )
-                      : (
-                          <span className="px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">대기</span>
-                        )}
+                  <td className="px-4 py-3 text-center text-xs whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                    {t.returnStatus === "returned" ? (
+                      <span className={`px-2 py-0.5 rounded-full ${
+                        t.returnType === "unused"
+                          ? "bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                          : "bg-green-50 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                      }`}>
+                        {t.returnType === "unused" ? "미사용반납" : "폐자재회수"}
+                      </span>
+                    ) : t.requiresReturn ? (
+                      admin ? (
+                        <button type="button" disabled={actionLoading === t.id}
+                          onClick={() => handleReturn(t, "반납등록")}
+                          className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 hover:bg-orange-200 disabled:opacity-50">
+                          폐자재회수
+                        </button>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">대기</span>
+                      )
+                    ) : admin ? (
+                      <button type="button" disabled={actionLoading === t.id}
+                        onClick={() => handleReturn(t, "미사용반납")}
+                        className="px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300 hover:bg-sky-100 disabled:opacity-50">
+                        미사용반납
+                      </button>
+                    ) : (
+                      <span className="text-gray-300 dark:text-gray-600">—</span>
+                    )}
                   </td>
                 )}
                 <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{t.userName}</td>
