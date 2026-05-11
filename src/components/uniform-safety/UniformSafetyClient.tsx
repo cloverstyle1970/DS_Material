@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth, hasMenuPermission, isAdmin } from "@/context/AuthContext";
+import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-
-const MENU_HREF = "/uniform-safety";
+import { useBackdropClose } from "@/lib/useBackdropClose";
 
 // ============================================================
 // 타입
@@ -29,6 +28,9 @@ interface ReqRow {
   id: number;
   request_type: "근무복" | "안전장구";
   status: "신청" | "처리중" | "수령완료" | "취소";
+  user_id: number;
+  user_name: string;
+  user_dept: string | null;
   note: string | null;
   requested_at: string;
   processed_at: string | null;
@@ -97,26 +99,57 @@ export default function UniformSafetyClient() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // 본인 이력
+  // 본인 신청 이력 (조회는 본인만, 수정/삭제는 본인 신청 + 신청 상태일 때 / 관리자는 모두)
   const [myRequests, setMyRequests] = useState<ReqRow[]>([]);
-  // 자재별 마지막 수령일 맵
+  // 신청 이력 필터
+  const [historyTypeFilter, setHistoryTypeFilter] = useState<"all" | "근무복" | "안전장구">("all");
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<"all" | "신청" | "처리중" | "수령완료" | "취소">("all");
+  const [historyDateFrom, setHistoryDateFrom] = useState("");
+  const [historyDateTo,   setHistoryDateTo]   = useState("");
+  const [historyMaterialFilter, setHistoryMaterialFilter] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
+  const HISTORY_PAGE_SIZE = 10;
+  // 자재별 마지막 수령일 맵 (본인 기준)
   const [lastReceivedMap, setLastReceivedMap] = useState<Map<string, string>>(new Map());
+  // 수정/삭제 상태
+  const [editing, setEditing] = useState<ReqRow | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   // ============================================================
   // 초기 로드
   // ============================================================
 
+  async function reloadRequests() {
+    if (!user) return;
+    const { data } = await supabase.from("uniform_safety_requests")
+      .select("*, items:uniform_safety_request_items(*)")
+      .eq("user_id", user.id)
+      .order("requested_at", { ascending: false })
+      .limit(200);
+    const reqs = (data ?? []) as ReqRow[];
+    setMyRequests(reqs);
+    // 본인 자재별 마지막 수령일 (자재 선택 시 힌트로 사용)
+    const map = new Map<string, string>();
+    for (const r of reqs) {
+      if (r.status !== "수령완료" || !r.received_at) continue;
+      for (const it of r.items ?? []) {
+        const prev = map.get(it.material_id);
+        if (!prev || prev < r.received_at) map.set(it.material_id, r.received_at);
+      }
+    }
+    setLastReceivedMap(map);
+  }
+
   useEffect(() => {
     if (!user) return;
     (async () => {
       setMatLoading(true);
-      const [uniRes, safRes, uniSubRes, safSubRes, userRes, reqRes] = await Promise.all([
+      const [uniRes, safRes, uniSubRes, safSubRes, userRes] = await Promise.all([
         supabase.from("materials").select("id, name, unit").like("id", "D9902%").order("id"),
         supabase.from("materials").select("id, name, unit").like("id", "D9903%").order("id"),
         supabase.from("categories").select("code, label").eq("level", "sub").eq("major_code", "99").eq("mid_code", "02"),
         supabase.from("categories").select("code, label").eq("level", "sub").eq("major_code", "99").eq("mid_code", "03"),
         supabase.from("users").select("uniform_top_size, uniform_bottom_size").eq("id", user.id).single(),
-        supabase.from("uniform_safety_requests").select("*, items:uniform_safety_request_items(*)").eq("user_id", user.id).order("requested_at", { ascending: false }).limit(50),
       ]);
       const unis = (uniRes.data ?? []) as MaterialMini[];
       const safs = (safRes.data ?? []) as MaterialMini[];
@@ -137,26 +170,21 @@ export default function UniformSafetyClient() {
           s.category === "하의" ? { ...s, size: userRes.data!.uniform_bottom_size ?? "" } : s
         ));
       }
-      const reqs = (reqRes.data ?? []) as ReqRow[];
-      setMyRequests(reqs);
-
-      // 자재별 마지막 수령일 (status=수령완료 만)
-      const map = new Map<string, string>();
-      for (const r of reqs) {
-        if (r.status !== "수령완료" || !r.received_at) continue;
-        for (const it of r.items ?? []) {
-          const prev = map.get(it.material_id);
-          if (!prev || prev < r.received_at) map.set(it.material_id, r.received_at);
-        }
-      }
-      setLastReceivedMap(map);
+      await reloadRequests();
       setMatLoading(false);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  // 필터 변경 시 페이지 초기화
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [historyTypeFilter, historyStatusFilter, historyDateFrom, historyDateTo, historyMaterialFilter]);
+
   if (!user) return <div className="p-8 text-center text-sm text-gray-500">로그인이 필요합니다.</div>;
+  // 본인 신청 페이지이므로 로그인된 모든 사용자가 신청 가능 (별도 메뉴 권한 불요)
+  const canCreate = true;
   const admin = isAdmin(user);
-  const canCreate = admin || hasMenuPermission(user, MENU_HREF, "create");
 
   // ============================================================
   // 자재 그룹: 소분류별로 첫 자재만 대표로 사용 (소분류명만 표시)
@@ -263,12 +291,26 @@ export default function UniformSafetyClient() {
       setNote("");
 
       // 이력 다시 로드
-      const reqRes = await supabase.from("uniform_safety_requests").select("*, items:uniform_safety_request_items(*)").eq("user_id", user.id).order("requested_at", { ascending: false }).limit(50);
-      setMyRequests((reqRes.data ?? []) as ReqRow[]);
+      await reloadRequests();
     } catch (e) {
       setMessage({ type: "error", text: e instanceof Error ? e.message : String(e) });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function deleteRequest(row: ReqRow) {
+    if (!user) return;
+    if (!confirm(`신청 [${row.request_type} / ${row.requested_at.slice(0, 16).replace("T", " ")}]을(를) 삭제하시겠습니까?\n\n· 신청 본문과 항목이 모두 삭제됩니다.\n· 복구할 수 없습니다.`)) return;
+    setDeletingId(row.id);
+    try {
+      const { error } = await supabase.from("uniform_safety_requests").delete().eq("id", row.id);
+      if (error) throw error;
+      await reloadRequests();
+    } catch (e) {
+      alert(`삭제 실패: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -435,44 +477,347 @@ export default function UniformSafetyClient() {
           </div>
         </div>
 
-        {/* 본인 신청 이력 */}
+        {/* 내 신청 이력 (본인 신청만 조회 / 신청 상태일 때 본인은 수정·삭제 가능, 관리자는 모두) */}
         <div className={sectionCls}>
           <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3">내 신청 이력</h2>
-          {myRequests.length === 0 ? (
-            <div className="text-center py-6 text-xs text-gray-400">신청 이력이 없습니다.</div>
-          ) : (
-            <div className="space-y-2">
-              {myRequests.map(r => (
-                <div key={r.id} className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 text-xs">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                      r.request_type === "근무복" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
-                                                  : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                    }`}>{r.request_type}</span>
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                      r.status === "수령완료" ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
-                      : r.status === "처리중"  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-                      : r.status === "취소"    ? "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-300"
-                      :                          "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
-                    }`}>{r.status}</span>
-                    <span className="text-gray-400 ml-auto font-mono">{r.requested_at.slice(0, 16).replace("T", " ")}</span>
-                  </div>
-                  <div className="text-gray-700 dark:text-gray-300">
-                    {(r.items ?? []).map(it => (
-                      <span key={it.id} className="mr-3">
-                        {it.category_label && <span className="text-gray-400">[{it.category_label}]</span>} {it.material_name}
-                        {it.size && <span className="text-gray-500"> ({it.size})</span>} ×{it.qty}
-                      </span>
-                    ))}
-                  </div>
-                  {r.note && <div className="mt-1 text-gray-500">📝 {r.note}</div>}
-                  {r.received_at && <div className="mt-1 text-green-600 dark:text-green-400 text-[11px]">✓ 수령완료: {r.received_at.slice(0, 16).replace("T", " ")}</div>}
-                </div>
-              ))}
+          {/* 필터: 기간 / 구분 / 상태 / 품목 */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 mb-1">시작일</label>
+              <input type="date" value={historyDateFrom} onChange={e => setHistoryDateFrom(e.target.value)}
+                className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 mb-1">종료일</label>
+              <input type="date" value={historyDateTo} onChange={e => setHistoryDateTo(e.target.value)}
+                className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 mb-1">구분</label>
+              <select value={historyTypeFilter} onChange={e => setHistoryTypeFilter(e.target.value as typeof historyTypeFilter)}
+                className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                <option value="all">전체</option>
+                <option value="근무복">근무복</option>
+                <option value="안전장구">안전장구</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 mb-1">상태</label>
+              <select value={historyStatusFilter} onChange={e => setHistoryStatusFilter(e.target.value as typeof historyStatusFilter)}
+                className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                <option value="all">전체</option>
+                <option value="신청">신청</option>
+                <option value="처리중">처리중</option>
+                <option value="수령완료">수령완료</option>
+                <option value="취소">취소</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 mb-1">품목</label>
+              {(() => {
+                // 신청 이력에서 품목 옵션 생성 (material_id 단위, 라벨은 자재명)
+                const map = new Map<string, string>();
+                for (const r of myRequests) {
+                  for (const it of r.items ?? []) {
+                    if (!map.has(it.material_id)) map.set(it.material_id, it.material_name);
+                  }
+                }
+                const opts = Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+                return (
+                  <select value={historyMaterialFilter} onChange={e => setHistoryMaterialFilter(e.target.value)}
+                    className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                    <option value="">전체</option>
+                    {opts.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                  </select>
+                );
+              })()}
+            </div>
+          </div>
+          {(historyDateFrom || historyDateTo || historyMaterialFilter || historyTypeFilter !== "all" || historyStatusFilter !== "all") && (
+            <div className="mb-2 flex justify-end">
+              <button type="button" onClick={() => {
+                setHistoryDateFrom(""); setHistoryDateTo(""); setHistoryMaterialFilter("");
+                setHistoryTypeFilter("all"); setHistoryStatusFilter("all");
+              }} className="text-[11px] text-blue-600 hover:underline">필터 초기화</button>
             </div>
           )}
+          {(() => {
+            const list = myRequests
+              .filter(r => historyTypeFilter === "all" ? true : r.request_type === historyTypeFilter)
+              .filter(r => historyStatusFilter === "all" ? true : r.status === historyStatusFilter)
+              .filter(r => {
+                const d = r.requested_at.slice(0, 10);
+                if (historyDateFrom && d < historyDateFrom) return false;
+                if (historyDateTo   && d > historyDateTo)   return false;
+                return true;
+              })
+              .filter(r => {
+                if (!historyMaterialFilter) return true;
+                return (r.items ?? []).some(it => it.material_id === historyMaterialFilter);
+              });
+            if (list.length === 0) {
+              return <div className="text-center py-6 text-xs text-gray-400">조건에 맞는 신청이 없습니다.</div>;
+            }
+            const totalPages = Math.max(1, Math.ceil(list.length / HISTORY_PAGE_SIZE));
+            const safePage = Math.min(historyPage, totalPages);
+            const start = (safePage - 1) * HISTORY_PAGE_SIZE;
+            const pageList = list.slice(start, start + HISTORY_PAGE_SIZE);
+            return (
+              <>
+                <div className="mb-2 text-[11px] text-gray-500">
+                  총 {list.length}건 · {safePage}/{totalPages} 페이지 ({start + 1}~{Math.min(start + HISTORY_PAGE_SIZE, list.length)})
+                </div>
+                <div className="space-y-2">
+                  {pageList.map(r => {
+                    // 본인 + 처리 시작 전(신청) 이거나, 관리자
+                    const canModify = r.status === "신청" || admin;
+                    return (
+                    <div key={r.id} className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 text-xs">
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          r.request_type === "근무복" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                                                      : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                        }`}>{r.request_type}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          r.status === "수령완료" ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                          : r.status === "처리중"  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                          : r.status === "취소"    ? "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-300"
+                          :                          "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                        }`}>{r.status}</span>
+                        <span className="text-gray-400 ml-auto font-mono">{r.requested_at.slice(0, 16).replace("T", " ")}</span>
+                      </div>
+                      <div className="text-gray-700 dark:text-gray-300">
+                        {(r.items ?? []).map(it => (
+                          <span key={it.id} className="mr-3">
+                            {it.category_label && <span className="text-gray-400">[{it.category_label}]</span>} {it.material_name}
+                            {it.size && <span className="text-gray-500"> ({it.size})</span>} ×{it.qty}
+                          </span>
+                        ))}
+                      </div>
+                      {r.note && <div className="mt-1 text-gray-500">📝 {r.note}</div>}
+                      {r.received_at && <div className="mt-1 text-green-600 dark:text-green-400 text-[11px]">✓ 수령완료: {r.received_at.slice(0, 16).replace("T", " ")}</div>}
+                      {canModify && (
+                        <div className="mt-2 flex gap-2 justify-end">
+                          <button type="button" onClick={() => setEditing(r)}
+                            className="px-3 py-1 rounded text-[11px] font-semibold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200">
+                            ✏️ 수정
+                          </button>
+                          <button type="button" disabled={deletingId === r.id}
+                            onClick={() => deleteRequest(r)}
+                            className="px-3 py-1 rounded text-[11px] font-semibold bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 hover:bg-red-100 disabled:opacity-50">
+                            {deletingId === r.id ? "삭제 중..." : "🗑️ 삭제"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    );
+                  })}
+                </div>
+                {totalPages > 1 && (
+                  <Pagination page={safePage} totalPages={totalPages} onChange={setHistoryPage} />
+                )}
+              </>
+            );
+          })()}
         </div>
       </div>
+
+      {editing && (
+        <EditModal
+          request={editing}
+          onClose={() => setEditing(null)}
+          onSaved={async () => { setEditing(null); await reloadRequests(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// 수정 모달 — 항목 수량·사이즈, 비고 편집 / 항목 삭제 가능 (최소 1개 유지)
+// ============================================================
+
+interface EditableItem {
+  id: number;
+  material_id: string;
+  material_name: string;
+  category_label: string | null;
+  size: string;
+  qty: number;
+  _deleted: boolean;
+}
+
+function EditModal({ request, onClose, onSaved }: {
+  request: ReqRow;
+  onClose: () => void;
+  onSaved: () => void | Promise<void>;
+}) {
+  const backdrop = useBackdropClose(onClose);
+  const [items, setItems] = useState<EditableItem[]>(
+    (request.items ?? []).map(it => ({
+      id: it.id,
+      material_id: it.material_id,
+      material_name: it.material_name,
+      category_label: it.category_label,
+      size: it.size ?? "",
+      qty: it.qty,
+      _deleted: false,
+    }))
+  );
+  const [note, setNote] = useState(request.note ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const isUniform = request.request_type === "근무복";
+  const remainingCount = items.filter(it => !it._deleted).length;
+
+  function toggleDelete(id: number) {
+    setItems(prev => prev.map(it => it.id === id ? { ...it, _deleted: !it._deleted } : it));
+  }
+  function patch(id: number, p: Partial<EditableItem>) {
+    setItems(prev => prev.map(it => it.id === id ? { ...it, ...p } : it));
+  }
+
+  async function save() {
+    setError("");
+    if (remainingCount === 0) { setError("최소 1개 이상의 항목이 필요합니다. 전체 삭제는 카드의 [삭제] 버튼을 사용하세요."); return; }
+    const alive = items.filter(it => !it._deleted);
+    for (const it of alive) {
+      if (it.qty < 1) { setError(`${it.material_name}: 수량은 1 이상이어야 합니다.`); return; }
+    }
+    setSaving(true);
+    try {
+      // 1) 비고 업데이트
+      const { error: e1 } = await supabase.from("uniform_safety_requests").update({ note: note.trim() || null }).eq("id", request.id);
+      if (e1) throw e1;
+      // 2) 삭제 표시된 항목 제거
+      const toDelete = items.filter(it => it._deleted).map(it => it.id);
+      if (toDelete.length > 0) {
+        const { error: e2 } = await supabase.from("uniform_safety_request_items").delete().in("id", toDelete);
+        if (e2) throw e2;
+      }
+      // 3) 남은 항목들 qty/size 업데이트 (변경 여부 무관하게 모두 update — 단순함 우선)
+      for (const it of alive) {
+        const { error: e3 } = await supabase.from("uniform_safety_request_items").update({
+          qty: it.qty,
+          size: isUniform ? (it.size || null) : null,
+        }).eq("id", it.id);
+        if (e3) throw e3;
+      }
+      await onSaved();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" {...backdrop}>
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <div>
+            <div className="text-base font-bold text-gray-900 dark:text-white">신청 수정 [{request.request_type}]</div>
+            <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+              {request.user_name}{request.user_dept ? ` (${request.user_dept})` : ""} · {request.requested_at.slice(0, 16).replace("T", " ")}
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-3">
+          <div className="text-[11px] font-bold text-gray-600 dark:text-gray-300">신청 항목 ({remainingCount}개)</div>
+          {items.map(it => (
+            <div key={it.id} className={"rounded-lg border p-3 " + (it._deleted
+              ? "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10 opacity-60"
+              : "border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/30")}>
+              <div className="flex items-center gap-2 mb-2">
+                {it.category_label && <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200">{it.category_label}</span>}
+                <span className="text-xs font-bold text-gray-800 dark:text-gray-100">{it.material_name}</span>
+                <span className="font-mono text-[10px] text-gray-400">{it.material_id}</span>
+                <button type="button" onClick={() => toggleDelete(it.id)}
+                  className={"ml-auto text-[11px] " + (it._deleted ? "text-blue-600 hover:underline" : "text-red-500 hover:underline")}>
+                  {it._deleted ? "↩ 되돌리기" : "🗑 항목 삭제"}
+                </button>
+              </div>
+              {!it._deleted && (
+                <div className="grid grid-cols-2 gap-2">
+                  {isUniform && (
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 mb-1">사이즈</label>
+                      <input type="text" value={it.size} onChange={e => patch(it.id, { size: e.target.value })}
+                        placeholder="예: 95, L, 270"
+                        className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
+                    </div>
+                  )}
+                  <div className={isUniform ? "" : "col-span-2"}>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1">수량</label>
+                    <input type="number" min={1} value={it.qty}
+                      onChange={e => patch(it.id, { qty: Math.max(1, parseInt(e.target.value) || 1) })}
+                      className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+
+          <div>
+            <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1">비고</label>
+            <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} lang="ko"
+              placeholder="신청 사유나 참고 사항"
+              className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm resize-none" />
+          </div>
+
+          {error && (
+            <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 text-xs px-3 py-2 rounded">{error}</div>
+          )}
+        </div>
+
+        <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+          <button type="button" onClick={onClose}
+            className="px-4 py-2 rounded text-sm font-semibold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">취소</button>
+          <button type="button" onClick={save} disabled={saving}
+            className="px-4 py-2 rounded text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+            {saving ? "저장 중..." : "저장"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// 페이지네이션 — 처음/이전/페이지번호(최대 5개)/다음/마지막
+// ============================================================
+
+function Pagination({ page, totalPages, onChange }: {
+  page: number;
+  totalPages: number;
+  onChange: (p: number) => void;
+}) {
+  const windowSize = 5;
+  let start = Math.max(1, page - Math.floor(windowSize / 2));
+  const end = Math.min(totalPages, start + windowSize - 1);
+  start = Math.max(1, end - windowSize + 1);
+  const pages: number[] = [];
+  for (let i = start; i <= end; i++) pages.push(i);
+
+  const btnCls = "px-2 py-1 rounded text-[11px] font-semibold border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed";
+
+  return (
+    <div className="mt-3 flex items-center justify-center gap-1">
+      <button type="button" disabled={page === 1} onClick={() => onChange(1)} className={btnCls}>«</button>
+      <button type="button" disabled={page === 1} onClick={() => onChange(page - 1)} className={btnCls}>‹</button>
+      {pages.map(p => (
+        <button key={p} type="button" onClick={() => onChange(p)}
+          className={p === page
+            ? "px-2.5 py-1 rounded text-[11px] font-bold bg-blue-600 text-white"
+            : btnCls}>
+          {p}
+        </button>
+      ))}
+      <button type="button" disabled={page === totalPages} onClick={() => onChange(page + 1)} className={btnCls}>›</button>
+      <button type="button" disabled={page === totalPages} onClick={() => onChange(totalPages)} className={btnCls}>»</button>
     </div>
   );
 }

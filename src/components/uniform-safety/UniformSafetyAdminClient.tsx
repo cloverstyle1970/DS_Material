@@ -54,14 +54,19 @@ export default function UniformSafetyAdminClient() {
 
   // 처리 탭 필터
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("신청");
-  const [search, setSearch] = useState("");
+  const [mgFrom,     setMgFrom]     = useState("");
+  const [mgTo,       setMgTo]       = useState("");
+  const [mgType,     setMgType]     = useState<"all" | "근무복" | "안전장구">("all");
+  const [mgUserId,   setMgUserId]   = useState<string>("");   // "" or user.id 문자열
+  const [mgMaterial, setMgMaterial] = useState<string>("");   // material_id
 
   // 이력 탭 필터
   const todayIso = new Date().toISOString().slice(0, 10);
   const monthAgoIso = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
   const [histFrom, setHistFrom] = useState(monthAgoIso);
   const [histTo,   setHistTo]   = useState(todayIso);
-  const [histUser, setHistUser] = useState("");
+  const [histUserId,   setHistUserId]   = useState<string>("");
+  const [histMaterial, setHistMaterial] = useState<string>("");
   const [histType, setHistType] = useState<"all" | "근무복" | "안전장구">("all");
 
   // 처리 진행 중
@@ -151,14 +156,13 @@ export default function UniformSafetyAdminClient() {
 
   const filteredManage = rows
     .filter(r => statusFilter === "all" ? true : r.status === statusFilter)
+    .filter(r => mgType === "all" ? true : r.request_type === mgType)
     .filter(r => {
-      if (!search.trim()) return true;
-      const s = search.trim().toLowerCase();
-      return r.user_name.toLowerCase().includes(s)
-        || (r.user_dept ?? "").toLowerCase().includes(s)
-        || (r.note ?? "").toLowerCase().includes(s)
-        || r.items.some(it => it.material_name.toLowerCase().includes(s));
-    });
+      const d = r.requested_at.slice(0, 10);
+      return (!mgFrom || d >= mgFrom) && (!mgTo || d <= mgTo);
+    })
+    .filter(r => mgUserId ? String(r.user_id) === mgUserId : true)
+    .filter(r => mgMaterial ? r.items.some(it => it.material_id === mgMaterial) : true);
 
   const filteredHistory = rows
     .filter(r => r.status === "수령완료")
@@ -167,11 +171,21 @@ export default function UniformSafetyAdminClient() {
       const d = (r.received_at ?? r.requested_at).slice(0, 10);
       return (!histFrom || d >= histFrom) && (!histTo || d <= histTo);
     })
-    .filter(r => {
-      if (!histUser.trim()) return true;
-      const s = histUser.trim().toLowerCase();
-      return r.user_name.toLowerCase().includes(s) || (r.user_dept ?? "").toLowerCase().includes(s);
-    });
+    .filter(r => histUserId ? String(r.user_id) === histUserId : true)
+    .filter(r => histMaterial ? r.items.some(it => it.material_id === histMaterial) : true);
+
+  // 물품 옵션: rows 의 모든 item 으로부터 distinct material 추출
+  const materialOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of rows) {
+      for (const it of r.items) {
+        if (!map.has(it.material_id)) map.set(it.material_id, it.material_name);
+      }
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [rows]);
 
   // 이력 탭: 자재별 집계
   const materialAgg = useMemo(() => {
@@ -222,8 +236,8 @@ export default function UniformSafetyAdminClient() {
       {/* 처리 탭 */}
       {tab === "manage" && (
         <>
-          <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex flex-wrap items-center gap-3">
-            <div className="flex gap-1">
+          <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
               {(["신청","처리중","수령완료","취소","all"] as StatusFilter[]).map(f => (
                 <button key={f} type="button" onClick={() => setStatusFilter(f)}
                   className={`px-3 py-1 text-[11px] font-semibold rounded-full border ${
@@ -234,10 +248,49 @@ export default function UniformSafetyAdminClient() {
                   {f === "all" ? `전체 (${rows.length})` : `${f} (${counts[f as Status]})`}
                 </button>
               ))}
+              {(mgFrom || mgTo || mgType !== "all" || mgUserId || mgMaterial) && (
+                <button type="button" onClick={() => {
+                  setMgFrom(""); setMgTo(""); setMgType("all"); setMgUserId(""); setMgMaterial("");
+                }} className="ml-auto text-[11px] text-blue-600 hover:underline">필터 초기화</button>
+              )}
             </div>
-            <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="신청자·부서·자재명·비고 검색" lang="ko"
-              className="flex-1 max-w-md px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-xs" />
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 mb-1">시작일</label>
+                <input type="date" value={mgFrom} onChange={e => setMgFrom(e.target.value)}
+                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 mb-1">종료일</label>
+                <input type="date" value={mgTo} onChange={e => setMgTo(e.target.value)}
+                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 mb-1">구분</label>
+                <select value={mgType} onChange={e => setMgType(e.target.value as typeof mgType)}
+                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs">
+                  <option value="all">전체</option>
+                  <option value="근무복">근무복</option>
+                  <option value="안전장구">안전장구</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 mb-1">사용자</label>
+                <select value={mgUserId} onChange={e => setMgUserId(e.target.value)}
+                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs">
+                  <option value="">전체</option>
+                  {users.map(u => <option key={u.id} value={String(u.id)}>{u.name}{u.dept ? ` (${u.dept})` : ""}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 mb-1">물품</label>
+                <select value={mgMaterial} onChange={e => setMgMaterial(e.target.value)}
+                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs">
+                  <option value="">전체</option>
+                  {materialOptions.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+            </div>
           </div>
 
           <div className="px-6 py-4 space-y-2">
@@ -255,32 +308,52 @@ export default function UniformSafetyAdminClient() {
       {/* 이력 탭 */}
       {tab === "history" && (
         <>
-          <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div>
-              <label className="block text-[10px] font-bold text-gray-500 mb-1">시작일</label>
-              <input type="date" value={histFrom} onChange={e => setHistFrom(e.target.value)}
-                className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
+          <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 space-y-2">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 mb-1">시작일</label>
+                <input type="date" value={histFrom} onChange={e => setHistFrom(e.target.value)}
+                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 mb-1">종료일</label>
+                <input type="date" value={histTo} onChange={e => setHistTo(e.target.value)}
+                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 mb-1">구분</label>
+                <select value={histType} onChange={e => setHistType(e.target.value as typeof histType)}
+                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs">
+                  <option value="all">전체</option>
+                  <option value="근무복">근무복</option>
+                  <option value="안전장구">안전장구</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 mb-1">사용자</label>
+                <select value={histUserId} onChange={e => setHistUserId(e.target.value)}
+                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs">
+                  <option value="">전체</option>
+                  {users.map(u => <option key={u.id} value={String(u.id)}>{u.name}{u.dept ? ` (${u.dept})` : ""}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 mb-1">물품</label>
+                <select value={histMaterial} onChange={e => setHistMaterial(e.target.value)}
+                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs">
+                  <option value="">전체</option>
+                  {materialOptions.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="block text-[10px] font-bold text-gray-500 mb-1">종료일</label>
-              <input type="date" value={histTo} onChange={e => setHistTo(e.target.value)}
-                className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-gray-500 mb-1">사원/부서</label>
-              <input type="text" value={histUser} onChange={e => setHistUser(e.target.value)} lang="ko"
-                placeholder="이름 또는 부서"
-                className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-gray-500 mb-1">구분</label>
-              <select value={histType} onChange={e => setHistType(e.target.value as typeof histType)}
-                className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs">
-                <option value="all">전체</option>
-                <option value="근무복">근무복</option>
-                <option value="안전장구">안전장구</option>
-              </select>
-            </div>
+            {(histUserId || histMaterial || histType !== "all" || histFrom !== monthAgoIso || histTo !== todayIso) && (
+              <div className="flex justify-end">
+                <button type="button" onClick={() => {
+                  setHistFrom(monthAgoIso); setHistTo(todayIso); setHistType("all");
+                  setHistUserId(""); setHistMaterial("");
+                }} className="text-[11px] text-blue-600 hover:underline">필터 초기화</button>
+              </div>
+            )}
           </div>
 
           <div className="px-6 py-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
