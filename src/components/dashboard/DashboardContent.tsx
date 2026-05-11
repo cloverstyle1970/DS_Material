@@ -48,7 +48,7 @@ export default function DashboardContent() {
             <StatCard label="총 유지보수 현장" value={stats.totalSites} unit="곳" color="blue" />
             <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 flex flex-col justify-center shadow-sm">
                <div className="flex justify-between items-center mb-3">
-                 <span className="text-sm font-medium text-slate-500 dark:text-slate-400">TKE 현장</span>
+                 <span className="text-sm font-medium text-slate-500 dark:text-slate-400">TK 현장</span>
                  <span className="font-bold text-slate-800 dark:text-slate-100">{stats.tkeSites.toLocaleString()}곳</span>
                </div>
                <div className="flex justify-between items-center">
@@ -60,7 +60,7 @@ export default function DashboardContent() {
             <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 flex flex-col justify-center shadow-sm xl:col-span-3">
                <div className="grid grid-cols-3 gap-4 text-center divide-x divide-slate-100 dark:divide-slate-700">
                  <div>
-                   <div className="text-xs font-medium text-slate-400 mb-1">TKE</div>
+                   <div className="text-xs font-medium text-slate-400 mb-1">TK</div>
                    <div className="font-bold text-lg text-slate-700 dark:text-slate-200">{stats.tkeElevators.toLocaleString()}대</div>
                  </div>
                  <div>

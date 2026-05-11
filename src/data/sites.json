@@ -2,7 +2,7 @@
   {
     "id": 1,
     "name": "B1삼송동빌딩",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": "TK-POG",
     "contractDate": null,
     "contractStart": null,
@@ -32,7 +32,7 @@
   {
     "id": 2,
     "name": "B1행신동644-31대수선공사(대한예수교장로회양화진교회)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": "대솔POG",
     "contractDate": null,
     "contractStart": null,
@@ -62,7 +62,7 @@
   {
     "id": 3,
     "name": "DMC스타비즈 5st 해링턴타워(고양향동오피스 5-1)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": "TK-POG",
     "contractDate": null,
     "contractStart": null,
@@ -92,7 +92,7 @@
   {
     "id": 4,
     "name": "DMC스타비즈 7st 해링턴타워(고양향동오피스 7-1)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": "TK-POG MAX",
     "contractDate": null,
     "contractStart": null,
@@ -176,7 +176,7 @@
   {
     "id": 7,
     "name": "ICT일산(고양화정오피스텔-1,2,3,4호기)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": "대솔FM",
     "contractDate": null,
     "contractStart": null,
@@ -236,7 +236,7 @@
   {
     "id": 9,
     "name": "가림타워더퍼스트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": "TK-FM",
     "contractDate": null,
     "contractStart": null,
@@ -266,7 +266,7 @@
   {
     "id": 10,
     "name": "가월리1848-9공장",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": "TK-FM MAX",
     "contractDate": null,
     "contractStart": null,
@@ -296,7 +296,7 @@
   {
     "id": 11,
     "name": "가좌동392-1 더힐에비뉴",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": "TK-FM MAX PLUS",
     "contractDate": null,
     "contractStart": null,
@@ -326,7 +326,7 @@
   {
     "id": 12,
     "name": "강별면옥(법원리680-4),(구)법원리근생주택",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": "TK-FM MAX",
     "contractDate": null,
     "contractStart": null,
@@ -356,7 +356,7 @@
   {
     "id": 13,
     "name": "강선10단지한양2차아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -386,7 +386,7 @@
   {
     "id": 14,
     "name": "강선마을9단지화성아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -506,7 +506,7 @@
   {
     "id": 18,
     "name": "검산유승한내들아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -536,7 +536,7 @@
   {
     "id": 19,
     "name": "경기도향교재단교하향교(교하향교명륜교육관)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -596,7 +596,7 @@
   {
     "id": 21,
     "name": "고려(현대)정형외과  밝은미래신경외과",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -626,7 +626,7 @@
   {
     "id": 22,
     "name": "고양R-10-9단독주택(안진5길40)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -686,7 +686,7 @@
   {
     "id": 24,
     "name": "고양덕은단독2-3-3",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -716,7 +716,7 @@
   {
     "id": 25,
     "name": "고양동1132-12",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -746,7 +746,7 @@
   {
     "id": 26,
     "name": "고양동122근생",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -770,7 +770,7 @@
   {
     "id": 27,
     "name": "고양동149단독주택(1호기)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -800,7 +800,7 @@
   {
     "id": 28,
     "name": "고양동238-25근생(세종명가B동) 236-32",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -830,7 +830,7 @@
   {
     "id": 29,
     "name": "고양동31-85(라이온스포츠)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -860,7 +860,7 @@
   {
     "id": 30,
     "name": "고양동B1-2BL5BT(음성농장)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -884,7 +884,7 @@
   {
     "id": 31,
     "name": "고양동주택지조성지구C1-13-4,3(스프링빌1,2동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -914,7 +914,7 @@
   {
     "id": 32,
     "name": "고양섬김의교회",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -944,7 +944,7 @@
   {
     "id": 33,
     "name": "고양시시립하나어린이집",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -974,7 +974,7 @@
   {
     "id": 34,
     "name": "고양시향동성당",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1058,7 +1058,7 @@
   {
     "id": 37,
     "name": "고양원흥오피스텔(1,2,3호기)휴로스센트럴302오피스텔",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1118,7 +1118,7 @@
   {
     "id": 39,
     "name": "고양중학교(삼송2중학교)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1148,7 +1148,7 @@
   {
     "id": 40,
     "name": "고양지축A-1블럭LH아파트(나인포레)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1178,7 +1178,7 @@
   {
     "id": 41,
     "name": "고양지축R1,4,5로트신규설치(민트하우스)1-4-5",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1238,7 +1238,7 @@
   {
     "id": 43,
     "name": "고양지축R1-13-6상가주택(안진로45 )",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1298,7 +1298,7 @@
   {
     "id": 45,
     "name": "고양지축R1-2-1(안진2길9)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1328,7 +1328,7 @@
   {
     "id": 46,
     "name": "고양지축R1-2-10( 안진2길14 )",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1358,7 +1358,7 @@
   {
     "id": 47,
     "name": "고양지축R1-7-7(포르티움)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1442,7 +1442,7 @@
   {
     "id": 50,
     "name": "고양지축공공주택지구R1-34-11단독주택(지축4로7)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1472,7 +1472,7 @@
   {
     "id": 51,
     "name": "고양지축공공주택지구R1블럭1-8(안진1길10)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1532,7 +1532,7 @@
   {
     "id": 53,
     "name": "고양지축공공주택지구R1블럭14-8(1-8해)안진6길2",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1562,7 +1562,7 @@
   {
     "id": 54,
     "name": "고양지축공공주택지구R1블럭9-8로트(지축동696-6번지)안진5길26",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1622,7 +1622,7 @@
   {
     "id": 56,
     "name": "고양지축지구R1-33-14(지축4로20)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1652,7 +1652,7 @@
   {
     "id": 57,
     "name": "고양지축지구R1-5-5(안진4길24)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1682,7 +1682,7 @@
   {
     "id": 58,
     "name": "고양풍림10단지아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1706,7 +1706,7 @@
   {
     "id": 59,
     "name": "고양풍림아파트5단지아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1730,7 +1730,7 @@
   {
     "id": 60,
     "name": "고양풍림아파트6단지아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1760,7 +1760,7 @@
   {
     "id": 61,
     "name": "고양향동DMC마스터원",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1790,7 +1790,7 @@
   {
     "id": 62,
     "name": "고양화성그린빌아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1820,7 +1820,7 @@
   {
     "id": 63,
     "name": "골프존파크 금촌제우스점(스포태인)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -1880,7 +1880,7 @@
   {
     "id": 65,
     "name": "관산동산25(A,B동)102,101동(세종멤버스)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2054,7 +2054,7 @@
   {
     "id": 71,
     "name": "교하일번가 주,파인스카이도시",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2078,7 +2078,7 @@
   {
     "id": 72,
     "name": "구읍리680-5",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2138,7 +2138,7 @@
   {
     "id": 74,
     "name": "금촌동288-6(모던하임)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2168,7 +2168,7 @@
   {
     "id": 75,
     "name": "금촌동356근생",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2198,7 +2198,7 @@
   {
     "id": 76,
     "name": "금촌동384-21주택(라피테2차)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2228,7 +2228,7 @@
   {
     "id": 77,
     "name": "금촌동407-2(우성빌딩)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2258,7 +2258,7 @@
   {
     "id": 78,
     "name": "금촌동466-129",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2288,7 +2288,7 @@
   {
     "id": 79,
     "name": "금촌동495-4신축공사(명남더블레스)301호",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2318,7 +2318,7 @@
   {
     "id": 80,
     "name": "금촌동512-2(A,B동)다솜이캐슬(프로방스16)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2348,7 +2348,7 @@
   {
     "id": 81,
     "name": "금촌동65-23(호텔얌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2378,7 +2378,7 @@
   {
     "id": 82,
     "name": "금촌동67-1(브라운도트호텔)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2408,7 +2408,7 @@
   {
     "id": 83,
     "name": "금촌동765-25(민들레캠프)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2438,7 +2438,7 @@
   {
     "id": 84,
     "name": "금촌동795-1(파주데이케어센터)효본빌딩",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2468,7 +2468,7 @@
   {
     "id": 85,
     "name": "금촌동796-9(세림타워)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2498,7 +2498,7 @@
   {
     "id": 86,
     "name": "금촌동799-3(마제스티)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2558,7 +2558,7 @@
   {
     "id": 88,
     "name": "금촌동941-20(코어맥스)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2612,7 +2612,7 @@
   {
     "id": 90,
     "name": "금촌동현아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2642,7 +2642,7 @@
   {
     "id": 91,
     "name": "금촌세운해비치빌(1,2동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2672,7 +2672,7 @@
   {
     "id": 92,
     "name": "금촌세운해비치빌(3,4동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2702,7 +2702,7 @@
   {
     "id": 93,
     "name": "금촌세운해비치빌(5,6,7동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2732,7 +2732,7 @@
   {
     "id": 94,
     "name": "금촌세운해비치빌(8,9,10,11,12,13동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2762,7 +2762,7 @@
   {
     "id": 95,
     "name": "금촌주공7단지아파트(서원마을)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2822,7 +2822,7 @@
   {
     "id": 97,
     "name": "금호프라자(금호상가)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2882,7 +2882,7 @@
   {
     "id": 99,
     "name": "기린하우스",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2912,7 +2912,7 @@
   {
     "id": 100,
     "name": "기쁨의집",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -2942,7 +2942,7 @@
   {
     "id": 101,
     "name": "기산리387-22근생",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3032,7 +3032,7 @@
   {
     "id": 104,
     "name": "꽃내음2길63",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3086,7 +3086,7 @@
   {
     "id": 106,
     "name": "꿈동산(파주금촌773-2)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3116,7 +3116,7 @@
   {
     "id": 107,
     "name": "나우빌(삼송동1214-2, 춘국빌딩)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3146,7 +3146,7 @@
   {
     "id": 108,
     "name": "남정시티프라자6차(1,2호기)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3170,7 +3170,7 @@
   {
     "id": 109,
     "name": "내유동15-12근생(어썸타운)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3200,7 +3200,7 @@
   {
     "id": 110,
     "name": "내유동272-15다세대(아이빌101,104동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3230,7 +3230,7 @@
   {
     "id": 111,
     "name": "내유동272-16다세대(아이빌103동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3260,7 +3260,7 @@
   {
     "id": 112,
     "name": "내유동272-1다세대(아이빌105동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3290,7 +3290,7 @@
   {
     "id": 113,
     "name": "내유동275-14(송림리츠빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3320,7 +3320,7 @@
   {
     "id": 114,
     "name": "내유동284-3외284-43외(더파크101)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3350,7 +3350,7 @@
   {
     "id": 115,
     "name": "내유동284-3외284-43외(더파크102)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3374,7 +3374,7 @@
   {
     "id": 116,
     "name": "내유동587-9빌라(서원퍼스트빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3404,7 +3404,7 @@
   {
     "id": 117,
     "name": "내유동589-1(베스트빌102동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3464,7 +3464,7 @@
   {
     "id": 119,
     "name": "내유동휴그린(702-39,41,42,50)-220,222,223,224동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3674,7 +3674,7 @@
   {
     "id": 126,
     "name": "내포리391-1(오블라디)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3704,7 +3704,7 @@
   {
     "id": 127,
     "name": "농협이념중앙교육원",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3734,7 +3734,7 @@
   {
     "id": 128,
     "name": "농협중앙회파주지부",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3764,7 +3764,7 @@
   {
     "id": 129,
     "name": "뇌조리2차노유자시설 A동 효누림실버케어",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3794,7 +3794,7 @@
   {
     "id": 130,
     "name": "뇌조리2차노유자시설 B동 라비앙로즈요양원",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3824,7 +3824,7 @@
   {
     "id": 131,
     "name": "뇌조리2차노유자시설 C동 삼성재활실버케어",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3854,7 +3854,7 @@
   {
     "id": 132,
     "name": "뇌조리노유자시설(가동)마음편한요양원",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3884,7 +3884,7 @@
   {
     "id": 133,
     "name": "뇌조리노유자시설(나동)금빛인생요양원",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3914,7 +3914,7 @@
   {
     "id": 134,
     "name": "뇌조리노유자시설(다동)어울림요양원",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3944,7 +3944,7 @@
   {
     "id": 135,
     "name": "눌노리821-1노유자시설(행복재활요양원)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -3974,7 +3974,7 @@
   {
     "id": 136,
     "name": "능곡교회교육관",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -4004,7 +4004,7 @@
   {
     "id": 137,
     "name": "능곡금호아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -4034,7 +4034,7 @@
   {
     "id": 138,
     "name": "능곡동행정복지센터",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -4094,7 +4094,7 @@
   {
     "id": 140,
     "name": "능곡중앙교육센타",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -4154,7 +4154,7 @@
   {
     "id": 142,
     "name": "능곡풍림아이원아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -4214,7 +4214,7 @@
   {
     "id": 144,
     "name": "능안리요양원신축공사(1호기)라온요양원",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -4244,7 +4244,7 @@
   {
     "id": 145,
     "name": "능안리요양원신축공사(2,3호기)파주운정요양원",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -4268,7 +4268,7 @@
   {
     "id": 146,
     "name": "다솜빌리지1,2동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -4352,7 +4352,7 @@
   {
     "id": 149,
     "name": "당동리710-27(파주성민학교)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -4412,7 +4412,7 @@
   {
     "id": 151,
     "name": "당동리916-7(스타빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -4442,7 +4442,7 @@
   {
     "id": 152,
     "name": "당동리923(엘까미노)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -4472,7 +4472,7 @@
   {
     "id": 153,
     "name": "당동리초원연립주택(101,102,103,104,105,106동)디어빌리지",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -4502,7 +4502,7 @@
   {
     "id": 154,
     "name": "당동리초원연립주택(107동)디어빌리지(201동201호)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -4562,7 +4562,7 @@
   {
     "id": 156,
     "name": "대곡역롯데캐슬엘클라씨아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -4592,7 +4592,7 @@
   {
     "id": 157,
     "name": "대능리218-30(호명힐크라운1~5동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -4622,7 +4622,7 @@
   {
     "id": 158,
     "name": "대능리435-4(쉐우드가구)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -4952,7 +4952,7 @@
   {
     "id": 169,
     "name": "대성빌딩(원당노블요양원)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5012,7 +5012,7 @@
   {
     "id": 171,
     "name": "대원리263-1,18공동주택(포엠빌1,2단지)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5042,7 +5042,7 @@
   {
     "id": 172,
     "name": "대자그린씨티빌(대자동823-3다세대)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5072,7 +5072,7 @@
   {
     "id": 173,
     "name": "대자동1027-3,4/1028-11공동주택(대자그린빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5102,7 +5102,7 @@
   {
     "id": 174,
     "name": "대자동1167-4(법문사)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5132,7 +5132,7 @@
   {
     "id": 175,
     "name": "대자동1227-3 대자빌",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5162,7 +5162,7 @@
   {
     "id": 176,
     "name": "대자동351-11번지신축태양",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5192,7 +5192,7 @@
   {
     "id": 177,
     "name": "대자동634-6로보빌딩(A동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5222,7 +5222,7 @@
   {
     "id": 178,
     "name": "대자동634-6로보빌딩(B동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5252,7 +5252,7 @@
   {
     "id": 179,
     "name": "대자동69-12(동인빌딩)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5282,7 +5282,7 @@
   {
     "id": 180,
     "name": "대자동은혜의집요양원(은혜마을)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5312,7 +5312,7 @@
   {
     "id": 181,
     "name": "대장동338-2(은우주택)디아크빌",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5402,7 +5402,7 @@
   {
     "id": 184,
     "name": "더테라스111동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5432,7 +5432,7 @@
   {
     "id": 185,
     "name": "더테라스112동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5492,7 +5492,7 @@
   {
     "id": 187,
     "name": "더플레이스A동(덕은동한양플러스뷰A동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5522,7 +5522,7 @@
   {
     "id": 188,
     "name": "더플레이스B동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5552,7 +5552,7 @@
   {
     "id": 189,
     "name": "더힐퍼스트2동(상지석동단지형빌라 이동열)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5582,7 +5582,7 @@
   {
     "id": 190,
     "name": "덕양구덕은동상가주택(대덕산2길70)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5612,7 +5612,7 @@
   {
     "id": 191,
     "name": "덕은GL메트로시티한강",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5642,7 +5642,7 @@
   {
     "id": 192,
     "name": "덕은단독2-4-8(대덕산2길35)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5672,7 +5672,7 @@
   {
     "id": 193,
     "name": "덕은단독2-8-10(대덕산2길16)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5702,7 +5702,7 @@
   {
     "id": 194,
     "name": "덕은단독2BL3-8(퍼스트빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5732,7 +5732,7 @@
   {
     "id": 195,
     "name": "덕은동2-4-5번지상가주택신축공사(클라우디움 덕은)주택근",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5762,7 +5762,7 @@
   {
     "id": 196,
     "name": "덕은동20-24(대덕산2길52주택)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5792,7 +5792,7 @@
   {
     "id": 197,
     "name": "덕은동20-72근생다가구주택(라파빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5822,7 +5822,7 @@
   {
     "id": 198,
     "name": "덕은동20-78,79 R2-12-2상가주택(대덕산2길23)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5852,7 +5852,7 @@
   {
     "id": 199,
     "name": "덕은동20-78,79 R2-12-2상가주택(대덕산2길25)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5882,7 +5882,7 @@
   {
     "id": 200,
     "name": "덕은동325-1(휴하우징-대덕산3길12)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -5996,7 +5996,7 @@
   {
     "id": 204,
     "name": "덕은동9-217,218,207빌라(그레이프힐103동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -6026,7 +6026,7 @@
   {
     "id": 205,
     "name": "덕은동9-220,235,219빌라(그레이프힐101,102동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -6056,7 +6056,7 @@
   {
     "id": 206,
     "name": "덕은동9-4,225빌라(그레이프힐104동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -6086,7 +6086,7 @@
   {
     "id": 207,
     "name": "덕은동9-4-225빌라(그레이프힐105동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -6206,7 +6206,7 @@
   {
     "id": 211,
     "name": "덕은지구2-6-2BL(늘숲)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -6326,7 +6326,7 @@
   {
     "id": 215,
     "name": "덕은지구3 1블럭7로트(수하우스)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -6386,7 +6386,7 @@
   {
     "id": 217,
     "name": "덕은지구3-3-16(대덕산3길38주택)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -6446,7 +6446,7 @@
   {
     "id": 219,
     "name": "덕은지구3-3-7점포주택",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -6506,7 +6506,7 @@
   {
     "id": 221,
     "name": "덕은지구R3-2-4(도담하우스)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -6536,7 +6536,7 @@
   {
     "id": 222,
     "name": "덕은지구단독2 4블럭6로트(수에르떼)대덕산2길31",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -6566,7 +6566,7 @@
   {
     "id": 223,
     "name": "덕은지구단독2-1-3(대덕산2길74)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -6596,7 +6596,7 @@
   {
     "id": 224,
     "name": "덕은지구단독2-1-5BL(엘림하우스)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -6656,7 +6656,7 @@
   {
     "id": 226,
     "name": "덕은지구단독2-3-4",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -6716,7 +6716,7 @@
   {
     "id": 228,
     "name": "덕은지구단독3-1-5(재환주택)대덕산3길11",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -6746,7 +6746,7 @@
   {
     "id": 229,
     "name": "덕은지구단독3-3-6(대덕산3길18)더존빌",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -6776,7 +6776,7 @@
   {
     "id": 230,
     "name": "덕은지구단독R2블록7-6로트(코너트리)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -6836,7 +6836,7 @@
   {
     "id": 232,
     "name": "도내동1001번지(산타플러스)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -6866,7 +6866,7 @@
   {
     "id": 233,
     "name": "도내동104-2근생(릴리엔)원흥동739-4,삼원안깅52-13",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -6986,7 +6986,7 @@
   {
     "id": 237,
     "name": "도내동1079(센트럴타워)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7016,7 +7016,7 @@
   {
     "id": 238,
     "name": "도내동1119-3(의장로29-35)엘림에벤에셀",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7076,7 +7076,7 @@
   {
     "id": 240,
     "name": "도내동14-4근생(도래울안길54-1)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7190,7 +7190,7 @@
   {
     "id": 244,
     "name": "도내동206-3상가주택(유스빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7304,7 +7304,7 @@
   {
     "id": 248,
     "name": "도내동213-2(아름누리)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7334,7 +7334,7 @@
   {
     "id": 249,
     "name": "도내동214-1근생(칸타빌레)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7364,7 +7364,7 @@
   {
     "id": 250,
     "name": "도내동215-1(대명하우스)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7394,7 +7394,7 @@
   {
     "id": 251,
     "name": "도내동217-4근생(청옥)신축판매",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7424,7 +7424,7 @@
   {
     "id": 252,
     "name": "도내동24-2상가주택(선프라자)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7454,7 +7454,7 @@
   {
     "id": 253,
     "name": "도내동307-4근생(도내동1117단독주택)-의장로29-9주택",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7484,7 +7484,7 @@
   {
     "id": 254,
     "name": "도내동951(원흥 힐사이드파크오피스텔)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7514,7 +7514,7 @@
   {
     "id": 255,
     "name": "도내동959(테마타워)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7544,7 +7544,7 @@
   {
     "id": 256,
     "name": "도래울빌딩(전의이씨도래울빌딩)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7604,7 +7604,7 @@
   {
     "id": 258,
     "name": "동남아트월드(전망용)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7664,7 +7664,7 @@
   {
     "id": 260,
     "name": "동물권행동카라(카라더봄센터)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7694,7 +7694,7 @@
   {
     "id": 261,
     "name": "동산동188-2 휴이스",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7754,7 +7754,7 @@
   {
     "id": 263,
     "name": "동산동348-2빌딩",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7844,7 +7844,7 @@
   {
     "id": 266,
     "name": "동산동355-7",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7874,7 +7874,7 @@
   {
     "id": 267,
     "name": "동산동357-4상가주택(세천빌딩)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7904,7 +7904,7 @@
   {
     "id": 268,
     "name": "동산동47-33(수현프리모)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7934,7 +7934,7 @@
   {
     "id": 269,
     "name": "동산동47-46다세대(제니스빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7964,7 +7964,7 @@
   {
     "id": 270,
     "name": "동산동47-53외2필지(1,2호기)한양",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -7994,7 +7994,7 @@
   {
     "id": 271,
     "name": "동산동48-18(101동)서연빌리지2차",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8024,7 +8024,7 @@
   {
     "id": 272,
     "name": "동산동48-18(103동)서연빌리지2차",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8054,7 +8054,7 @@
   {
     "id": 273,
     "name": "동산동48-45근생",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8114,7 +8114,7 @@
   {
     "id": 275,
     "name": "동산동53-40공동주택(더세영)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8138,7 +8138,7 @@
   {
     "id": 276,
     "name": "동산동53-65(창릉씨티빌A동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8168,7 +8168,7 @@
   {
     "id": 277,
     "name": "동산동56-32,33다가구주택(모던하임A동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8198,7 +8198,7 @@
   {
     "id": 278,
     "name": "동산동56-32,33다가구주택(모던하임B,C동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8258,7 +8258,7 @@
   {
     "id": 280,
     "name": "동산동62",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8288,7 +8288,7 @@
   {
     "id": 281,
     "name": "동산동75-1외1필지(주,에몬스프리미엄아울렛지점)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8318,7 +8318,7 @@
   {
     "id": 282,
     "name": "동산동75-3외1필지(장애인용)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8378,7 +8378,7 @@
   {
     "id": 284,
     "name": "동산동근린생활시설(2210-3)카페칸타빌레 동산동358-2",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8408,7 +8408,7 @@
   {
     "id": 285,
     "name": "동산동다가구주택(빛나다율) 47-31",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8438,7 +8438,7 @@
   {
     "id": 286,
     "name": "동산동더휴(102동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8468,7 +8468,7 @@
   {
     "id": 287,
     "name": "두원공과대학교 파주캠퍼스(본관2,기숙사1,산학관2)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8498,7 +8498,7 @@
   {
     "id": 288,
     "name": "두원빌딩(행신동1080근생)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8528,7 +8528,7 @@
   {
     "id": 289,
     "name": "둥지하우스(신원동1161-17빌라)신원동640-1",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8558,7 +8558,7 @@
   {
     "id": 290,
     "name": "드림빌리지(원흥동652-2)청송드림빌",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8618,7 +8618,7 @@
   {
     "id": 292,
     "name": "드림하이(문산당동상가주택)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8648,7 +8648,7 @@
   {
     "id": 293,
     "name": "라테라스102동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8678,7 +8678,7 @@
   {
     "id": 294,
     "name": "라테라스105동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8852,7 +8852,7 @@
   {
     "id": 300,
     "name": "리치빌리지 관산동 345-13",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8876,7 +8876,7 @@
   {
     "id": 301,
     "name": "마지리47-13(삼성당)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8936,7 +8936,7 @@
   {
     "id": 303,
     "name": "맥금동121-4신축공사",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8966,7 +8966,7 @@
   {
     "id": 304,
     "name": "메가박스 고양스타필드점",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -8996,7 +8996,7 @@
   {
     "id": 305,
     "name": "메주꽃요양원(내포리373)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9026,7 +9026,7 @@
   {
     "id": 306,
     "name": "명빌딩(덕양구근생및주택)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9086,7 +9086,7 @@
   {
     "id": 308,
     "name": "모슈쿠라2호점",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9146,7 +9146,7 @@
   {
     "id": 310,
     "name": "모아프라자(향동지구근생10-1)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9176,7 +9176,7 @@
   {
     "id": 311,
     "name": "목동동1103주택",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9206,7 +9206,7 @@
   {
     "id": 312,
     "name": "목동동878",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9236,7 +9236,7 @@
   {
     "id": 313,
     "name": "목동동878-1",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9266,7 +9266,7 @@
   {
     "id": 314,
     "name": "무궁화아파트(1,2호기)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9410,7 +9410,7 @@
   {
     "id": 319,
     "name": "문산세아아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9440,7 +9440,7 @@
   {
     "id": 320,
     "name": "문산신원아침도시아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9470,7 +9470,7 @@
   {
     "id": 321,
     "name": "문산양우내안애아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9500,7 +9500,7 @@
   {
     "id": 322,
     "name": "문산장안8차아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9530,7 +9530,7 @@
   {
     "id": 323,
     "name": "문산터미널타워(문산리7-5)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9560,7 +9560,7 @@
   {
     "id": 324,
     "name": "문산휴먼빌아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9590,7 +9590,7 @@
   {
     "id": 325,
     "name": "문수장빌딩(보람요양원)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9650,7 +9650,7 @@
   {
     "id": 327,
     "name": "미래여성병원(파주)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9680,7 +9680,7 @@
   {
     "id": 328,
     "name": "반디호텔",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9710,7 +9710,7 @@
   {
     "id": 329,
     "name": "발렌시아C동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9740,7 +9740,7 @@
   {
     "id": 330,
     "name": "발리모텔",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9770,7 +9770,7 @@
   {
     "id": 331,
     "name": "백석리79-2요양원(행복사랑요양원)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9800,7 +9800,7 @@
   {
     "id": 332,
     "name": "법원리416-1(다솜주야간보호센터)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9854,7 +9854,7 @@
   {
     "id": 334,
     "name": "벽제농협협동조합(승객1,장애1,2,화물3)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9884,7 +9884,7 @@
   {
     "id": 335,
     "name": "벽제동208판매시설(주,꼬끼오)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9914,7 +9914,7 @@
   {
     "id": 336,
     "name": "벽제동251-4,5,9(4,5,3동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9944,7 +9944,7 @@
   {
     "id": 337,
     "name": "벽제동고양외고기숙사(고양외국어고등학교)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -9974,7 +9974,7 @@
   {
     "id": 338,
     "name": "별빛7단지청구현대아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10034,7 +10034,7 @@
   {
     "id": 340,
     "name": "봉서리단지형빌라(메종드힐)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10064,7 +10064,7 @@
   {
     "id": 341,
     "name": "봉서리해비치빌(301,302,303동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10094,7 +10094,7 @@
   {
     "id": 342,
     "name": "봉서리해비치빌(305,306,307동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10124,7 +10124,7 @@
   {
     "id": 343,
     "name": "봉서리해비치빌(308,309,310,311동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10154,7 +10154,7 @@
   {
     "id": 344,
     "name": "봉서리해비치빌(313,314동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10184,7 +10184,7 @@
   {
     "id": 345,
     "name": "봉암리1351-4",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10244,7 +10244,7 @@
   {
     "id": 347,
     "name": "봉암리261(앤세븐디자인)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10274,7 +10274,7 @@
   {
     "id": 348,
     "name": "봉암리단지형빌라(펜타빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10418,7 +10418,7 @@
   {
     "id": 353,
     "name": "봉일천성원아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10448,7 +10448,7 @@
   {
     "id": 354,
     "name": "부곡리7-14(교보문고신물류센터)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10508,7 +10508,7 @@
   {
     "id": 356,
     "name": "블루모터스(동산동2210-9)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10538,7 +10538,7 @@
   {
     "id": 357,
     "name": "비채빌-A동(관산동540다세대주택)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10568,7 +10568,7 @@
   {
     "id": 358,
     "name": "비채빌-B동(관산동540다세대주택)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10598,7 +10598,7 @@
   {
     "id": 359,
     "name": "비채빌-C동(관산동540다세대주택)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10628,7 +10628,7 @@
   {
     "id": 360,
     "name": "사리현동351외2필지",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10682,7 +10682,7 @@
   {
     "id": 362,
     "name": "사리현동444-2(벧엘의집)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10712,7 +10712,7 @@
   {
     "id": 363,
     "name": "삼문빌딩",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10772,7 +10772,7 @@
   {
     "id": 365,
     "name": "삼송619상가(신원캐슬프라자1)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10886,7 +10886,7 @@
   {
     "id": 369,
     "name": "삼송동128-177다세대(P177)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10946,7 +10946,7 @@
   {
     "id": 371,
     "name": "삼송동128-2 A동(서연프라자)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -10976,7 +10976,7 @@
   {
     "id": 372,
     "name": "삼송동128-240 1단지(삼송뉴시티)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11006,7 +11006,7 @@
   {
     "id": 373,
     "name": "삼송동128-324(에덴스테이2동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11030,7 +11030,7 @@
   {
     "id": 374,
     "name": "삼송동128-46(박지영주택)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11060,7 +11060,7 @@
   {
     "id": 375,
     "name": "삼송동128-59",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11090,7 +11090,7 @@
   {
     "id": 376,
     "name": "삼송동128-60근생(이효근주택)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11120,7 +11120,7 @@
   {
     "id": 377,
     "name": "삼송동128-71(대영펠리시티A동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11150,7 +11150,7 @@
   {
     "id": 378,
     "name": "삼송동128-71(대영펠리시티B동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11180,7 +11180,7 @@
   {
     "id": 379,
     "name": "삼송동128-86(에덴스테이1동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11210,7 +11210,7 @@
   {
     "id": 380,
     "name": "삼송동128-90근생신축(수빌딩)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11270,7 +11270,7 @@
   {
     "id": 382,
     "name": "삼송동16-46근생(명빌딩)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11360,7 +11360,7 @@
   {
     "id": 385,
     "name": "삼송동27-5(벧엘동일상가)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11390,7 +11390,7 @@
   {
     "id": 386,
     "name": "삼송동299-1다가구(행복한집)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11420,7 +11420,7 @@
   {
     "id": 387,
     "name": "삼송동301-2상가주택",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11504,7 +11504,7 @@
   {
     "id": 390,
     "name": "삼송동302(라온재빌딩)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11588,7 +11588,7 @@
   {
     "id": 393,
     "name": "삼송동313-6(삼송동상가)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11678,7 +11678,7 @@
   {
     "id": 396,
     "name": "삼송동314-3주택(세솔로1길 13-11)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11708,7 +11708,7 @@
   {
     "id": 397,
     "name": "삼송동318-3(대영힐하우스)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11738,7 +11738,7 @@
   {
     "id": 398,
     "name": "삼송동347-1,2(서연빌딩)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11768,7 +11768,7 @@
   {
     "id": 399,
     "name": "삼송동347-3근린생활시설(ACK빌딩)구,성보빌딩",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11822,7 +11822,7 @@
   {
     "id": 401,
     "name": "삼송동350-1(아이엠하우스)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11852,7 +11852,7 @@
   {
     "id": 402,
     "name": "삼송동351-1(흥복빌리지)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11882,7 +11882,7 @@
   {
     "id": 403,
     "name": "삼송동352-14주택",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11942,7 +11942,7 @@
   {
     "id": 405,
     "name": "삼송동352-9(모아드림빌9)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -11972,7 +11972,7 @@
   {
     "id": 406,
     "name": "삼송동353-16근생(삼인빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12032,7 +12032,7 @@
   {
     "id": 408,
     "name": "삼송동353다세대(K-HOUSE)삼송동 353-7",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12062,7 +12062,7 @@
   {
     "id": 409,
     "name": "삼송동354-7근생(엘로힘에비뉴)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12092,7 +12092,7 @@
   {
     "id": 410,
     "name": "삼송동356-12(삼원로2길6-5)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12122,7 +12122,7 @@
   {
     "id": 411,
     "name": "삼송동356-5(아트리움)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12152,7 +12152,7 @@
   {
     "id": 412,
     "name": "삼송동357-12(성민빌3)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12182,7 +12182,7 @@
   {
     "id": 413,
     "name": "삼송동357-16(단하우스)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12212,7 +12212,7 @@
   {
     "id": 414,
     "name": "삼송동357-1주택(수우재)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12302,7 +12302,7 @@
   {
     "id": 417,
     "name": "삼송동362-1(대림에코빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12362,7 +12362,7 @@
   {
     "id": 419,
     "name": "삼송동364-1(법륜)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12416,7 +12416,7 @@
   {
     "id": 421,
     "name": "삼송동364근생",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12446,7 +12446,7 @@
   {
     "id": 422,
     "name": "삼송동366-1",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12500,7 +12500,7 @@
   {
     "id": 424,
     "name": "삼송동366-5(주택근)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12560,7 +12560,7 @@
   {
     "id": 426,
     "name": "삼송동368-1근생신축(1호기)상현재",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12590,7 +12590,7 @@
   {
     "id": 427,
     "name": "삼송동370-2",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12620,7 +12620,7 @@
   {
     "id": 428,
     "name": "삼송동50-69",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12650,7 +12650,7 @@
   {
     "id": 429,
     "name": "삼송동50-77(프리마베라)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12680,7 +12680,7 @@
   {
     "id": 430,
     "name": "삼송동50-80신축(오복가)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12710,7 +12710,7 @@
   {
     "id": 431,
     "name": "삼송동50-86(미호빌딩)덕궁빌라",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12740,7 +12740,7 @@
   {
     "id": 432,
     "name": "삼송동50-90(은향채)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12770,7 +12770,7 @@
   {
     "id": 433,
     "name": "삼송동57-15외1(미소빌라A,B동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12800,7 +12800,7 @@
   {
     "id": 434,
     "name": "삼송동57-25(유앤미)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12830,7 +12830,7 @@
   {
     "id": 435,
     "name": "삼송동61-38(삼송스타힐)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12890,7 +12890,7 @@
   {
     "id": 437,
     "name": "삼송동78-58신축(더 휴스카이)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12920,7 +12920,7 @@
   {
     "id": 438,
     "name": "삼송동84-36(벨라카사)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12950,7 +12950,7 @@
   {
     "id": 439,
     "name": "삼송동다가구주택(349-2)PNP상가주택",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -12980,7 +12980,7 @@
   {
     "id": 440,
     "name": "삼송동도시형생활주택(303-2)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -13010,7 +13010,7 @@
   {
     "id": 441,
     "name": "삼송동주택(삼송동361-4)원클린",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -13040,7 +13040,7 @@
   {
     "id": 442,
     "name": "삼송동포레스트101~104동(143-82/143-89)삼송동근생A~D",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -13070,7 +13070,7 @@
   {
     "id": 443,
     "name": "삼송수질복원센타",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -13100,7 +13100,7 @@
   {
     "id": 444,
     "name": "삼송월드타워(효원산업개발)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -13130,7 +13130,7 @@
   {
     "id": 445,
     "name": "삼송중앙성결교회",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -13160,7 +13160,7 @@
   {
     "id": 446,
     "name": "삼송지구16-1-10(신원동638-5) 파인포레-센트럴하우스",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -13184,7 +13184,7 @@
   {
     "id": 447,
     "name": "삼송지구유치원신축공사(꿈나라유치원)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -13448,7 +13448,7 @@
   {
     "id": 456,
     "name": "서로의향기요양원증측(참행복한요양원)다동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -13478,7 +13478,7 @@
   {
     "id": 457,
     "name": "서연주차타워",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -13508,7 +13508,7 @@
   {
     "id": 458,
     "name": "서연하우스(원흥동640-1)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -13538,7 +13538,7 @@
   {
     "id": 459,
     "name": "서정중학교",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -13628,7 +13628,7 @@
   {
     "id": 462,
     "name": "선유리1364-2(정암아트)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -13748,7 +13748,7 @@
   {
     "id": 466,
     "name": "선유리266-1(일정빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -13778,7 +13778,7 @@
   {
     "id": 467,
     "name": "선유리772-27외(온누리파크1단지)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -13808,7 +13808,7 @@
   {
     "id": 468,
     "name": "선유리772-27외(온누리파크2단지)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -13868,7 +13868,7 @@
   {
     "id": 470,
     "name": "성사동300-3근생",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -13898,7 +13898,7 @@
   {
     "id": 471,
     "name": "성사동426",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -13928,7 +13928,7 @@
   {
     "id": 472,
     "name": "성사중학교",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -13958,7 +13958,7 @@
   {
     "id": 473,
     "name": "성서동494-18(골드리움B동(마상로168)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -13982,7 +13982,7 @@
   {
     "id": 474,
     "name": "성훈빌딩",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14102,7 +14102,7 @@
   {
     "id": 478,
     "name": "세신훼밀리타운",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14132,7 +14132,7 @@
   {
     "id": 479,
     "name": "세종빌리지(관산동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14162,7 +14162,7 @@
   {
     "id": 480,
     "name": "소담전원빌",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14192,7 +14192,7 @@
   {
     "id": 481,
     "name": "소만5단지삼신아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14222,7 +14222,7 @@
   {
     "id": 482,
     "name": "소만6단지성원아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14252,7 +14252,7 @@
   {
     "id": 483,
     "name": "소만마을3단지늘푸른아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14312,7 +14312,7 @@
   {
     "id": 485,
     "name": "송도빌딩",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14342,7 +14342,7 @@
   {
     "id": 486,
     "name": "송촌토파즈아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14372,7 +14372,7 @@
   {
     "id": 487,
     "name": "수린나몽마르뜨",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14402,7 +14402,7 @@
   {
     "id": 488,
     "name": "수린나몽마르뜨(201동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14456,7 +14456,7 @@
   {
     "id": 490,
     "name": "수정빌리지(동산동1227-6)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14516,7 +14516,7 @@
   {
     "id": 492,
     "name": "순복음밝은빛교회",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14606,7 +14606,7 @@
   {
     "id": 495,
     "name": "스카이캐슬A,B동(구,가온캐슬)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14636,7 +14636,7 @@
   {
     "id": 496,
     "name": "스타필드 고양(동산꽃맞이공원주차장포함)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14660,7 +14660,7 @@
   {
     "id": 497,
     "name": "신산리154-21(광영프라자)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14690,7 +14690,7 @@
   {
     "id": 498,
     "name": "신산리214-1번지다세대주택신축(예가채)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14744,7 +14744,7 @@
   {
     "id": 500,
     "name": "신선설농탕(엘레베이터)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14774,7 +14774,7 @@
   {
     "id": 501,
     "name": "신성타워(파주시문산리6-2)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14804,7 +14804,7 @@
   {
     "id": 502,
     "name": "신성프라자  주,대솔이엘",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": "TK-POG",
     "contractDate": "1231-12-22",
     "contractStart": "1231-11-22",
@@ -14828,7 +14828,7 @@
   {
     "id": 503,
     "name": "신원2로45-6(327-2)상아빌딩",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14858,7 +14858,7 @@
   {
     "id": 504,
     "name": "신원동1161-13(신원파크빌)신원동639-2",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14882,7 +14882,7 @@
   {
     "id": 505,
     "name": "신원동628-1(테마프라자)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14912,7 +14912,7 @@
   {
     "id": 506,
     "name": "신원동638-1(ELTM 에벤에셀2)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14942,7 +14942,7 @@
   {
     "id": 507,
     "name": "신원동638-2(느티나무그늘)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -14972,7 +14972,7 @@
   {
     "id": 508,
     "name": "신원동641",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15002,7 +15002,7 @@
   {
     "id": 509,
     "name": "신원동641-4",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15032,7 +15032,7 @@
   {
     "id": 510,
     "name": "신원동642-1신축(신원동 아느칸빌Ⅵ)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15062,7 +15062,7 @@
   {
     "id": 511,
     "name": "신원동642-2(유림Vill)유림빌",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15092,7 +15092,7 @@
   {
     "id": 512,
     "name": "신원동642다가구(파인포레)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15122,7 +15122,7 @@
   {
     "id": 513,
     "name": "신원동644-1(해븐빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15152,7 +15152,7 @@
   {
     "id": 514,
     "name": "신원동644-2",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15182,7 +15182,7 @@
   {
     "id": 515,
     "name": "신원동647-2(원클린)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15302,7 +15302,7 @@
   {
     "id": 519,
     "name": "신원동650-1주택(신원로2길28-15)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15362,7 +15362,7 @@
   {
     "id": 521,
     "name": "신원동650-8(화니빌)원클린",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15392,7 +15392,7 @@
   {
     "id": 522,
     "name": "신원동651",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15422,7 +15422,7 @@
   {
     "id": 523,
     "name": "신원동651-2(옹스전하우스)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15452,7 +15452,7 @@
   {
     "id": 524,
     "name": "신원동651-3(원클린)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15482,7 +15482,7 @@
   {
     "id": 525,
     "name": "신원동651-7",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15512,7 +15512,7 @@
   {
     "id": 526,
     "name": "신원동651-8(제가원1)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15572,7 +15572,7 @@
   {
     "id": 528,
     "name": "신원동성프란치스코성당",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15602,7 +15602,7 @@
   {
     "id": 529,
     "name": "신원중학교(삼송3중학교)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15632,7 +15632,7 @@
   {
     "id": 530,
     "name": "신원초등학교(삼송초등학교)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15692,7 +15692,7 @@
   {
     "id": 532,
     "name": "신풍프라자",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15746,7 +15746,7 @@
   {
     "id": 534,
     "name": "아동동357-2",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15776,7 +15776,7 @@
   {
     "id": 535,
     "name": "아동동357-6",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15806,7 +15806,7 @@
   {
     "id": 536,
     "name": "아름터프라자",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15836,7 +15836,7 @@
   {
     "id": 537,
     "name": "아이하우스1,2차(1,2동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15866,7 +15866,7 @@
   {
     "id": 538,
     "name": "아침동산(금촌동941-3)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -15896,7 +15896,7 @@
   {
     "id": 539,
     "name": "안진2길5(지축지구R1 1-5)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16016,7 +16016,7 @@
   {
     "id": 543,
     "name": "애덕의집보호작업장(2,3호기)소울베이커리",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16046,7 +16046,7 @@
   {
     "id": 544,
     "name": "야당동192-88 로체101동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16076,7 +16076,7 @@
   {
     "id": 545,
     "name": "야당동192-88 로체102동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16166,7 +16166,7 @@
   {
     "id": 548,
     "name": "야동동624다세대2차(도담빌4,5동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16196,7 +16196,7 @@
   {
     "id": 549,
     "name": "야동동72-14도시형생활주택",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16226,7 +16226,7 @@
   {
     "id": 550,
     "name": "약수암사찰",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16280,7 +16280,7 @@
   {
     "id": 552,
     "name": "어반트리C동(더부띠크)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16310,7 +16310,7 @@
   {
     "id": 553,
     "name": "에벤에셀 (용두동397-7신축공사)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16370,7 +16370,7 @@
   {
     "id": 555,
     "name": "에이스궁전모텔리모델링(에이스모텔)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16430,7 +16430,7 @@
   {
     "id": 557,
     "name": "에이스빌아파트교체공사",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16460,7 +16460,7 @@
   {
     "id": 558,
     "name": "에코하우스A동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16490,7 +16490,7 @@
   {
     "id": 559,
     "name": "에코하우스B동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16520,7 +16520,7 @@
   {
     "id": 560,
     "name": "에코하우스C동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16610,7 +16610,7 @@
   {
     "id": 563,
     "name": "엘리시아107동(봉서리257-7)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16640,7 +16640,7 @@
   {
     "id": 564,
     "name": "연풍리해피존7차",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16730,7 +16730,7 @@
   {
     "id": 567,
     "name": "예담11가 (신산리205-6)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16760,7 +16760,7 @@
   {
     "id": 568,
     "name": "예원추모관",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16814,7 +16814,7 @@
   {
     "id": 570,
     "name": "예중파크뷰아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16934,7 +16934,7 @@
   {
     "id": 574,
     "name": "오금동226-4(미래광고)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16964,7 +16964,7 @@
   {
     "id": 575,
     "name": "오금동597-2다가구",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -16994,7 +16994,7 @@
   {
     "id": 576,
     "name": "오금동598-2(라온하우스)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -17024,7 +17024,7 @@
   {
     "id": 577,
     "name": "오금동598-3주택(유앤아이)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -17054,7 +17054,7 @@
   {
     "id": 578,
     "name": "오금동599-1단독주택(오금1로57 )",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -17084,7 +17084,7 @@
   {
     "id": 579,
     "name": "오금동599-2단독주택(오금1로59 )",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -17114,7 +17114,7 @@
   {
     "id": 580,
     "name": "오금동599-6(창경삼공)오금1로67",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -17174,7 +17174,7 @@
   {
     "id": 582,
     "name": "오금동604-9근생",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -17378,7 +17378,7 @@
   {
     "id": 589,
     "name": "오성프라자(삼송동305-1,2근린생활시설)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -17408,7 +17408,7 @@
   {
     "id": 590,
     "name": "오피스텔라코드",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -17438,7 +17438,7 @@
   {
     "id": 591,
     "name": "옥빛마을13단지일신아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -17468,7 +17468,7 @@
   {
     "id": 592,
     "name": "옥빛마을16단지아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -17498,7 +17498,7 @@
   {
     "id": 593,
     "name": "옥빛마을17단지아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -17558,7 +17558,7 @@
   {
     "id": 595,
     "name": "용두동353-14근생 와이에이치빌딩(쏘렌토)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -17648,7 +17648,7 @@
   {
     "id": 598,
     "name": "용두동462-1,2신축-어울림빌103,104동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -17678,7 +17678,7 @@
   {
     "id": 599,
     "name": "용두동462-2신축(4,5동)어울림빌105동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -17768,7 +17768,7 @@
   {
     "id": 602,
     "name": "용두동더휴",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -17798,7 +17798,7 @@
   {
     "id": 603,
     "name": "우리애요양병원",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -17828,7 +17828,7 @@
   {
     "id": 604,
     "name": "우리집원룸",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -17858,7 +17858,7 @@
   {
     "id": 605,
     "name": "운정푸르지오파르세나아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -17912,7 +17912,7 @@
   {
     "id": 607,
     "name": "원당제일교회",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -17942,7 +17942,7 @@
   {
     "id": 608,
     "name": "원흥동105-6단독주택(헬싱키)741-5",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18002,7 +18002,7 @@
   {
     "id": 610,
     "name": "원흥동2블럭17-2(프레하임)도래울 경배와찬양교회",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18032,7 +18032,7 @@
   {
     "id": 611,
     "name": "원흥동373(미르젠빌A동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18062,7 +18062,7 @@
   {
     "id": 612,
     "name": "원흥동375-12",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18092,7 +18092,7 @@
   {
     "id": 613,
     "name": "원흥동541-16(코방고양점)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18122,7 +18122,7 @@
   {
     "id": 614,
     "name": "원흥동620-5(라임빌딩)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18152,7 +18152,7 @@
   {
     "id": 615,
     "name": "원흥동621주차타워(킹마트원흥점)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18182,7 +18182,7 @@
   {
     "id": 616,
     "name": "원흥동629(한일골드타워)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18212,7 +18212,7 @@
   {
     "id": 617,
     "name": "원흥동633-1,2신축(PATIO.34)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18242,7 +18242,7 @@
   {
     "id": 618,
     "name": "원흥동634-4(호텔 윈)1,2,3호기",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18272,7 +18272,7 @@
   {
     "id": 619,
     "name": "원흥동641-4신축공사(리빈디자인)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18332,7 +18332,7 @@
   {
     "id": 621,
     "name": "원흥동646-4",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18362,7 +18362,7 @@
   {
     "id": 622,
     "name": "원흥동647-5(킴스유빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18422,7 +18422,7 @@
   {
     "id": 624,
     "name": "원흥동655-2상가주택(현빌딩)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18452,7 +18452,7 @@
   {
     "id": 625,
     "name": "원흥동659-7(다다빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18512,7 +18512,7 @@
   {
     "id": 627,
     "name": "원흥동660-3(주택근)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18536,7 +18536,7 @@
   {
     "id": 628,
     "name": "원흥동664-2다가구(수와주빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18566,7 +18566,7 @@
   {
     "id": 629,
     "name": "원흥동664-3(주택근)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18620,7 +18620,7 @@
   {
     "id": 631,
     "name": "원흥동703(지벤컴퍼니타워)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18710,7 +18710,7 @@
   {
     "id": 634,
     "name": "원흥동737-7(삼원안길52-5)735-2",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18770,7 +18770,7 @@
   {
     "id": 636,
     "name": "원흥동성당",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18800,7 +18800,7 @@
   {
     "id": 637,
     "name": "원흥동엘리제(1,5동) 원흥동411",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18830,7 +18830,7 @@
   {
     "id": 638,
     "name": "원흥동엘리제(2동) 원흥동411",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18860,7 +18860,7 @@
   {
     "id": 639,
     "name": "원흥동엘리제(3동)원흥동411",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18890,7 +18890,7 @@
   {
     "id": 640,
     "name": "원흥동엘리제(4동)원흥동411",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18920,7 +18920,7 @@
   {
     "id": 641,
     "name": "원흥동탑클래식(상가)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18944,7 +18944,7 @@
   {
     "id": 642,
     "name": "원흥동탑클래식(오피스텔)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -18974,7 +18974,7 @@
   {
     "id": 643,
     "name": "원흥동평화교회신축",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19004,7 +19004,7 @@
   {
     "id": 644,
     "name": "원흥역푸르지오시티",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19028,7 +19028,7 @@
   {
     "id": 645,
     "name": "원흥지구단독1-4-1다가구(원흥동738-5,도내동104-1)J&H 빌딩",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19058,7 +19058,7 @@
   {
     "id": 646,
     "name": "원흥지구단독2-12-1다가구(도내동212-1)J&H 2빌딩",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19082,7 +19082,7 @@
   {
     "id": 647,
     "name": "원흥지구단독2-17-7다가구(하이하우싱)도내동스페이스",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19112,7 +19112,7 @@
   {
     "id": 648,
     "name": "원흥지구주차빌딩(원흥월드타워)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19142,7 +19142,7 @@
   {
     "id": 649,
     "name": "원흥택지단독3블럭2-3(코지라움)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19172,7 +19172,7 @@
   {
     "id": 650,
     "name": "원흥퍼스트푸르지오시티",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19202,7 +19202,7 @@
   {
     "id": 651,
     "name": "웨스턴파크2차 201동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19232,7 +19232,7 @@
   {
     "id": 652,
     "name": "웨스턴파크2차 202동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19262,7 +19262,7 @@
   {
     "id": 653,
     "name": "유퍼스트빌딩",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19286,7 +19286,7 @@
   {
     "id": 654,
     "name": "윤군상빌딩(도내동203-1)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19316,7 +19316,7 @@
   {
     "id": 655,
     "name": "은혜의집",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19346,7 +19346,7 @@
   {
     "id": 656,
     "name": "이마트트레이더스 고양스타필드점(3,23호기)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19400,7 +19400,7 @@
   {
     "id": 658,
     "name": "일산동국홈타운209동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19460,7 +19460,7 @@
   {
     "id": 660,
     "name": "일산브라운스톤",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19538,7 +19538,7 @@
   {
     "id": 663,
     "name": "자운서원로14-14(파주벧엘교회)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19598,7 +19598,7 @@
   {
     "id": 665,
     "name": "장곡리166-7",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19628,7 +19628,7 @@
   {
     "id": 666,
     "name": "장곡리692-3,4(주,신용사옥)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19658,7 +19658,7 @@
   {
     "id": 667,
     "name": "장안프라자",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19742,7 +19742,7 @@
   {
     "id": 670,
     "name": "정다움아파트(1,2,3호기)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19802,7 +19802,7 @@
   {
     "id": 672,
     "name": "정원노인요양원",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19856,7 +19856,7 @@
   {
     "id": 674,
     "name": "제일메디컬센터",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19916,7 +19916,7 @@
   {
     "id": 676,
     "name": "조이빌리지(시몬의집)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19964,7 +19964,7 @@
   {
     "id": 678,
     "name": "주교동1133근생(에이치엠72)독곶이길72근생",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -19988,7 +19988,7 @@
   {
     "id": 679,
     "name": "주교동567-7",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -20012,7 +20012,7 @@
   {
     "id": 680,
     "name": "주교동610-6업무시설(스카이팰리스)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -20036,7 +20036,7 @@
   {
     "id": 681,
     "name": "주교동문화빌딩(1호기)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": "TK-FM",
     "contractDate": null,
     "contractStart": null,
@@ -20060,7 +20060,7 @@
   {
     "id": 682,
     "name": "준빌딩",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -20084,7 +20084,7 @@
   {
     "id": 683,
     "name": "지에스프라자",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -20192,7 +20192,7 @@
   {
     "id": 687,
     "name": "지축R1-17-5단독주택(오부자1길30 )",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -20360,7 +20360,7 @@
   {
     "id": 693,
     "name": "지축동1102-2",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -20432,7 +20432,7 @@
   {
     "id": 696,
     "name": "지축동1142-11(MJ하우스)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -20456,7 +20456,7 @@
   {
     "id": 697,
     "name": "지축동1154-2",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -20486,7 +20486,7 @@
   {
     "id": 698,
     "name": "지축동137-4(둥지하우스 지축2차)온새미로",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -20516,7 +20516,7 @@
   {
     "id": 699,
     "name": "지축동148-2(북한산그린파크빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -20546,7 +20546,7 @@
   {
     "id": 700,
     "name": "지축동173(스웨첸탑)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -20576,7 +20576,7 @@
   {
     "id": 701,
     "name": "지축동234(벧엘빌딩, 북한산스튜디오)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -20606,7 +20606,7 @@
   {
     "id": 702,
     "name": "지축동334-2(삼화프라자)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -20660,7 +20660,7 @@
   {
     "id": 704,
     "name": "지축동766-110",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -20690,7 +20690,7 @@
   {
     "id": 705,
     "name": "지축동766-42신축",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -20810,7 +20810,7 @@
   {
     "id": 709,
     "name": "지축동R1-31-1",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -20870,7 +20870,7 @@
   {
     "id": 711,
     "name": "지축동R1-4-3",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -20900,7 +20900,7 @@
   {
     "id": 712,
     "name": "지축동R1-8-1(안진4길29 )",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -20924,7 +20924,7 @@
   {
     "id": 713,
     "name": "지축동공유주택(파란여백)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -20954,7 +20954,7 @@
   {
     "id": 714,
     "name": "지축스타스퀘어근린생활시설(1,2,3호기)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -20978,7 +20978,7 @@
   {
     "id": 715,
     "name": "지축지구B1-3블럭1로트(1,2호기)엘스페이스북한산",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -21002,7 +21002,7 @@
   {
     "id": 716,
     "name": "지축지구C3블럭2-2로트(대경스퀘어)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -21032,7 +21032,7 @@
   {
     "id": 717,
     "name": "지축지구R1 23블럭4로트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -21062,7 +21062,7 @@
   {
     "id": 718,
     "name": "지축지구R1 32블럭1로트(지축4로71)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -21092,7 +21092,7 @@
   {
     "id": 719,
     "name": "지축지구R1 34블럭16로트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -21122,7 +21122,7 @@
   {
     "id": 720,
     "name": "지축지구R1 34블럭4로트(가이아01)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -21152,7 +21152,7 @@
   {
     "id": 721,
     "name": "지축지구R1-1-3상가주택(안진1길14)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -21182,7 +21182,7 @@
   {
     "id": 722,
     "name": "지축지구R1-12-4",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -21212,7 +21212,7 @@
   {
     "id": 723,
     "name": "지축지구R1-13-4(안진7길3)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -21242,7 +21242,7 @@
   {
     "id": 724,
     "name": "지축지구R1-14-2(안진6길20 )",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -21302,7 +21302,7 @@
   {
     "id": 726,
     "name": "지축지구R1-17블럭3로트(오부자1길20)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -21350,7 +21350,7 @@
   {
     "id": 728,
     "name": "지축지구R1-19-1(오부자2길5 )",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -21560,7 +21560,7 @@
   {
     "id": 735,
     "name": "지축지구R1-23-3",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -21650,7 +21650,7 @@
   {
     "id": 738,
     "name": "지축지구R1-26블럭1로트(안진8길37)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -21680,7 +21680,7 @@
   {
     "id": 739,
     "name": "지축지구R1-27-1(안진로77)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -21770,7 +21770,7 @@
   {
     "id": 742,
     "name": "지축지구R1-29-3(안진로91)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -21860,7 +21860,7 @@
   {
     "id": 745,
     "name": "지축지구R1-31-4(창대)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -21890,7 +21890,7 @@
   {
     "id": 746,
     "name": "지축지구R1-32-10(엘리트빌2, 지축4로 53)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -21920,7 +21920,7 @@
   {
     "id": 747,
     "name": "지축지구R1-32-9상가주택(베라하우스-J.K)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -21950,7 +21950,7 @@
   {
     "id": 748,
     "name": "지축지구R1-33-3(지축4로40)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22154,7 +22154,7 @@
   {
     "id": 755,
     "name": "지축지구R1-4-1(지축5로 24)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22184,7 +22184,7 @@
   {
     "id": 756,
     "name": "지축지구R1-4-4(빈하우스21)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22268,7 +22268,7 @@
   {
     "id": 759,
     "name": "지축지구R1-8-11상가주택",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22298,7 +22298,7 @@
   {
     "id": 760,
     "name": "지축지구R1-8-9(로이스빌딩)-안진5길5",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22328,7 +22328,7 @@
   {
     "id": 761,
     "name": "지축지구R134-9(에벤에셀3) R1-34-9",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22358,7 +22358,7 @@
   {
     "id": 762,
     "name": "지축지구SR2-1-1(한솔에비뉴)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22418,7 +22418,7 @@
   {
     "id": 764,
     "name": "차우빌1동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22478,7 +22478,7 @@
   {
     "id": 766,
     "name": "창원황씨오도리소파종중(송산빌딩)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22508,7 +22508,7 @@
   {
     "id": 767,
     "name": "창익골든뷰(A동,B동), 용두동465-72",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22538,7 +22538,7 @@
   {
     "id": 768,
     "name": "채움지축역",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22568,7 +22568,7 @@
   {
     "id": 769,
     "name": "천사어린이집 (금촌동교육연구시설)오성빌딩",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22598,7 +22598,7 @@
   {
     "id": 770,
     "name": "청도하늘채(102.103,104동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22628,7 +22628,7 @@
   {
     "id": 771,
     "name": "청암프라자",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22658,7 +22658,7 @@
   {
     "id": 772,
     "name": "충현교회(1호기, 충현빌딩)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22778,7 +22778,7 @@
   {
     "id": 776,
     "name": "케이탑빌딩(주,케이맥스) 홀인원골프",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22808,7 +22808,7 @@
   {
     "id": 777,
     "name": "코오롱레이크폴리스2차",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22838,7 +22838,7 @@
   {
     "id": 778,
     "name": "큐브빌 (원흥동651-2) K-house",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22868,7 +22868,7 @@
   {
     "id": 779,
     "name": "큐어메디팜㈜큐어팜텍",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22898,7 +22898,7 @@
   {
     "id": 780,
     "name": "크리스찬메모리얼파크",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22952,7 +22952,7 @@
   {
     "id": 782,
     "name": "테라비아타IN삼송",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -22982,7 +22982,7 @@
   {
     "id": 783,
     "name": "토당동345-47(숲예찬103동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23012,7 +23012,7 @@
   {
     "id": 784,
     "name": "토당동345-5(숲예찬101동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23042,7 +23042,7 @@
   {
     "id": 785,
     "name": "토당동345-5(숲예찬104동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23072,7 +23072,7 @@
   {
     "id": 786,
     "name": "토당동867-2(그라하시티)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23102,7 +23102,7 @@
   {
     "id": 787,
     "name": "토당동869(CITY VIEW)101동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23132,7 +23132,7 @@
   {
     "id": 788,
     "name": "토당동869(CITY VIEW)102동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23180,7 +23180,7 @@
   {
     "id": 790,
     "name": "파주금촌역주상복합(금촌역더트루엘센트리지)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23240,7 +23240,7 @@
   {
     "id": 792,
     "name": "파주리201-2(1,2,3동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23270,7 +23270,7 @@
   {
     "id": 793,
     "name": "파주리456-13빌라(1,2호기)펜타빌",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23300,7 +23300,7 @@
   {
     "id": 794,
     "name": "파주리476-2근생(소풍타워)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23330,7 +23330,7 @@
   {
     "id": 795,
     "name": "파주리712-12(101,102동)아름다온숲",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23360,7 +23360,7 @@
   {
     "id": 796,
     "name": "파주문산역2차동문디이스트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23390,7 +23390,7 @@
   {
     "id": 797,
     "name": "파주봉일천효성해링턴플레이스",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23420,7 +23420,7 @@
   {
     "id": 798,
     "name": "파주빌리지(1동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23570,7 +23570,7 @@
   {
     "id": 803,
     "name": "파주장안하나아파트(1,2호기)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23630,7 +23630,7 @@
   {
     "id": 805,
     "name": "파주제일정밀공장",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23690,7 +23690,7 @@
   {
     "id": 807,
     "name": "파주청도훼미리매션아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23720,7 +23720,7 @@
   {
     "id": 808,
     "name": "파티마평화의성당(마정리588-1)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23780,7 +23780,7 @@
   {
     "id": 810,
     "name": "팜스프링종합상가",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23810,7 +23810,7 @@
   {
     "id": 811,
     "name": "팰리즈1동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23840,7 +23840,7 @@
   {
     "id": 812,
     "name": "팰리즈2동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23870,7 +23870,7 @@
   {
     "id": 813,
     "name": "팰리즈3동",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -23900,7 +23900,7 @@
   {
     "id": 814,
     "name": "펠리스빌(가,나동)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -24104,7 +24104,7 @@
   {
     "id": 821,
     "name": "하지석동160-16",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -24134,7 +24134,7 @@
   {
     "id": 822,
     "name": "하지석동160-20창고시설(컴프비전센터)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -24284,7 +24284,7 @@
   {
     "id": 827,
     "name": "한승미메이드주상복합상가",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -24344,7 +24344,7 @@
   {
     "id": 829,
     "name": "한울생약제2공장",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -24374,7 +24374,7 @@
   {
     "id": 830,
     "name": "한일미디어타워신축공사",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -24434,7 +24434,7 @@
   {
     "id": 832,
     "name": "햇빛마을19단지아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -24494,7 +24494,7 @@
   {
     "id": 834,
     "name": "행동지구광흥교회",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -24524,7 +24524,7 @@
   {
     "id": 835,
     "name": "행신2동성당",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -24554,7 +24554,7 @@
   {
     "id": 836,
     "name": "행신2지구근영타워",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -24614,7 +24614,7 @@
   {
     "id": 838,
     "name": "행신SK1차아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -24644,7 +24644,7 @@
   {
     "id": 839,
     "name": "행신SK2차아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -24698,7 +24698,7 @@
   {
     "id": 841,
     "name": "행신동1105-1(비전개발)블록피아(월드타워)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -24728,7 +24728,7 @@
   {
     "id": 842,
     "name": "행신동201(코지하임)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -24758,7 +24758,7 @@
   {
     "id": 843,
     "name": "행신동706-1근생(해피트리움)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -24788,7 +24788,7 @@
   {
     "id": 844,
     "name": "행신동765-1근생(행신동에버그린-상가,오피스텔)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -24818,7 +24818,7 @@
   {
     "id": 845,
     "name": "행신동999(1,2호기)행신스퀘어",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -24878,7 +24878,7 @@
   {
     "id": 847,
     "name": "행신동센터프라자",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -24968,7 +24968,7 @@
   {
     "id": 850,
     "name": "행신삼성디지털프라자(가라뫼)청안빌딩",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25028,7 +25028,7 @@
   {
     "id": 852,
     "name": "행주내동156빌라",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25058,7 +25058,7 @@
   {
     "id": 853,
     "name": "행주내동163번지외1필지(해피하우스)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25088,7 +25088,7 @@
   {
     "id": 854,
     "name": "행주내동208(사커붐)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25178,7 +25178,7 @@
   {
     "id": 857,
     "name": "행주외동178-49",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25208,7 +25208,7 @@
   {
     "id": 858,
     "name": "행주외동212-11(카페리오리코)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25238,7 +25238,7 @@
   {
     "id": 859,
     "name": "행주외동212-24근생",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25268,7 +25268,7 @@
   {
     "id": 860,
     "name": "향동교회신축공사",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25298,7 +25298,7 @@
   {
     "id": 861,
     "name": "향동동112-5(꽃내음2길50-2)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25328,7 +25328,7 @@
   {
     "id": 862,
     "name": "향동동113-1신축(현우빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25412,7 +25412,7 @@
   {
     "id": 865,
     "name": "향동동123-14(들꽃하우스)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25472,7 +25472,7 @@
   {
     "id": 867,
     "name": "향동동124-7(주택근)꽃내음1길 155",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25496,7 +25496,7 @@
   {
     "id": 868,
     "name": "향동동126-6 꽃내음1길80",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25526,7 +25526,7 @@
   {
     "id": 869,
     "name": "향동동132-8(향동지구D3-2-8다가구주택신축(O2HEIM)) 향기3로 25",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25646,7 +25646,7 @@
   {
     "id": 873,
     "name": "향동동151-4 (향동동488-9)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25670,7 +25670,7 @@
   {
     "id": 874,
     "name": "향동동161-4",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25700,7 +25700,7 @@
   {
     "id": 875,
     "name": "향동동163-2다세대(꽃내음3길10-2 )",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25730,7 +25730,7 @@
   {
     "id": 876,
     "name": "향동동163-5(제가원Ⅱ)꽃내음3길12-2",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25790,7 +25790,7 @@
   {
     "id": 878,
     "name": "향동동430-7(꽃내음3길18-1)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25820,7 +25820,7 @@
   {
     "id": 879,
     "name": "향동동431(꽃내음3길 16)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25850,7 +25850,7 @@
   {
     "id": 880,
     "name": "향동동432-1단독주택",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25910,7 +25910,7 @@
   {
     "id": 882,
     "name": "향동동456-12단독주택(하람재, 꽃내음2길 30)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25940,7 +25940,7 @@
   {
     "id": 883,
     "name": "향동동458-13(라온빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -25970,7 +25970,7 @@
   {
     "id": 884,
     "name": "향동동459-11(꽃내음2길 18 )",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26000,7 +26000,7 @@
   {
     "id": 885,
     "name": "향동동468(K-엔터타워)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26030,7 +26030,7 @@
   {
     "id": 886,
     "name": "향동동472번지(DMC서원프라자)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26090,7 +26090,7 @@
   {
     "id": 888,
     "name": "향동동488-7(어진하우스)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26120,7 +26120,7 @@
   {
     "id": 889,
     "name": "향동동489다가구주택및근생(세븐스타리움)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26150,7 +26150,7 @@
   {
     "id": 890,
     "name": "향동동491-18(꽃내음1길63)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26210,7 +26210,7 @@
   {
     "id": 892,
     "name": "향동동492-11단독주택(1호기)꽃내음1길100",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26270,7 +26270,7 @@
   {
     "id": 894,
     "name": "향동동492-7(비앙쥬에)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26300,7 +26300,7 @@
   {
     "id": 895,
     "name": "향동동494-10(꽃내음1길82)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26330,7 +26330,7 @@
   {
     "id": 896,
     "name": "향동동494-5번지상가주택신축공사(꽃내음1길180)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26420,7 +26420,7 @@
   {
     "id": 899,
     "name": "향동동542-3(에녹하우스)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26450,7 +26450,7 @@
   {
     "id": 900,
     "name": "향동동543-2",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26480,7 +26480,7 @@
   {
     "id": 901,
     "name": "향동동D1-3-6단독(성우빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26510,7 +26510,7 @@
   {
     "id": 902,
     "name": "향동동D8블럭1-2로트(181-2)금은동경-향기3로 35",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26540,7 +26540,7 @@
   {
     "id": 903,
     "name": "향동동상가주택 하은재(주택근)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26564,7 +26564,7 @@
   {
     "id": 904,
     "name": "향동동은목교회",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26594,7 +26594,7 @@
   {
     "id": 905,
     "name": "향동로데오프라자(1,2,3호기)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26624,7 +26624,7 @@
   {
     "id": 906,
     "name": "향동메디타운(예광프라자)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26654,7 +26654,7 @@
   {
     "id": 907,
     "name": "향동지구11-4근생(아주리센스타프라자)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26684,7 +26684,7 @@
   {
     "id": 908,
     "name": "향동지구7블럭4-2로트점포주택(아르빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26804,7 +26804,7 @@
   {
     "id": 912,
     "name": "향양리188-3(이화요양원)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26864,7 +26864,7 @@
   {
     "id": 914,
     "name": "현대금촌타워(1,2호기)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26894,7 +26894,7 @@
   {
     "id": 915,
     "name": "현대모터스튜디오 고양",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -26984,7 +26984,7 @@
   {
     "id": 918,
     "name": "현창빌딩",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -27044,7 +27044,7 @@
   {
     "id": 920,
     "name": "현천동41-13외3필지(해)대덕로77",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -27104,7 +27104,7 @@
   {
     "id": 922,
     "name": "형창빌딩",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -27134,7 +27134,7 @@
   {
     "id": 923,
     "name": "혜성빌딩",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -27164,7 +27164,7 @@
   {
     "id": 924,
     "name": "호텔사이버",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -27194,7 +27194,7 @@
   {
     "id": 925,
     "name": "호텔첼시(주교동606-10)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -27224,7 +27224,7 @@
   {
     "id": 926,
     "name": "화수빌딩",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -27278,7 +27278,7 @@
   {
     "id": 928,
     "name": "화전동162-21(해든빌)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -27308,7 +27308,7 @@
   {
     "id": 929,
     "name": "화전동576-28(해피스포츠)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -27338,7 +27338,7 @@
   {
     "id": 930,
     "name": "화전동576-36근생(핀코리아)영광빌딩",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -27368,7 +27368,7 @@
   {
     "id": 931,
     "name": "화전동598-3",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -27398,7 +27398,7 @@
   {
     "id": 932,
     "name": "화정동1000번지근린생활시설(화정브릿지타워)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -27428,7 +27428,7 @@
   {
     "id": 933,
     "name": "화정동118-37근생",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -27458,7 +27458,7 @@
   {
     "id": 934,
     "name": "화정동696-4빌딩(종로대학약국)",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -27518,7 +27518,7 @@
   {
     "id": 936,
     "name": "화정역루미니바이롯데캐슬",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -27548,7 +27548,7 @@
   {
     "id": 937,
     "name": "후곡마을10단지임광동아서안아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -27578,7 +27578,7 @@
   {
     "id": 938,
     "name": "후곡마을16단지동아코오롱아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -27608,7 +27608,7 @@
   {
     "id": 939,
     "name": "후곡마을4단지금호한양아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,
@@ -27638,7 +27638,7 @@
   {
     "id": 940,
     "name": "후곡마을6단지건영동부아파트",
-    "companyType": "TKE",
+    "companyType": "TK",
     "contractType": null,
     "contractDate": null,
     "contractStart": null,

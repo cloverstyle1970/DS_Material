@@ -221,7 +221,7 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
                   disabled={isRepairMode}
                   className="w-full rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:opacity-60 disabled:cursor-not-allowed">
                   <option value="D">DS 자사 (D)</option>
-                  <option value="_">TKE (_)</option>
+                  <option value="_">TK (_)</option>
                 </select>
               </div>
               <div>

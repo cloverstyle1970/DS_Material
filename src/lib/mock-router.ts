@@ -441,7 +441,7 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
       supabase.from("materials").select("*", { count: "exact", head: true }).lte("stock_qty", 0),
       supabase.from("materials").select("*", { count: "exact", head: true }),
       supabase.from("material_requests").select("*").order("requested_at", { ascending: false }).limit(10),
-      supabase.from("sites").select("*", { count: "exact", head: true }).eq("company_type", "TKE"),
+      supabase.from("sites").select("*", { count: "exact", head: true }).eq("company_type", "TK"),
       supabase.from("sites").select("*", { count: "exact", head: true }).eq("company_type", "DS"),
       supabase.from("elevators").select("*"),
       supabase.from("sites").select("name, company_type")
@@ -462,7 +462,7 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
 
     allElevators.forEach((e: any) => {
       const type = siteTypeMap.get(e.site_name);
-      if (type === "TKE") tkeElevators++;
+      if (type === "TK") tkeElevators++;
       else if (type === "DS") dsElevators++;
       else otherElevators++;
     });

@@ -4,7 +4,7 @@ import { useState, FormEvent, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { SiteRecord } from "@/lib/mock-sites";
 import { ElevatorRecord } from "@/lib/mock-elevators";
-import { useAuth, isViewOnly } from "@/context/AuthContext";
+import { useAuth, isViewOnly, isAdmin } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
@@ -13,12 +13,12 @@ import { useAutoPageSize } from "@/lib/useAutoPageSize";
 
 // ── 배지 ────────────────────────────────────────────────────────
 const COMPANY_STYLES: Record<string, string> = {
-  TKE: "bg-blue-50 text-blue-600 border border-blue-100",
-  DS:  "bg-emerald-50 text-emerald-700 border border-emerald-100",
+  TK: "bg-blue-600 text-white",
+  DS: "bg-red-500 text-white",
 };
 const COMPANY_STYLES_DARK: Record<string, string> = {
-  TKE: "bg-blue-900/60 text-blue-300 border border-blue-800",
-  DS:  "bg-emerald-900/60 text-emerald-300 border border-emerald-800",
+  TK: "bg-blue-600 text-white",
+  DS: "bg-red-500 text-white",
 };
 function normalizeCompany(type: string | null): string | null {
   if (type === "자사") return "DS";
@@ -27,8 +27,8 @@ function normalizeCompany(type: string | null): string | null {
 function companyBadge(type: string | null, dark = false) {
   const normalized = normalizeCompany(type);
   const styles = dark ? COMPANY_STYLES_DARK : COMPANY_STYLES;
-  const style = (normalized && styles[normalized]) ?? (dark ? "bg-gray-700 text-gray-300 border border-gray-600" : "bg-gray-100 text-gray-500 border border-gray-200");
-  return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${style}`}>{normalized ?? "기타"}</span>;
+  const style = (normalized && styles[normalized]) ?? "bg-gray-900 text-white";
+  return <span className={`text-xs px-2 py-0.5 rounded-lg font-semibold ${style}`}>{normalized ?? "기타"}</span>;
 }
 
 // ── 호기 등록/수정 모달 ───────────────────────────────────────
@@ -117,7 +117,7 @@ function AddSiteModal({ onClose, onSaved, editSite }: AddSiteModalProps) {
   const labelCls = `block text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`;
   const isEdit = !!editSite;
   const [name,             setName]             = useState(editSite?.name ?? "");
-  const [companyType,      setCompanyType]       = useState(editSite?.companyType ?? "TKE");
+  const [companyType,      setCompanyType]       = useState(editSite?.companyType ?? "TK");
   const [contractType,     setContractType]      = useState(editSite?.contractType ?? "");
   const [contractDate,     setContractDate]      = useState(editSite?.contractDate ?? "");
   const [contractStart,    setContractStart]     = useState(editSite?.contractStart ?? "");
@@ -204,7 +204,7 @@ function AddSiteModal({ onClose, onSaved, editSite }: AddSiteModalProps) {
             <div>
               <label className={labelCls}>회사구분</label>
               <select value={companyType} onChange={e => setCompanyType(e.target.value)} className={fieldCls}>
-                <option value="TKE">TKE</option>
+                <option value="TK">TK</option>
                 <option value="DS">DS</option>
                 <option value="">기타</option>
               </select>
@@ -377,7 +377,7 @@ export default function SitesClient({ initial, elevators }: Props) {
   const [sites, setSites]       = useState(initial);
   const [allElevators, setAllElevators] = useState(elevators);
   const [query, setQuery]       = useState("");
-  const [companyFilter, setCompanyFilter] = useState<"전체" | "TKE" | "DS">("전체");
+  const [companyFilter, setCompanyFilter] = useState<"전체" | "DS" | "TK">("전체");
   const [selected, setSelected] = useState<SiteRecord | null>(null);
   const [showAdd, setShowAdd]   = useState(false);
   const [editTarget, setEditTarget] = useState<SiteRecord | null>(null);
@@ -400,6 +400,7 @@ export default function SitesClient({ initial, elevators }: Props) {
   const { user } = useAuth();
   const viewOnly = user ? isViewOnly(user) : true;
   const canEdit  = user ? !viewOnly : false;
+  const canDownload = user ? isAdmin(user) : false;
 
   // Supabase 초기 로드 + Realtime 구독
   useEffect(() => {
@@ -474,7 +475,7 @@ export default function SitesClient({ initial, elevators }: Props) {
       주점검자: s.primaryInspector ?? "", 보조점검자1: s.subInspector ?? "", 보조점검자2: s.subInspector2 ?? "",
       현장전화: s.sitePhone ?? "", 현장핸드폰: s.siteMobile ?? "",
       담당자HP: s.managerPhone ?? "", 소재지: s.address ?? "",
-      거래처: s.vendor ?? "", 호기수: elevators.filter(e => e.siteName === s.name).length,
+      거래처: s.vendor ?? "", 호기수: allElevators.filter(e => e.siteName === s.name).length,
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -528,10 +529,12 @@ export default function SitesClient({ initial, elevators }: Props) {
           <p className="text-xs text-gray-500 mt-0.5">현장 목록 조회 및 호기 정보 관리</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={downloadExcel}
-            className="px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1.5">
-            <span className="text-xs">📥</span> {checkedSiteIds.size > 0 ? `선택 ${checkedSiteIds.size}건` : "엑셀 다운로드"}
-          </button>
+          {canDownload && (
+            <button onClick={downloadExcel}
+              className="px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1.5">
+              <span className="text-xs">📥</span> {checkedSiteIds.size > 0 ? `선택 ${checkedSiteIds.size}건` : "엑셀 다운로드"}
+            </button>
+          )}
           {canEdit && (
             <button onClick={() => setShowAdd(true)}
               className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-1.5">
@@ -563,12 +566,12 @@ export default function SitesClient({ initial, elevators }: Props) {
               )}
             </div>
             <div className="mt-2 flex gap-1 p-1 bg-gray-100 rounded-xl">
-              {(["전체", "TKE", "DS"] as const).map(t => (
+              {(["전체", "DS", "TK"] as const).map(t => (
                 <button key={t} type="button" onClick={() => { setCompanyFilter(t); setPage(1); }}
                   className={`flex-1 py-1 rounded-lg text-xs font-semibold transition-colors ${
                     companyFilter === t
                       ? t === "전체" ? "bg-gray-900 text-white shadow-sm"
-                        : t === "DS" ? "bg-emerald-600 text-white shadow-sm"
+                        : t === "DS" ? "bg-red-500 text-white shadow-sm"
                         : "bg-blue-600 text-white shadow-sm"
                       : isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-400 hover:text-gray-600"
                   }`}>{t}</button>
@@ -622,7 +625,7 @@ export default function SitesClient({ initial, elevators }: Props) {
               </div>
             ) : (
               displaySites.map(site => {
-                const unitCount = elevators.filter(e => e.siteName === site.name).length;
+                const unitCount = allElevators.filter(e => e.siteName === site.name).length;
                 const isSelected = selected?.id === site.id;
                 return (
                   <div key={site.id} className={`flex items-center ${isDark ? "border-b border-gray-700" : "border-b border-gray-50"}`}>
@@ -649,27 +652,25 @@ export default function SitesClient({ initial, elevators }: Props) {
                           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                             {companyBadge(site.companyType, isDark)}
                             {site.contractType && (
-                              <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                                site.contractType.includes("FM")
-                                  ? isDark ? "bg-gray-700 text-red-400" : "bg-gray-100 text-red-600"
-                                  : isDark ? "bg-gray-700 text-gray-400" : "bg-gray-100 text-gray-500"
+                              <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                isDark ? "bg-white" : "border border-black"
+                              } ${
+                                site.contractType.includes("FM") ? "text-red-500" : "text-black"
                               }`}>
                                 {site.contractType}
                               </span>
                             )}
                             {site.primaryInspector && (
-                              <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>{site.primaryInspector}</span>
+                              <span className={`text-xs font-semibold ${isDark ? "text-white" : "text-black"}`}>{site.primaryInspector}</span>
                             )}
                           </div>
                         </div>
                         <div className="shrink-0 text-right">
-                          {unitCount > 0 ? (
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isDark ? "bg-gray-600 text-gray-200" : "bg-slate-100 text-slate-600"}`}>
-                              {unitCount}대
-                            </span>
-                          ) : (
-                            <span className={`text-xs ${isDark ? "text-gray-600" : "text-gray-300"}`}>호기 없음</span>
-                          )}
+                          <span className={`text-xs px-1.5 py-0.5 rounded text-black ${
+                            isDark ? "bg-white" : "border border-black"
+                          }`}>
+                            {unitCount > 0 ? `${unitCount}대` : "호기 없음"}
+                          </span>
                         </div>
                       </div>
                     </button>
