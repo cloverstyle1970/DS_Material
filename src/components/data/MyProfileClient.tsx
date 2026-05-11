@@ -161,7 +161,17 @@ export default function MyProfileClient() {
         setPhotoUrl(r.photo_url ?? null);
       }
       setFamily(((fam.data ?? []) as FamilyMember[]).map(f => ({ ...f, gender: (f.gender ?? "") as "M" | "F" | "" })));
-      const vehData = (veh.data ?? []) as Vehicle[];
+      // DB에서 null로 올 수 있는 필드들을 input controlled value 용으로 빈 문자열로 정규화
+      const vehData = ((veh.data ?? []) as Vehicle[]).map(v => ({
+        ...v,
+        plate_number: v.plate_number ?? "",
+        model: v.model ?? "",
+        year_made: v.year_made ?? "",
+        registration_date: v.registration_date ?? "",
+        insurance_company: v.insurance_company ?? "",
+        insurance_start_date: v.insurance_start_date ?? "",
+        insurance_end_date: v.insurance_end_date ?? "",
+      }));
       setVehicles(vehData);
       // 회사차량이 등록되어 있으면 드롭다운 옵션을 미리 로드해 차량번호가 즉시 표시되도록 함
       if (vehData.some(v => v.vehicle_type === "회사차량")) {
@@ -685,7 +695,7 @@ export default function MyProfileClient() {
                   </div>
                   <div>
                     <label className={labelCls}>차량등록일</label>
-                    <input type="text" value={v.registration_date}
+                    <input type="text" value={v.registration_date ?? ""}
                       onChange={e => setVehicles(p => p.map((x, idx) => idx === i ? { ...x, registration_date: formatYmd(e.target.value) } : x))}
                       readOnly={isCompanyAssigned}
                       placeholder="YYYYMMDD" inputMode="numeric" maxLength={10}
