@@ -55,6 +55,9 @@ interface Vehicle {
   year_made: string;
   fuel_type: "가솔린" | "디젤" | "가스" | "전기" | "기타" | "";
   registration_date: string;
+  insurance_company?: string | null;
+  insurance_start_date?: string | null;
+  insurance_end_date?: string | null;
 }
 
 interface Certification {
@@ -158,7 +161,12 @@ export default function MyProfileClient() {
         setPhotoUrl(r.photo_url ?? null);
       }
       setFamily(((fam.data ?? []) as FamilyMember[]).map(f => ({ ...f, gender: (f.gender ?? "") as "M" | "F" | "" })));
-      setVehicles(((veh.data ?? []) as Vehicle[]));
+      const vehData = (veh.data ?? []) as Vehicle[];
+      setVehicles(vehData);
+      // 회사차량이 등록되어 있으면 드롭다운 옵션을 미리 로드해 차량번호가 즉시 표시되도록 함
+      if (vehData.some(v => v.vehicle_type === "회사차량")) {
+        void loadCompanyVehicles();
+      }
       setCerts(((cert.data ?? []) as Array<Omit<Certification, "doc_file" | "doc_preview">>).map(c => ({
         ...c,
         doc_file: null,
@@ -283,11 +291,13 @@ export default function MyProfileClient() {
         if (fErr) throw fErr;
       }
 
-      // 5. 차량: 전체 삭제 + 재삽입
-      await supabase.from("user_vehicles").delete().eq("user_id", user.id);
-      if (vehicles.length > 0) {
+      // 5. 차량: 회사차량 행은 관리자(회사차량관리)가 관리하므로 보존.
+      //    개인이 입력하는 자차/렌트/기타 행만 삭제 후 재삽입.
+      await supabase.from("user_vehicles").delete().eq("user_id", user.id).neq("vehicle_type", "회사차량");
+      const editableVehicles = vehicles.filter(v => v.vehicle_type !== "회사차량");
+      if (editableVehicles.length > 0) {
         const { error: vErr } = await supabase.from("user_vehicles").insert(
-          vehicles.map((v, i) => ({
+          editableVehicles.map((v, i) => ({
             user_id: user.id,
             vehicle_type: v.vehicle_type,
             plate_number: v.plate_number.trim(),
@@ -588,11 +598,24 @@ export default function MyProfileClient() {
           </div>
           {vehicles.length === 0 && <div className="text-center py-4 text-xs text-gray-400">등록된 차량 없음</div>}
           <div className="space-y-3">
-            {vehicles.map((v, i) => (
-              <div key={i} className="rounded-lg border border-gray-200 dark:border-gray-600 p-3 bg-gray-50 dark:bg-gray-700/30">
+            {vehicles.map((v, i) => {
+              const isCompanyAssigned = v.vehicle_type === "회사차량" && v.id !== undefined;
+              return (
+              <div key={i} className={"rounded-lg border p-3 " + (isCompanyAssigned
+                ? "border-blue-200 dark:border-blue-800 bg-blue-50/40 dark:bg-blue-900/10"
+                : "border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/30")}>
                 <div className="flex items-center justify-between mb-2">
-                  <div className="text-[11px] font-bold text-gray-500">차량 #{i + 1}</div>
-                  <button type="button" onClick={() => setVehicles(p => p.filter((_, idx) => idx !== i))} className="text-[11px] text-red-500">삭제</button>
+                  <div className="flex items-center gap-2">
+                    <div className="text-[11px] font-bold text-gray-500">차량 #{i + 1}</div>
+                    {isCompanyAssigned && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                        🔒 회사차량 (관리자 관리)
+                      </span>
+                    )}
+                  </div>
+                  {!isCompanyAssigned && (
+                    <button type="button" onClick={() => setVehicles(p => p.filter((_, idx) => idx !== i))} className="text-[11px] text-red-500">삭제</button>
+                  )}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                   <div>
@@ -601,13 +624,22 @@ export default function MyProfileClient() {
                       const t = e.target.value as Vehicle["vehicle_type"];
                       setVehicles(p => p.map((x, idx) => idx === i ? { ...x, vehicle_type: t, plate_number: "", model: "", fuel_type: "", year_made: "" } : x));
                       if (t === "회사차량") loadCompanyVehicles();
-                    }} className={inputCls}>
-                      <option value="">선택</option><option value="자차">자차</option><option value="렌트">렌트</option><option value="회사차량">회사차량</option><option value="기타">기타</option>
+                    }}
+                      disabled={isCompanyAssigned}
+                      className={inputCls + (isCompanyAssigned ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")}>
+                      <option value="">선택</option><option value="자차">자차</option><option value="렌트">렌트</option>
+                      {/* '회사차량' 구분은 회사차량관리(관리자)에서만 신규 등록 가능. 기존 행 표시용으로만 유지. */}
+                      {isCompanyAssigned && <option value="회사차량">회사차량</option>}
+                      <option value="기타">기타</option>
                     </select>
                   </div>
                   <div>
                     <label className={labelCls}>차량번호 *</label>
                     {v.vehicle_type === "회사차량" ? (
+                      isCompanyAssigned ? (
+                        <input type="text" value={v.plate_number} readOnly
+                          className={inputCls + " font-mono bg-gray-100 dark:bg-gray-600 cursor-not-allowed"} />
+                      ) : (
                       <select value={v.plate_number} onChange={e => {
                         const cv = companyVehicles.find(c => c.plate_number === e.target.value);
                         setVehicles(p => p.map((x, idx) => idx === i ? {
@@ -623,6 +655,7 @@ export default function MyProfileClient() {
                           <option key={cv.id} value={cv.plate_number}>{cv.plate_number} ({cv.model})</option>
                         ))}
                       </select>
+                      )
                     ) : (
                       <input type="text" value={v.plate_number} onChange={e => setVehicles(p => p.map((x, idx) => idx === i ? { ...x, plate_number: e.target.value } : x))} lang="ko" className={inputCls} />
                     )}
@@ -654,11 +687,32 @@ export default function MyProfileClient() {
                     <label className={labelCls}>차량등록일</label>
                     <input type="text" value={v.registration_date}
                       onChange={e => setVehicles(p => p.map((x, idx) => idx === i ? { ...x, registration_date: formatYmd(e.target.value) } : x))}
-                      placeholder="YYYYMMDD" inputMode="numeric" maxLength={10} className={inputCls + " font-mono"} />
+                      readOnly={isCompanyAssigned}
+                      placeholder="YYYYMMDD" inputMode="numeric" maxLength={10}
+                      className={inputCls + " font-mono" + (isCompanyAssigned ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>보험사 <span className="text-[10px] font-normal text-gray-400">(관리자 관리)</span></label>
+                    <input type="text" value={v.insurance_company ?? ""} readOnly
+                      placeholder="—"
+                      className={inputCls + " bg-gray-100 dark:bg-gray-600 cursor-not-allowed"} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>보험가입일 <span className="text-[10px] font-normal text-gray-400">(관리자 관리)</span></label>
+                    <input type="text" value={v.insurance_start_date ?? ""} readOnly
+                      placeholder="—"
+                      className={inputCls + " font-mono bg-gray-100 dark:bg-gray-600 cursor-not-allowed"} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>보험만기일 <span className="text-[10px] font-normal text-gray-400">(관리자 관리)</span></label>
+                    <input type="text" value={v.insurance_end_date ?? ""} readOnly
+                      placeholder="—"
+                      className={inputCls + " font-mono bg-gray-100 dark:bg-gray-600 cursor-not-allowed"} />
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

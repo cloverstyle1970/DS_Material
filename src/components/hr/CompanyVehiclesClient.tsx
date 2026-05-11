@@ -8,10 +8,12 @@ import { useBackdropClose } from "@/lib/useBackdropClose";
 
 const MENU_HREF = "/hr/company-vehicles";
 const VEHICLE_DOCS_BUCKET = "vehicle-docs";
+const SHARED_USER_ID = -1;
+const SHARED_USER_LABEL = "공용 차량";
 
 interface Vehicle {
   id: number;
-  user_id: number;
+  user_id: number | null;
   vehicle_type: string;
   plate_number: string;
   model: string;
@@ -62,11 +64,11 @@ export default function CompanyVehiclesClient() {
     const userMap = new Map<number, UserMini>();
     ((u.data ?? []) as UserMini[]).forEach(x => userMap.set(x.id, x));
     setUsers((u.data ?? []) as UserMini[]);
-    const enriched: Row[] = ((v.data ?? []) as Vehicle[]).map(r => ({
-      ...r,
-      user_name: userMap.get(r.user_id)?.name ?? `(ID: ${r.user_id})`,
-      user_dept: userMap.get(r.user_id)?.dept ?? "",
-    }));
+    const enriched: Row[] = ((v.data ?? []) as Vehicle[]).map(r => {
+      if (r.user_id === null) return { ...r, user_name: SHARED_USER_LABEL, user_dept: "" };
+      const m = userMap.get(r.user_id);
+      return { ...r, user_name: m?.name ?? `(ID: ${r.user_id})`, user_dept: m?.dept ?? "" };
+    });
     setRows(enriched);
     setLoading(false);
   }
@@ -274,14 +276,15 @@ function CreateModal({ users, onClose, onSaved }: { users: UserMini[]; onClose: 
 
   async function save() {
     setError("");
-    if (!userId) { setError("사용자를 선택하세요."); return; }
+    if (userId === null) { setError("사용자를 선택하세요. (공용 차량으로 등록하려면 '공용 차량'을 선택)"); return; }
     if (!plate.trim() || !model.trim() || !fuel) { setError("차량번호·차종·유종은 필수입니다."); return; }
     setSaving(true);
     try {
-      const docUrl    = docFile    ? await uploadDoc(docFile, userId)    : null;
-      const insDocUrl = insDocFile ? await uploadDoc(insDocFile, userId) : null;
+      const uploadOwnerId = userId === SHARED_USER_ID ? 0 : userId;
+      const docUrl    = docFile    ? await uploadDoc(docFile, uploadOwnerId)    : null;
+      const insDocUrl = insDocFile ? await uploadDoc(insDocFile, uploadOwnerId) : null;
       const payload = {
-        user_id: userId, vehicle_type: "회사차량",
+        user_id: userId === SHARED_USER_ID ? null : userId, vehicle_type: "회사차량",
         plate_number: plate.trim(), model: model.trim(),
         year_made: yearMade || null, fuel_type: fuel,
         registration_date: regDate || null, registration_doc_url: docUrl,
@@ -307,15 +310,24 @@ function CreateModal({ users, onClose, onSaved }: { users: UserMini[]; onClose: 
   return (
     <Modal title="회사차량 등록" onClose={onClose} onSave={save} saving={saving} error={error}>
       <div>
-        <label className={labelCls}>사용자 *</label>
+        <label className={labelCls}>사용자 * <span className="text-[10px] font-normal text-gray-400">(특정 사용자 없이 공용으로 운용 시 '공용 차량' 선택)</span></label>
         <Combobox<UserMini>
           value={userText}
-          onChange={v => { setUserText(v); const m = users.find(u => v === `${u.name}${u.dept ? ` (${u.dept})` : ""}`); setUserId(m?.id ?? null); }}
-          options={users}
-          getLabel={u => `${u.name}${u.dept ? ` (${u.dept})` : ""}`}
-          filter={(u, q) => u.name.toLowerCase().includes(q.toLowerCase()) || (u.dept ?? "").toLowerCase().includes(q.toLowerCase())}
+          onChange={v => {
+            setUserText(v);
+            if (v === SHARED_USER_LABEL) { setUserId(SHARED_USER_ID); return; }
+            const m = users.find(u => v === `${u.name}${u.dept ? ` (${u.dept})` : ""}`);
+            setUserId(m?.id ?? null);
+          }}
+          options={[{ id: SHARED_USER_ID, name: SHARED_USER_LABEL, dept: null }, ...users]}
+          getLabel={u => u.id === SHARED_USER_ID ? SHARED_USER_LABEL : `${u.name}${u.dept ? ` (${u.dept})` : ""}`}
+          filter={(u, q) => {
+            const ql = q.toLowerCase();
+            if (u.id === SHARED_USER_ID) return SHARED_USER_LABEL.includes(q) || "공용".includes(q);
+            return u.name.toLowerCase().includes(ql) || (u.dept ?? "").toLowerCase().includes(ql);
+          }}
           onSelect={u => setUserId(u.id)}
-          placeholder="이름 또는 부서 (↓·↑·Enter)"
+          placeholder="이름·부서 또는 '공용' (↓·↑·Enter)"
           className={inputCls}
         />
       </div>
@@ -367,7 +379,7 @@ function EditModal({
 
   // 사용자 변경
   const [userText, setUserText] = useState(`${vehicle.user_name}${vehicle.user_dept ? ` (${vehicle.user_dept})` : ""}`);
-  const [newUserId, setNewUserId] = useState<number | null>(vehicle.user_id);
+  const [newUserId, setNewUserId] = useState<number | null>(vehicle.user_id === null ? SHARED_USER_ID : vehicle.user_id);
 
   // 보험 변경
   const [insCompany, setInsCompany] = useState(vehicle.insurance_company ?? "");
@@ -386,17 +398,18 @@ function EditModal({
     setSaving(true);
     try {
       if (mode === "user") {
-        if (!newUserId) { setError("새 사용자를 선택하세요."); return; }
-        if (newUserId === vehicle.user_id) { setError("동일한 사용자입니다."); return; }
-        const newUser = users.find(u => u.id === newUserId);
-        const { error: e1 } = await supabase.from("user_vehicles").update({ user_id: newUserId }).eq("id", vehicle.id);
+        if (newUserId === null) { setError("새 사용자를 선택하세요. (공용 차량으로 변경하려면 '공용 차량' 선택)"); return; }
+        const finalUserId = newUserId === SHARED_USER_ID ? null : newUserId;
+        if (finalUserId === vehicle.user_id) { setError("동일한 사용자입니다."); return; }
+        const newUser = finalUserId === null ? null : users.find(u => u.id === finalUserId);
+        const { error: e1 } = await supabase.from("user_vehicles").update({ user_id: finalUserId }).eq("id", vehicle.id);
         if (e1) throw e1;
         const { error: e2 } = await supabase.from("vehicle_user_history").insert({
           vehicle_id: vehicle.id,
           prev_user_id: vehicle.user_id,
           prev_user_name: vehicle.user_name,
-          new_user_id: newUserId,
-          new_user_name: newUser?.name ?? "",
+          new_user_id: finalUserId,
+          new_user_name: finalUserId === null ? SHARED_USER_LABEL : (newUser?.name ?? ""),
           changed_by_id: actor.id,
           changed_by_name: actor.name,
           note: note || null,
@@ -404,7 +417,7 @@ function EditModal({
         if (e2) throw e2;
       } else if (mode === "insurance") {
         let finalDocUrl = insDocUrl;
-        if (insDocFile) finalDocUrl = await uploadDoc(insDocFile, vehicle.user_id);
+        if (insDocFile) finalDocUrl = await uploadDoc(insDocFile, vehicle.user_id ?? 0);
         const { error: e1 } = await supabase.from("user_vehicles").update({
           insurance_company: insCompany || null,
           insurance_start_date: insStart || null,
@@ -499,15 +512,24 @@ function EditModal({
 
       {mode === "user" && (
         <div>
-          <label className={labelCls}>새 사용자 *</label>
+          <label className={labelCls}>새 사용자 * <span className="text-[10px] font-normal text-gray-400">(공용으로 변경 시 '공용 차량' 선택)</span></label>
           <Combobox<UserMini>
             value={userText}
-            onChange={v => { setUserText(v); const m = users.find(u => v === `${u.name}${u.dept ? ` (${u.dept})` : ""}`); setNewUserId(m?.id ?? null); }}
-            options={users}
-            getLabel={u => `${u.name}${u.dept ? ` (${u.dept})` : ""}`}
-            filter={(u, q) => u.name.toLowerCase().includes(q.toLowerCase()) || (u.dept ?? "").toLowerCase().includes(q.toLowerCase())}
+            onChange={v => {
+              setUserText(v);
+              if (v === SHARED_USER_LABEL) { setNewUserId(SHARED_USER_ID); return; }
+              const m = users.find(u => v === `${u.name}${u.dept ? ` (${u.dept})` : ""}`);
+              setNewUserId(m?.id ?? null);
+            }}
+            options={[{ id: SHARED_USER_ID, name: SHARED_USER_LABEL, dept: null }, ...users]}
+            getLabel={u => u.id === SHARED_USER_ID ? SHARED_USER_LABEL : `${u.name}${u.dept ? ` (${u.dept})` : ""}`}
+            filter={(u, q) => {
+              const ql = q.toLowerCase();
+              if (u.id === SHARED_USER_ID) return SHARED_USER_LABEL.includes(q) || "공용".includes(q);
+              return u.name.toLowerCase().includes(ql) || (u.dept ?? "").toLowerCase().includes(ql);
+            }}
             onSelect={u => setNewUserId(u.id)}
-            placeholder="이름 또는 부서"
+            placeholder="이름·부서 또는 '공용'"
             className={inputCls}
           />
         </div>
