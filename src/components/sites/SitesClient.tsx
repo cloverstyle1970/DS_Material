@@ -434,33 +434,44 @@ export default function SitesClient({ initial, elevators }: Props) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
-  // 승강기번호로 매칭되는 현장명 Set (검색어 있을 때만 계산)
+  // 승강기번호 / 비상통화장치 끝 4자리로 매칭되는 현장명 Set
   const elevatorMatchSites = useMemo(() => {
     if (!q) return new Set<string>();
+    const qDigits = q.replace(/\D/g, "");
     const matched = new Set<string>();
     for (const e of allElevators) {
       if (e.elevatorNo?.toLowerCase().includes(q)) {
         matched.add(e.siteName);
+        continue;
+      }
+      if (e.emergencyPhone && qDigits) {
+        const phoneDigits = e.emergencyPhone.replace(/\D/g, "");
+        if (phoneDigits.slice(-4).includes(qDigits)) {
+          matched.add(e.siteName);
+        }
       }
     }
     return matched;
   }, [allElevators, q]);
 
   const filteredSites = useMemo(() => {
-    const byCompany = companyFilter !== "전체" ? sites.filter(s => normalizeCompany(s.companyType) === companyFilter) : sites;
-    if (!q) return byCompany;
-    return byCompany.filter(s =>
-      s.name.toLowerCase().includes(q) ||
-      (s.primaryInspector?.toLowerCase().includes(q) ?? false) ||
-      (s.subInspector?.toLowerCase().includes(q) ?? false) ||
-      (s.subInspector2?.toLowerCase().includes(q) ?? false) ||
-      (s.address?.toLowerCase().includes(q) ?? false) ||
-      (s.companyType?.toLowerCase().includes(q) ?? false) ||
-      (s.vendor?.toLowerCase().includes(q) ?? false) ||
-      (s.emergencyDevice?.toLowerCase().includes(q) ?? false) ||
-      (s.emergencyDevices?.some(d => d.number.toLowerCase().includes(q)) ?? false) ||
-      elevatorMatchSites.has(s.name)
-    );
+    // 검색어가 있으면 회사 필터 무시하고 매칭되는 모든 현장 표시
+    if (q) {
+      return sites.filter(s =>
+        s.name.toLowerCase().includes(q) ||
+        (s.primaryInspector?.toLowerCase().includes(q) ?? false) ||
+        (s.subInspector?.toLowerCase().includes(q) ?? false) ||
+        (s.subInspector2?.toLowerCase().includes(q) ?? false) ||
+        (s.address?.toLowerCase().includes(q) ?? false) ||
+        (s.companyType?.toLowerCase().includes(q) ?? false) ||
+        (s.vendor?.toLowerCase().includes(q) ?? false) ||
+        (s.emergencyDevice?.toLowerCase().includes(q) ?? false) ||
+        (s.emergencyDevices?.some(d => d.number.toLowerCase().includes(q)) ?? false) ||
+        elevatorMatchSites.has(s.name)
+      );
+    }
+    // 검색어 없으면 회사 필터만 적용
+    return companyFilter !== "전체" ? sites.filter(s => normalizeCompany(s.companyType) === companyFilter) : sites;
   }, [sites, q, elevatorMatchSites, companyFilter]);
 
   const totalPages  = Math.max(1, Math.ceil(filteredSites.length / PAGE_SIZE));
