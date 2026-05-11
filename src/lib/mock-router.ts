@@ -159,19 +159,21 @@ function siteToDb(d: any): Record<string, unknown> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function dbToElevator(r: any): ElevatorRecord {
   return {
-    id:          r.id,
-    siteName:    r.site_name   ?? "",
-    unitName:    r.unit_name   ?? null,
-    elevatorNo:  r.elevator_no ?? null,
+    id:             r.id,
+    siteName:       r.site_name       ?? "",
+    unitName:       r.unit_name       ?? null,
+    elevatorNo:     r.elevator_no     ?? null,
+    emergencyPhone: r.emergency_phone ?? null,
   };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function elevatorToDb(d: any): Record<string, unknown> {
   const obj: Record<string, unknown> = {};
-  if (d.siteName   !== undefined) obj.site_name   = d.siteName;
-  if (d.unitName   !== undefined) obj.unit_name   = d.unitName;
-  if (d.elevatorNo !== undefined) obj.elevator_no = d.elevatorNo;
+  if (d.siteName       !== undefined) obj.site_name       = d.siteName;
+  if (d.unitName       !== undefined) obj.unit_name       = d.unitName;
+  if (d.elevatorNo     !== undefined) obj.elevator_no     = d.elevatorNo;
+  if (d.emergencyPhone !== undefined) obj.emergency_phone = d.emergencyPhone;
   return obj;
 }
 
@@ -852,10 +854,10 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
     return dbToVendor(data);
   }
   if (path === "/api/elevators") {
-    const { siteName, unitName, elevatorNo } = body;
+    const { siteName, unitName, elevatorNo, emergencyPhone } = body;
     if (!siteName) throw new MockApiError("siteName 필수", 400);
     const { data, error } = await supabase.from("elevators")
-      .insert({ site_name: siteName, unit_name: unitName || null, elevator_no: elevatorNo || null })
+      .insert({ site_name: siteName, unit_name: unitName || null, elevator_no: elevatorNo || null, emergency_phone: emergencyPhone || null })
       .select().single();
     if (error) throw new MockApiError(error.message, 500);
     return dbToElevator(data);

@@ -47,8 +47,9 @@ function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: Elevato
   const fieldCls = `w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 ${isDark ? "border-gray-600 bg-gray-700 text-gray-100 placeholder:text-gray-400" : "border-gray-200 bg-white text-gray-900"}`;
   const labelCls = `block text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`;
   const isEdit = !!editElevator;
-  const [unitName,   setUnitName]   = useState(editElevator?.unitName   ?? "");
-  const [elevatorNo, setElevatorNo] = useState(editElevator?.elevatorNo ?? "");
+  const [unitName,       setUnitName]       = useState(editElevator?.unitName       ?? "");
+  const [elevatorNo,     setElevatorNo]     = useState(editElevator?.elevatorNo     ?? "");
+  const [emergencyPhone, setEmergencyPhone] = useState(editElevator?.emergencyPhone ?? "");
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState("");
 
@@ -56,7 +57,12 @@ function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: Elevato
     e.preventDefault();
     if (!unitName.trim()) { setError("호기명을 입력해 주세요."); return; }
     setSaving(true);
-    const body = { siteName, unitName: unitName.trim(), elevatorNo: elevatorNo.trim() || null };
+    const body = {
+      siteName,
+      unitName: unitName.trim(),
+      elevatorNo: elevatorNo.trim() || null,
+      emergencyPhone: emergencyPhone.trim() || null,
+    };
     try {
       if (isEdit) await api.patch(`/api/elevators/${editElevator!.id}`, body);
       else        await api.post("/api/elevators", body);
@@ -87,6 +93,10 @@ function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: Elevato
           <div>
             <label className={labelCls}>승강기 번호</label>
             <input value={elevatorNo} onChange={e => setElevatorNo(e.target.value)} placeholder="예: 2163209" className={fieldCls} />
+          </div>
+          <div>
+            <label className={labelCls}>비상통화장치</label>
+            <input value={emergencyPhone} onChange={e => setEmergencyPhone(e.target.value)} placeholder="예: 012-2080-3565" className={fieldCls} />
           </div>
           {error && <p className={`text-sm text-red-500 rounded-lg px-3 py-2 ${isDark ? "bg-red-900/30" : "bg-red-50"}`}>{error}</p>}
           <div className="flex gap-3 pt-1">
@@ -836,6 +846,7 @@ export default function SitesClient({ initial, elevators }: Props) {
                           <th className={`px-4 py-3 text-left text-xs font-medium w-8 ${isDark ? "text-gray-400" : "text-gray-500"}`}>#</th>
                           <th className={`px-4 py-3 text-left text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>호기명</th>
                           <th className={`px-4 py-3 text-left text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>승강기 번호</th>
+                          <th className={`px-4 py-3 text-left text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>비상통화장치</th>
                           {canEdit && (
                             <th className={`px-4 py-3 text-xs font-medium w-20 ${isDark ? "text-gray-400" : "text-gray-500"}`}></th>
                           )}
@@ -847,6 +858,7 @@ export default function SitesClient({ initial, elevators }: Props) {
                             <td className={`px-4 py-3 text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>{idx + 1}</td>
                             <td className={`px-4 py-3 font-medium whitespace-nowrap ${isDark ? "text-gray-200" : "text-gray-800"}`}>{e.unitName ?? "—"}</td>
                             <td className={`px-4 py-3 font-mono text-xs whitespace-nowrap ${isDark ? "text-blue-400" : "text-blue-600"}`}>{e.elevatorNo ?? "—"}</td>
+                            <td className={`px-4 py-3 font-mono text-xs whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"}`}>{e.emergencyPhone ?? "—"}</td>
                             {canEdit && (
                               <td className="px-4 py-3">
                                 <div className="flex gap-1">
