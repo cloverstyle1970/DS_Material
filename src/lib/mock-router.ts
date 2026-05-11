@@ -437,7 +437,22 @@ type AnyBody = any;
 async function routeGET(path: string, params: URLSearchParams): Promise<unknown> {
   if (path === "/api/dashboard") {
     const today = new Date().toISOString().split("T")[0];
-    const [todayResult, pendingResult, lowStockResult, totalResult, recentResult, tkeSitesResult, dsSitesResult, elevatorsResult, sitesResult] = await Promise.all([
+
+    // PostgREST 기본 row limit(1000)을 우회하기 위해 페이지네이션으로 전체 조회
+    async function fetchAll(table: string, columns: string) {
+      const PAGE = 1000;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const all: any[] = [];
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase.from(table).select(columns).range(from, from + PAGE - 1);
+        if (error || !data?.length) break;
+        all.push(...data);
+        if (data.length < PAGE) break;
+      }
+      return all;
+    }
+
+    const [todayResult, pendingResult, lowStockResult, totalResult, recentResult, tkeSitesResult, dsSitesResult, allElevators, allSites] = await Promise.all([
       supabase.from("material_requests").select("*", { count: "exact", head: true }).gte("requested_at", `${today}T00:00:00`),
       supabase.from("material_requests").select("*", { count: "exact", head: true }).eq("status", "신청"),
       supabase.from("materials").select("*", { count: "exact", head: true }).lte("stock_qty", 0),
@@ -445,18 +460,16 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
       supabase.from("material_requests").select("*").order("requested_at", { ascending: false }).limit(10),
       supabase.from("sites").select("*", { count: "exact", head: true }).eq("company_type", "TK"),
       supabase.from("sites").select("*", { count: "exact", head: true }).eq("company_type", "DS"),
-      supabase.from("elevators").select("*"),
-      supabase.from("sites").select("name, company_type")
+      fetchAll("elevators", "site_name"),
+      fetchAll("sites", "name, company_type"),
     ]);
     const tkeSites = tkeSitesResult.count ?? 0;
     const dsSites = dsSitesResult.count ?? 0;
-    
-    // 실제 등록된 호기 정보로 통계 계산
-    const allElevators = elevatorsResult.data ?? [];
+
     const totalElevators = allElevators.length;
-    
+
     const siteTypeMap = new Map<string, string>();
-    (sitesResult.data ?? []).forEach((s: any) => siteTypeMap.set(s.name, s.company_type));
+    allSites.forEach((s: any) => siteTypeMap.set(s.name, s.company_type));
 
     let tkeElevators = 0;
     let dsElevators = 0;
