@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { MaterialRecord } from "@/lib/mock-materials";
 import AddMaterialModal from "./AddMaterialModal";
 import EditMaterialModal from "./EditMaterialModal";
+import BulkUploadModal from "./BulkUploadModal";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
@@ -68,6 +69,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showModal, setShowModal] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
   const [editTarget, setEditTarget] = useState<MaterialRecord | null>(null);
   const [repairTarget, setRepairTarget] = useState<MaterialRecord | null>(null);
   const [loading, setLoading] = useState(false);
@@ -80,8 +82,19 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
     setPage(1);
   }
 
+  function dedupeById(list: MaterialRecord[]): MaterialRecord[] {
+    const seen = new Set<string>();
+    const out: MaterialRecord[] = [];
+    for (const m of list) {
+      if (seen.has(m.id)) continue;
+      seen.add(m.id);
+      out.push(m);
+    }
+    return out;
+  }
+
   useEffect(() => {
-    api.get<MaterialRecord[]>("/api/materials").then(setMaterials).catch(() => {});
+    api.get<MaterialRecord[]>("/api/materials").then(d => setMaterials(dedupeById(d))).catch(() => {});
   }, []);
 
   const { user } = useAuth();
@@ -207,7 +220,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
     setLoading(true);
     try {
       const data = await api.get<MaterialRecord[]>("/api/materials");
-      setMaterials(data);
+      setMaterials(dedupeById(data));
     } catch (e) {
       alert(getErrorMessage(e));
     } finally {
@@ -308,6 +321,13 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
             className="flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 transition-colors shrink-0">
             엑셀 다운로드
           </button>
+
+          {!viewOnly && (
+            <button type="button" onClick={() => setShowBulkModal(true)}
+              className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors shrink-0">
+              엑셀 업로드
+            </button>
+          )}
 
           {!viewOnly && (
             <button type="button" onClick={() => setShowModal(true)}
@@ -510,6 +530,12 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
       </div>
 
       {showModal && <AddMaterialModal onClose={() => setShowModal(false)} onSaved={reload} />}
+      {showBulkModal && (
+        <BulkUploadModal
+          onClose={() => setShowBulkModal(false)}
+          onSaved={() => { setShowBulkModal(false); reload(); }}
+        />
+      )}
       {repairTarget && (
         <AddMaterialModal
           source={repairTarget}

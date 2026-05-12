@@ -515,7 +515,7 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const all: any[] = [];
     for (let offset = 0; ; offset += PAGE) {
-      let query = supabase.from("materials").select("*").order("name").range(offset, offset + PAGE - 1);
+      let query = supabase.from("materials").select("*").order("name").order("id").range(offset, offset + PAGE - 1);
       if (matType === "DS") query = query.like("id", "D%");
       if (matType === "TK") query = query.not("id", "like", "D%");
       const { data, error } = await query;
