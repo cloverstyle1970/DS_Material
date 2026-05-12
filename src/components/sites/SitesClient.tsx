@@ -115,6 +115,18 @@ function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: Elevato
   );
 }
 
+// ── 날짜 입력 정규화: "20260512" → "2026-05-12" ─────────────────
+function normalizeDateInput(s: string): string {
+  const trimmed = (s ?? "").trim();
+  if (!trimmed) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const digits = trimmed.replace(/[^\d]/g, "");
+  if (digits.length === 8) {
+    return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+  }
+  return trimmed;
+}
+
 // ── 현장 등록 모달 ─────────────────────────────────────────────
 
 interface AddSiteModalProps { onClose: () => void; onSaved: () => void; editSite?: SiteRecord; }
@@ -152,6 +164,10 @@ function AddSiteModal({ onClose, onSaved, editSite }: AddSiteModalProps) {
   const [emergencyDevices, setEmergencyDevices]  = useState(
     editSite?.emergencyDevices?.length ? editSite.emergencyDevices : [{ number: "", note: "" }]
   );
+  // 신규 등록 시에만 사용: 호기 정보 동시 등록
+  const [elevatorsToAdd, setElevatorsToAdd] = useState<{ unitName: string; elevatorNo: string; emergencyPhone: string }[]>(
+    isEdit ? [] : [{ unitName: "", elevatorNo: "", emergencyPhone: "" }]
+  );
   const [saving,           setSaving]            = useState(false);
   const [error,            setError]             = useState("");
 
@@ -188,8 +204,29 @@ function AddSiteModal({ onClose, onSaved, editSite }: AddSiteModalProps) {
       warrantyEnd: warrantyEnd || null,
     };
     try {
-      if (isEdit) await api.patch(`/api/sites/${editSite!.id}`, body);
-      else        await api.post("/api/sites", body);
+      if (isEdit) {
+        await api.patch(`/api/sites/${editSite!.id}`, body);
+      } else {
+        await api.post("/api/sites", body);
+        // 현장 등록 직후 호기들 추가 등록 (현장 등록은 성공했으므로 실패한 호기만 알림)
+        const validElevators = elevatorsToAdd.filter(e => e.unitName.trim());
+        const elevatorFailures: string[] = [];
+        for (const ev of validElevators) {
+          try {
+            await api.post("/api/elevators", {
+              siteName: name,
+              unitName: ev.unitName.trim(),
+              elevatorNo: ev.elevatorNo.trim() || null,
+              emergencyPhone: ev.emergencyPhone.trim() || null,
+            });
+          } catch (err) {
+            elevatorFailures.push(`${ev.unitName.trim()}: ${getErrorMessage(err)}`);
+          }
+        }
+        if (elevatorFailures.length > 0) {
+          alert(`현장은 등록됐지만 일부 호기 등록에 실패했습니다:\n${elevatorFailures.join("\n")}`);
+        }
+      }
       onSaved();
     } catch (e) {
       setError(getErrorMessage(e));
@@ -227,17 +264,32 @@ function AddSiteModal({ onClose, onSaved, editSite }: AddSiteModalProps) {
             </div>
             <div>
               <label className={labelCls}>계약일자</label>
-              <input type="date" value={contractDate} onChange={e => setContractDate(e.target.value)} className={fieldCls} />
+              <input type="text" inputMode="numeric" maxLength={10}
+                value={contractDate}
+                onChange={e => setContractDate(e.target.value)}
+                onBlur={e => setContractDate(normalizeDateInput(e.target.value))}
+                placeholder="YYYY-MM-DD (예: 20260512)"
+                className={fieldCls} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>계약시작</label>
-              <input type="date" value={contractStart} onChange={e => setContractStart(e.target.value)} className={fieldCls} />
+              <input type="text" inputMode="numeric" maxLength={10}
+                value={contractStart}
+                onChange={e => setContractStart(e.target.value)}
+                onBlur={e => setContractStart(normalizeDateInput(e.target.value))}
+                placeholder="YYYY-MM-DD (예: 20260512)"
+                className={fieldCls} />
             </div>
             <div>
               <label className={labelCls}>계약만료</label>
-              <input type="date" value={contractEnd} onChange={e => setContractEnd(e.target.value)} className={fieldCls} />
+              <input type="text" inputMode="numeric" maxLength={10}
+                value={contractEnd}
+                onChange={e => setContractEnd(e.target.value)}
+                onBlur={e => setContractEnd(normalizeDateInput(e.target.value))}
+                placeholder="YYYY-MM-DD (예: 20260512)"
+                className={fieldCls} />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
@@ -331,15 +383,59 @@ function AddSiteModal({ onClose, onSaved, editSite }: AddSiteModalProps) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>하자기간 시작</label>
-                  <input type="date" value={warrantyStart} onChange={e => setWarrantyStart(e.target.value)} className={fieldCls} />
+                  <input type="text" inputMode="numeric" maxLength={10}
+                    value={warrantyStart}
+                    onChange={e => setWarrantyStart(e.target.value)}
+                    onBlur={e => setWarrantyStart(normalizeDateInput(e.target.value))}
+                    placeholder="YYYY-MM-DD (예: 20260512)"
+                    className={fieldCls} />
                 </div>
                 <div>
                   <label className={labelCls}>하자기간 종료</label>
-                  <input type="date" value={warrantyEnd} onChange={e => setWarrantyEnd(e.target.value)} className={fieldCls} />
+                  <input type="text" inputMode="numeric" maxLength={10}
+                    value={warrantyEnd}
+                    onChange={e => setWarrantyEnd(e.target.value)}
+                    onBlur={e => setWarrantyEnd(normalizeDateInput(e.target.value))}
+                    placeholder="YYYY-MM-DD (예: 20260512)"
+                    className={fieldCls} />
                 </div>
               </div>
             </div>
           </div>
+          {/* 호기 정보 — 신규 등록 시에만 표시 */}
+          {!isEdit && (
+            <div className={`border-t pt-3 ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+              <div className="flex items-center justify-between mb-2.5">
+                <p className={`text-xs font-semibold uppercase tracking-wide ${isDark ? "text-gray-500" : "text-gray-500"}`}>호기 정보 (선택)</p>
+                <button type="button"
+                  onClick={() => setElevatorsToAdd(prev => [...prev, { unitName: "", elevatorNo: "", emergencyPhone: "" }])}
+                  className={`text-xs px-2.5 py-1 rounded-lg transition-colors ${isDark ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                  + 호기 추가
+                </button>
+              </div>
+              <p className={`text-[11px] mb-2 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                호기명만 입력된 행이 등록됩니다. 빈 행은 무시됩니다.
+              </p>
+              <div className="space-y-2">
+                {elevatorsToAdd.map((ev, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center">
+                    <input value={ev.unitName}
+                      onChange={e => setElevatorsToAdd(prev => prev.map((x, j) => j === i ? { ...x, unitName: e.target.value } : x))}
+                      placeholder="호기명 (예: 1호기)" className={fieldCls} />
+                    <input value={ev.elevatorNo}
+                      onChange={e => setElevatorsToAdd(prev => prev.map((x, j) => j === i ? { ...x, elevatorNo: e.target.value } : x))}
+                      placeholder="승강기번호" className={fieldCls} />
+                    <input value={ev.emergencyPhone}
+                      onChange={e => setElevatorsToAdd(prev => prev.map((x, j) => j === i ? { ...x, emergencyPhone: e.target.value } : x))}
+                      placeholder="비상통화장치" className={fieldCls} />
+                    <button type="button"
+                      onClick={() => setElevatorsToAdd(prev => prev.length > 1 ? prev.filter((_, j) => j !== i) : [{ unitName: "", elevatorNo: "", emergencyPhone: "" }])}
+                      className={`text-xl px-2 hover:text-red-400 ${isDark ? "text-gray-500" : "text-gray-300"}`}>×</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div>
             <label className={labelCls}>거래처</label>
             <input value={vendor} onChange={e => setVendor(e.target.value)} className={fieldCls} />
