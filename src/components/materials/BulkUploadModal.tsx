@@ -281,28 +281,26 @@ export default function BulkUploadModal({ onClose, onSaved }: Props) {
   const failCount = rows.filter(r => r.status === "fail").length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-5xl mx-4 overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-[1400px] h-[92vh] overflow-hidden flex flex-col">
+        {/* 헤더 */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
           <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">자재 일괄 등록 (엑셀 업로드)</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">×</button>
         </div>
 
-        <div className="px-6 py-4 space-y-3 overflow-auto flex-1">
-          {/* 안내 + 양식 다운로드 */}
+        {/* 상단 컨트롤 (고정) */}
+        <div className="px-6 py-4 space-y-3 flex-shrink-0 border-b border-gray-100 dark:border-gray-700">
           <div className="rounded-lg bg-slate-50 dark:bg-slate-700/50 px-4 py-3 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
             <div className="flex items-center justify-between gap-3 mb-1">
               <span className="font-semibold text-slate-700 dark:text-slate-200">엑셀 양식</span>
               <button onClick={() => downloadTemplate(cats)} className="text-xs text-blue-600 hover:text-blue-800 underline">양식 다운로드</button>
             </div>
-            <p>· 필수: 자재구분(DS/TK), 부품명, 대/중/소 분류코드</p>
-            <p>· DS는 자재코드를 비우면 자동 채번, TK는 자재코드 직접 입력 필수</p>
-            <p>· 수리품: Y/N (코드 직접 입력 시 자동 판정 — DS는 끝 R, TK는 첫 글자 A)</p>
-            <p>· 분류코드는 양식 파일 안 <span className="font-semibold">[분류코드표]</span> 시트에서 확인하세요</p>
+            <p>· 필수: 자재구분(DS/TK), 부품명, 대/중/소 분류코드 — DS는 자재코드 비우면 자동 채번, TK는 자재코드 필수</p>
+            <p>· 수리품: Y/N (코드 직접 입력 시 자동 판정 — DS는 끝 R, TK는 첫 글자 A) · 분류코드는 양식 파일 [분류코드표] 시트 참고</p>
           </div>
 
-          {/* 파일 선택 */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <input
               ref={fileRef}
               type="file"
@@ -314,42 +312,57 @@ export default function BulkUploadModal({ onClose, onSaved }: Props) {
               className="text-xs text-slate-600 dark:text-slate-300"
             />
             {fileName && <span className="text-xs text-slate-500">{fileName} — 총 {rows.length}행</span>}
+            {rows.length > 0 && (
+              <div className="flex items-center gap-2 text-xs ml-auto">
+                <span className="px-2 py-1 rounded bg-green-50 text-green-700 dark:bg-green-900/40 dark:text-green-300">정상 {validCount}</span>
+                {errorCount > 0 && (
+                  <span className="px-2 py-1 rounded bg-red-50 text-red-700 dark:bg-red-900/40 dark:text-red-300">오류 {errorCount}</span>
+                )}
+                {done && (
+                  <>
+                    <span className="px-2 py-1 rounded bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">성공 {okCount}</span>
+                    {failCount > 0 && (
+                      <span className="px-2 py-1 rounded bg-orange-50 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">실패 {failCount}</span>
+                    )}
+                  </>
+                )}
+                {uploading && <span className="text-slate-500">진행 {progress} / {validCount}</span>}
+              </div>
+            )}
           </div>
+        </div>
 
-          {/* 요약 */}
-          {rows.length > 0 && (
-            <div className="flex items-center gap-3 text-xs">
-              <span className="px-2 py-1 rounded bg-green-50 text-green-700 dark:bg-green-900/40 dark:text-green-300">정상 {validCount}</span>
-              {errorCount > 0 && (
-                <span className="px-2 py-1 rounded bg-red-50 text-red-700 dark:bg-red-900/40 dark:text-red-300">오류 {errorCount}</span>
-              )}
-              {done && (
-                <>
-                  <span className="px-2 py-1 rounded bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">성공 {okCount}</span>
-                  {failCount > 0 && (
-                    <span className="px-2 py-1 rounded bg-orange-50 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">실패 {failCount}</span>
-                  )}
-                </>
-              )}
-              {uploading && <span className="text-slate-500">진행 {progress} / {validCount}</span>}
+        {/* 미리보기 테이블 — 남은 공간 모두 차지 */}
+        <div className="flex-1 min-h-0 px-6 py-4 overflow-hidden flex flex-col">
+          {rows.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center text-sm text-slate-400 dark:text-slate-500 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
+              위에서 엑셀 파일을 선택하면 미리보기가 표시됩니다
             </div>
-          )}
-
-          {/* 미리보기 테이블 */}
-          {rows.length > 0 && (
-            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-auto max-h-[50vh]">
-              <table className="w-full text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-700 sticky top-0">
-                  <tr className="text-slate-600 dark:text-slate-200">
-                    <th className="px-2 py-1.5 text-center w-10">행</th>
-                    <th className="px-2 py-1.5 text-center w-16">상태</th>
-                    <th className="px-2 py-1.5 text-left">자재구분</th>
-                    <th className="px-2 py-1.5 text-left">자재코드</th>
-                    <th className="px-2 py-1.5 text-left">부품명</th>
-                    <th className="px-2 py-1.5 text-left">분류(대중소)</th>
-                    <th className="px-2 py-1.5 text-left">규격/단위</th>
-                    <th className="px-2 py-1.5 text-right">가격(구매/판매)</th>
-                    <th className="px-2 py-1.5 text-left">메모/오류</th>
+          ) : (
+            <div className="flex-1 min-h-0 border border-gray-200 dark:border-gray-700 rounded-lg overflow-auto">
+              <table className="w-full text-xs table-fixed">
+                <colgroup>
+                  <col style={{ width: "48px" }} />
+                  <col style={{ width: "56px" }} />
+                  <col style={{ width: "72px" }} />
+                  <col style={{ width: "130px" }} />
+                  <col style={{ width: "200px" }} />
+                  <col style={{ width: "300px" }} />
+                  <col style={{ width: "160px" }} />
+                  <col style={{ width: "140px" }} />
+                  <col />
+                </colgroup>
+                <thead className="bg-slate-100 dark:bg-slate-700 sticky top-0 z-10">
+                  <tr className="text-slate-700 dark:text-slate-100">
+                    <th className="px-2 py-2 text-center font-semibold">행</th>
+                    <th className="px-2 py-2 text-center font-semibold">상태</th>
+                    <th className="px-2 py-2 text-center font-semibold">구분</th>
+                    <th className="px-2 py-2 text-left font-semibold">자재코드</th>
+                    <th className="px-2 py-2 text-left font-semibold">부품명</th>
+                    <th className="px-2 py-2 text-left font-semibold">분류(코드/명)</th>
+                    <th className="px-2 py-2 text-left font-semibold">규격 / 단위</th>
+                    <th className="px-2 py-2 text-right font-semibold">구매 / 판매</th>
+                    <th className="px-2 py-2 text-left font-semibold">메모 / 오류</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -358,32 +371,36 @@ export default function BulkUploadModal({ onClose, onSaved }: Props) {
                       r.status === "ok" ? "bg-green-50 dark:bg-green-900/20"
                       : r.status === "fail" ? "bg-red-50 dark:bg-red-900/20"
                       : r.errors.length > 0 ? "bg-orange-50 dark:bg-orange-900/20"
-                      : "";
+                      : "bg-white dark:bg-gray-800";
                     const majorLabel = cats?.major.find(x => x.code === r.major)?.label;
                     const midLabel = cats?.mid[r.major]?.find(x => x.code === r.mid)?.label;
                     const subLabel = cats?.sub[`${r.major}${r.mid}`]?.find(x => x.code === r.sub)?.label;
                     const catLabel = [majorLabel, midLabel, subLabel].filter(Boolean).join(" › ");
                     return (
-                      <tr key={r.rowNo} className={rowCls}>
-                        <td className="px-2 py-1.5 text-center text-slate-400">{r.rowNo + 1}</td>
-                        <td className="px-2 py-1.5 text-center">
-                          {r.status === "ok" ? <span className="text-green-700">✓</span>
-                            : r.status === "fail" ? <span className="text-red-700">✗</span>
-                            : r.errors.length > 0 ? <span className="text-orange-600">!</span>
+                      <tr key={r.rowNo} className={`${rowCls} align-top`}>
+                        <td className="px-2 py-2 text-center text-slate-400">{r.rowNo + 1}</td>
+                        <td className="px-2 py-2 text-center">
+                          {r.status === "ok" ? <span className="text-green-700 font-bold">✓</span>
+                            : r.status === "fail" ? <span className="text-red-700 font-bold">✗</span>
+                            : r.errors.length > 0 ? <span className="text-orange-600 font-bold">!</span>
                             : <span className="text-slate-400">·</span>}
                         </td>
-                        <td className="px-2 py-1.5">{r.raw.자재구분 || "-"}</td>
-                        <td className="px-2 py-1.5 font-mono">{r.directId || <span className="text-slate-400">자동</span>}</td>
-                        <td className="px-2 py-1.5">{r.name}</td>
-                        <td className="px-2 py-1.5">
-                          <span className="font-mono">{r.major}/{r.mid}/{r.sub}</span>
-                          {catLabel && <span className="text-slate-500 ml-1">({catLabel})</span>}
+                        <td className="px-2 py-2 text-center">{r.raw.자재구분 || "-"}</td>
+                        <td className="px-2 py-2 font-mono break-all">{r.directId || <span className="text-slate-400 font-sans">자동</span>}</td>
+                        <td className="px-2 py-2 break-words">{r.name || <span className="text-slate-400">-</span>}</td>
+                        <td className="px-2 py-2">
+                          <div className="font-mono">{r.major}/{r.mid}/{r.sub}</div>
+                          {catLabel && <div className="text-slate-500 text-[11px] mt-0.5">{catLabel}</div>}
                         </td>
-                        <td className="px-2 py-1.5">{r.modelNo || "-"} / {r.unit}</td>
-                        <td className="px-2 py-1.5 text-right tabular-nums">
-                          {r.buyPrice || "-"} / {r.sellPrice || "-"}
+                        <td className="px-2 py-2 break-words">
+                          <div>{r.modelNo || "-"}</div>
+                          <div className="text-slate-500 text-[11px]">{r.unit}</div>
                         </td>
-                        <td className="px-2 py-1.5 text-red-600 dark:text-red-400">
+                        <td className="px-2 py-2 text-right tabular-nums">
+                          <div>{r.buyPrice || "-"}</div>
+                          <div className="text-slate-500 text-[11px]">{r.sellPrice || "-"}</div>
+                        </td>
+                        <td className="px-2 py-2 text-red-600 dark:text-red-400 break-words whitespace-normal">
                           {r.message || r.errors.join(", ")}
                         </td>
                       </tr>
@@ -395,7 +412,8 @@ export default function BulkUploadModal({ onClose, onSaved }: Props) {
           )}
         </div>
 
-        <div className="flex gap-3 px-6 py-4 border-t border-gray-100 dark:border-gray-700">
+        {/* 푸터 */}
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-100 dark:border-gray-700 flex-shrink-0">
           <button
             type="button"
             onClick={() => { if (done) onSaved(); else onClose(); }}

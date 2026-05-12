@@ -51,6 +51,10 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
       if (activeHref !== pathname) setActive(pathname);
       return;
     }
+    // 활성 탭 X 클릭으로 닫는 중인 상태:
+    // closeTab이 activeHref를 다음 탭으로 바꾼 직후, URL이 아직 옛 pathname을 가리키므로
+    // 아래 #2 useEffect의 router.push로 곧 정리됨. 그 사이 옛 탭을 다시 추가하지 않도록 보류.
+    if (activeHref && activeHref !== pathname && PAGE_REGISTRY[activeHref]) return;
     // dashboard/settings/profile는 메뉴 외 공통 페이지 — 권한 체크 우회
     const isAlwaysAllowed = pathname === "/dashboard" || pathname === "/settings" || pathname === "/data/profile";
     const allowed = isAlwaysAllowed || isAdmin(user) || hasMenuPermission(user, pathname, "read");
@@ -62,7 +66,7 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
     }
     openTab(pathname, entry.label);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, isAuthenticated, user, tabs]);
+  }, [pathname, isAuthenticated, user, tabs, activeHref]);
 
   // activeHref → URL 동기화 (TabBar 탭 클릭으로 활성이 바뀐 경우)
   useEffect(() => {
