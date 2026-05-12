@@ -9,6 +9,7 @@ import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { api } from "@/lib/api-client";
 import { useBackdropClose } from "@/lib/useBackdropClose";
 import Autocomplete from "@/components/common/Autocomplete";
+import TransactionBulkUploadModal from "./TransactionBulkUploadModal";
 
 interface SiteOption { id: number; name: string }
 
@@ -89,6 +90,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
   const [editingTx, setEditingTx] = useState<TransactionRecord | null>(null);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
   const { user } = useAuth();
   const admin = user ? !isViewOnly(user) : false;
 
@@ -265,10 +267,18 @@ export default function StockHistoryClient({ mode, initial }: Props) {
             전표 입력
           </Link>
         )}
-        <button type="button" onClick={downloadExcel}
-          className="bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 transition-colors shrink-0">
-          {selectedIds.size > 0 ? `선택 ${selectedIds.size}건 다운로드` : "엑셀 다운로드"}
-        </button>
+        {admin && (
+          <button type="button" onClick={downloadExcel}
+            className="bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 transition-colors shrink-0">
+            {selectedIds.size > 0 ? `선택 ${selectedIds.size}건 다운로드` : "엑셀 다운로드"}
+          </button>
+        )}
+        {admin && (
+          <button type="button" onClick={() => setShowBulkUpload(true)}
+            className="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors shrink-0">
+            엑셀 업로드
+          </button>
+        )}
       </div>
 
       {/* 테이블 */}
@@ -402,6 +412,18 @@ export default function StockHistoryClient({ mode, initial }: Props) {
           onClose={() => setEditingTx(null)}
           onSave={handleSaveEdit}
           sites={sites}
+        />
+      )}
+
+      {showBulkUpload && (
+        <TransactionBulkUploadModal
+          mode={mode}
+          onClose={() => setShowBulkUpload(false)}
+          onSaved={() => {
+            setShowBulkUpload(false);
+            api.get<TransactionRecord[]>(`/api/transactions?type=${encodeURIComponent(mode)}`)
+              .then(setTransactions).catch(() => {});
+          }}
         />
       )}
     </>

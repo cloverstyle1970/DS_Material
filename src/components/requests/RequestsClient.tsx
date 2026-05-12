@@ -8,6 +8,7 @@ import { PurchaseOrderRecord, OrderStatus } from "@/lib/mock-purchase-orders";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import StockHistoryClient from "@/components/stock/StockHistoryClient";
+import PurchaseOrderBulkUploadModal from "@/components/purchase/PurchaseOrderBulkUploadModal";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { useBackdropClose } from "@/lib/useBackdropClose";
 import Autocomplete from "@/components/common/Autocomplete";
@@ -198,6 +199,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
   const [requesterNames, setRequesterNames] = useState<string[]>([]);
   const [userNames, setUserNames] = useState<string[]>([]);
   const [orders,   setOrders]   = useState(initialOrders);
+  const [showOrderBulkUpload, setShowOrderBulkUpload] = useState(false);
 
   useEffect(() => {
     api.get<MaterialRequestRecord[]>("/api/material-requests").then(setRequests).catch(() => {});
@@ -446,10 +448,12 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
               className="ml-auto px-4 py-2.5 rounded-xl text-sm font-semibold bg-slate-700 text-white hover:bg-slate-800 transition-colors">
               전표 입력
             </Link>
-            <button type="button" onClick={downloadReqs}
-              className="bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 transition-colors">
-              {selectedReqIds.size > 0 ? `선택 ${selectedReqIds.size}건 다운로드` : "엑셀 다운로드"}
-            </button>
+            {admin && (
+              <button type="button" onClick={downloadReqs}
+                className="bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 transition-colors">
+                {selectedReqIds.size > 0 ? `선택 ${selectedReqIds.size}건 다운로드` : "엑셀 다운로드"}
+              </button>
+            )}
           </div>
 
           {/* 검색 필터 */}
@@ -654,10 +658,18 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                 전표 입력
               </Link>
             )}
-            <button type="button" onClick={downloadOrds}
-              className={`${admin ? "" : "ml-auto "}bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 transition-colors`}>
-              {selectedOrdIds.size > 0 ? `선택 ${selectedOrdIds.size}건 다운로드` : "엑셀 다운로드"}
-            </button>
+            {admin && (
+              <button type="button" onClick={downloadOrds}
+                className="bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 transition-colors">
+                {selectedOrdIds.size > 0 ? `선택 ${selectedOrdIds.size}건 다운로드` : "엑셀 다운로드"}
+              </button>
+            )}
+            {admin && (
+              <button type="button" onClick={() => setShowOrderBulkUpload(true)}
+                className="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors">
+                엑셀 업로드
+              </button>
+            )}
           </div>
 
           {/* 검색 필터 */}
@@ -828,6 +840,16 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
           onSave={data => handleOrdAction(editingOrder.id, "수정", data)}
           sites={sites}
           vendors={vendors}
+        />
+      )}
+
+      {showOrderBulkUpload && (
+        <PurchaseOrderBulkUploadModal
+          onClose={() => setShowOrderBulkUpload(false)}
+          onSaved={() => {
+            setShowOrderBulkUpload(false);
+            api.get<PurchaseOrderRecord[]>("/api/purchase-orders").then(setOrders).catch(() => {});
+          }}
         />
       )}
 

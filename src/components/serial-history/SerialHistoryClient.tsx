@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { MaterialUnitRecord, MaterialUnitStatus } from "@/lib/mock-material-units";
 import { TransactionRecord } from "@/lib/mock-transactions";
+import { useAuth, isViewOnly } from "@/context/AuthContext";
 
 const STATUS_OPTIONS: { v: MaterialUnitStatus | "전체"; label: string; color: string }[] = [
   { v: "전체",     label: "전체",     color: "bg-gray-700 text-white" },
@@ -33,6 +34,8 @@ function statusBadge(status: MaterialUnitStatus) {
 }
 
 export default function SerialHistoryClient() {
+  const { user } = useAuth();
+  const canDownload = user ? !isViewOnly(user) : false;
   const [units,    setUnits]    = useState<MaterialUnitRecord[]>([]);
   const [loading,  setLoading]  = useState(false);
   const [snQuery,  setSnQuery]  = useState("");
@@ -145,10 +148,12 @@ export default function SerialHistoryClient() {
 
         <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">{units.length.toLocaleString()}건</span>
 
-        <button type="button" onClick={downloadExcel} disabled={units.length === 0}
-          className="bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors shrink-0">
-          엑셀 다운로드
-        </button>
+        {canDownload && (
+          <button type="button" onClick={downloadExcel} disabled={units.length === 0}
+            className="bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors shrink-0">
+            엑셀 다운로드
+          </button>
+        )}
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">

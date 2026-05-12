@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { api } from "@/lib/api-client";
+import { useAuth, isViewOnly } from "@/context/AuthContext";
 
 interface Transaction {
   id: number;
@@ -54,6 +55,8 @@ function periodDisplay(key: string, mode: ViewMode) {
 }
 
 export default function PeriodStatsClient() {
+  const { user } = useAuth();
+  const canDownload = user ? !isViewOnly(user) : false;
   const [viewMode, setViewMode] = useState<ViewMode>("monthly");
   const [year, setYear]         = useState(CURRENT_YEAR);
   const [showChart, setShowChart] = useState(true);
@@ -174,10 +177,12 @@ export default function PeriodStatsClient() {
             className="px-3.5 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
             {showChart ? "차트 숨기기" : "차트 표시"}
           </button>
-          <button onClick={downloadExcel} disabled={pivotData.length === 0}
-            className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center gap-1.5">
-            <span>📥</span> 엑셀 다운로드
-          </button>
+          {canDownload && (
+            <button onClick={downloadExcel} disabled={pivotData.length === 0}
+              className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center gap-1.5">
+              <span>📥</span> 엑셀 다운로드
+            </button>
+          )}
         </div>
       </div>
 

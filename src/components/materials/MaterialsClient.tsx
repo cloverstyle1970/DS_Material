@@ -317,10 +317,12 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
             </div>
           )}
 
-          <button type="button" onClick={downloadExcel}
-            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 transition-colors shrink-0">
-            엑셀 다운로드
-          </button>
+          {!viewOnly && (
+            <button type="button" onClick={downloadExcel}
+              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 transition-colors shrink-0">
+              엑셀 다운로드
+            </button>
+          )}
 
           {!viewOnly && (
             <button type="button" onClick={() => setShowBulkModal(true)}

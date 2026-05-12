@@ -410,7 +410,7 @@ export default function SitesClient({ initial, elevators }: Props) {
   const { user } = useAuth();
   const viewOnly = user ? isViewOnly(user) : true;
   const canEdit  = user ? !viewOnly : false;
-  const canDownload = user ? isAdmin(user) : false;
+  const canDownload = user ? !isViewOnly(user) : false;
 
   // Supabase 초기 로드 + Realtime 구독
   useEffect(() => {

@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { api } from "@/lib/api-client";
+import { useAuth, isViewOnly } from "@/context/AuthContext";
 
 interface Transaction {
   id: number;
@@ -23,6 +24,8 @@ function fmtDate(iso: string) {
 }
 
 export default function SiteStatsClient() {
+  const { user } = useAuth();
+  const canDownload = user ? !isViewOnly(user) : false;
   const [selectedSite, setSelectedSite] = useState<string>("");
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date();
@@ -155,10 +158,12 @@ export default function SiteStatsClient() {
             {sites.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
           </select>
           <div className="flex items-center gap-2 ml-auto">
-            <button onClick={downloadExcel} disabled={materialStats.length === 0}
-              className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center gap-1.5">
-              <span>📥</span> 엑셀 다운로드
-            </button>
+            {canDownload && (
+              <button onClick={downloadExcel} disabled={materialStats.length === 0}
+                className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center gap-1.5">
+                <span>📥</span> 엑셀 다운로드
+              </button>
+            )}
           </div>
         </div>
       </div>
