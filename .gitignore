@@ -63,3 +63,6 @@ next-env.d.ts
 # Claude Code 로컬 설정
 .claude/settings.local.json
 DS_Material/
+
+# 외장하드 동기화용 Claude 대화·메모리 백업 (save.ps1 / restore.ps1)
+/.claude-backup/
