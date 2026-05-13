@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { ElevatorRecord } from "@/lib/mock-elevators";
 import { api, getErrorMessage } from "@/lib/api-client";
-import { useBackdropClose } from "@/lib/useBackdropClose";
+import DraggableModal from "@/components/common/DraggableModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 
 interface SiteOption { id: number; name: string }
@@ -557,7 +557,6 @@ function Td({ children, right, center, className = "", colSpan }: { children?: R
 function MaterialPopup({ onSelect, onClose }: { onSelect: (m: MaterialRecord) => void; onClose: () => void }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<MaterialRecord[]>([]);
-  const backdrop = useBackdropClose(onClose);
   useEffect(() => {
     const t = setTimeout(async () => {
       if (!q.trim()) { setResults([]); return; }
@@ -569,12 +568,17 @@ function MaterialPopup({ onSelect, onClose }: { onSelect: (m: MaterialRecord) =>
     return () => clearTimeout(t);
   }, [q]);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-[640px] max-h-[70vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-[640px] max-h-[70vh]"
+      header={
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-700">
           <h3 className="text-sm font-semibold dark:text-gray-100">품목 검색</h3>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none">×</button>
         </div>
+      }
+    >
         <div className="p-3">
           <input type="text" value={q} onChange={e => setQ(e.target.value)} autoFocus
             placeholder="품목코드, 품목명, 규격, 별칭"
@@ -603,7 +607,6 @@ function MaterialPopup({ onSelect, onClose }: { onSelect: (m: MaterialRecord) =>
           {results.length === 0 && q && <p className="text-center py-8 text-xs text-gray-400 dark:text-gray-500">검색 결과 없음</p>}
           {!q && <p className="text-center py-8 text-xs text-gray-400 dark:text-gray-500">검색어를 입력하세요</p>}
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }

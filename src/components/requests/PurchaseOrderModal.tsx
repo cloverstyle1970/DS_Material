@@ -8,7 +8,7 @@ import { ElevatorRecord } from "@/lib/mock-elevators";
 import SiteSearchInput from "@/components/ui/SiteSearchInput";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { api, getErrorMessage } from "@/lib/api-client";
-import { useBackdropClose } from "@/lib/useBackdropClose";
+import DraggableModal from "@/components/common/DraggableModal";
 
 interface VendorOption { id: number; name: string }
 interface SiteOption  { id: number; name: string }
@@ -35,7 +35,6 @@ const USER_DEFAULT_MAT_TYPE: Record<string, "DS" | "TK"> = {
 
 export default function PurchaseOrderModal({ vendors, sites, pendingRequests, user, onClose, onSaved }: Props) {
   const defaultMatType = USER_DEFAULT_MAT_TYPE[user.name] ?? "ALL";
-  const backdrop = useBackdropClose(onClose);
   const [matType, setMatType] = useState<"ALL" | "DS" | "TK">(defaultMatType);
   const [matQuery, setMatQuery] = useState("");
   const [matResults, setMatResults] = useState<MaterialRecord[]>([]);
@@ -209,13 +208,17 @@ export default function PurchaseOrderModal({ vendors, sites, pendingRequests, us
   const isSelected = (id: string) => selectedItems.some(i => i.material.id === id);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md mx-4 max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-full max-w-md mx-4 max-h-[90vh]"
+      header={
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 shrink-0">
           <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">발주 등록</h2>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">×</button>
         </div>
-
+      }
+    >
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
 
           {/* DS / TK 토글 */}
@@ -466,7 +469,6 @@ export default function PurchaseOrderModal({ vendors, sites, pendingRequests, us
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }

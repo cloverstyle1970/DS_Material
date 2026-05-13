@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import Combobox from "@/components/tbm/Combobox";
-import { useBackdropClose } from "@/lib/useBackdropClose";
+import DraggableModal from "@/components/common/DraggableModal";
 
 const MENU_HREF = "/hr/company-vehicles";
 const VEHICLE_DOCS_BUCKET = "vehicle-docs";
@@ -603,7 +603,6 @@ function HistoryModal({ vehicle, onClose }: { vehicle: Row; onClose: () => void 
   const [userHist, setUserHist] = useState<UserHistRow[]>([]);
   const [insHist, setInsHist] = useState<InsHistRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const backdrop = useBackdropClose(onClose);
 
   useEffect(() => {
     (async () => {
@@ -623,8 +622,12 @@ function HistoryModal({ vehicle, onClose }: { vehicle: Row; onClose: () => void 
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-full max-w-2xl max-h-[90vh]"
+      z={60}
+      header={
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div>
             <div className="text-base font-bold text-gray-900 dark:text-white">변경 이력</div>
@@ -632,7 +635,8 @@ function HistoryModal({ vehicle, onClose }: { vehicle: Row; onClose: () => void 
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
-
+      }
+    >
         <div className="px-5 border-b border-gray-200 dark:border-gray-700">
           <div className="flex gap-1">
             {([["user", `👤 사용자 (${userHist.length})`],["insurance", `🛡️ 보험 (${insHist.length})`]] as [typeof tab, string][]).map(([t, label]) => (
@@ -684,8 +688,7 @@ function HistoryModal({ vehicle, onClose }: { vehicle: Row; onClose: () => void 
           <button type="button" onClick={onClose}
             className="px-4 py-2 rounded text-sm font-semibold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">닫기</button>
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }
 
@@ -696,14 +699,18 @@ function HistoryModal({ vehicle, onClose }: { vehicle: Row; onClose: () => void 
 function Modal({ title, children, onClose, onSave, saving, error }: {
   title: string; children: React.ReactNode; onClose: () => void; onSave: () => void; saving: boolean; error: string;
 }) {
-  const backdrop = useBackdropClose(onClose);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-full max-w-2xl max-h-[90vh]"
+      header={
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div className="text-base font-bold text-gray-900 dark:text-white">{title}</div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
+      }
+    >
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {children}
           {error && (
@@ -718,8 +725,7 @@ function Modal({ title, children, onClose, onSave, saving, error }: {
             {saving ? "저장 중..." : "저장"}
           </button>
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }
 

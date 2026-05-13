@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
+import DraggableModal from "@/components/common/DraggableModal";
 
 export interface ConstructionRequest {
   id: number;
@@ -227,14 +228,17 @@ export default function ConstructionRequestClient() {
         )}
       </div>
 
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
-            <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">{editId ? "공사 요청 수정" : "공사 요청 등록"}</h3>
-              <button onClick={() => { setShowModal(false); resetForm(); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
+      <DraggableModal
+        open={showModal}
+        panelClassName="w-full max-w-lg"
+        header={
+          <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">{editId ? "공사 요청 수정" : "공사 요청 등록"}</h3>
+            <button onClick={() => { setShowModal(false); resetForm(); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
+          </div>
+        }
+      >
+        <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">현장명 <span className="text-red-500">*</span></label>
                 <input 
@@ -300,9 +304,7 @@ export default function ConstructionRequestClient() {
                 <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded hover:bg-orange-700 disabled:opacity-50">등록하기</button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </DraggableModal>
     </div>
   );
 }

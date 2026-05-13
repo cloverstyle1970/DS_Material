@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { useBackdropClose } from "@/lib/useBackdropClose";
+import DraggableModal from "@/components/common/DraggableModal";
 
 const MENU_HREF = "/quotes/labor-rates";
 
@@ -186,7 +186,6 @@ function LaborRateModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const backdrop = useBackdropClose(onClose);
   const [code, setCode] = useState(initial?.process_code ?? "");
   const [name, setName] = useState(initial?.process_name ?? "");
   const [category, setCategory] = useState(initial?.category ?? "");
@@ -232,12 +231,17 @@ function LaborRateModal({
   const inputCls = "w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-full max-w-md"
+      header={
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div className="text-base font-bold text-gray-900 dark:text-white">{initial ? "공정 수정" : "공정 추가"}</div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
+      }
+    >
         <div className="p-5 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -301,7 +305,6 @@ function LaborRateModal({
             {saving ? "저장 중..." : "저장"}
           </button>
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }

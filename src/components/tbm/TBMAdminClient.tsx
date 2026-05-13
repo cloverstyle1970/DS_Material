@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { useBackdropClose } from "@/lib/useBackdropClose";
+import DraggableModal from "@/components/common/DraggableModal";
 import {
   TBMRecord, TBMParticipant, TBMRecordSafetyRule, TBMChecklistResult, TBMPhoto,
   TBMMode, MODE_LABELS, SUB_TYPE_LABELS,
@@ -34,10 +34,7 @@ export default function TBMAdminClient() {
   const [detail, setDetail] = useState<DetailData | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [participantStats, setParticipantStats] = useState<Map<number, { total: number; confirmed: number }>>(new Map());
-  const detailBackdrop = useBackdropClose(() => setOpenDetail(null));
-
   const [editing, setEditing] = useState<TBMRecord | null>(null);
-  const editingBackdrop = useBackdropClose(() => setEditing(null));
   const [editForm, setEditForm] = useState({
     site_name: "", elevator_name: "", work_content: "", risk_assessment: "",
     parts_name: "", passenger_trapped: false,
@@ -334,19 +331,23 @@ export default function TBMAdminClient() {
       </div>
 
       {/* 상세 모달 */}
-      {openDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" {...detailBackdrop}>
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-              <div>
-                <div className="text-base font-bold text-gray-900 dark:text-white">TBM 상세</div>
-                <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                  #{openDetail.id} · {fmtDt(openDetail.created_at)} · {openDetail.user_name}
-                </div>
+      <DraggableModal
+        open={!!openDetail}
+        onClose={() => setOpenDetail(null)}
+        panelClassName="w-full max-w-2xl max-h-[90vh]"
+        header={
+          <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div>
+              <div className="text-base font-bold text-gray-900 dark:text-white">TBM 상세</div>
+              <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                #{openDetail?.id} · {openDetail && fmtDt(openDetail.created_at)} · {openDetail?.user_name}
               </div>
-              <button onClick={() => setOpenDetail(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
             </div>
-
+            <button onClick={() => setOpenDetail(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          </div>
+        }
+      >
+        {openDetail && (<>
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
               <div className="flex flex-wrap gap-2 items-center">
                 {modeBadge(openDetail)}
@@ -472,18 +473,23 @@ export default function TBMAdminClient() {
                 닫기
               </button>
             </div>
-          </div>
-        </div>
-      )}
+        </>)}
+      </DraggableModal>
 
       {/* 수정 모달 */}
-      {editing && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" {...editingBackdrop}>
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
-            <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-              <div className="text-base font-bold text-gray-900 dark:text-white">TBM 기본정보 수정</div>
-              <button onClick={() => setEditing(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
-            </div>
+      <DraggableModal
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        panelClassName="w-full max-w-lg"
+        z={60}
+        header={
+          <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div className="text-base font-bold text-gray-900 dark:text-white">TBM 기본정보 수정</div>
+            <button onClick={() => setEditing(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          </div>
+        }
+      >
+        {editing && (<>
             <div className="p-5 space-y-3 max-h-[70vh] overflow-y-auto">
               <EditField label="현장명 *">
                 <input type="text" value={editForm.site_name} onChange={e => setEditForm(f => ({...f, site_name: e.target.value}))} lang="ko"
@@ -530,9 +536,8 @@ export default function TBMAdminClient() {
                 {editSaving ? "저장 중..." : "저장"}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+        </>)}
+      </DraggableModal>
     </div>
   );
 }

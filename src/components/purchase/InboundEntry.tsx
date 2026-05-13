@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { PurchaseOrderRecord } from "@/lib/mock-purchase-orders";
 import { api, getErrorMessage } from "@/lib/api-client";
-import { useBackdropClose } from "@/lib/useBackdropClose";
+import DraggableModal from "@/components/common/DraggableModal";
 import SerialEntryModal from "./SerialEntryModal";
 
 interface SiteOption   { id: number; name: string }
@@ -639,7 +639,6 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
   const [mats, setMats] = useState<Record<string, string>>({});
   const [q, setQ] = useState("");
   const [checked, setChecked] = useState<Set<number>>(new Set());
-  const backdrop = useBackdropClose(onClose);
 
   useEffect(() => {
     api.get<PurchaseOrderRecord[]>("/api/purchase-orders?status=발주").then(setOrders).catch(() => setOrders([]));
@@ -686,12 +685,17 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-[1000px] max-w-[95vw] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-[1000px] max-w-[95vw] max-h-[80vh]"
+      header={
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-700">
           <h3 className="text-sm font-semibold dark:text-gray-100">발주서 참조 (미입고 {orders.length}건)</h3>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none">×</button>
         </div>
+      }
+    >
         <div className="p-3">
           <input type="text" value={q} onChange={e => { setQ(e.target.value); setChecked(new Set()); }} autoFocus
             placeholder="자재명, 코드, 거래처, 현장, 주문참조번호 검색"
@@ -738,7 +742,6 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
             선택 품목 적용
           </button>
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }

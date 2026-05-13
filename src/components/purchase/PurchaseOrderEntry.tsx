@@ -7,7 +7,7 @@ import { MaterialRecord } from "@/lib/mock-materials";
 import { MaterialRequestRecord } from "@/lib/mock-material-requests";
 import { ElevatorRecord } from "@/lib/mock-elevators";
 import { api, getErrorMessage } from "@/lib/api-client";
-import { useBackdropClose } from "@/lib/useBackdropClose";
+import DraggableModal from "@/components/common/DraggableModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 
 interface SiteOption   { id: number; name: string }
@@ -591,15 +591,19 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
 
 function RequestPopup({ requests, onSelect, onClose }: { requests: MaterialRequestRecord[]; onSelect: (r: MaterialRequestRecord) => void; onClose: () => void }) {
   const [q, setQ] = useState("");
-  const backdrop = useBackdropClose(onClose);
   const filtered = requests.filter(r => !q || (r.siteName?.toLowerCase().includes(q.toLowerCase()) ?? false) || r.requesterName.toLowerCase().includes(q.toLowerCase()) || r.items.some(i => i.materialName.toLowerCase().includes(q.toLowerCase())));
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-[720px] max-h-[75vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-[720px] max-h-[75vh]"
+      header={
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-700">
           <h3 className="text-sm font-semibold dark:text-gray-100">자재신청 불러오기</h3>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none">×</button>
         </div>
+      }
+    >
         <div className="p-3">
           <input type="text" value={q} onChange={e => setQ(e.target.value)} autoFocus placeholder="현장명, 신청자, 자재명 검색"
             className="w-full px-3 py-2 text-sm font-medium text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-500 placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:font-normal" />
@@ -620,7 +624,6 @@ function RequestPopup({ requests, onSelect, onClose }: { requests: MaterialReque
           ))}
           {filtered.length === 0 && <p className="text-center py-8 text-xs text-gray-400 dark:text-gray-500">신청 내역 없음</p>}
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }

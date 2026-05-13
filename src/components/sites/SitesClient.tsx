@@ -8,7 +8,7 @@ import { useAuth, isViewOnly, isAdmin } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
-import { useBackdropClose } from "@/lib/useBackdropClose";
+import DraggableModal from "@/components/common/DraggableModal";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
 
 // ── 배지 ────────────────────────────────────────────────────────
@@ -43,7 +43,6 @@ interface ElevatorFormModalProps {
 function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: ElevatorFormModalProps) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const backdrop = useBackdropClose(onClose);
   const fieldCls = `w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 ${isDark ? "border-gray-600 bg-gray-700 text-gray-100 placeholder:text-gray-400" : "border-gray-200 bg-white text-gray-900"}`;
   const labelCls = `block text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`;
   const isEdit = !!editElevator;
@@ -75,12 +74,17 @@ function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: Elevato
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" {...backdrop}>
-      <div className={`rounded-2xl shadow-xl w-full max-w-sm mx-4 ${isDark ? "bg-gray-800" : "bg-white"}`} onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-full max-w-sm mx-4"
+      header={
         <div className={`flex items-center justify-between px-6 py-4 border-b ${isDark ? "border-gray-700" : "border-gray-200"}`}>
           <h2 className={`text-base font-semibold ${isDark ? "text-gray-100" : "text-gray-800"}`}>{isEdit ? "호기 수정" : "호기 등록"}</h2>
           <button onClick={onClose} className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg transition-colors ${isDark ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"}`}>×</button>
         </div>
+      }
+    >
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
           <div>
             <label className={labelCls}>현장명</label>
@@ -110,8 +114,7 @@ function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: Elevato
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }
 
@@ -134,7 +137,6 @@ interface AddSiteModalProps { onClose: () => void; onSaved: () => void; editSite
 function AddSiteModal({ onClose, onSaved, editSite }: AddSiteModalProps) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const backdrop = useBackdropClose(onClose);
   const fieldCls = `w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 ${isDark ? "border-gray-600 bg-gray-700 text-gray-100 placeholder:text-gray-400" : "border-gray-200 bg-white text-gray-900"}`;
   const labelCls = `block text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`;
   const isEdit = !!editSite;
@@ -236,12 +238,17 @@ function AddSiteModal({ onClose, onSaved, editSite }: AddSiteModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" {...backdrop}>
-      <div className={`rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col ${isDark ? "bg-gray-800" : "bg-white"}`} onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-full max-w-lg mx-4 max-h-[90vh]"
+      header={
         <div className={`flex items-center justify-between px-6 py-4 border-b shrink-0 ${isDark ? "border-gray-700" : "border-gray-200"}`}>
           <h2 className={`text-base font-semibold ${isDark ? "text-gray-100" : "text-gray-800"}`}>{isEdit ? "현장 수정" : "현장 등록"}</h2>
           <button onClick={onClose} className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg transition-colors ${isDark ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"}`}>×</button>
         </div>
+      }
+    >
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-3 overflow-y-auto flex-1">
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
@@ -457,8 +464,7 @@ function AddSiteModal({ onClose, onSaved, editSite }: AddSiteModalProps) {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }
 
@@ -491,7 +497,6 @@ export default function SitesClient({ initial, elevators }: Props) {
   const [showElevatorForm, setShowElevatorForm]     = useState(false);
   const [editElevator, setEditElevator]             = useState<ElevatorRecord | null>(null);
   const [deleteElevatorTarget, setDeleteElevatorTarget] = useState<ElevatorRecord | null>(null);
-  const deleteBackdrop = useBackdropClose(() => setDeleteElevatorTarget(null));
   const [page, setPage] = useState(1);
   const [checkedSiteIds, setCheckedSiteIds] = useState<Set<number>>(new Set());
 
@@ -1025,12 +1030,18 @@ export default function SitesClient({ initial, elevators }: Props) {
       )}
 
       {/* 호기 삭제 확인 */}
-      {deleteElevatorTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          {...deleteBackdrop}>
-          <div className={`rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6 ${isDark ? "bg-gray-800" : "bg-white"}`}
-            onClick={e => e.stopPropagation()}>
-            <h3 className={`text-base font-semibold mb-2 ${isDark ? "text-gray-100" : "text-gray-800"}`}>호기 삭제</h3>
+      <DraggableModal
+        open={!!deleteElevatorTarget}
+        onClose={() => setDeleteElevatorTarget(null)}
+        panelClassName="w-full max-w-sm mx-4"
+        header={
+          <div className="px-6 pt-6 pb-2">
+            <h3 className={`text-base font-semibold ${isDark ? "text-gray-100" : "text-gray-800"}`}>호기 삭제</h3>
+          </div>
+        }
+      >
+        {deleteElevatorTarget && (
+          <div className="px-6 pb-6">
             <p className={`text-sm mb-1 ${isDark ? "text-gray-300" : "text-gray-600"}`}>
               <span className={`font-medium ${isDark ? "text-gray-100" : "text-gray-800"}`}>{deleteElevatorTarget.unitName ?? "—"}</span>
               {deleteElevatorTarget.elevatorNo && (
@@ -1050,8 +1061,8 @@ export default function SitesClient({ initial, elevators }: Props) {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </DraggableModal>
     </div>
   );
 }

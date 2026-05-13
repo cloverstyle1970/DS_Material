@@ -8,6 +8,8 @@ interface Props {
   children: ReactNode;
   panelClassName?: string;
   z?: number;
+  /** 지정하면 오버레이 클릭 시 호출 (mousedown→click 외부 검증 포함) */
+  onClose?: () => void;
 }
 
 export default function DraggableModal({
@@ -16,9 +18,11 @@ export default function DraggableModal({
   children,
   panelClassName = "w-full max-w-lg max-h-[90vh]",
   z = 50,
+  onClose,
 }: Props) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const dragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(null);
+  const pressedOnBackdrop = useRef(false);
 
   useEffect(() => { if (!open) setPos({ x: 0, y: 0 }); }, [open]);
 
@@ -43,11 +47,26 @@ export default function DraggableModal({
     try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
   }
 
+  function onBackdropMouseDown(e: React.MouseEvent<HTMLDivElement>) {
+    pressedOnBackdrop.current = e.target === e.currentTarget;
+  }
+  function onBackdropClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (onClose && pressedOnBackdrop.current && e.target === e.currentTarget) onClose();
+    pressedOnBackdrop.current = false;
+  }
+
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/50 p-4" style={{ zIndex: z }}>
+    <div
+      className="fixed inset-0 flex items-center justify-center bg-black/50 p-4"
+      style={{ zIndex: z }}
+      onMouseDown={onBackdropMouseDown}
+      onClick={onBackdropClick}
+    >
       <div
         className={`bg-white dark:bg-gray-800 rounded-xl shadow-xl flex flex-col overflow-hidden ${panelClassName}`}
         style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}
+        onClick={e => e.stopPropagation()}
+        onMouseDown={e => e.stopPropagation()}
       >
         <div
           className="select-none cursor-grab active:cursor-grabbing touch-none"

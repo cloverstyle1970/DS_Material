@@ -9,7 +9,7 @@ import {
   MODE_LABELS, SUB_TYPE_LABELS,
 } from "@/lib/tbm";
 import SignaturePad, { SignaturePadHandle } from "./SignaturePad";
-import { useBackdropClose } from "@/lib/useBackdropClose";
+import DraggableModal from "@/components/common/DraggableModal";
 
 interface Props {
   record: TBMRecord;
@@ -21,7 +21,6 @@ const STORAGE_BUCKET = "tbm-photos";
 
 export default function TBMParticipantConfirmModal({ record, onClose, onSaved }: Props) {
   const { user } = useAuth();
-  const backdrop = useBackdropClose(onClose);
 
   const [checklist, setChecklist] = useState<TBMChecklistResult[]>([]);
   const [rules, setRules] = useState<TBMRecordSafetyRule[]>([]);
@@ -183,8 +182,11 @@ export default function TBMParticipantConfirmModal({ record, onClose, onSaved }:
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg max-h-[95vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-full max-w-lg max-h-[95vh]"
+      header={
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div>
             <div className="text-base font-bold text-gray-900 dark:text-white">참가자 확인</div>
@@ -194,7 +196,8 @@ export default function TBMParticipantConfirmModal({ record, onClose, onSaved }:
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
-
+      }
+    >
         {loading ? (
           <div className="p-12 text-center text-sm text-gray-500">로딩 중...</div>
         ) : (
@@ -346,8 +349,7 @@ export default function TBMParticipantConfirmModal({ record, onClose, onSaved }:
             {saving ? "저장 중..." : confirmedAt ? "재확인 저장" : "확인 완료"}
           </button>
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }
 

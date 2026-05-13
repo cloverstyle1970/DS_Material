@@ -7,7 +7,7 @@ import { TransactionRecord } from "@/lib/mock-transactions";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { api } from "@/lib/api-client";
-import { useBackdropClose } from "@/lib/useBackdropClose";
+import DraggableModal from "@/components/common/DraggableModal";
 import Autocomplete from "@/components/common/Autocomplete";
 import TransactionBulkUploadModal from "./TransactionBulkUploadModal";
 
@@ -441,7 +441,6 @@ function EditTransactionModal({
   onSave: (data: Record<string, unknown>) => void;
   sites: SiteOption[];
 }) {
-  const backdrop = useBackdropClose(onClose);
   const [qty, setQty] = useState(tx.qty.toString());
   const [siteName, setSiteName] = useState(tx.siteName ?? "");
   const [note, setNote] = useState(tx.note ?? "");
@@ -456,12 +455,17 @@ function EditTransactionModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-[400px] overflow-hidden" onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-[400px]"
+      header={
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
           <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">내역 수정</h3>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none">&times;</button>
         </div>
+      }
+    >
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div className="mb-4">
             <p className="text-xs text-gray-500 dark:text-gray-400">자재 정보</p>
@@ -501,7 +505,6 @@ function EditTransactionModal({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }

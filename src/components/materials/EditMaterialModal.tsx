@@ -3,9 +3,9 @@
 import { useState, FormEvent } from "react";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { api, getErrorMessage } from "@/lib/api-client";
-import { useBackdropClose } from "@/lib/useBackdropClose";
 import { supabase } from "@/lib/supabase";
 import RegisterRepairModal from "./RegisterRepairModal";
+import DraggableModal from "@/components/common/DraggableModal";
 
 const OPINION_BUCKET = "material-opinions";
 
@@ -35,7 +35,6 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
 
   const isDs = material.id.startsWith("D");
   const canRegisterRepair = isDs && !material.isRepair;
-  const backdrop = useBackdropClose(onClose);
 
   async function uploadOpinionImage(file: File): Promise<string> {
     setOpinionUploading(true);
@@ -85,8 +84,11 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
         onSaved={() => { setShowRepair(false); onSaved(); }}
       />
     )}
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-full max-w-lg mx-4"
+      header={
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
           <div>
             <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">자재 수정</h2>
@@ -105,7 +107,8 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none ml-1">×</button>
           </div>
         </div>
-
+      }
+    >
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4 max-h-[75vh] overflow-y-auto">
           {/* 부품명 */}
           <div>
@@ -213,8 +216,7 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </DraggableModal>
     </>
   );
 }

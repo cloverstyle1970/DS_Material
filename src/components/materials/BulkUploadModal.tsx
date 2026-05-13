@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { CategoryStore } from "@/lib/mock-categories";
+import DraggableModal from "@/components/common/DraggableModal";
 
 interface Props {
   onClose: () => void;
@@ -281,13 +282,16 @@ export default function BulkUploadModal({ onClose, onSaved }: Props) {
   const failCount = rows.filter(r => r.status === "fail").length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-[1400px] h-[92vh] overflow-hidden flex flex-col">
-        {/* 헤더 */}
+    <DraggableModal
+      open={true}
+      panelClassName="w-full max-w-[1400px] h-[92vh]"
+      header={
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
           <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">자재 일괄 등록 (엑셀 업로드)</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">×</button>
         </div>
+      }
+    >
 
         {/* 상단 컨트롤 (고정) */}
         <div className="px-6 py-4 space-y-3 flex-shrink-0 border-b border-gray-100 dark:border-gray-700">
@@ -430,7 +434,6 @@ export default function BulkUploadModal({ onClose, onSaved }: Props) {
             {uploading ? `등록 중 ${progress}/${validCount}` : done ? "완료" : `${validCount}건 등록`}
           </button>
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }

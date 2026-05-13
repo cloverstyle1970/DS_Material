@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { useBackdropClose } from "@/lib/useBackdropClose";
+import DraggableModal from "@/components/common/DraggableModal";
 
 interface OrgItem {
   id: number;
@@ -166,7 +166,6 @@ function OrgEditModal({
   const [name, setName] = useState(initial?.name ?? "");
   const [sortOrder, setSortOrder] = useState(initial?.sort_order ?? 0);
   const [saving, setSaving] = useState(false);
-  const backdrop = useBackdropClose(onClose);
 
   async function save() {
     if (!name.trim()) { alert(`${title}명은 필수입니다.`); return; }
@@ -184,12 +183,18 @@ function OrgEditModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-full max-w-sm"
+      z={60}
+      header={
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div className="text-base font-bold text-gray-900 dark:text-white">{initial ? `${title} 수정` : `${title} 추가`}</div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
+      }
+    >
         <div className="p-5 space-y-3">
           <div>
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">{title}명 *</label>
@@ -212,7 +217,6 @@ function OrgEditModal({
             {saving ? "저장 중..." : "저장"}
           </button>
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }

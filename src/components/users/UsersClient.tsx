@@ -6,7 +6,7 @@ import { useAuth, isAdmin } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
-import { useBackdropClose } from "@/lib/useBackdropClose";
+import DraggableModal from "@/components/common/DraggableModal";
 import PermissionsModal from "./PermissionsModal";
 
 type SortKey = "id" | "name" | "dept" | "rank" | "cert" | "hireDate" | "phone" | "status";
@@ -63,7 +63,6 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("재직");
   const [page, setPage]             = useState(1);
   const [selected, setSelected]     = useState<UserRecord | null>(null);
-  const selectedBackdrop = useBackdropClose(() => setSelected(null));
   const [editPerms, setEditPerms]   = useState<UserRecord | null>(null);
   const [sortKey, setSortKey]       = useState<SortKey>("id");
   const [sortDir, setSortDir]       = useState<SortDir>("asc");
@@ -249,26 +248,31 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
       </div>
 
       {/* 상세 모달 */}
-      {selected && !editPerms && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" {...selectedBackdrop}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-semibold text-gray-800">{selected.name}</h2>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CLS[selected.status ?? ""] ?? "bg-gray-100 text-gray-500"}`}>{selected.status}</span>
-                </div>
-                <p className="text-xs text-gray-400 mt-0.5">{selected.dept} · {selected.rank}</p>
-              </div>
+      <DraggableModal
+        open={!!selected && !editPerms}
+        onClose={() => setSelected(null)}
+        panelClassName="w-full max-w-md mx-4 max-h-[85vh]"
+        header={selected && (
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+            <div>
               <div className="flex items-center gap-2">
-                {meIsAdmin && (
-                  <button type="button" onClick={() => setEditPerms(selected)}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors font-medium">권한 수정</button>
-                )}
-                <button type="button" onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none ml-1">×</button>
+                <h2 className="text-base font-semibold text-gray-800">{selected.name}</h2>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CLS[selected.status ?? ""] ?? "bg-gray-100 text-gray-500"}`}>{selected.status}</span>
               </div>
+              <p className="text-xs text-gray-400 mt-0.5">{selected.dept} · {selected.rank}</p>
             </div>
-            <div className="px-6 py-5 space-y-2.5 overflow-y-auto">
+            <div className="flex items-center gap-2">
+              {meIsAdmin && (
+                <button type="button" onClick={() => setEditPerms(selected)}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors font-medium">권한 수정</button>
+              )}
+              <button type="button" onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none ml-1">×</button>
+            </div>
+          </div>
+        )}
+      >
+        {selected && (
+          <div className="px-6 py-5 space-y-2.5 overflow-y-auto">
               {[
                 ["사원번호", String(selected.id)],
                 ["주민번호", selected.ssn ? maskSsn(selected.ssn) : "-"],
@@ -291,10 +295,9 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
                   </div>
                 </div>
               )}
-            </div>
           </div>
-        </div>
-      )}
+        )}
+      </DraggableModal>
 
       {/* 권한 수정 모달 */}
       {editPerms && (

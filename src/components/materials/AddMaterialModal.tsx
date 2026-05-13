@@ -6,6 +6,7 @@ import { generateMaterialCode } from "@/lib/category-codes";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { MaterialRecord } from "@/lib/mock-materials";
 import CategoryManagerModal from "./CategoryManagerModal";
+import DraggableModal from "@/components/common/DraggableModal";
 
 interface Props {
   onClose: () => void;
@@ -128,13 +129,16 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
+      <DraggableModal
+        open={true}
+        panelClassName="w-full max-w-lg mx-4"
+        header={
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
             <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">{isRepairMode ? "수리품 등록" : "신규 자재 등록"}</h2>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">×</button>
           </div>
-
+        }
+      >
           <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4 max-h-[75vh] overflow-y-auto">
             {/* 코드 미리보기 / 직접 입력 */}
             <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg px-4 py-3 space-y-2">
@@ -330,8 +334,7 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
               </button>
             </div>
           </form>
-        </div>
-      </div>
+      </DraggableModal>
 
       {showCatManager && (
         <CategoryManagerModal onClose={() => { setShowCatManager(false); loadCats(); }} />

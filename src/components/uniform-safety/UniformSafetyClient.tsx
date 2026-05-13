@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { useBackdropClose } from "@/lib/useBackdropClose";
+import DraggableModal from "@/components/common/DraggableModal";
 
 // ============================================================
 // 타입
@@ -652,7 +652,6 @@ function EditModal({ request, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void | Promise<void>;
 }) {
-  const backdrop = useBackdropClose(onClose);
   const [items, setItems] = useState<EditableItem[]>(
     (request.items ?? []).map(it => ({
       id: it.id,
@@ -713,8 +712,11 @@ function EditModal({ request, onClose, onSaved }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-full max-w-2xl max-h-[90vh]"
+      header={
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div>
             <div className="text-base font-bold text-gray-900 dark:text-white">신청 수정 [{request.request_type}]</div>
@@ -724,7 +726,8 @@ function EditModal({ request, onClose, onSaved }: {
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
-
+      }
+    >
         <div className="flex-1 overflow-y-auto p-5 space-y-3">
           <div className="text-[11px] font-bold text-gray-600 dark:text-gray-300">신청 항목 ({remainingCount}개)</div>
           {items.map(it => (
@@ -781,8 +784,7 @@ function EditModal({ request, onClose, onSaved }: {
             {saving ? "저장 중..." : "저장"}
           </button>
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }
 

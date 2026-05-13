@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { MaterialUnitRecord } from "@/lib/mock-material-units";
-import { useBackdropClose } from "@/lib/useBackdropClose";
+import DraggableModal from "@/components/common/DraggableModal";
 
 interface Props {
   mode: "inbound" | "outbound";
@@ -20,7 +20,6 @@ export default function SerialEntryModal({ mode, materialId, materialName, initi
   const [checked, setChecked] = useState<Set<string>>(new Set(initial));
   const [loading, setLoading] = useState(false);
   const [query,   setQuery]   = useState("");
-  const backdrop = useBackdropClose(onClose);
 
   useEffect(() => {
     if (mode !== "outbound") return;
@@ -64,8 +63,12 @@ export default function SerialEntryModal({ mode, materialId, materialName, initi
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-[560px] max-w-[95vw] flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-[560px] max-w-[95vw] max-h-[80vh]"
+      z={60}
+      header={
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-700">
           <div>
             <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{mode === "inbound" ? "입고 S/N 입력" : "출고 S/N 선택"}</h3>
@@ -73,6 +76,8 @@ export default function SerialEntryModal({ mode, materialId, materialName, initi
           </div>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">×</button>
         </div>
+      }
+    >
 
         {mode === "inbound" ? (
           <div className="p-4 flex-1 overflow-auto">
@@ -123,7 +128,6 @@ export default function SerialEntryModal({ mode, materialId, materialName, initi
           <button type="button" onClick={handleSave}
             className="text-xs px-4 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700">확인</button>
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }

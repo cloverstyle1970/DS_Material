@@ -411,14 +411,17 @@ function CalendarContent() {
       </div>
 
       {/* 공사일정 등록/수정 모달 */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
-            <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">{editingId ? "공사 일정 수정" : "공사 일정 등록"}</h3>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
+      <DraggableModal
+        open={showModal}
+        panelClassName="w-full max-w-lg"
+        header={
+          <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">{editingId ? "공사 일정 수정" : "공사 일정 등록"}</h3>
+            <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
+          </div>
+        }
+      >
+        <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
               {requestId && !editingId && (
                 <div className="bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 p-3 rounded-lg text-sm mb-2">
                   ℹ️ 선택하신 공사요청 정보를 기반으로 일정을 등록합니다.
@@ -524,9 +527,7 @@ function CalendarContent() {
                 </div>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </DraggableModal>
 
       {/* 연간일정 관리 모달 */}
       <DraggableModal

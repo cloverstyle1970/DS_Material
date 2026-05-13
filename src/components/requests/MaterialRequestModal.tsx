@@ -6,7 +6,7 @@ import { MaterialRecord } from "@/lib/mock-materials";
 import SiteSearchInput from "@/components/ui/SiteSearchInput";
 import { ElevatorRecord } from "@/lib/mock-elevators";
 import { api, getErrorMessage } from "@/lib/api-client";
-import { useBackdropClose } from "@/lib/useBackdropClose";
+import DraggableModal from "@/components/common/DraggableModal";
 
 interface SiteOption { id: number; name: string }
 interface SelectedItem { material: MaterialRecord; qty: number }
@@ -218,7 +218,6 @@ function ElevatorGroupRow({
 
 // ── 메인 모달 ───────────────────────────────────────────────
 export default function MaterialRequestModal({ sites, user, onClose, onSaved }: Props) {
-  const backdrop = useBackdropClose(onClose);
   const [siteName, setSiteName] = useState("");
   const [elevators, setElevators] = useState<ElevatorRecord[]>([]);
   const [groups, setGroups] = useState<ElevatorGroup[]>([
@@ -281,16 +280,18 @@ export default function MaterialRequestModal({ sites, user, onClose, onSaved }: 
   const totalItems = groups.reduce((sum, g) => sum + g.items.length, 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md mx-4 max-h-[90vh] flex flex-col"
-        onClick={e => e.stopPropagation()}>
-        {/* 헤더 */}
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-full max-w-md mx-4 max-h-[90vh]"
+      header={
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 shrink-0">
           <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">자재 신청</h2>
           <button type="button" onClick={onClose}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">×</button>
         </div>
-
+      }
+    >
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
           {/* 현장 */}
           <div className="space-y-1.5">
@@ -367,7 +368,6 @@ export default function MaterialRequestModal({ sites, user, onClose, onSaved }: 
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }

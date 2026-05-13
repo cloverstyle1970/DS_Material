@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { useBackdropClose } from "@/lib/useBackdropClose";
+import DraggableModal from "@/components/common/DraggableModal";
 import {
   SafetyRule, RepairType, FaultType, ChecklistItem,
   SafetyCategory, SafetySeason, ChecklistType,
@@ -185,7 +185,6 @@ function SafetyRuleModal({ initial, onClose, onSaved }: {
   const [season, setSeason] = useState<SafetySeason>(initial?.season ?? "all");
   const [sortOrder, setSortOrder] = useState(initial?.sort_order ?? 0);
   const [saving, setSaving] = useState(false);
-  const backdrop = useBackdropClose(onClose);
 
   async function save() {
     if (!code.trim() || !text.trim()) { alert("코드와 내용은 필수입니다."); return; }
@@ -203,12 +202,18 @@ function SafetyRuleModal({ initial, onClose, onSaved }: {
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-full max-w-md"
+      z={60}
+      header={
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div className="text-base font-bold text-gray-900 dark:text-white">{initial ? "안전수칙 수정" : "안전수칙 추가"}</div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
+      }
+    >
         <div className="p-5 space-y-3">
           <Field label="코드 *">
             <input type="text" value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="예: R21"
@@ -249,8 +254,7 @@ function SafetyRuleModal({ initial, onClose, onSaved }: {
             {saving ? "저장 중..." : "저장"}
           </button>
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }
 
@@ -343,7 +347,6 @@ function SimpleTypeModal({
   const [label, setLabel] = useState(initial?.label ?? "");
   const [sortOrder, setSortOrder] = useState(initial?.sort_order ?? 0);
   const [saving, setSaving] = useState(false);
-  const backdrop = useBackdropClose(onClose);
 
   async function save() {
     if (!code.trim() || !label.trim()) { alert("코드와 이름은 필수입니다."); return; }
@@ -358,12 +361,18 @@ function SimpleTypeModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-full max-w-md"
+      z={60}
+      header={
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div className="text-base font-bold text-gray-900 dark:text-white">{initial ? `${title} 수정` : `${title} 추가`}</div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
+      }
+    >
         <div className="p-5 space-y-3">
           <Field label={`코드 * (예: ${codePrefix}10)`}>
             <input type="text" value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder={`${codePrefix}10`}
@@ -386,8 +395,7 @@ function SimpleTypeModal({
             {saving ? "저장 중..." : "저장"}
           </button>
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }
 
@@ -503,7 +511,6 @@ function ChecklistModal({ initial, onClose, onSaved }: {
   const [label, setLabel] = useState(initial?.label ?? "");
   const [sortOrder, setSortOrder] = useState(initial?.sort_order ?? 0);
   const [saving, setSaving] = useState(false);
-  const backdrop = useBackdropClose(onClose);
 
   async function save() {
     if (!label.trim()) { alert("항목 내용은 필수입니다."); return; }
@@ -518,12 +525,18 @@ function ChecklistModal({ initial, onClose, onSaved }: {
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-full max-w-md"
+      z={60}
+      header={
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div className="text-base font-bold text-gray-900 dark:text-white">{initial ? "체크리스트 항목 수정" : "체크리스트 항목 추가"}</div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
+      }
+    >
         <div className="p-5 space-y-3">
           <Field label="유형 *">
             <select value={listType} onChange={e => setListType(e.target.value as ChecklistType)}
@@ -549,8 +562,7 @@ function ChecklistModal({ initial, onClose, onSaved }: {
             {saving ? "저장 중..." : "저장"}
           </button>
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }
 

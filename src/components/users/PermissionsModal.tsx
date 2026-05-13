@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { UserRecord } from "@/lib/mock-users";
 import { PERMISSION_MENUS } from "@/lib/permissions";
+import DraggableModal from "@/components/common/DraggableModal";
 
 export { PERMISSION_MENUS };
 
@@ -84,8 +85,11 @@ export default function PermissionsModal({ user, onClose, onSave }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-full max-w-4xl max-h-[90vh]"
+      header={
         <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">권한 설정</h3>
@@ -95,7 +99,8 @@ export default function PermissionsModal({ user, onClose, onSave }: Props) {
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
         </div>
-
+      }
+    >
         <div className="flex-1 flex flex-col min-h-0 p-5">
           <div className="mb-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
             <label className="flex items-center gap-3 cursor-pointer">
@@ -200,7 +205,6 @@ export default function PermissionsModal({ user, onClose, onSave }: Props) {
             권한 저장
           </button>
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }

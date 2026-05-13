@@ -6,7 +6,7 @@ import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
-import { useBackdropClose } from "@/lib/useBackdropClose";
+import DraggableModal from "@/components/common/DraggableModal";
 
 // ── 공통 필드 입력 스타일 ───────────────────────────────────
 const field = "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-slate-400";
@@ -68,17 +68,21 @@ interface ModalProps {
 
 function VendorFormModal({ title, initial, saving, error, onSubmit, onClose, submitLabel, submitCls }: ModalProps) {
   const [f, setF] = useState<FormState>(initial);
-  const backdrop = useBackdropClose(onClose);
   const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setF(p => ({ ...p, [k]: e.target.value }));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" {...backdrop}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-full max-w-lg mx-4 max-h-[90vh]"
+      header={
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
           <h2 className="text-base font-semibold text-gray-800">{title}</h2>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
+      }
+    >
         <form onSubmit={e => { e.preventDefault(); onSubmit(f); }} className="px-6 py-5 space-y-3 overflow-y-auto flex-1">
           {/* 거래처명 + 구분 */}
           <div className="grid grid-cols-3 gap-3">
@@ -187,8 +191,7 @@ function VendorFormModal({ title, initial, saving, error, onSubmit, onClose, sub
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }
 
@@ -218,8 +221,6 @@ export default function VendorsClient({ initial }: Props) {
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<VendorRecord | null>(null);
-  const selectedBackdrop = useBackdropClose(() => setSelected(null));
-  const deleteConfirmBackdrop = useBackdropClose(() => setDeleteConfirm(null));
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
@@ -461,30 +462,35 @@ export default function VendorsClient({ initial }: Props) {
       </div>
 
       {/* 상세 보기 */}
-      {selected && !editTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" {...selectedBackdrop}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-semibold text-gray-800">{selected.name}</h2>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${TYPE_CLS[selected.type ?? "매출"]}`}>{selected.type}</span>
-                </div>
-                <p className="text-xs text-gray-400 mt-0.5">코드 {selected.vendorCode ?? "-"}</p>
-              </div>
+      <DraggableModal
+        open={!!selected && !editTarget}
+        onClose={() => setSelected(null)}
+        panelClassName="w-full max-w-md mx-4 max-h-[85vh]"
+        header={selected && (
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+            <div>
               <div className="flex items-center gap-2">
-                {admin && (
-                  <>
-                    <button type="button" onClick={() => { setEditTarget(selected); setError(""); }}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors font-medium">수정</button>
-                    <button type="button" onClick={() => setDeleteConfirm(selected)}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors font-medium">삭제</button>
-                  </>
-                )}
-                <button type="button" onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none ml-1">×</button>
+                <h2 className="text-base font-semibold text-gray-800">{selected.name}</h2>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${TYPE_CLS[selected.type ?? "매출"]}`}>{selected.type}</span>
               </div>
+              <p className="text-xs text-gray-400 mt-0.5">코드 {selected.vendorCode ?? "-"}</p>
             </div>
-            <div className="px-6 py-5 space-y-2.5 overflow-y-auto">
+            <div className="flex items-center gap-2">
+              {admin && (
+                <>
+                  <button type="button" onClick={() => { setEditTarget(selected); setError(""); }}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors font-medium">수정</button>
+                  <button type="button" onClick={() => setDeleteConfirm(selected)}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors font-medium">삭제</button>
+                </>
+              )}
+              <button type="button" onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none ml-1">×</button>
+            </div>
+          </div>
+        )}
+      >
+        {selected && (
+          <div className="px-6 py-5 space-y-2.5 overflow-y-auto">
               {[
                 ["사업자번호", selected.bizNo],
                 ["대표자명",   selected.representative],
@@ -502,10 +508,9 @@ export default function VendorsClient({ initial }: Props) {
                   <span className="text-gray-800 text-sm break-all">{value || "-"}</span>
                 </div>
               ))}
-            </div>
           </div>
-        </div>
-      )}
+        )}
+      </DraggableModal>
 
       {/* 등록 모달 */}
       {showAdd && (
@@ -536,10 +541,19 @@ export default function VendorsClient({ initial }: Props) {
       )}
 
       {/* 삭제 확인 */}
-      {deleteConfirm && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" {...deleteConfirmBackdrop}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-gray-800 mb-2">거래처 삭제</h3>
+      <DraggableModal
+        open={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        panelClassName="w-full max-w-sm mx-4"
+        z={60}
+        header={
+          <div className="px-6 pt-6 pb-2">
+            <h3 className="text-base font-semibold text-gray-800">거래처 삭제</h3>
+          </div>
+        }
+      >
+        {deleteConfirm && (
+          <div className="px-6 pb-6">
             <p className="text-sm text-gray-600 mb-1">
               <span className="font-medium text-gray-800">{deleteConfirm.name}</span>을(를) 삭제하시겠습니까?
             </p>
@@ -551,8 +565,8 @@ export default function VendorsClient({ initial }: Props) {
                 className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition-colors">삭제</button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </DraggableModal>
     </>
   );
 }

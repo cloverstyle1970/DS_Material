@@ -7,7 +7,7 @@ import { MaterialRecord } from "@/lib/mock-materials";
 import { ElevatorRecord } from "@/lib/mock-elevators";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { api, getErrorMessage } from "@/lib/api-client";
-import { useBackdropClose } from "@/lib/useBackdropClose";
+import DraggableModal from "@/components/common/DraggableModal";
 import SerialEntryModal from "./SerialEntryModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 
@@ -614,7 +614,6 @@ function SiteInlineSearch({ value, onChange, sites }: { value: string; onChange:
 function InboundRefPopup({ onSelect, onClose }: { onSelect: (t: TransactionRecord) => void; onClose: () => void }) {
   const [records, setRecords] = useState<TransactionRecord[]>([]);
   const [q, setQ] = useState("");
-  const backdrop = useBackdropClose(onClose);
   useEffect(() => {
     api.get<TransactionRecord[]>("/api/transactions?type=입고").then(data => setRecords(data.slice(0, 200))).catch(() => setRecords([]));
   }, []);
@@ -624,12 +623,17 @@ function InboundRefPopup({ onSelect, onClose }: { onSelect: (t: TransactionRecor
     (t.siteName?.toLowerCase().includes(q.toLowerCase()) ?? false)
   );
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-[700px] max-h-[70vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-[700px] max-h-[70vh]"
+      header={
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-700">
           <h3 className="text-sm font-semibold dark:text-gray-100">입고내역 참조 ({records.length}건)</h3>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none">×</button>
         </div>
+      }
+    >
         <div className="p-3">
           <input type="text" value={q} onChange={e => setQ(e.target.value)} autoFocus
             placeholder="자재명, 코드, 현장 검색"
@@ -657,8 +661,7 @@ function InboundRefPopup({ onSelect, onClose }: { onSelect: (t: TransactionRecor
           </table>
           {filtered.length === 0 && <p className="text-center py-8 text-xs text-gray-400 dark:text-gray-500">입고 내역 없음</p>}
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }
 
@@ -671,7 +674,6 @@ function StockAdjustModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const backdrop = useBackdropClose(onClose);
   // 오늘 날짜 yyyy-MM-dd
   function todayLocal() {
     const d = new Date();
@@ -744,8 +746,12 @@ function StockAdjustModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-full max-w-md"
+      z={60}
+      header={
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div>
             <div className="text-base font-bold text-gray-900 dark:text-white">재고수량 조정</div>
@@ -753,7 +759,8 @@ function StockAdjustModal({
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
-
+      }
+    >
         <div className="p-5 space-y-3">
           <div className="bg-gray-50 dark:bg-gray-700/40 rounded-lg p-3 text-xs space-y-1">
             <div><span className="text-gray-500">자재명: </span><span className="font-semibold text-gray-800 dark:text-gray-100">{row.materialName}</span></div>
@@ -838,7 +845,6 @@ function StockAdjustModal({
             {saving ? "처리 중..." : "재고조정 처리"}
           </button>
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import DraggableModal from "@/components/common/DraggableModal";
 
 // ============================================================
 // 타입
@@ -362,14 +363,14 @@ function QuoteDetailInner() {
       </div>
 
       {/* 소견서 모달 (화면 전용) */}
-      {openOpinionId && (() => {
-        const it = items.find(x => x.id === openOpinionId);
-        if (!it) return null;
+      {(() => {
+        const it = openOpinionId ? items.find(x => x.id === openOpinionId) : null;
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 print:hidden"
-            onClick={() => setOpenOpinionId(null)}>
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-xl max-h-[85vh] overflow-y-auto"
-              onClick={e => e.stopPropagation()}>
+          <DraggableModal
+            open={!!it}
+            onClose={() => setOpenOpinionId(null)}
+            panelClassName="w-full max-w-xl max-h-[85vh]"
+            header={it && (
               <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                 <div>
                   <div className="text-base font-bold text-gray-900 dark:text-white">소견서</div>
@@ -377,7 +378,10 @@ function QuoteDetailInner() {
                 </div>
                 <button onClick={() => setOpenOpinionId(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
               </div>
-              <div className="p-5 space-y-3 text-sm text-gray-700 dark:text-gray-300">
+            )}
+          >
+            {it && (
+              <div className="p-5 space-y-3 text-sm text-gray-700 dark:text-gray-300 overflow-y-auto">
                 {it.opinion_image_url && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={it.opinion_image_url} alt="소견서 이미지" className="max-w-full rounded-lg border border-gray-200 dark:border-gray-700" />
@@ -388,8 +392,8 @@ function QuoteDetailInner() {
                   <div className="text-gray-400 text-xs">텍스트 소견 없음</div>
                 )}
               </div>
-            </div>
-          </div>
+            )}
+          </DraggableModal>
         );
       })()}
 

@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { useAuth } from "@/context/AuthContext";
+import DraggableModal from "@/components/common/DraggableModal";
 
 interface Props {
   onClose: () => void;
@@ -173,12 +174,16 @@ export default function PurchaseOrderBulkUploadModal({ onClose, onSaved }: Props
   const failCount = rows.filter(r => r.status === "fail").length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-[1400px] h-[92vh] overflow-hidden flex flex-col">
+    <DraggableModal
+      open={true}
+      panelClassName="w-full max-w-[1400px] h-[92vh]"
+      header={
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
           <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">발주 일괄 등록 (엑셀 업로드)</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">×</button>
         </div>
+      }
+    >
 
         <div className="px-6 py-4 space-y-3 flex-shrink-0 border-b border-gray-100 dark:border-gray-700">
           <div className="rounded-lg bg-slate-50 dark:bg-slate-700/50 px-4 py-3 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
@@ -310,7 +315,6 @@ export default function PurchaseOrderBulkUploadModal({ onClose, onSaved }: Props
             {uploading ? `등록 중 ${progress}/${validCount}` : done ? "완료" : `${validCount}건 등록`}
           </button>
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }

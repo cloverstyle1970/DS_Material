@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { CategoryStore, CategoryItem } from "@/lib/mock-categories";
 import { api as apiClient, getErrorMessage } from "@/lib/api-client";
+import DraggableModal from "@/components/common/DraggableModal";
 
 interface Props {
   onClose: () => void;
@@ -115,13 +116,17 @@ export default function CategoryManagerModal({ onClose }: Props) {
   const subList = selMajor && selMid ? (store.sub[`${selMajor}${selMid}`] ?? []) : [];
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-[900px] mx-4 flex flex-col max-h-[85vh]">
+    <DraggableModal
+      open={true}
+      panelClassName="w-full max-w-[900px] mx-4 max-h-[85vh]"
+      z={60}
+      header={
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 shrink-0">
           <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">분류 관리</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">×</button>
         </div>
-
+      }
+    >
         <div className="flex flex-1 min-h-0 divide-x divide-gray-100 dark:divide-gray-700 overflow-hidden">
           {/* 대분류 */}
           <div className="w-1/3 flex flex-col min-h-0 p-4 overflow-hidden">
@@ -192,7 +197,6 @@ export default function CategoryManagerModal({ onClose }: Props) {
         <div className="px-6 py-3 border-t border-gray-100 dark:border-gray-700 shrink-0 flex justify-end">
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">닫기</button>
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }

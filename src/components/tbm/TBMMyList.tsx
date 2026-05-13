@@ -8,7 +8,7 @@ import {
   MODE_LABELS, SUB_TYPE_LABELS,
 } from "@/lib/tbm";
 import TBMParticipantConfirmModal from "./TBMParticipantConfirmModal";
-import { useBackdropClose } from "@/lib/useBackdropClose";
+import DraggableModal from "@/components/common/DraggableModal";
 
 interface DetailData {
   participants: TBMParticipant[];
@@ -366,7 +366,6 @@ function EditTBMModal({
   const [passengerTrapped, setPassengerTrapped] = useState(record.passenger_trapped);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const backdrop = useBackdropClose(onClose);
 
   async function save() {
     if (!siteName.trim() || !workContent.trim()) {
@@ -390,12 +389,18 @@ function EditTBMModal({
   const inputCls = "w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100";
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-full max-w-md max-h-[90vh]"
+      z={60}
+      header={
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div className="text-base font-bold text-gray-900 dark:text-white">TBM 기본정보 수정</div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
+      }
+    >
         <div className="flex-1 overflow-y-auto p-5 space-y-3">
           <Field label="현장명 *">
             <input type="text" value={siteName} onChange={e => setSiteName(e.target.value)} lang="ko" className={inputCls} />
@@ -439,8 +444,7 @@ function EditTBMModal({
             {saving ? "저장 중..." : "저장"}
           </button>
         </div>
-      </div>
-    </div>
+    </DraggableModal>
   );
 }
 

@@ -7,7 +7,7 @@ import { PurchaseOrderRecord } from "@/lib/mock-purchase-orders";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import SiteSearchInput from "@/components/ui/SiteSearchInput";
 import { api, getErrorMessage } from "@/lib/api-client";
-import { useBackdropClose } from "@/lib/useBackdropClose";
+import DraggableModal from "@/components/common/DraggableModal";
 
 interface SiteOption { id: number; name: string }
 
@@ -30,7 +30,6 @@ function fmtDate(iso: string) {
 }
 
 export default function StockTxModal({ initialType, sites, user, onClose, onSaved }: Props) {
-  const backdrop = useBackdropClose(onClose);
   const [txType, setTxType] = useState<"입고" | "출고">(initialType);
 
   // ── 참조 데이터 ──────────────────────────────────────────────
@@ -175,15 +174,17 @@ export default function StockTxModal({ initialType, sites, user, onClose, onSave
   const hasRef = txType === "입고" ? pendingOrders.length > 0 : inboundList.length > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" {...backdrop}>
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
-
-        {/* 헤더 */}
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-full max-w-lg mx-4 max-h-[92vh]"
+      header={
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 shrink-0">
           <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">입출고 등록</h2>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">×</button>
         </div>
-
+      }
+    >
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
 
           {/* 입고 / 출고 토글 */}
@@ -404,7 +405,6 @@ export default function StockTxModal({ initialType, sites, user, onClose, onSave
           </button>
         </div>
 
-      </div>
-    </div>
+    </DraggableModal>
   );
 }
