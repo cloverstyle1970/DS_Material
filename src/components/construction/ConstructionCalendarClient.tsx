@@ -377,7 +377,7 @@ function CalendarContent() {
                     // 공사휴무는 기존 색감 유지 (휴무는 TBM 대상 아님)
                     const isHoliday = sch.siteName === "공사휴무";
                     const borderCls = isHoliday
-                      ? "border-orange-400 dark:border-orange-500"
+                      ? "border-green-300 dark:border-green-400"
                       : hasTbm
                         ? "border-blue-500 dark:border-white"        // TBM 작성됨
                         : "border-red-500 dark:border-red-500";      // TBM 미작성
