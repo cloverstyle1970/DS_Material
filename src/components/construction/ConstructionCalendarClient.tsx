@@ -361,7 +361,7 @@ function CalendarContent() {
                 <div className={`flex items-baseline gap-1 px-1 py-0.5 ${isRed || hasYeonga ? "text-red-500" : isSaturday ? "text-blue-500" : "text-gray-700 dark:text-gray-300"}`}>
                   <span className="text-xs font-semibold">{cell.day}</span>
                   {holidayName && (
-                    <span className="text-[10px] font-normal text-red-400 dark:text-red-300 leading-none truncate">{holidayName}</span>
+                    <span className="text-[10px] font-semibold text-red-500 leading-none truncate">{holidayName}</span>
                   )}
                 </div>
                 <div className="flex flex-col gap-0.5 mt-0.5">
