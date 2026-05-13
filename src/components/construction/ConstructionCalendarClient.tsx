@@ -380,7 +380,7 @@ function CalendarContent() {
                       ? "border-green-300 dark:border-green-400"
                       : hasTbm
                         ? "border-blue-500 dark:border-white"        // TBM 작성됨
-                        : "border-red-500 dark:border-red-500";      // TBM 미작성
+                        : "border-black dark:border-white";          // TBM 미작성
                     return (
                       <div
                         key={`sch-${sch.id}`}
