@@ -6,6 +6,7 @@ import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
+import DraggableModal from "@/components/common/DraggableModal";
 import { getHolidaysForYear } from "@/lib/korean-holidays";
 
 export interface ConstructionSchedule {
@@ -528,18 +529,20 @@ function CalendarContent() {
       )}
 
       {/* 연간일정 관리 모달 */}
-      {showAnnualModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between shrink-0">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">연간일정 관리</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{year}년 단체연차 · 휴무 · 행사 등</p>
-              </div>
-              <button onClick={() => setShowAnnualModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
+      <DraggableModal
+        open={showAnnualModal}
+        panelClassName="w-full max-w-lg max-h-[90vh]"
+        header={
+          <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between shrink-0">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">연간일정 관리</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{year}년 단체연차 · 휴무 · 행사 등</p>
             </div>
-
-            <div className="flex-1 overflow-y-auto">
+            <button onClick={() => setShowAnnualModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
+          </div>
+        }
+      >
+        <div className="flex-1 overflow-y-auto">
               {!showEventForm ? (
                 <div className="p-5 flex flex-col gap-3">
                   <button
@@ -636,9 +639,7 @@ function CalendarContent() {
                 </form>
               )}
             </div>
-          </div>
-        </div>
-      )}
+      </DraggableModal>
     </div>
   );
 }
