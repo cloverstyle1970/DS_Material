@@ -228,8 +228,10 @@ function CalendarContent() {
 
   function openNewEventForm() {
     setEditingEvent(null);
-    setEvStartDate(`${year}-01-01`);
-    setEvEndDate(`${year}-01-01`);
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+    setEvStartDate(todayStr);
+    setEvEndDate(todayStr);
     setEvType("연차");
     setEvTitle("");
     setEvNote("");
@@ -602,7 +604,11 @@ function CalendarContent() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">시작일 <span className="text-red-500">*</span></label>
-                      <input type="date" value={evStartDate} onChange={e => setEvStartDate(e.target.value)} required className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                      <input type="date" value={evStartDate} onChange={e => {
+                        const v = e.target.value;
+                        setEvStartDate(v);
+                        if (!evEndDate || evEndDate < v) setEvEndDate(v);
+                      }} required className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">종료일 <span className="text-red-500">*</span></label>
@@ -621,7 +627,7 @@ function CalendarContent() {
                   </div>
                   <div className="flex justify-between pt-2">
                     <button type="button" onClick={() => setShowEventForm(false)} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600">
-                      뒤로
+                      취소
                     </button>
                     <button type="submit" disabled={evSaving} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50">
                       {evSaving ? "저장 중..." : "저장"}

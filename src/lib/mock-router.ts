@@ -86,8 +86,18 @@ export interface AnnualEvent {
   note: string;
 }
 
-let nextAnnualEventId = 1;
-export const mockAnnualEvents: AnnualEvent[] = [];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function dbToAnnualEvent(r: any): AnnualEvent {
+  return {
+    id:        r.id,
+    year:      r.year,
+    startDate: r.start_date,
+    endDate:   r.end_date,
+    type:      r.type,
+    title:     r.title ?? "",
+    note:      r.note  ?? "",
+  };
+}
 
 // ── Supabase 변환 헬퍼 ────────────────────────────────────────────
 
@@ -733,11 +743,11 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
   }
   if (path === "/api/annual-events") {
     const year = params.get("year");
-    if (year) {
-      const y = Number(year);
-      return mockAnnualEvents.filter(ev => ev.year === y).sort((a, b) => a.startDate.localeCompare(b.startDate));
-    }
-    return [...mockAnnualEvents].sort((a, b) => a.startDate.localeCompare(b.startDate));
+    let query = supabase.from("annual_events").select("*").order("start_date");
+    if (year) query = query.eq("year", Number(year));
+    const { data, error } = await query;
+    if (error) throw new MockApiError(error.message, 500);
+    return (data ?? []).map(dbToAnnualEvent);
   }
   throw new MockApiError("Not found", 404);
 }
@@ -940,17 +950,16 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
     return dbToConstSched(data);
   }
   if (path === "/api/annual-events") {
-    const record: AnnualEvent = {
-      id: nextAnnualEventId++,
-      year: Number(body.year) || new Date().getFullYear(),
-      startDate: body.startDate,
-      endDate: body.endDate || body.startDate,
-      type: body.type || "기타",
-      title: body.title || "",
-      note: body.note || "",
-    };
-    mockAnnualEvents.push(record);
-    return record;
+    const { data, error } = await supabase.from("annual_events").insert({
+      year:       Number(body.year) || new Date().getFullYear(),
+      start_date: body.startDate,
+      end_date:   body.endDate || body.startDate,
+      type:       body.type  || "기타",
+      title:      body.title || "",
+      note:       body.note  || "",
+    }).select().single();
+    if (error) throw new MockApiError(error.message, 500);
+    return dbToAnnualEvent(data);
   }
   throw new MockApiError("Not found", 404);
 }
@@ -1226,16 +1235,19 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
 
   const annualEventId = extractId(path, "/api/annual-events");
   if (annualEventId) {
-    const idx = mockAnnualEvents.findIndex(ev => ev.id === Number(annualEventId));
-    if (idx === -1) throw new MockApiError("not found", 404);
-    const { startDate, endDate, type, title, note, year } = body;
-    if (year      !== undefined) mockAnnualEvents[idx].year      = Number(year);
-    if (startDate !== undefined) mockAnnualEvents[idx].startDate = startDate;
-    if (endDate   !== undefined) mockAnnualEvents[idx].endDate   = endDate;
-    if (type      !== undefined) mockAnnualEvents[idx].type      = type;
-    if (title     !== undefined) mockAnnualEvents[idx].title     = title;
-    if (note      !== undefined) mockAnnualEvents[idx].note      = note;
-    return mockAnnualEvents[idx];
+    const numId = Number(annualEventId);
+    const patch: Record<string, unknown> = {};
+    if (body.year      !== undefined) patch.year       = Number(body.year);
+    if (body.startDate !== undefined) patch.start_date = body.startDate;
+    if (body.endDate   !== undefined) patch.end_date   = body.endDate;
+    if (body.type      !== undefined) patch.type       = body.type;
+    if (body.title     !== undefined) patch.title      = body.title;
+    if (body.note      !== undefined) patch.note       = body.note;
+    const { data, error } = await supabase.from("annual_events")
+      .update(patch).eq("id", numId).select().single();
+    if (error) throw new MockApiError(error.message, 500);
+    if (!data) throw new MockApiError("not found", 404);
+    return dbToAnnualEvent(data);
   }
 
   throw new MockApiError("Not found", 404);
@@ -1398,9 +1410,8 @@ async function routeDELETE(path: string, body: AnyBody): Promise<unknown> {
 
   const annualEventDelId = extractId(path, "/api/annual-events");
   if (annualEventDelId) {
-    const idx = mockAnnualEvents.findIndex(ev => ev.id === Number(annualEventDelId));
-    if (idx === -1) throw new MockApiError("not found", 404);
-    mockAnnualEvents.splice(idx, 1);
+    const { error } = await supabase.from("annual_events").delete().eq("id", Number(annualEventDelId));
+    if (error) throw new MockApiError(error.message, 500);
     return { ok: true };
   }
 
