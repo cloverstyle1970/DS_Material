@@ -176,9 +176,8 @@ const ORD_COLS: { key: OrdSortKey | null; label: string; sortable: boolean }[] =
   { key: "elevatorName",  label: "호기",     sortable: true  },
   { key: "requesterName", label: "신청자",   sortable: true  },
   { key: "vendorName",    label: "거래처",   sortable: true  },
-  { key: "unitPrice",     label: "단가",     sortable: true  },
-  { key: "userName",      label: "담당자",   sortable: true  },
-  { key: null,            label: "비고",     sortable: false },
+  { key: "unitPrice",     label: "판매단가",     sortable: true  },
+  { key: null,            label: "적요",     sortable: false },
 ];
 
 function compareSort<T>(a: T, b: T, dir: SortDir) {
@@ -299,20 +298,28 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
   }
 
   const [bulkInboundLoading, setBulkInboundLoading] = useState(false);
+  const [bulkInboundOpen, setBulkInboundOpen] = useState(false);
 
-  async function handleBulkInbound() {
-    if (!user) return;
+  function openBulkInboundModal() {
     const targets = orders.filter(o => selectedOrdIds.has(o.id) && o.status === "발주");
     if (targets.length === 0) {
       alert("입고 처리 가능한 발주(상태=발주)가 선택되지 않았습니다.");
       return;
     }
-    if (!confirm(`선택한 ${targets.length}건을 일괄 입고완료 처리하시겠습니까?`)) return;
+    setBulkInboundOpen(true);
+  }
+
+  async function handleBulkInboundSubmit(receivedAt: string) {
+    if (!user) return;
+    const targets = orders.filter(o => selectedOrdIds.has(o.id) && o.status === "발주");
+    if (targets.length === 0) return;
     setBulkInboundLoading(true);
     const fails: string[] = [];
     for (const o of targets) {
       try {
-        await api.patch(`/api/purchase-orders/${o.id}`, { action: "입고완료", userId: user.id, userName: user.name });
+        await api.patch(`/api/purchase-orders/${o.id}`, {
+          action: "입고완료", userId: user.id, userName: user.name, receivedAt,
+        });
       } catch (e) {
         fails.push(`${o.materialName}: ${(e as Error).message}`);
       }
@@ -320,6 +327,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
     setOrders(await api.get<PurchaseOrderRecord[]>("/api/purchase-orders"));
     setSelectedOrdIds(new Set());
     setBulkInboundLoading(false);
+    setBulkInboundOpen(false);
     if (fails.length > 0) {
       alert(`${targets.length - fails.length}건 처리 완료. 실패 ${fails.length}건:\n` + fails.join("\n"));
     }
@@ -436,9 +444,8 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
       호기: o.elevatorName ?? "",
       신청자: o.requesterName ?? "",
       거래처: o.vendorName ?? "",
-      단가: o.unitPrice ?? "",
-      담당자: o.userName,
-      비고: o.note ?? "",
+      판매단가: o.unitPrice ?? "",
+      적요: (o.note ?? "").replace(/^\[[^\]]*\]\s*/, "").trim(),
     }));
     xlsxDownload(rows, "발주", `발주내역_${label}_${stamp}.xlsx`);
   }
@@ -690,7 +697,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
               ))}
             </div>
             {admin && selectedOrdIds.size > 0 && (
-              <button type="button" onClick={handleBulkInbound} disabled={bulkInboundLoading}
+              <button type="button" onClick={openBulkInboundModal} disabled={bulkInboundLoading}
                 className="ml-auto bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60">
                 {bulkInboundLoading ? "처리 중..." : `선택 ${selectedOrdIds.size}건 입고완료`}
               </button>
@@ -805,7 +812,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                 {sortedOrds.length === 0 ? (
-                  <tr><td colSpan={admin ? 15 : 14} className="text-center py-16 text-gray-400 dark:text-gray-500">
+                  <tr><td colSpan={admin ? 14 : 13} className="text-center py-16 text-gray-400 dark:text-gray-500">
                     {orders.length === 0 ? "발주 내역이 없습니다." : "조건에 맞는 내역이 없습니다."}
                   </td></tr>
                 ) : sortedOrds.map(o => (
@@ -836,8 +843,9 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                     <td className="px-4 py-3 text-right tabular-nums text-black dark:text-white">
                       {o.unitPrice != null ? o.unitPrice.toLocaleString() : "-"}
                     </td>
-                    <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.userName}</td>
-                    <td className="px-4 py-3 text-left text-black dark:text-white max-w-[120px] truncate">{o.note ?? "-"}</td>
+                    <td className="px-4 py-3 text-left text-black dark:text-white max-w-[160px] truncate">
+                      {(o.note ?? "").replace(/^\[[^\]]*\]\s*/, "").trim() || "-"}
+                    </td>
                     {admin && (
                       <td className="px-4 py-3">
                         {o.status === "발주" && (
@@ -897,7 +905,87 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
         />
       )}
 
+      {bulkInboundOpen && (
+        <BulkInboundModal
+          targets={orders.filter(o => selectedOrdIds.has(o.id) && o.status === "발주")}
+          onClose={() => setBulkInboundOpen(false)}
+          onSubmit={handleBulkInboundSubmit}
+          loading={bulkInboundLoading}
+        />
+      )}
+
     </>
+  );
+}
+
+// ── 일괄 입고 모달 ────────────────────────────────────────────────
+function BulkInboundModal({
+  targets, onClose, onSubmit, loading,
+}: {
+  targets: PurchaseOrderRecord[];
+  onClose: () => void;
+  onSubmit: (receivedAt: string) => void;
+  loading: boolean;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [receivedAt, setReceivedAt] = useState(today);
+  return (
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-[560px]"
+      header={
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-gray-700">
+          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">일괄 입고완료</h3>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none">&times;</button>
+        </div>
+      }
+    >
+      <div className="p-5 space-y-4">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">입고일자 <span className="text-red-500">*</span></label>
+          <input type="date" value={receivedAt} onChange={e => setReceivedAt(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+            대상 발주 <span className="text-blue-600 dark:text-blue-400 font-semibold">{targets.length}건</span>
+          </label>
+          <div className="max-h-64 overflow-auto rounded-lg border border-gray-200 dark:border-gray-700">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50 dark:bg-gray-700/50 sticky top-0">
+                <tr>
+                  <th className="px-3 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">자재코드</th>
+                  <th className="px-3 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">자재명</th>
+                  <th className="px-3 py-2 text-right text-gray-500 dark:text-gray-400 font-medium">수량</th>
+                  <th className="px-3 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">거래처</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {targets.map(o => (
+                  <tr key={o.id}>
+                    <td className="px-3 py-1.5 font-mono text-gray-700 dark:text-gray-300">{o.materialId}</td>
+                    <td className="px-3 py-1.5 text-gray-800 dark:text-gray-200">{o.materialName}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums text-gray-700 dark:text-gray-300">{o.qty}</td>
+                    <td className="px-3 py-1.5 text-gray-600 dark:text-gray-400">{o.vendorName ?? "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="flex gap-2 justify-end pt-3 border-t border-gray-100 dark:border-gray-700">
+          <button type="button" onClick={onClose} disabled={loading}
+            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
+            취소
+          </button>
+          <button type="button" onClick={() => onSubmit(receivedAt)} disabled={loading || !receivedAt}
+            className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60">
+            {loading ? "처리 중..." : `${targets.length}건 입고완료`}
+          </button>
+        </div>
+      </div>
+    </DraggableModal>
   );
 }
 

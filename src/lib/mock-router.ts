@@ -1097,6 +1097,10 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
         .select("*").eq("id", numId).single();
       if (fetchErr || !ord) throw new MockApiError("not found", 404);
       const order = dbToOrder(ord);
+      const inputReceivedAt = body.receivedAt as string | undefined;
+      const receivedAt = inputReceivedAt
+        ? new Date(`${inputReceivedAt}T00:00:00Z`).toISOString()
+        : new Date().toISOString();
       const { records: txs, error } = await supabaseAddTransaction({
         type: "입고",
         materialId: order.materialId,
@@ -1108,8 +1112,12 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
         userName,
       });
       if (error) throw new MockApiError(error, 400);
+      if (inputReceivedAt && txs && txs.length > 0) {
+        await supabase.from("transactions")
+          .update({ created_at: receivedAt }).in("id", txs.map(t => t.id));
+      }
       const { data: updated, error: updateErr } = await supabase.from("purchase_orders")
-        .update({ status: "입고완료", received_at: new Date().toISOString() })
+        .update({ status: "입고완료", received_at: receivedAt })
         .eq("id", numId).select().single();
       if (updateErr) throw new MockApiError(updateErr.message, 500);
       return { order: dbToOrder(updated), transaction: txs?.[0] ?? null, transactions: txs };
