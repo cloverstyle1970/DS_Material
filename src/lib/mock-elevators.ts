@@ -6,6 +6,7 @@ export interface ElevatorRecord {
   unitName: string | null;
   elevatorNo: string | null;
   emergencyPhone: string | null;
+  modelName: string | null;
 }
 
 const elevators: ElevatorRecord[] = elevatorsJson as ElevatorRecord[];

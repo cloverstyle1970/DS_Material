@@ -106,6 +106,9 @@ function dbToSite(r: any): SiteRecord {
   return {
     id:                r.id,
     name:              r.name,
+    alias:             r.alias              ?? null,
+    ledgerNo:          r.ledger_no          ?? null,
+    siteKind:          r.site_kind          ?? null,
     companyType:       r.company_type       ?? null,
     contractType:      r.contract_type      ?? null,
     contractDate:      r.contract_date      ?? null,
@@ -138,6 +141,9 @@ function dbToSite(r: any): SiteRecord {
 function siteToDb(d: any): Record<string, unknown> {
   const obj: Record<string, unknown> = {};
   if (d.name              !== undefined) obj.name               = d.name;
+  if (d.alias             !== undefined) obj.alias              = d.alias;
+  if (d.ledgerNo          !== undefined) obj.ledger_no          = d.ledgerNo;
+  if (d.siteKind          !== undefined) obj.site_kind          = d.siteKind;
   if (d.companyType       !== undefined) obj.company_type       = d.companyType;
   if (d.contractType      !== undefined) obj.contract_type      = d.contractType;
   if (d.contractDate      !== undefined) obj.contract_date      = d.contractDate;
@@ -174,6 +180,7 @@ function dbToElevator(r: any): ElevatorRecord {
     unitName:       r.unit_name       ?? null,
     elevatorNo:     r.elevator_no     ?? null,
     emergencyPhone: r.emergency_phone ?? null,
+    modelName:      r.model_name      ?? null,
   };
 }
 
@@ -184,6 +191,7 @@ function elevatorToDb(d: any): Record<string, unknown> {
   if (d.unitName       !== undefined) obj.unit_name       = d.unitName;
   if (d.elevatorNo     !== undefined) obj.elevator_no     = d.elevatorNo;
   if (d.emergencyPhone !== undefined) obj.emergency_phone = d.emergencyPhone;
+  if (d.modelName      !== undefined) obj.model_name      = d.modelName;
   return obj;
 }
 

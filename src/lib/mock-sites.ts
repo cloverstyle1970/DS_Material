@@ -3,6 +3,9 @@ import sitesJson from "@/data/sites.json";
 export interface SiteRecord {
   id: number;
   name: string;
+  alias: string | null;
+  ledgerNo: string | null;
+  siteKind: string | null;
   companyType: string | null;
   contractType: string | null;
   contractDate: string | null;
@@ -23,7 +26,7 @@ export interface SiteRecord {
   jobNo: string | null;
   note: string | null;
   emergencyDevice: string | null;
-  emergencyDevices: { number: string; note: string }[] | null;
+  emergencyDevices: { number: string; unit?: string; slot?: number; note?: string }[] | null;
   warrantyCount: number | null;
   warrantyUnits: string | null;
   warrantyStart: string | null;
@@ -37,6 +40,7 @@ export function getSites(query?: string): SiteRecord[] {
   const q = query.toLowerCase();
   return sites.filter(s =>
     s.name.toLowerCase().includes(q) ||
+    (s.alias?.toLowerCase().includes(q) ?? false) ||
     (s.primaryInspector?.toLowerCase().includes(q) ?? false) ||
     (s.subInspector?.toLowerCase().includes(q) ?? false) ||
     (s.address?.toLowerCase().includes(q) ?? false) ||

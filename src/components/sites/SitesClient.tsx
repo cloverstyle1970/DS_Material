@@ -118,6 +118,49 @@ function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: Elevato
   );
 }
 
+// ── 비상통화장치 호기별 dedup ──────────────────────────────────
+// 같은 번호가 여러 호기에 매칭되면 정렬상 가장 빠른 호기 1개에만 배치.
+// unit이 빈/매칭 안 되는 번호는 첫 호기에 배치.
+interface DeviceItem { number: string; unit?: string; slot?: number; note?: string }
+function dedupDevicesByUnit(
+  devices: DeviceItem[],
+  elevators: { unitName: string | null }[],
+): Map<string, DeviceItem[]> {
+  const unitOrder = elevators.map(e => e.unitName ?? "");
+  const firstUnit = unitOrder[0] ?? "";
+  const filtered = devices.filter(d => d.number?.trim());
+  const numberToUnit = new Map<string, string>();
+  const seen = new Set<string>();
+  for (const d of filtered) {
+    const num = d.number.trim();
+    if (seen.has(num)) continue;
+    seen.add(num);
+    const candidates = filtered
+      .filter(x => x.number.trim() === num && x.unit && unitOrder.includes(x.unit))
+      .map(x => x.unit!);
+    if (candidates.length > 0) {
+      numberToUnit.set(num, unitOrder.find(u => candidates.includes(u)) ?? firstUnit);
+    } else {
+      numberToUnit.set(num, firstUnit);
+    }
+  }
+  const result = new Map<string, DeviceItem[]>();
+  const placed = new Set<string>();
+  for (const u of unitOrder) result.set(u, []);
+  for (const d of filtered) {
+    const num = d.number.trim();
+    if (placed.has(num)) continue;
+    const target = numberToUnit.get(num) ?? firstUnit;
+    placed.add(num);
+    if (!result.has(target)) result.set(target, []);
+    result.get(target)!.push({ ...d, number: num });
+  }
+  for (const items of result.values()) {
+    items.sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
+  }
+  return result;
+}
+
 // ── 날짜 입력 정규화: "20260512" → "2026-05-12" ─────────────────
 function normalizeDateInput(s: string): string {
   const trimmed = (s ?? "").trim();
@@ -132,15 +175,16 @@ function normalizeDateInput(s: string): string {
 
 // ── 현장 등록 모달 ─────────────────────────────────────────────
 
-interface AddSiteModalProps { onClose: () => void; onSaved: () => void; editSite?: SiteRecord; }
+interface AddSiteModalProps { onClose: () => void; onSaved: () => void; editSite?: SiteRecord; existingElevators?: ElevatorRecord[]; }
 
-function AddSiteModal({ onClose, onSaved, editSite }: AddSiteModalProps) {
+function AddSiteModal({ onClose, onSaved, editSite, existingElevators }: AddSiteModalProps) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const fieldCls = `w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 ${isDark ? "border-gray-600 bg-gray-700 text-gray-100 placeholder:text-gray-400" : "border-gray-200 bg-white text-gray-900"}`;
   const labelCls = `block text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`;
   const isEdit = !!editSite;
   const [name,             setName]             = useState(editSite?.name ?? "");
+  const [alias,            setAlias]            = useState(editSite?.alias ?? "");
   const [companyType,      setCompanyType]       = useState(editSite?.companyType ?? "TK");
   const [contractType,     setContractType]      = useState(editSite?.contractType ?? "");
   const [contractDate,     setContractDate]      = useState(editSite?.contractDate ?? "");
@@ -163,8 +207,8 @@ function AddSiteModal({ onClose, onSaved, editSite }: AddSiteModalProps) {
   const [warrantyUnits,    setWarrantyUnits]     = useState(editSite?.warrantyUnits ?? "");
   const [warrantyStart,    setWarrantyStart]     = useState(editSite?.warrantyStart ?? "");
   const [warrantyEnd,      setWarrantyEnd]       = useState(editSite?.warrantyEnd ?? "");
-  const [emergencyDevices, setEmergencyDevices]  = useState(
-    editSite?.emergencyDevices?.length ? editSite.emergencyDevices : [{ number: "", note: "" }]
+  const [emergencyDevices, setEmergencyDevices]  = useState<{ number: string; unit?: string; slot?: number; note?: string }[]>(
+    editSite?.emergencyDevices?.length ? editSite.emergencyDevices : [{ number: "", unit: "", note: "" }]
   );
   // 신규 등록 시에만 사용: 호기 정보 동시 등록
   const [elevatorsToAdd, setElevatorsToAdd] = useState<{ unitName: string; elevatorNo: string; emergencyPhone: string }[]>(
@@ -190,7 +234,7 @@ function AddSiteModal({ onClose, onSaved, editSite }: AddSiteModalProps) {
     if (!name.trim()) { setError("현장명을 입력해 주세요."); return; }
     setSaving(true);
     const body = {
-      name, companyType: companyType || null, contractType: contractType || null,
+      name, alias: alias || null, companyType: companyType || null, contractType: contractType || null,
       contractDate: contractDate || null, contractStart: contractStart || null,
       contractEnd: contractEnd || null, primaryInspector: primaryInspector || null,
       subInspector: subInspector || null, subInspector2: subInspector2 || null, sitePhone: sitePhone || null,
@@ -199,7 +243,15 @@ function AddSiteModal({ onClose, onSaved, editSite }: AddSiteModalProps) {
       address: address || null, entryInfo: entryInfo || null,
       vendor: vendor || null, customerEmail: null, jobNo: null, note: note || null,
       emergencyDevice: null,
-      emergencyDevices: emergencyDevices.filter(d => d.number.trim()),
+      emergencyDevices: (() => {
+        const filtered = emergencyDevices.filter(d => d.number.trim());
+        const slotByUnit: Record<string, number> = {};
+        return filtered.map(d => {
+          const u = d.unit ?? "";
+          slotByUnit[u] = (slotByUnit[u] ?? 0) + 1;
+          return { number: d.number.trim(), unit: u, slot: slotByUnit[u], note: d.note ?? "" };
+        });
+      })(),
       warrantyCount: warrantyCount !== "" ? Number(warrantyCount) : null,
       warrantyUnits: warrantyUnits || null,
       warrantyStart: warrantyStart || null,
@@ -263,6 +315,10 @@ function AddSiteModal({ onClose, onSaved, editSite }: AddSiteModalProps) {
                 <option value="">기타</option>
               </select>
             </div>
+          </div>
+          <div>
+            <label className={labelCls}>현장 별칭</label>
+            <input value={alias} onChange={e => setAlias(e.target.value)} placeholder="짧게 부르는 이름 (선택)" className={fieldCls} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -328,27 +384,40 @@ function AddSiteModal({ onClose, onSaved, editSite }: AddSiteModalProps) {
             <div className="flex items-center justify-between mb-2">
               <label className={labelCls}>비상통화장치</label>
               <button type="button"
-                onClick={() => setEmergencyDevices(prev => [...prev, { number: "", note: "" }])}
+                onClick={() => setEmergencyDevices(prev => [...prev, { number: "", unit: "", note: "" }])}
                 className={`text-xs px-2.5 py-1 rounded-lg transition-colors ${isDark ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
                 + 추가
               </button>
             </div>
             <div className="space-y-2">
-              {emergencyDevices.map((d, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <input value={d.number}
-                    onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, number: e.target.value } : x))}
-                    placeholder="전화번호" className={`${fieldCls} w-36 shrink-0`} />
-                  <input value={d.note}
-                    onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, note: e.target.value } : x))}
-                    placeholder="비고 (예: 1~3호기)" className={`${fieldCls} flex-1`} />
-                  {emergencyDevices.length > 1 && (
-                    <button type="button"
-                      onClick={() => setEmergencyDevices(prev => prev.filter((_, j) => j !== i))}
-                      className={`text-xl hover:text-red-400 ${isDark ? "text-gray-500" : "text-gray-300"}`}>×</button>
-                  )}
-                </div>
-              ))}
+              {emergencyDevices.map((d, i) => {
+                const unitOptions = isEdit
+                  ? (existingElevators ?? []).map(e => e.unitName ?? "")
+                  : elevatorsToAdd.map(e => e.unitName).filter(u => u.trim());
+                return (
+                  <div key={i} className="flex items-center gap-2">
+                    <select value={d.unit ?? ""}
+                      onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, unit: e.target.value } : x))}
+                      className={`${fieldCls} w-24 shrink-0`}>
+                      <option value="">현장공통</option>
+                      {Array.from(new Set(unitOptions)).map(u => (
+                        <option key={u} value={u}>{u || "-"}</option>
+                      ))}
+                    </select>
+                    <input value={d.number}
+                      onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, number: e.target.value } : x))}
+                      placeholder="전화번호" className={`${fieldCls} w-36 shrink-0`} />
+                    <input value={d.note ?? ""}
+                      onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, note: e.target.value } : x))}
+                      placeholder="비고" className={`${fieldCls} flex-1`} />
+                    {emergencyDevices.length > 1 && (
+                      <button type="button"
+                        onClick={() => setEmergencyDevices(prev => prev.filter((_, j) => j !== i))}
+                        className={`text-xl hover:text-red-400 ${isDark ? "text-gray-500" : "text-gray-300"}`}>×</button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -560,6 +629,7 @@ export default function SitesClient({ initial, elevators }: Props) {
     if (q) {
       return sites.filter(s =>
         s.name.toLowerCase().includes(q) ||
+        (s.alias?.toLowerCase().includes(q) ?? false) ||
         (s.primaryInspector?.toLowerCase().includes(q) ?? false) ||
         (s.subInspector?.toLowerCase().includes(q) ?? false) ||
         (s.subInspector2?.toLowerCase().includes(q) ?? false) ||
@@ -591,22 +661,97 @@ export default function SitesClient({ initial, elevators }: Props) {
       ? sites.filter(s => checkedSiteIds.has(s.id))
       : sites;
     const label = checkedSiteIds.size > 0 ? `선택${checkedSiteIds.size}건` : "전체";
-    const rows = list.map(s => ({
-      현장명: s.name, 회사구분: s.companyType ?? "", 계약구분: s.contractType ?? "",
-      계약일자: s.contractDate ?? "", 계약시작: s.contractStart ?? "", 계약만료: s.contractEnd ?? "",
-      주점검자: s.primaryInspector ?? "", 보조점검자1: s.subInspector ?? "", 보조점검자2: s.subInspector2 ?? "",
-      현장전화: s.sitePhone ?? "", 현장핸드폰: s.siteMobile ?? "",
-      담당자HP: s.managerPhone ?? "", 소재지: s.address ?? "",
-      거래처: s.vendor ?? "", 호기수: allElevators.filter(e => e.siteName === s.name).length,
-    }));
+
+    // 대솔이엘_관리현장 원본과 동일한 34컬럼, 1행=1호기 포맷
+    const epLabels = [
+      "비상통화장치", "비상통화장치2", "비상통화장치3", "비상통화장치4", "비상통화장치5",
+      "비상통화장치6", "비상통화장치7", "비상통화장치8", "비상통화장치9", "비상통화장치10",
+    ];
+    const rows: Record<string, string | number | null>[] = [];
+    for (const s of list) {
+      const myElevs = allElevators.filter(e => e.siteName === s.name);
+      const targets: (ElevatorRecord | null)[] = myElevs.length > 0 ? myElevs : [null];
+      const allDevices = s.emergencyDevices ?? [];
+      const unitOrder = myElevs.map(e => e.unitName ?? "");
+
+      // 번호별 표시 호기 결정:
+      //   - 후보 unit(matchedUnits 안의 것) 중 호기 정렬상 가장 빠른 호기에 1번만 배치
+      //   - 후보 없거나 unit이 빈 경우 → 첫 호기
+      const numberToUnit = new Map<string, string>();    // unitName 또는 "" (첫 호기)
+      const seenNumbers = new Set<string>();
+      for (const d of allDevices) {
+        const num = d.number?.trim();
+        if (!num || seenNumbers.has(num)) continue;
+        seenNumbers.add(num);
+        const candidates = allDevices
+          .filter(x => x.number?.trim() === num && x.unit && unitOrder.includes(x.unit))
+          .map(x => x.unit!);
+        if (candidates.length > 0) {
+          const earliest = unitOrder.find(u => candidates.includes(u)) ?? "";
+          numberToUnit.set(num, earliest);
+        } else {
+          numberToUnit.set(num, ""); // 첫 호기
+        }
+      }
+
+      targets.forEach((e, idx) => {
+        const myUnit = e?.unitName ?? "";
+        // 이 호기에 표시할 unique 번호들 — 입력 순서 유지하면서 dedup
+        const myNumbers: { number: string; slot: number }[] = [];
+        const placed = new Set<string>();
+        for (const d of allDevices) {
+          const num = d.number?.trim();
+          if (!num || placed.has(num)) continue;
+          const target = numberToUnit.get(num);
+          const goesHere = target === "" ? idx === 0 : target === myUnit;
+          if (goesHere) {
+            myNumbers.push({ number: num, slot: d.slot ?? myNumbers.length + 1 });
+            placed.add(num);
+          }
+        }
+        myNumbers.sort((a, b) => a.slot - b.slot);
+        const epCols: Record<string, string> = {};
+        for (let i = 0; i < 10; i++) {
+          epCols[epLabels[i]] = myNumbers[i]?.number ?? "";
+        }
+
+        rows.push({
+          현장명: s.name,
+          현장별칭: s.alias ?? "",
+          원장번호: s.ledgerNo ?? "",
+          proj_no: s.jobNo ?? "",
+          기종명: e?.modelName ?? "",
+          회사구분: s.companyType ?? "",
+          호기명: e?.unitName ?? "",
+          승강기번호: e?.elevatorNo ?? "",
+          주점검자: s.primaryInspector ?? "",
+          보조점검자1: s.subInspector ?? "",
+          보조점검자2: s.subInspector2 ?? "",
+          현장유형: s.siteKind ?? "",
+          계약구분: s.contractType ?? "",
+          계약일자: s.contractDate ?? "",
+          계약시작: s.contractStart ?? "",
+          계약만료: s.contractEnd ?? "",
+          하자기간: s.warrantyEnd ?? "",
+          현장전화: s.sitePhone ?? "",
+          현장연락처2: s.siteMobile ?? "",
+          팩스: s.fax ?? "",
+          ...epCols,
+          "담당자 메일": s.managerEmail ?? "",
+          "승강기 소재지": s.address ?? "",
+          비고: s.note ?? "",
+          거래처: s.vendor ?? "",
+        });
+      });
+    }
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "현장목록");
+    XLSX.utils.book_append_sheet(wb, ws, "전체현장");
     const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     const blob = new Blob([buf], { type: "application/octet-stream" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `현장목록_${label}_${stamp}.xlsx`; a.click();
+    const a = document.createElement("a"); a.href = url; a.download = `대솔이엘_관리현장_${stamp}_${label}.xlsx`; a.click();
     URL.revokeObjectURL(url);
   }
 
@@ -771,6 +916,11 @@ export default function SitesClient({ initial, elevators }: Props) {
                           <p className={`text-sm font-medium truncate ${isSelected ? isDark ? "text-white" : "text-blue-700" : isDark ? "text-gray-200" : "text-gray-800"}`}>
                             {site.name}
                           </p>
+                          {site.alias && (
+                            <p className={`text-xs truncate ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                              {site.alias}
+                            </p>
+                          )}
                           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                             {companyBadge(site.companyType, isDark)}
                             {site.contractType && (
@@ -830,6 +980,11 @@ export default function SitesClient({ initial, elevators }: Props) {
                         </span>
                       )}
                     </div>
+                    {selected.alias && (
+                      <p className={`text-sm mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                        별칭: {selected.alias}
+                      </p>
+                    )}
                     {selected.address && (
                       <p className={`text-sm mt-1.5 flex items-center gap-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
                         <span>📍</span>{selected.address}
@@ -917,6 +1072,7 @@ export default function SitesClient({ initial, elevators }: Props) {
               <EmergencyDevicesPanel
                 key={selected.id}
                 site={selected}
+                elevators={selectedElevators}
                 canEdit={canEdit}
                 isDark={isDark}
                 onSaved={async () => {
@@ -965,12 +1121,18 @@ export default function SitesClient({ initial, elevators }: Props) {
                         </tr>
                       </thead>
                       <tbody className={`divide-y ${isDark ? "divide-gray-700" : "divide-gray-50"}`}>
-                        {selectedElevators.map((e, idx) => (
+                        {(() => {
+                          const deviceMap = dedupDevicesByUnit(selected.emergencyDevices ?? [], selectedElevators);
+                          return selectedElevators.map((e, idx) => {
+                            const myDevices = deviceMap.get(e.unitName ?? "") ?? [];
+                            return (
                           <tr key={e.id} className={`transition-colors ${isDark ? "hover:bg-gray-700" : "hover:bg-gray-50"}`}>
                             <td className={`px-4 py-3 text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>{idx + 1}</td>
                             <td className={`px-4 py-3 font-medium whitespace-nowrap ${isDark ? "text-gray-200" : "text-gray-800"}`}>{e.unitName ?? "—"}</td>
                             <td className={`px-4 py-3 font-mono text-xs whitespace-nowrap ${isDark ? "text-blue-400" : "text-blue-600"}`}>{e.elevatorNo ?? "—"}</td>
-                            <td className={`px-4 py-3 font-mono text-xs whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"}`}>{e.emergencyPhone ?? "—"}</td>
+                            <td className={`px-4 py-3 font-mono text-xs ${isDark ? "text-gray-300" : "text-gray-600"}`}>
+                              {myDevices.length === 0 ? "—" : myDevices.map(d => d.number).join(", ")}
+                            </td>
                             {canEdit && (
                               <td className="px-4 py-3">
                                 <div className="flex gap-1">
@@ -988,7 +1150,9 @@ export default function SitesClient({ initial, elevators }: Props) {
                               </td>
                             )}
                           </tr>
-                        ))}
+                            );
+                          });
+                        })()}
                       </tbody>
                     </table>
                   </div>
@@ -1014,6 +1178,7 @@ export default function SitesClient({ initial, elevators }: Props) {
       {editTarget && (
         <AddSiteModal
           editSite={editTarget}
+          existingElevators={allElevators.filter(e => e.siteName === editTarget.name)}
           onClose={() => setEditTarget(null)}
           onSaved={reload}
         />
@@ -1069,9 +1234,10 @@ export default function SitesClient({ initial, elevators }: Props) {
 
 // ── 비상통화장치 인라인 편집 패널 ──────────────────────────────
 function EmergencyDevicesPanel({
-  site, canEdit, isDark, onSaved,
+  site, elevators, canEdit, isDark, onSaved,
 }: {
   site: SiteRecord;
+  elevators: ElevatorRecord[];
   canEdit: boolean;
   isDark: boolean;
   onSaved: () => void;
@@ -1082,14 +1248,22 @@ function EmergencyDevicesPanel({
   const [editing, setEditing] = useState(false);
   const [saving,  setSaving]  = useState(false);
 
-  function patch(i: number, field: "number" | "note", value: string) {
+  function patch(i: number, field: "number" | "unit" | "note", value: string) {
     setDevices(prev => prev.map((d, j) => j === i ? { ...d, [field]: value } : d));
   }
 
   async function save() {
     setSaving(true);
     try {
-      await api.patch(`/api/sites/${site.id}`, { emergencyDevices: devices.filter(d => d.number.trim()) });
+      // 같은 unit 그룹별로 slot 1, 2, ... 자동 부여
+      const filtered = devices.filter(d => d.number.trim());
+      const slotByUnit: Record<string, number> = {};
+      const submitted = filtered.map(d => {
+        const u = d.unit ?? "";
+        slotByUnit[u] = (slotByUnit[u] ?? 0) + 1;
+        return { number: d.number.trim(), unit: u, slot: slotByUnit[u], note: d.note ?? "" };
+      });
+      await api.patch(`/api/sites/${site.id}`, { emergencyDevices: submitted });
     } catch (e) {
       alert(getErrorMessage(e));
     } finally {
@@ -1123,6 +1297,16 @@ function EmergencyDevicesPanel({
         <div className="space-y-2">
           {devices.map((d, i) => (
             <div key={i} className="flex items-center gap-2">
+              <select
+                value={d.unit ?? ""}
+                onChange={e => patch(i, "unit", e.target.value)}
+                className={`${inputCls} w-24 shrink-0`}
+              >
+                <option value="">현장공통</option>
+                {elevators.map(ev => (
+                  <option key={ev.id} value={ev.unitName ?? ""}>{ev.unitName ?? "-"}</option>
+                ))}
+              </select>
               <input
                 value={d.number}
                 onChange={e => patch(i, "number", e.target.value)}
@@ -1130,9 +1314,9 @@ function EmergencyDevicesPanel({
                 className={`${inputCls} w-36 shrink-0`}
               />
               <input
-                value={d.note}
+                value={d.note ?? ""}
                 onChange={e => patch(i, "note", e.target.value)}
-                placeholder="비고 (예: 1~3호기)"
+                placeholder="비고"
                 className={`${inputCls} flex-1`}
               />
               <button type="button"
@@ -1141,7 +1325,7 @@ function EmergencyDevicesPanel({
             </div>
           ))}
           <button type="button"
-            onClick={() => setDevices(prev => [...prev, { number: "", note: "" }])}
+            onClick={() => setDevices(prev => [...prev, { number: "", unit: "", note: "" }])}
             className={`text-xs px-2.5 py-1 rounded-lg transition-colors ${isDark ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
             + 추가
           </button>
@@ -1156,20 +1340,28 @@ function EmergencyDevicesPanel({
             </button>
           </div>
         </div>
-      ) : (
-        <div className="space-y-1.5">
-          {devices.filter(d => d.number).length === 0 ? (
-            <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>등록된 비상통화장치가 없습니다.</p>
-          ) : (
-            devices.filter(d => d.number).map((d, i) => (
-              <div key={i} className="flex items-center gap-3 text-sm">
-                <span className={`font-mono font-medium ${isDark ? "text-gray-200" : "text-gray-800"}`}>{d.number}</span>
-                {d.note && <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>{d.note}</span>}
-              </div>
-            ))
-          )}
-        </div>
-      )}
+      ) : (() => {
+        const grouped = dedupDevicesByUnit(devices, elevators);
+        const totalShown = Array.from(grouped.values()).reduce((sum, arr) => sum + arr.length, 0);
+        if (totalShown === 0) {
+          return <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>등록된 비상통화장치가 없습니다.</p>;
+        }
+        return (
+          <div className="space-y-1.5">
+            {Array.from(grouped.entries()).map(([unit, items]) =>
+              items.map((d, i) => (
+                <div key={`${unit}-${i}`} className="flex items-center gap-3 text-sm">
+                  <span className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${isDark ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600"}`}>
+                    {unit || "현장공통"}
+                  </span>
+                  <span className={`font-mono font-medium ${isDark ? "text-gray-200" : "text-gray-800"}`}>{d.number}</span>
+                  {d.note && <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>{d.note}</span>}
+                </div>
+              ))
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
