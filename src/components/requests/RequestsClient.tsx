@@ -168,9 +168,10 @@ const REQ_COLS: { key: ReqSortKey | null; label: string; sortable: boolean }[] =
 const ORD_COLS: { key: OrdSortKey | null; label: string; sortable: boolean }[] = [
   { key: "orderedAt",     label: "발주일자",      sortable: true  },
   { key: null,            label: "발주참조번호", sortable: false },
+  { key: "materialId",    label: "코드",          sortable: true  },
   { key: "materialName",  label: "자재명",        sortable: true  },
-  { key: "materialId",    label: "코드",     sortable: true  },
-  { key: "qty",           label: "수량",     sortable: true  },
+  { key: null,            label: "규격",          sortable: false },
+  { key: "qty",           label: "수량",          sortable: true  },
   { key: "siteName",      label: "현장",     sortable: true  },
   { key: "elevatorName",  label: "호기",     sortable: true  },
   { key: "requesterName", label: "신청자",   sortable: true  },
@@ -200,6 +201,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
   const [userNames, setUserNames] = useState<string[]>([]);
   const [orders,   setOrders]   = useState(initialOrders);
   const [showOrderBulkUpload, setShowOrderBulkUpload] = useState(false);
+  const [matModelMap, setMatModelMap] = useState<Map<string, string>>(new Map()); // materialId → modelNo(규격)
 
   useEffect(() => {
     api.get<MaterialRequestRecord[]>("/api/material-requests").then(setRequests).catch(() => {});
@@ -211,6 +213,13 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
         const active = data.filter(u => u.status === "재직").map(u => u.name).sort();
         setRequesterNames(active);
         setUserNames(active);
+      })
+      .catch(() => {});
+    api.get<{ id: string; modelNo: string | null }[]>("/api/materials")
+      .then(data => {
+        const m = new Map<string, string>();
+        data.forEach(x => m.set(x.id, x.modelNo ?? ""));
+        setMatModelMap(m);
       })
       .catch(() => {});
   }, []);
@@ -286,6 +295,33 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
       alert(getErrorMessage(e));
     } finally {
       setActionLoading(null);
+    }
+  }
+
+  const [bulkInboundLoading, setBulkInboundLoading] = useState(false);
+
+  async function handleBulkInbound() {
+    if (!user) return;
+    const targets = orders.filter(o => selectedOrdIds.has(o.id) && o.status === "발주");
+    if (targets.length === 0) {
+      alert("입고 처리 가능한 발주(상태=발주)가 선택되지 않았습니다.");
+      return;
+    }
+    if (!confirm(`선택한 ${targets.length}건을 일괄 입고완료 처리하시겠습니까?`)) return;
+    setBulkInboundLoading(true);
+    const fails: string[] = [];
+    for (const o of targets) {
+      try {
+        await api.patch(`/api/purchase-orders/${o.id}`, { action: "입고완료", userId: user.id, userName: user.name });
+      } catch (e) {
+        fails.push(`${o.materialName}: ${(e as Error).message}`);
+      }
+    }
+    setOrders(await api.get<PurchaseOrderRecord[]>("/api/purchase-orders"));
+    setSelectedOrdIds(new Set());
+    setBulkInboundLoading(false);
+    if (fails.length > 0) {
+      alert(`${targets.length - fails.length}건 처리 완료. 실패 ${fails.length}건:\n` + fails.join("\n"));
     }
   }
 
@@ -392,8 +428,9 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
     const rows = list.map(o => ({
       발주일자: fmtDateOnly(o.orderedAt),
       발주참조번호: o.note?.match(/^\[(.*?)\]/)?.[1] ?? "",
-      자재명: o.materialName,
       자재코드: o.materialId,
+      자재명: o.materialName,
+      규격: matModelMap.get(o.materialId) ?? "",
       수량: o.qty,
       현장: o.siteName ?? "",
       호기: o.elevatorName ?? "",
@@ -652,9 +689,15 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                 </button>
               ))}
             </div>
+            {admin && selectedOrdIds.size > 0 && (
+              <button type="button" onClick={handleBulkInbound} disabled={bulkInboundLoading}
+                className="ml-auto bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60">
+                {bulkInboundLoading ? "처리 중..." : `선택 ${selectedOrdIds.size}건 입고완료`}
+              </button>
+            )}
             {admin && (
               <Link href="/purchase-orders/new"
-                className="ml-auto px-4 py-2.5 rounded-xl text-sm font-semibold bg-slate-700 text-white hover:bg-slate-800 transition-colors">
+                className={`${selectedOrdIds.size === 0 ? "ml-auto " : ""}px-4 py-2.5 rounded-xl text-sm font-semibold bg-slate-700 text-white hover:bg-slate-800 transition-colors`}>
                 전표 입력
               </Link>
             )}
@@ -744,12 +787,12 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                   {ORD_COLS.map((c, idx) => {
                     const active = c.sortable && c.key === ordSortKey;
                     return (
-                      <th key={idx} className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      <th key={idx} className="px-4 py-3 text-center font-bold text-black dark:text-white whitespace-nowrap">
                         {c.sortable && c.key ? (
                           <button type="button" onClick={() => toggleOrdSort(c.key as OrdSortKey)}
-                            className={`flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ${active ? "text-gray-700 dark:text-gray-100 font-semibold" : ""}`}>
+                            className={`inline-flex items-center gap-1 mx-auto transition-opacity hover:opacity-70 ${active ? "underline underline-offset-2" : ""}`}>
                             {c.label}
-                            <span className={`text-[10px] ${active ? "opacity-100" : "opacity-30"}`}>
+                            <span className={`text-[10px] ${active ? "opacity-100" : "opacity-40"}`}>
                               {active ? (ordSortDir === "asc" ? "▲" : "▼") : "⇅"}
                             </span>
                           </button>
@@ -757,12 +800,12 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                       </th>
                     );
                   })}
-                  {admin && <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">처리</th>}
+                  {admin && <th className="px-4 py-3 text-center font-bold text-black dark:text-white whitespace-nowrap">처리</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                 {sortedOrds.length === 0 ? (
-                  <tr><td colSpan={admin ? 14 : 13} className="text-center py-16 text-gray-400 dark:text-gray-500">
+                  <tr><td colSpan={admin ? 15 : 14} className="text-center py-16 text-gray-400 dark:text-gray-500">
                     {orders.length === 0 ? "발주 내역이 없습니다." : "조건에 맞는 내역이 없습니다."}
                   </td></tr>
                 ) : sortedOrds.map(o => (
@@ -778,22 +821,23 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                         className="h-3.5 w-3.5 rounded cursor-pointer"
                       />
                     </td>
-                    <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDateOnly(o.orderedAt)}</td>
-                    <td className="px-4 py-3 text-center text-blue-600 dark:text-blue-400 text-xs font-medium whitespace-nowrap">
+                    <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">{fmtDateOnly(o.orderedAt)}</td>
+                    <td className="px-4 py-3 text-left text-blue-600 dark:text-blue-400 font-medium whitespace-nowrap">
                       {o.note?.match(/^\[(.*?)\]/)?.[1] || "-"}
                     </td>
-                    <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[160px] truncate">{o.materialName}</td>
-                    <td className="px-4 py-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{o.materialId}</td>
-                    <td className="px-4 py-3 text-center tabular-nums text-gray-700 dark:text-gray-300">{o.qty}</td>
-                    <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{o.siteName ?? "-"}</td>
-                    <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{o.elevatorName ?? "-"}</td>
-                    <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{o.requesterName ?? "-"}</td>
-                    <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{o.vendorName ?? "-"}</td>
-                    <td className="px-4 py-3 text-center tabular-nums text-gray-500 dark:text-gray-400 text-xs">
+                    <td className="px-4 py-3 text-left font-mono text-black dark:text-white whitespace-nowrap">{o.materialId}</td>
+                    <td className="px-4 py-3 text-left font-medium text-black dark:text-white max-w-[160px] truncate">{o.materialName}</td>
+                    <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">{matModelMap.get(o.materialId) || "-"}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-black dark:text-white">{o.qty}</td>
+                    <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.siteName ?? "-"}</td>
+                    <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.elevatorName ?? "-"}</td>
+                    <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.requesterName ?? "-"}</td>
+                    <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.vendorName ?? "-"}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-black dark:text-white">
                       {o.unitPrice != null ? o.unitPrice.toLocaleString() : "-"}
                     </td>
-                    <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{o.userName}</td>
-                    <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs max-w-[120px] truncate">{o.note ?? "-"}</td>
+                    <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.userName}</td>
+                    <td className="px-4 py-3 text-left text-black dark:text-white max-w-[120px] truncate">{o.note ?? "-"}</td>
                     {admin && (
                       <td className="px-4 py-3">
                         {o.status === "발주" && (

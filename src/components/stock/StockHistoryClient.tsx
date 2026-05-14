@@ -27,8 +27,9 @@ type ColDef = { key: SortKey | null; label: string; sortable: boolean; outboundO
 
 const COLUMNS: ColDef[] = [
   { key: "createdAt",    label: "일자",     sortable: true  },
-  { key: "materialName", label: "자재명",   sortable: true  },
   { key: "materialId",   label: "자재코드", sortable: true  },
+  { key: "materialName", label: "자재명",   sortable: true  },
+  { key: null,           label: "규격",     sortable: false },
   { key: "qty",          label: "수량",     sortable: true  },
   { key: null,           label: "재고변동", sortable: false },
   { key: "siteName",     label: "현장",     sortable: true  },
@@ -189,8 +190,9 @@ export default function StockHistoryClient({ mode, initial }: Props) {
     const rows = list.map(t => {
       const base: Record<string, string | number> = {
         일자: fmtDateOnly(t.createdAt),
-        자재명: t.materialName,
         자재코드: t.materialId,
+        자재명: t.materialName,
+        규격: matMap.get(t.materialId) ?? "",
         수량: t.qty,
         이전재고: t.prevStock,
         이후재고: t.afterStock,
@@ -301,12 +303,12 @@ export default function StockHistoryClient({ mode, initial }: Props) {
               {COLUMNS.filter(c => !c.outboundOnly || !isInbound).map(c => {
                 const active = c.sortable && c.key === sortKey;
                 return (
-                  <th key={c.label} className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                  <th key={c.label} className="px-4 py-3 text-center font-bold text-black dark:text-white whitespace-nowrap">
                     {c.sortable && c.key ? (
                       <button type="button" onClick={() => toggleSort(c.key as SortKey)}
-                        className={`flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ${active ? "text-gray-700 dark:text-gray-100 font-semibold" : ""}`}>
+                        className={`inline-flex items-center gap-1 mx-auto transition-opacity hover:opacity-70 ${active ? "underline underline-offset-2" : ""}`}>
                         {c.label}
-                        <span className={`text-[10px] ${active ? "opacity-100" : "opacity-30"}`}>
+                        <span className={`text-[10px] ${active ? "opacity-100" : "opacity-40"}`}>
                           {active ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
                         </span>
                       </button>
@@ -314,13 +316,13 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                   </th>
                 );
               })}
-              {admin && <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">처리</th>}
+              {admin && <th className="px-4 py-3 text-center font-bold text-black dark:text-white whitespace-nowrap">처리</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={(isInbound ? 8 : 10) + (admin ? 1 : 0) + 1} className="text-center py-16 text-gray-400 dark:text-gray-500">
+                <td colSpan={(isInbound ? 9 : 11) + (admin ? 1 : 0) + 1} className="text-center py-16 text-gray-400 dark:text-gray-500">
                   {transactions.length === 0
                     ? `${mode} 내역이 없습니다.`
                     : "조건에 맞는 내역이 없습니다."}
@@ -339,25 +341,26 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                     className="h-3.5 w-3.5 rounded cursor-pointer"
                   />
                 </td>
-                <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDateOnly(t.createdAt)}</td>
-                <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[200px] truncate">{t.materialName}</td>
-                <td className="px-4 py-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{t.materialId}</td>
-                <td className="px-4 py-3 text-center tabular-nums">
-                  <span className={signColor}>{t.qty}</span>
+                <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">{fmtDateOnly(t.createdAt)}</td>
+                <td className="px-4 py-3 text-left font-mono text-black dark:text-white whitespace-nowrap">{t.materialId}</td>
+                <td className="px-4 py-3 text-left font-medium text-black dark:text-white max-w-[200px] truncate">{t.materialName}</td>
+                <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">{matMap.get(t.materialId) || "-"}</td>
+                <td className="px-4 py-3 text-right tabular-nums text-black dark:text-white">
+                  {t.qty}
                 </td>
-                <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">
-                  {t.prevStock} → <span className="text-gray-700 dark:text-gray-300 font-medium">{t.afterStock}</span>
+                <td className="px-4 py-3 text-right tabular-nums text-black dark:text-white whitespace-nowrap">
+                  {t.prevStock} → <span className="font-medium">{t.afterStock}</span>
                 </td>
-                <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">
-                  {t.siteName ?? "-"}{t.elevatorName ? <span className="text-gray-400 ml-1">({t.elevatorName})</span> : null}
+                <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">
+                  {t.siteName ?? "-"}{t.elevatorName ? <span className="ml-1 opacity-70">({t.elevatorName})</span> : null}
                 </td>
                 {!isInbound && (
-                  <td className="px-4 py-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap max-w-[140px] truncate">
+                  <td className="px-4 py-3 text-left font-mono text-black dark:text-white whitespace-nowrap max-w-[140px] truncate">
                     {t.serialNo || "-"}
                   </td>
                 )}
                 {!isInbound && (
-                  <td className="px-4 py-3 text-center text-xs whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                  <td className="px-4 py-3 text-center whitespace-nowrap" onClick={e => e.stopPropagation()}>
                     {t.returnStatus === "returned" ? (
                       <span className={`px-2 py-0.5 rounded-full ${
                         t.returnType === "unused"
@@ -387,8 +390,8 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                     )}
                   </td>
                 )}
-                <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{t.userName}</td>
-                <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs max-w-[140px] truncate">{t.note ?? "-"}</td>
+                <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">{t.userName}</td>
+                <td className="px-4 py-3 text-left text-black dark:text-white max-w-[140px] truncate">{t.note ?? "-"}</td>
                 {admin && (
                   <td className="px-4 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                     <div className="flex gap-1">
