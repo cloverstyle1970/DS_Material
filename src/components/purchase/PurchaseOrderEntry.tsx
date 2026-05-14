@@ -151,8 +151,11 @@ export default function PurchaseOrderEntry() {
           userId: user.id, userName: user.name,
         });
       }
-      if (goList) router.push("/purchase-orders");
-      else clearAll();
+      if (goList) {
+        window.location.href = "/purchase-orders";
+      } else {
+        clearAll();
+      }
     } catch (e) { alert(getErrorMessage(e)); }
     finally { setSaving(false); }
   }
