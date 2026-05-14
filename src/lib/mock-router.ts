@@ -896,6 +896,16 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
   if (path === "/api/transactions") {
     const { records, error } = await supabaseAddTransaction(body);
     if (error) throw new MockApiError(error, 400);
+    // createdAt이 지정되면 transactions.created_at 업데이트
+    const inputCreatedAt = body.createdAt as string | undefined;
+    if (inputCreatedAt && records && records.length > 0) {
+      const createdAtIso = /^\d{4}-\d{2}-\d{2}$/.test(inputCreatedAt)
+        ? new Date(`${inputCreatedAt}T00:00:00Z`).toISOString()
+        : inputCreatedAt;
+      await supabase.from("transactions")
+        .update({ created_at: createdAtIso }).in("id", records.map(r => r.id));
+      records.forEach(r => { r.createdAt = createdAtIso; });
+    }
     // 단일 트랜잭션이면 record로, 다중이면 records 배열로 반환 (호환성 유지)
     if (records && records.length === 1) return records[0];
     return { records };
@@ -1106,7 +1116,8 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
         materialId: order.materialId,
         materialName: order.materialName,
         qty: order.qty,
-        siteName: null,
+        siteName: order.siteName,
+        elevatorName: order.elevatorName,
         note: `발주 #${numId} 입고완료`,
         userId,
         userName,

@@ -6,7 +6,7 @@ import * as XLSX from "xlsx";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
-import { api } from "@/lib/api-client";
+import { api, getErrorMessage } from "@/lib/api-client";
 import DraggableModal from "@/components/common/DraggableModal";
 import Autocomplete from "@/components/common/Autocomplete";
 import TransactionBulkUploadModal from "./TransactionBulkUploadModal";
@@ -92,6 +92,8 @@ export default function StockHistoryClient({ mode, initial }: Props) {
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const [bulkOutboundOpen, setBulkOutboundOpen] = useState(false);
+  const [bulkOutboundLoading, setBulkOutboundLoading] = useState(false);
   const { user } = useAuth();
   const admin = user ? !isViewOnly(user) : false;
 
@@ -164,6 +166,39 @@ export default function StockHistoryClient({ mode, initial }: Props) {
       alert(`${label} 실패: ` + (e as Error).message);
     } finally {
       setActionLoading(null);
+    }
+  }
+
+  async function handleBulkOutboundSubmit(data: { outboundAt: string; siteName: string; elevatorName: string }) {
+    if (!user) return;
+    const targets = transactions.filter(t => selectedIds.has(t.id));
+    if (targets.length === 0) return;
+    setBulkOutboundLoading(true);
+    const fails: string[] = [];
+    for (const t of targets) {
+      try {
+        await api.post("/api/transactions", {
+          type: "출고",
+          materialId: t.materialId,
+          materialName: t.materialName,
+          qty: t.qty,
+          siteName: data.siteName || null,
+          elevatorName: data.elevatorName || null,
+          note: `입고#${t.id} 일괄출고`,
+          userId: user.id,
+          userName: user.name,
+          createdAt: data.outboundAt,
+        });
+      } catch (e) {
+        fails.push(`${t.materialName}: ${getErrorMessage(e)}`);
+      }
+    }
+    setTransactions(await api.get<TransactionRecord[]>(`/api/transactions?type=${encodeURIComponent(mode)}`));
+    setSelectedIds(new Set());
+    setBulkOutboundLoading(false);
+    setBulkOutboundOpen(false);
+    if (fails.length > 0) {
+      alert(`${targets.length - fails.length}건 처리 완료. 실패 ${fails.length}건:\n` + fails.join("\n"));
     }
   }
 
@@ -263,6 +298,12 @@ export default function StockHistoryClient({ mode, initial }: Props) {
           <span className="ml-auto text-xs text-gray-400 dark:text-gray-500 shrink-0">{sorted.length}건</span>
         </div>
 
+        {admin && isInbound && selectedIds.size > 0 && (
+          <button type="button" onClick={() => setBulkOutboundOpen(true)} disabled={bulkOutboundLoading}
+            className="px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors shrink-0 bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-60">
+            {bulkOutboundLoading ? "처리 중..." : `선택 ${selectedIds.size}건 일괄 출고`}
+          </button>
+        )}
         {admin && (
           <Link href={isInbound ? "/inbound/new" : "/outbound/new"}
             className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors shrink-0 bg-slate-700 text-white hover:bg-slate-800">
@@ -302,8 +343,9 @@ export default function StockHistoryClient({ mode, initial }: Props) {
               </th>
               {COLUMNS.filter(c => !c.outboundOnly || !isInbound).map(c => {
                 const active = c.sortable && c.key === sortKey;
+                const padCls = c.label === "일자" ? "pl-2 pr-0" : c.label === "자재코드" ? "pl-1 pr-2" : "px-2";
                 return (
-                  <th key={c.label} className="px-4 py-3 text-center font-bold text-black dark:text-white whitespace-nowrap">
+                  <th key={c.label} className={`${padCls} py-3 text-center font-bold text-black dark:text-white whitespace-nowrap`}>
                     {c.sortable && c.key ? (
                       <button type="button" onClick={() => toggleSort(c.key as SortKey)}
                         className={`inline-flex items-center gap-1 mx-auto transition-opacity hover:opacity-70 ${active ? "underline underline-offset-2" : ""}`}>
@@ -316,7 +358,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                   </th>
                 );
               })}
-              {admin && <th className="px-4 py-3 text-center font-bold text-black dark:text-white whitespace-nowrap">처리</th>}
+              {admin && <th className="px-2 py-3 text-center font-bold text-black dark:text-white whitespace-nowrap">처리</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
@@ -341,26 +383,26 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                     className="h-3.5 w-3.5 rounded cursor-pointer"
                   />
                 </td>
-                <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">{fmtDateOnly(t.createdAt)}</td>
-                <td className="px-4 py-3 text-left font-mono text-black dark:text-white whitespace-nowrap">{t.materialId}</td>
-                <td className="px-4 py-3 text-left font-medium text-black dark:text-white max-w-[200px] truncate">{t.materialName}</td>
-                <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">{matMap.get(t.materialId) || "-"}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-black dark:text-white">
+                <td className="pl-2 pr-0 py-3 text-left text-black dark:text-white whitespace-nowrap">{fmtDateOnly(t.createdAt)}</td>
+                <td className="pl-1 pr-2 py-3 text-left font-mono text-black dark:text-white whitespace-nowrap">{t.materialId}</td>
+                <td className="px-2 py-3 text-left font-medium text-black dark:text-white max-w-[200px] truncate">{t.materialName}</td>
+                <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{matMap.get(t.materialId) || "-"}</td>
+                <td className="px-2 py-3 text-center tabular-nums text-black dark:text-white">
                   {t.qty}
                 </td>
-                <td className="px-4 py-3 text-right tabular-nums text-black dark:text-white whitespace-nowrap">
+                <td className="px-2 py-3 text-center tabular-nums text-black dark:text-white whitespace-nowrap">
                   {t.prevStock} → <span className="font-medium">{t.afterStock}</span>
                 </td>
-                <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">
+                <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">
                   {t.siteName ?? "-"}{t.elevatorName ? <span className="ml-1 opacity-70">({t.elevatorName})</span> : null}
                 </td>
                 {!isInbound && (
-                  <td className="px-4 py-3 text-left font-mono text-black dark:text-white whitespace-nowrap max-w-[140px] truncate">
+                  <td className="px-2 py-3 text-left font-mono text-black dark:text-white whitespace-nowrap max-w-[140px] truncate">
                     {t.serialNo || "-"}
                   </td>
                 )}
                 {!isInbound && (
-                  <td className="px-4 py-3 text-center whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                  <td className="px-2 py-3 text-center whitespace-nowrap" onClick={e => e.stopPropagation()}>
                     {t.returnStatus === "returned" ? (
                       <span className={`px-2 py-0.5 rounded-full ${
                         t.returnType === "unused"
@@ -390,10 +432,10 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                     )}
                   </td>
                 )}
-                <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">{t.userName}</td>
-                <td className="px-4 py-3 text-left text-black dark:text-white max-w-[140px] truncate">{t.note ?? "-"}</td>
+                <td className="px-2 py-3 text-center text-black dark:text-white whitespace-nowrap">{t.userName}</td>
+                <td className="px-2 py-3 text-center text-black dark:text-white max-w-[140px] truncate">{t.note ?? "-"}</td>
                 {admin && (
-                  <td className="px-4 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                  <td className="px-2 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                     <div className="flex gap-1">
                       <button type="button" disabled={actionLoading === t.id} onClick={() => setEditingTx(t)}
                         className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors">수정</button>
@@ -427,6 +469,16 @@ export default function StockHistoryClient({ mode, initial }: Props) {
             api.get<TransactionRecord[]>(`/api/transactions?type=${encodeURIComponent(mode)}`)
               .then(setTransactions).catch(() => {});
           }}
+        />
+      )}
+
+      {bulkOutboundOpen && (
+        <BulkOutboundModal
+          targets={transactions.filter(t => selectedIds.has(t.id))}
+          sites={sites}
+          onClose={() => setBulkOutboundOpen(false)}
+          onSubmit={handleBulkOutboundSubmit}
+          loading={bulkOutboundLoading}
         />
       )}
     </>
@@ -508,6 +560,109 @@ function EditTransactionModal({
             </button>
           </div>
         </form>
+    </DraggableModal>
+  );
+}
+
+// ── 일괄 출고 모달 ────────────────────────────────────────────────
+function BulkOutboundModal({
+  targets, sites, onClose, onSubmit, loading,
+}: {
+  targets: TransactionRecord[];
+  sites: SiteOption[];
+  onClose: () => void;
+  onSubmit: (data: { outboundAt: string; siteName: string; elevatorName: string }) => void;
+  loading: boolean;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [outboundAt, setOutboundAt] = useState(today);
+  const [siteName, setSiteName] = useState("");
+  const [elevatorName, setElevatorName] = useState("");
+  const [siteElevators, setSiteElevators] = useState<{ unitName: string | null }[]>([]);
+
+  useEffect(() => {
+    if (!siteName) { setSiteElevators([]); return; }
+    api.get<{ unitName: string | null }[]>(`/api/elevators?site=${encodeURIComponent(siteName)}`)
+      .then(setSiteElevators).catch(() => setSiteElevators([]));
+  }, [siteName]);
+
+  return (
+    <DraggableModal
+      open={true}
+      onClose={onClose}
+      panelClassName="w-[640px]"
+      header={
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-gray-700">
+          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">일괄 출고</h3>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none">&times;</button>
+        </div>
+      }
+    >
+      <div className="p-5 space-y-4">
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">출고일자 <span className="text-red-500">*</span></label>
+            <input type="date" value={outboundAt} onChange={e => setOutboundAt(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">현장 <span className="text-red-500">*</span></label>
+            <input type="text" value={siteName} onChange={e => { setSiteName(e.target.value); setElevatorName(""); }}
+              list="bulk-outbound-sites" placeholder="현장 선택" className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+            <datalist id="bulk-outbound-sites">
+              {sites.map(s => <option key={s.id} value={s.name} />)}
+            </datalist>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">호기</label>
+            <select value={elevatorName} onChange={e => setElevatorName(e.target.value)} disabled={!siteName}
+              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 disabled:opacity-50">
+              <option value="">(선택 안함)</option>
+              {siteElevators.filter(e => e.unitName).map(e => (
+                <option key={e.unitName} value={e.unitName!}>{e.unitName}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+            대상 <span className="text-orange-600 dark:text-orange-400 font-semibold">{targets.length}건</span>
+          </label>
+          <div className="max-h-64 overflow-auto rounded-lg border border-gray-200 dark:border-gray-700">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50 dark:bg-gray-700/50 sticky top-0">
+                <tr>
+                  <th className="px-3 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">자재코드</th>
+                  <th className="px-3 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">자재명</th>
+                  <th className="px-3 py-2 text-right text-gray-500 dark:text-gray-400 font-medium">수량</th>
+                  <th className="px-3 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">입고일자</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {targets.map(t => (
+                  <tr key={t.id}>
+                    <td className="px-3 py-3 font-mono text-gray-700 dark:text-gray-300">{t.materialId}</td>
+                    <td className="px-3 py-3 text-gray-800 dark:text-gray-200">{t.materialName}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-gray-700 dark:text-gray-300">{t.qty}</td>
+                    <td className="px-3 py-3 text-gray-500 dark:text-gray-400">{t.createdAt.substring(0, 10)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="flex gap-2 justify-end pt-3 border-t border-gray-100 dark:border-gray-700">
+          <button type="button" onClick={onClose} disabled={loading}
+            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
+            취소
+          </button>
+          <button type="button" onClick={() => onSubmit({ outboundAt, siteName, elevatorName })}
+            disabled={loading || !outboundAt || !siteName}
+            className="px-4 py-2 text-sm font-semibold text-white bg-orange-500 rounded-lg hover:bg-orange-600 disabled:opacity-60">
+            {loading ? "처리 중..." : `${targets.length}건 출고`}
+          </button>
+        </div>
+      </div>
     </DraggableModal>
   );
 }

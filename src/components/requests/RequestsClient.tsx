@@ -501,7 +501,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
           </div>
 
           {/* 검색 필터 */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-3 flex-wrap">
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-2 py-3 flex items-center gap-3 flex-wrap">
             <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">검색</span>
             <div className="flex items-center gap-1.5">
               <input type="date" value={reqSearch.dateFrom} onChange={e => setReqSearch(p => ({...p, dateFrom: e.target.value}))} className={inputCls()} />
@@ -527,7 +527,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
               width="w-28"
             />
             <button type="button" onClick={() => setReqSearch(defaultReq())}
-              className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+              className="px-3 py-3 rounded-lg border border-gray-200 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
               초기화
             </button>
             <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">{sortedReqs.length}건</span>
@@ -553,7 +553,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                   {REQ_COLS.map((c, idx) => {
                     const active = c.sortable && c.key === reqSortKey;
                     return (
-                      <th key={idx} className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      <th key={idx} className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
                         {c.sortable && c.key ? (
                           <button type="button" onClick={() => toggleReqSort(c.key as ReqSortKey)}
                             className={`flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ${active ? "text-gray-700 dark:text-gray-100 font-semibold" : ""}`}>
@@ -566,7 +566,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                       </th>
                     );
                   })}
-                  {admin && <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">처리</th>}
+                  {admin && <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">처리</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
@@ -593,30 +593,30 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                             className="h-3.5 w-3.5 rounded cursor-pointer"
                           />
                         </td>
-                        <td className="px-4 py-3 text-center w-8 text-gray-400 dark:text-gray-500 text-xs">
+                        <td className="px-2 py-3 text-center w-8 text-gray-400 dark:text-gray-500 text-xs">
                           <span className={`inline-block transition-transform ${isOpen ? "rotate-90" : ""}`}>▶</span>
                         </td>
-                        <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(r.requestedAt)}</td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-2 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(r.requestedAt)}</td>
+                        <td className="px-2 py-3 text-center">
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${reqStatusCls(r.status, kind)}`}>
                             {r.status === "신청" ? kind : r.status}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-center text-gray-700 dark:text-gray-300 text-xs whitespace-nowrap">
+                        <td className="px-2 py-3 text-center text-gray-700 dark:text-gray-300 text-xs whitespace-nowrap">
                           {r.siteName ?? "-"}
                           {elevators.length > 0 && (
                             <span className="ml-1 text-gray-400 dark:text-gray-500">({elevators.length}호기)</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-center text-gray-700 dark:text-gray-300 text-xs">
+                        <td className="px-2 py-3 text-center text-gray-700 dark:text-gray-300 text-xs">
                           <span className="font-medium">{r.items[0]?.materialName ?? "-"}</span>
                           {r.items.length > 1 && <span className="text-gray-400 dark:text-gray-500"> 외 {r.items.length - 1}건</span>}
                         </td>
-                        <td className="px-4 py-3 text-center tabular-nums text-gray-700 dark:text-gray-300">{totalQty}</td>
-                        <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{r.requesterName} <span className="text-gray-400 dark:text-gray-500">({r.requesterDept})</span></td>
-                        <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs max-w-[120px] truncate">{r.note ?? "-"}</td>
+                        <td className="px-2 py-3 text-center tabular-nums text-gray-700 dark:text-gray-300">{totalQty}</td>
+                        <td className="px-2 py-3 text-center text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{r.requesterName} <span className="text-gray-400 dark:text-gray-500">({r.requesterDept})</span></td>
+                        <td className="px-2 py-3 text-center text-gray-400 dark:text-gray-500 text-xs max-w-[120px] truncate">{r.note ?? "-"}</td>
                         {admin && (
-                          <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                          <td className="px-2 py-3" onClick={e => e.stopPropagation()}>
                             {r.status === "신청" && (
                               <div className="flex gap-1">
                                 <button type="button" disabled={actionLoading === r.id} onClick={() => handleReqAction(r.id, "처리중")}
@@ -725,7 +725,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
           {/* 검색 필터 */}
           <form
             onSubmit={e => { e.preventDefault(); setOrdSearch(ordDraft); }}
-            className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-3 flex-wrap"
+            className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-2 py-3 flex items-center gap-3 flex-wrap"
           >
             <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">검색</span>
             <div className="flex items-center gap-1.5">
@@ -764,11 +764,11 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
               width="w-28"
             />
             <button type="submit"
-              className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 transition-colors">
+              className="px-3 py-3 rounded-lg bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 transition-colors">
               검색
             </button>
             <button type="button" onClick={() => { setOrdDraft(defaultOrd()); setOrdSearch(defaultOrd()); }}
-              className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+              className="px-3 py-3 rounded-lg border border-gray-200 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
               초기화
             </button>
             <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">{sortedOrds.length}건</span>
@@ -794,7 +794,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                   {ORD_COLS.map((c, idx) => {
                     const active = c.sortable && c.key === ordSortKey;
                     return (
-                      <th key={idx} className="px-4 py-3 text-center font-bold text-black dark:text-white whitespace-nowrap">
+                      <th key={idx} className="px-2 py-3 text-center font-bold text-black dark:text-white whitespace-nowrap">
                         {c.sortable && c.key ? (
                           <button type="button" onClick={() => toggleOrdSort(c.key as OrdSortKey)}
                             className={`inline-flex items-center gap-1 mx-auto transition-opacity hover:opacity-70 ${active ? "underline underline-offset-2" : ""}`}>
@@ -807,7 +807,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                       </th>
                     );
                   })}
-                  {admin && <th className="px-4 py-3 text-center font-bold text-black dark:text-white whitespace-nowrap">처리</th>}
+                  {admin && <th className="px-2 py-3 text-center font-bold text-black dark:text-white whitespace-nowrap">처리</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
@@ -828,26 +828,26 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                         className="h-3.5 w-3.5 rounded cursor-pointer"
                       />
                     </td>
-                    <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">{fmtDateOnly(o.orderedAt)}</td>
-                    <td className="px-4 py-3 text-left text-blue-600 dark:text-blue-400 font-medium whitespace-nowrap">
+                    <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{fmtDateOnly(o.orderedAt)}</td>
+                    <td className="px-2 py-3 text-left text-blue-600 dark:text-blue-400 font-medium whitespace-nowrap">
                       {o.note?.match(/^\[(.*?)\]/)?.[1] || "-"}
                     </td>
-                    <td className="px-4 py-3 text-left font-mono text-black dark:text-white whitespace-nowrap">{o.materialId}</td>
-                    <td className="px-4 py-3 text-left font-medium text-black dark:text-white max-w-[160px] truncate">{o.materialName}</td>
-                    <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">{matModelMap.get(o.materialId) || "-"}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-black dark:text-white">{o.qty}</td>
-                    <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.siteName ?? "-"}</td>
-                    <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.elevatorName ?? "-"}</td>
-                    <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.requesterName ?? "-"}</td>
-                    <td className="px-4 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.vendorName ?? "-"}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-black dark:text-white">
+                    <td className="px-2 py-3 text-left font-mono text-black dark:text-white whitespace-nowrap">{o.materialId}</td>
+                    <td className="px-2 py-3 text-left font-medium text-black dark:text-white max-w-[160px] truncate">{o.materialName}</td>
+                    <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{matModelMap.get(o.materialId) || "-"}</td>
+                    <td className="px-2 py-3 text-right tabular-nums text-black dark:text-white">{o.qty}</td>
+                    <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.siteName ?? "-"}</td>
+                    <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.elevatorName ?? "-"}</td>
+                    <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.requesterName ?? "-"}</td>
+                    <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.vendorName ?? "-"}</td>
+                    <td className="px-2 py-3 text-right tabular-nums text-black dark:text-white">
                       {o.unitPrice != null ? o.unitPrice.toLocaleString() : "-"}
                     </td>
-                    <td className="px-4 py-3 text-left text-black dark:text-white max-w-[160px] truncate">
+                    <td className="px-2 py-3 text-left text-black dark:text-white max-w-[160px] truncate">
                       {(o.note ?? "").replace(/^\[[^\]]*\]\s*/, "").trim() || "-"}
                     </td>
                     {admin && (
-                      <td className="px-4 py-3">
+                      <td className="px-2 py-3">
                         {o.status === "발주" && (
                           <div className="flex gap-1">
                             <button type="button" disabled={actionLoading === o.id} onClick={() => setEditingOrder(o)}
@@ -964,10 +964,10 @@ function BulkInboundModal({
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {targets.map(o => (
                   <tr key={o.id}>
-                    <td className="px-3 py-1.5 font-mono text-gray-700 dark:text-gray-300">{o.materialId}</td>
-                    <td className="px-3 py-1.5 text-gray-800 dark:text-gray-200">{o.materialName}</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums text-gray-700 dark:text-gray-300">{o.qty}</td>
-                    <td className="px-3 py-1.5 text-gray-600 dark:text-gray-400">{o.vendorName ?? "-"}</td>
+                    <td className="px-3 py-3 font-mono text-gray-700 dark:text-gray-300">{o.materialId}</td>
+                    <td className="px-3 py-3 text-gray-800 dark:text-gray-200">{o.materialName}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-gray-700 dark:text-gray-300">{o.qty}</td>
+                    <td className="px-3 py-3 text-gray-600 dark:text-gray-400">{o.vendorName ?? "-"}</td>
                   </tr>
                 ))}
               </tbody>

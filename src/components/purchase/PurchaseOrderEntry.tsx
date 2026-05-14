@@ -47,6 +47,7 @@ export default function PurchaseOrderEntry() {
   const [elevators,   setElevators]   = useState<ElevatorRecord[]>([]);
   const [reference,   setReference]   = useState("");
   const [matType,     setMatType]     = useState<"전체" | "DS" | "TK">("전체");
+  const [formType,    setFormType]    = useState<"기본" | "긴급" | "수리">("기본");
   const [requesterNames, setRequesterNames] = useState<string[]>([]);
 
   useEffect(() => {
@@ -141,7 +142,12 @@ export default function PurchaseOrderEntry() {
           materialId: r.materialId, materialName: r.materialName, qty: r.qty,
           vendorName: vendorName || null, unitPrice: r.unitPrice || null, requestId: r.reqId,
           siteName: siteName || null, elevatorName: r.elevatorName || null,
-          requesterName: managerName || null, note: [orderRefNo ? `[${orderRefNo}]` : "", r.remark || reference || ""].filter(Boolean).join(" ") || null,
+          requesterName: managerName || null,
+          note: [
+            orderRefNo ? `[${orderRefNo}]` : "",
+            formType !== "기본" ? `[${formType}]` : "",
+            r.remark || reference || "",
+          ].filter(Boolean).join(" ") || null,
           userId: user.id, userName: user.name,
         });
       }
@@ -165,41 +171,45 @@ export default function PurchaseOrderEntry() {
         </h1>
       </div>
 
-      <div className="px-5 py-2 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2">
+      <div className="px-5 py-2 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
+        <MatTypeToggle value={matType} onChange={setMatType} />
         <span className="text-xs text-gray-500 dark:text-gray-400">양식</span>
-        <select className="text-xs px-2 py-1 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-gray-200">
-          <option>대출기본발주서</option>
-          <option>긴급발주서</option>
-          <option>수리부품 발주서</option>
+        <select value={formType} onChange={e => setFormType(e.target.value as typeof formType)}
+          className="text-xs px-2 py-1 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-gray-200">
+          <option value="기본">기본발주서</option>
+          <option value="긴급">긴급발주서</option>
+          <option value="수리">수리부품 발주서</option>
         </select>
+        {formType !== "기본" && (
+          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${formType === "긴급" ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"}`}>
+            [{formType}]
+          </span>
+        )}
       </div>
 
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-5 py-3">
-        <div className="grid grid-cols-4 gap-x-4 gap-y-2">
-          <FormField label="일자" required>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <FormField label="일자" required className="w-44">
             <input type="date" value={orderDate} onChange={e => setOrderDate(e.target.value)} className={inputCls} />
           </FormField>
-          <FormField label="거래처" required>
+          <FormField label="거래처" required className="w-64">
             <VendorInlineSearch value={vendorName} onChange={setVendorName} vendors={vendors} />
           </FormField>
-          <FormField label="신청자">
+          <FormField label="신청자" className="w-48">
             <input type="text" value={managerName} onChange={e => setManagerName(e.target.value)}
               list="po-requester-names" placeholder="입력 또는 선택" className={inputCls} />
             <datalist id="po-requester-names">
               {requesterNames.map(n => <option key={n} value={n} />)}
             </datalist>
           </FormField>
-          <FormField label="현장">
+          <FormField label="현장" className="w-80 flex-1 min-w-[280px]">
             <SiteInlineSearch value={siteName} onChange={setSiteName} sites={sites} />
           </FormField>
-          <FormField label="주문참조번호">
+          <FormField label="주문참조번호" className="w-56">
             <input type="text" value={orderRefNo} onChange={e => setOrderRefNo(e.target.value)} className={inputCls} />
           </FormField>
-          <FormField label="참조" wide>
-            <div className="flex items-center gap-2">
-              <input type="text" value={reference} onChange={e => setReference(e.target.value)} className={`${inputCls} flex-1`} />
-              <MatTypeToggle value={matType} onChange={setMatType} />
-            </div>
+          <FormField label="참조" className="flex-1 min-w-[280px]">
+            <input type="text" value={reference} onChange={e => setReference(e.target.value)} className={`${inputCls} w-full`} />
           </FormField>
         </div>
         <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
@@ -230,7 +240,7 @@ export default function PurchaseOrderEntry() {
               <Th w="220">품목명</Th>
               <Th w="120">규격</Th>
               <Th w="80">수량</Th>
-              <Th w="110">단가</Th>
+              <Th w="110">구매단가</Th>
               <Th w="120">공급가액</Th>
               <Th w="100">호기</Th>
               <Th w="160">적요</Th>
@@ -328,10 +338,10 @@ export default function PurchaseOrderEntry() {
 const inputCls = "w-full px-2 py-1 text-xs font-medium text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:font-normal";
 const cellInput = "w-full px-1.5 py-1 text-xs font-medium text-gray-900 dark:text-gray-100 border-0 bg-white dark:bg-gray-800 focus:outline-none focus:bg-yellow-50 dark:focus:bg-yellow-900/20 focus:ring-1 focus:ring-blue-300 placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:font-normal";
 
-function FormField({ label, required, wide, children }: { label: string; required?: boolean; wide?: boolean; children: React.ReactNode }) {
+function FormField({ label, required, className, children }: { label: string; required?: boolean; className?: string; children: React.ReactNode }) {
   return (
-    <div className={`flex items-center gap-2 ${wide ? "col-span-2" : ""}`}>
-      <label className="text-xs font-medium text-gray-800 dark:text-gray-200 shrink-0 w-20 text-right">
+    <div className={`flex items-center gap-1.5 ${className ?? ""}`}>
+      <label className="text-xs font-medium text-gray-800 dark:text-gray-200 shrink-0 text-right whitespace-nowrap">
         {label}{required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
       <div className="flex-1 min-w-0">{children}</div>
