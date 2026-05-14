@@ -42,11 +42,12 @@ export default function PurchaseOrderEntry() {
   const [vendors,     setVendors]     = useState<VendorOption[]>([]);
   const [pendingRequests, setPendingRequests] = useState<MaterialRequestRecord[]>([]);
   const [vendorName,  setVendorName]  = useState("");
-  const [managerName, setManagerName] = useState(user?.name ?? "");
+  const [managerName, setManagerName] = useState("");
   const [siteName,    setSiteName]    = useState("");
   const [elevators,   setElevators]   = useState<ElevatorRecord[]>([]);
   const [reference,   setReference]   = useState("");
   const [matType,     setMatType]     = useState<"전체" | "DS" | "TK">("전체");
+  const [requesterNames, setRequesterNames] = useState<string[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -61,6 +62,9 @@ export default function PurchaseOrderEntry() {
     api.get<VendorOption[]>("/api/vendors?type=매입").then(setVendors).catch(() => {});
     api.get<MaterialRequestRecord[]>("/api/material-requests")
       .then(data => setPendingRequests(data.filter(r => r.status === "신청" || r.status === "처리중")))
+      .catch(() => {});
+    api.get<{ name: string; status: string | null }[]>("/api/users")
+      .then(data => setRequesterNames(data.filter(u => u.status === "재직").map(u => u.name).sort()))
       .catch(() => {});
   }, []);
 
@@ -179,7 +183,11 @@ export default function PurchaseOrderEntry() {
             <VendorInlineSearch value={vendorName} onChange={setVendorName} vendors={vendors} />
           </FormField>
           <FormField label="신청자">
-            <input type="text" value={managerName} onChange={e => setManagerName(e.target.value)} className={inputCls} />
+            <input type="text" value={managerName} onChange={e => setManagerName(e.target.value)}
+              list="po-requester-names" placeholder="입력 또는 선택" className={inputCls} />
+            <datalist id="po-requester-names">
+              {requesterNames.map(n => <option key={n} value={n} />)}
+            </datalist>
           </FormField>
           <FormField label="현장">
             <SiteInlineSearch value={siteName} onChange={setSiteName} sites={sites} />
