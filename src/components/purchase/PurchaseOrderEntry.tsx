@@ -10,7 +10,7 @@ import { api, getErrorMessage } from "@/lib/api-client";
 import DraggableModal from "@/components/common/DraggableModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 
-interface SiteOption   { id: number; name: string }
+interface SiteOption   { id: number; name: string; alias?: string | null }
 interface VendorOption { id: number; name: string }
 
 interface Row {
@@ -378,12 +378,18 @@ function Td({ children, right, center, className = "", colSpan }: { children?: R
 }
 
 // ── 인라인 자동완성 ─────────────────────────────────────────────
-function SiteInlineSearch({ value, onChange, sites }: { value: string; onChange: (v: string) => void; sites: { id: number; name: string }[] }) {
+function SiteInlineSearch({ value, onChange, sites }: { value: string; onChange: (v: string) => void; sites: SiteOption[] }) {
   const [open, setOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
   const ulRef = useRef<HTMLUListElement>(null);
-  const suggestions = value.trim() ? sites.filter(s => s.name.toLowerCase().includes(value.toLowerCase())).slice(0, 10) : [];
+  const q = value.trim().toLowerCase();
+  const suggestions = q
+    ? sites.filter(s =>
+        s.name.toLowerCase().includes(q) ||
+        (s.alias?.toLowerCase().includes(q) ?? false)
+      ).slice(0, 10)
+    : [];
 
   useEffect(() => { setFocusedIndex(-1); }, [value]);
 
@@ -421,7 +427,10 @@ function SiteInlineSearch({ value, onChange, sites }: { value: string; onChange:
             <li key={s.id}>
               <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => { onChange(s.name); setOpen(false); }}
                 className={`w-full text-left px-3 py-2 text-xs text-gray-800 dark:text-gray-200 border-b border-gray-50 dark:border-gray-700 last:border-0 ${focusedIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-blue-50 dark:hover:bg-blue-900/20"}`}>
-                {s.name}
+                <span>{s.name}</span>
+                {s.alias && s.alias !== s.name && (
+                  <span className="ml-2 text-[10px] text-gray-400 dark:text-gray-500">({s.alias})</span>
+                )}
               </button>
             </li>
           ))}
