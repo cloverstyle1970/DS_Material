@@ -146,8 +146,8 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
     render: () => (
       <div className="p-6 space-y-4">
         <div>
-          <h1 className="text-lg font-semibold text-gray-800">자재 신청 관리</h1>
-          <p className="text-sm text-gray-500 mt-0.5">현장 자재 신청 내역 조회 및 처리</p>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-white">자재 신청 관리</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-300 mt-0.5">현장 자재 신청 내역 조회 및 처리</p>
         </div>
         <RequestsClient
           initialRequests={[]}
@@ -164,8 +164,8 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
     render: () => (
       <div className="p-6 space-y-4">
         <div>
-          <h1 className="text-lg font-semibold text-gray-800">발주 관리</h1>
-          <p className="text-sm text-gray-500 mt-0.5">발주 내역 조회 및 신규 발주 등록</p>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-white">발주 관리</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-300 mt-0.5">발주 내역 조회 및 신규 발주 등록</p>
         </div>
         <RequestsClient
           initialRequests={[]}
@@ -182,8 +182,8 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
     render: () => (
       <div className="p-6 space-y-4">
         <div>
-          <h1 className="text-lg font-semibold text-gray-800">입고 관리</h1>
-          <p className="text-sm text-gray-500 mt-0.5">자재 입고 등록 및 이력 조회</p>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-white">입고 관리</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-300 mt-0.5">자재 입고 등록 및 이력 조회</p>
         </div>
         <StockHistoryClient mode="입고" initial={[]} />
       </div>
@@ -194,8 +194,8 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
     render: () => (
       <div className="p-6 space-y-4">
         <div>
-          <h1 className="text-lg font-semibold text-gray-800">출고 관리</h1>
-          <p className="text-sm text-gray-500 mt-0.5">자재 출고 등록 및 이력 조회</p>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-white">출고 관리</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-300 mt-0.5">자재 출고 등록 및 이력 조회</p>
         </div>
         <StockHistoryClient mode="출고" initial={[]} />
       </div>
@@ -230,8 +230,8 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
     render: () => (
       <div className="p-6 space-y-4">
         <div>
-          <h1 className="text-lg font-semibold text-gray-800">기간별 입출고 내역</h1>
-          <p className="text-sm text-gray-500 mt-0.5">월별/분기별/연도별 입고·출고 추이 분석</p>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-white">기간별 입출고 내역</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-300 mt-0.5">월별/분기별/연도별 입고·출고 추이 분석</p>
         </div>
         <PeriodStatsClient />
       </div>
@@ -242,8 +242,8 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
     render: () => (
       <div className="p-6 space-y-4">
         <div>
-          <h1 className="text-lg font-semibold text-gray-800">현장/호기별 투입 현황</h1>
-          <p className="text-sm text-gray-500 mt-0.5">현장별·자재별 입출고 집계 및 분석</p>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-white">현장/호기별 투입 현황</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-300 mt-0.5">현장별·자재별 입출고 집계 및 분석</p>
         </div>
         <SiteStatsClient />
       </div>
