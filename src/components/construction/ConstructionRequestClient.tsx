@@ -17,6 +17,7 @@ export interface ConstructionRequest {
   requesterName: string;
   details: string;
   requestedAt: string;
+  companyType: "TK" | "DS" | "" | null;
 }
 
 interface SiteOption { id: number; name: string }
@@ -33,6 +34,7 @@ export default function ConstructionRequestClient() {
   const [manager, setManager] = useState("");
   const [managerPhone, setManagerPhone] = useState("");
   const [details, setDetails] = useState("");
+  const [companyType, setCompanyType] = useState<"TK" | "DS" | "">("");
   const [sites, setSites] = useState<SiteOption[]>([]);
   const [elevators, setElevators] = useState<{ id: number; unitName: string }[]>([]);
   const [saving, setSaving] = useState(false);
@@ -46,6 +48,7 @@ export default function ConstructionRequestClient() {
     setManager(req.manager || "");
     setManagerPhone(req.managerPhone || "");
     setDetails(req.details);
+    setCompanyType(req.companyType === "TK" || req.companyType === "DS" ? req.companyType : "");
     setShowModal(true);
   }
 
@@ -101,6 +104,7 @@ export default function ConstructionRequestClient() {
     setManager("");
     setManagerPhone("");
     setDetails("");
+    setCompanyType("");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -116,6 +120,7 @@ export default function ConstructionRequestClient() {
           manager,
           managerPhone,
           details,
+          companyType,
         });
       } else {
         await api.post("/api/construction-requests", {
@@ -125,6 +130,7 @@ export default function ConstructionRequestClient() {
           managerPhone,
           details,
           requesterName: user?.name || "익명",
+          companyType,
         });
       }
       setShowModal(false);
@@ -174,19 +180,34 @@ export default function ConstructionRequestClient() {
           <div className="text-center py-20 text-gray-500 dark:text-gray-400">등록된 공사 요청이 없습니다.</div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {requests.map(req => (
-              <div key={req.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow bg-gray-50 dark:bg-gray-800/50">
+            {requests.map(req => {
+              const isTk = req.companyType === "TK";
+              return (
+              <div key={req.id} className={`border-2 rounded-lg p-4 hover:shadow-md transition-shadow bg-gray-50 dark:bg-gray-800/50 ${
+                isTk ? "border-blue-500 dark:border-blue-400" : "border-gray-200 dark:border-gray-700"
+              }`}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className={`text-xs font-bold px-2 py-1 rounded ${
-                    req.status === "요청" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
-                    req.status === "일정등록됨" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
-                    "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
-                  }`}>
-                    {req.status}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-xs font-bold px-2 py-1 rounded ${
+                      req.status === "요청" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
+                      req.status === "일정등록됨" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
+                      "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+                    }`}>
+                      {req.status}
+                    </span>
+                    {req.companyType && (
+                      <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                        req.companyType === "TK"
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                          : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+                      }`}>
+                        {req.companyType}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-xs text-gray-500 dark:text-gray-400">{new Date(req.requestedAt).toLocaleDateString()}</span>
                 </div>
-                <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-1">{req.siteName} {req.elevatorName && <span className="text-gray-500 text-sm font-normal">({req.elevatorName})</span>}</h3>
+                <h3 className={`font-bold mb-1 ${isTk ? "text-blue-600 dark:text-blue-400" : "text-gray-800 dark:text-gray-100"}`}>{req.siteName} {req.elevatorName && <span className="text-gray-500 text-sm font-normal">({req.elevatorName})</span>}</h3>
                 {(req.manager || req.managerPhone) && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                     담당: {req.manager}{req.managerPhone ? ` · ${req.managerPhone}` : ""}
@@ -223,7 +244,8 @@ export default function ConstructionRequestClient() {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -239,30 +261,49 @@ export default function ConstructionRequestClient() {
         }
       >
         <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">현장명 <span className="text-red-500">*</span></label>
-                <input 
-                  type="text" 
-                  value={siteName} 
-                  onChange={e => setSiteName(e.target.value)} 
-                  onKeyDown={e => {
-                    if (e.key === "Enter" && siteName.trim()) {
-                      const matched = sites.filter(s => s.name.toLowerCase().includes(siteName.toLowerCase()));
-                      if (matched.length === 1) {
-                        e.preventDefault();
-                        setSiteName(matched[0].name);
-                        e.currentTarget.blur();
+              <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">현장명 <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={siteName}
+                    onChange={e => setSiteName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && siteName.trim()) {
+                        const matched = sites.filter(s => s.name.toLowerCase().includes(siteName.toLowerCase()));
+                        if (matched.length === 1) {
+                          e.preventDefault();
+                          setSiteName(matched[0].name);
+                          e.currentTarget.blur();
+                        }
                       }
-                    }
-                  }}
-                  lang="ko"
-                  placeholder="현장명을 입력하거나 검색하세요"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  list="sites-list"
-                />
-                <datalist id="sites-list">
-                  {sites.map(s => <option key={s.id} value={s.name} />)}
-                </datalist>
+                    }}
+                    lang="ko"
+                    placeholder="현장명을 입력하거나 검색하세요"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    list="sites-list"
+                  />
+                  <datalist id="sites-list">
+                    {sites.map(s => <option key={s.id} value={s.name} />)}
+                  </datalist>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">현장구분</label>
+                  <div className="flex rounded overflow-hidden border border-gray-300 dark:border-gray-600">
+                    {(["", "TK", "DS"] as const).map(t => (
+                      <button key={t || "none"} type="button" onClick={() => setCompanyType(t)}
+                        className={`px-3 py-2 text-sm font-semibold transition-colors ${
+                          companyType === t
+                            ? t === "TK" ? "bg-blue-600 text-white"
+                              : t === "DS" ? "bg-red-500 text-white"
+                              : "bg-slate-600 text-white"
+                            : "bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600"
+                        }`}>
+                        {t || "—"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">호기 정보</label>
@@ -290,7 +331,7 @@ export default function ConstructionRequestClient() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">공사 내역 <span className="text-red-500">*</span></label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">공사내용 및 전달사항 <span className="text-red-500">*</span></label>
                 <textarea 
                   value={details} 
                   onChange={e => setDetails(e.target.value)} 

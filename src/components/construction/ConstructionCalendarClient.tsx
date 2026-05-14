@@ -21,6 +21,7 @@ export interface ConstructionSchedule {
   workers: string;
   manager: string;
   managerPhone: string;
+  companyType: "TK" | "DS" | "" | null;
 }
 
 interface AnnualEvent {
@@ -68,6 +69,7 @@ function CalendarContent() {
   const [workers, setWorkers] = useState("");
   const [manager, setManager] = useState("");
   const [managerPhone, setManagerPhone] = useState("");
+  const [companyType, setCompanyType] = useState<"TK" | "DS" | "">("");
   const [saving, setSaving] = useState(false);
 
   // 연간일정 관리 모달
@@ -165,6 +167,7 @@ function CalendarContent() {
     setWorkers("");
     setManager("");
     setManagerPhone("");
+    setCompanyType("");
     setShowModal(true);
   }
 
@@ -181,6 +184,7 @@ function CalendarContent() {
     setWorkers(schedule.workers);
     setManager(schedule.manager);
     setManagerPhone(schedule.managerPhone || "");
+    setCompanyType(schedule.companyType === "TK" || schedule.companyType === "DS" ? schedule.companyType : "");
     setShowModal(true);
   }
 
@@ -191,7 +195,7 @@ function CalendarContent() {
 
     setSaving(true);
     try {
-      const payload = { requestId, startDate, endDate, startTime, siteName, elevatorName, details, workers, manager, managerPhone };
+      const payload = { requestId, startDate, endDate, startTime, siteName, elevatorName, details, workers, manager, managerPhone, companyType };
       if (editingId) {
         await api.patch(`/api/construction-schedules/${editingId}`, payload);
       } else {
@@ -362,14 +366,14 @@ function CalendarContent() {
                 <div className={`flex items-baseline gap-1 px-1 py-0.5 ${isRed || hasYeonga ? "text-red-500" : isSaturday ? "text-blue-500" : "text-gray-700 dark:text-gray-300"}`}>
                   <span className="text-xs font-semibold">{cell.day}</span>
                   {holidayName && (
-                    <span className="text-[10px] font-semibold text-red-500 leading-none truncate">{holidayName}</span>
+                    <span className="text-xs font-bold text-red-600 dark:text-red-400 leading-none truncate">{holidayName}</span>
                   )}
                 </div>
                 <div className="flex flex-col gap-0.5 mt-0.5">
                   {dayEvents.map(ev => (
                     <div
                       key={`ev-${ev.id}`}
-                      className={`text-[11px] px-1.5 py-0.5 rounded leading-tight truncate ${EVENT_COLORS[ev.type]}`}
+                      className={`text-xs font-bold px-1.5 py-1 rounded leading-tight truncate ${EVENT_COLORS[ev.type]}`}
                       title={`${ev.type}: ${ev.title}${ev.note ? ` · ${ev.note}` : ""}`}
                     >
                       {ev.title}
@@ -379,11 +383,14 @@ function CalendarContent() {
                     const hasTbm = tbmScheduleIds.has(sch.id);
                     // 공사휴무는 기존 색감 유지 (휴무는 TBM 대상 아님)
                     const isHoliday = sch.siteName === "공사휴무";
+                    const isTk = sch.companyType === "TK";
                     const borderCls = isHoliday
                       ? "border-green-300 dark:border-green-400"
-                      : hasTbm
-                        ? "border-blue-500 dark:border-white"        // TBM 작성됨
-                        : "border-black dark:border-white";          // TBM 미작성
+                      : isTk
+                        ? "border-blue-500 dark:border-blue-400"     // TK 현장: 파란색
+                        : hasTbm
+                          ? "border-blue-500 dark:border-white"      // TBM 작성됨
+                          : "border-black dark:border-white";        // TBM 미작성
                     return (
                       <div
                         key={`sch-${sch.id}`}
@@ -391,7 +398,7 @@ function CalendarContent() {
                         className={`text-xs px-2 py-1.5 rounded cursor-pointer leading-tight flex flex-col gap-0.5 bg-transparent border-2 text-gray-900 dark:text-gray-100 ${borderCls}`}
                         title={`${sch.siteName} ${sch.elevatorName ? `(${sch.elevatorName})` : ""}${sch.startTime ? ` ${sch.startTime}` : ""} / ${sch.details} / ${sch.workers}${sch.manager ? ` / 담당: ${sch.manager}${sch.managerPhone ? ` ${sch.managerPhone}` : ""}` : ""}${!isHoliday ? (hasTbm ? " · TBM 작성됨" : " · TBM 미작성") : ""}`}
                       >
-                        <div className="font-bold truncate text-[12px]">
+                        <div className={`font-bold truncate text-[12px] ${isTk ? "text-blue-600 dark:text-blue-400" : ""}`}>
                           {sch.siteName}{sch.elevatorName ? ` · ${sch.elevatorName}` : ""}
                         </div>
                         {sch.startTime && (
@@ -456,7 +463,7 @@ function CalendarContent() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-[1fr_auto_auto] gap-3 items-end">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">현장명 <span className="text-red-500">*</span></label>
                   <input
@@ -478,6 +485,23 @@ function CalendarContent() {
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
                   <datalist id="sites-list">{sites.map(s => <option key={s.id} value={s.name} />)}</datalist>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">현장구분</label>
+                  <div className="flex rounded overflow-hidden border border-gray-300 dark:border-gray-600">
+                    {(["", "TK", "DS"] as const).map(t => (
+                      <button key={t || "none"} type="button" onClick={() => setCompanyType(t)}
+                        className={`px-3 py-2 text-sm font-semibold transition-colors ${
+                          companyType === t
+                            ? t === "TK" ? "bg-blue-600 text-white"
+                              : t === "DS" ? "bg-red-500 text-white"
+                              : "bg-slate-600 text-white"
+                            : "bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600"
+                        }`}>
+                        {t || "—"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">호기</label>
@@ -509,7 +533,7 @@ function CalendarContent() {
                 <input type="text" value={workers} onChange={e => setWorkers(e.target.value)} placeholder="예: 홍길동 외 1명" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">공사 내용</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">공사내용 및 전달사항</label>
                 <textarea value={details} onChange={e => setDetails(e.target.value)} rows={3} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none" />
               </div>
               <div className="pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center">

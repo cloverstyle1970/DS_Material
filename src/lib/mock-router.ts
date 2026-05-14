@@ -26,6 +26,7 @@ export interface ConstructionRequest {
   requesterName: string;
   details: string;
   requestedAt: string;
+  companyType: "TK" | "DS" | "" | null;
 }
 
 export interface ConstructionSchedule {
@@ -40,6 +41,7 @@ export interface ConstructionSchedule {
   workers: string;
   manager: string;
   managerPhone: string;
+  companyType: "TK" | "DS" | "" | null;
 }
 
 // ── construction 헬퍼 ─────────────────────────────────────────────
@@ -55,6 +57,7 @@ function dbToConstReq(r: any): ConstructionRequest {
     requesterName: r.requester_name ?? "",
     details:       r.details        ?? "",
     requestedAt:   r.requested_at,
+    companyType:   r.company_type   ?? null,
   };
 }
 
@@ -72,6 +75,7 @@ function dbToConstSched(r: any): ConstructionSchedule {
     workers:       r.workers        ?? "",
     manager:       r.manager        ?? "",
     managerPhone:  r.manager_phone  ?? "",
+    companyType:   r.company_type   ?? null,
   };
 }
 
@@ -942,6 +946,7 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
       manager_phone:  body.managerPhone  || "",
       requester_name: body.requesterName || "",
       details:        body.details       || "",
+      company_type:   body.companyType   || null,
     }).select().single();
     if (error) throw new MockApiError(error.message, 500);
     return dbToConstReq(data);
@@ -958,6 +963,7 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
       workers:       body.workers      || "",
       manager:       body.manager      || "",
       manager_phone: body.managerPhone || "",
+      company_type:  body.companyType  || null,
     }).select().single();
     if (error) throw new MockApiError(error.message, 500);
     // 연결된 공사요청 상태 업데이트
@@ -1236,6 +1242,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
     if (body.workers      !== undefined) patch.workers       = body.workers;
     if (body.manager      !== undefined) patch.manager       = body.manager;
     if (body.managerPhone !== undefined) patch.manager_phone = body.managerPhone;
+    if (body.companyType  !== undefined) patch.company_type  = body.companyType || null;
     const { data, error } = await supabase.from("construction_schedules")
       .update(patch).eq("id", numId).select().single();
     if (error) throw new MockApiError(error.message, 500);
@@ -1253,6 +1260,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
     if (body.managerPhone !== undefined) patch.manager_phone = body.managerPhone;
     if (body.details      !== undefined) patch.details       = body.details;
     if (body.status       !== undefined) patch.status        = body.status;
+    if (body.companyType  !== undefined) patch.company_type  = body.companyType || null;
     const { data, error } = await supabase.from("construction_requests")
       .update(patch).eq("id", numId).select().single();
     if (error) throw new MockApiError(error.message, 500);
