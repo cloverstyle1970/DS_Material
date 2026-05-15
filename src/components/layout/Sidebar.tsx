@@ -268,7 +268,7 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
         <nav className="flex-1 overflow-y-auto py-3">
 
           {/* 대시보드 */}
-          <div className="px-2 mb-4">
+          <div className="px-2 mb-4 space-y-1">
             <button
               type="button"
               onClick={() => handleMenuOpen("/dashboard", "대시보드")}
@@ -280,6 +280,20 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
               <span className="text-base w-5 text-center shrink-0">⊞</span>
               대시보드
               {pathname === "/dashboard" && (
+                <span className="ml-auto w-1 h-4 rounded-full bg-blue-400 shrink-0" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleMenuOpen("/me", "내 대시보드")}
+              className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors whitespace-nowrap ${
+                pathname === "/me"
+                  ? "bg-white/10 text-white font-medium"
+                  : "text-slate-200 hover:bg-white/5 hover:text-white"
+              }`}>
+              <span className="text-base w-5 text-center shrink-0">👤</span>
+              내 대시보드
+              {pathname === "/me" && (
                 <span className="ml-auto w-1 h-4 rounded-full bg-blue-400 shrink-0" />
               )}
             </button>

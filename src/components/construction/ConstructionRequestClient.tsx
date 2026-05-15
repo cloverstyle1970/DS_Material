@@ -130,6 +130,7 @@ export default function ConstructionRequestClient() {
           managerPhone,
           details,
           requesterName: user?.name || "익명",
+          requesterUserId: user?.id ?? null,
           companyType,
         });
       }

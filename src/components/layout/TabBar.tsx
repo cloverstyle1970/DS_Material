@@ -1,6 +1,7 @@
 "use client";
 
 import { useTabs, MAX_TABS } from "@/context/TabsContext";
+import NotificationBell from "./NotificationBell";
 
 export default function TabBar() {
   const { tabs, activeHref, setActive, closeTab } = useTabs();
@@ -45,8 +46,9 @@ export default function TabBar() {
           </div>
         );
       })}
-      <div className="ml-auto pr-1.5 text-[11px] text-gray-400 dark:text-gray-500 shrink-0">
-        {tabs.length} / {MAX_TABS}
+      <div className="ml-auto pr-1.5 text-[11px] text-gray-400 dark:text-gray-500 shrink-0 flex items-center gap-1">
+        <span>{tabs.length} / {MAX_TABS}</span>
+        <NotificationBell />
       </div>
     </div>
   );

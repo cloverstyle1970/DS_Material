@@ -24,9 +24,23 @@ export interface ConstructionRequest {
   manager: string;
   managerPhone: string;
   requesterName: string;
+  requesterUserId: number | null;
   details: string;
   requestedAt: string;
   companyType: "TK" | "DS" | "" | null;
+}
+
+export interface NotificationItem {
+  id: number;
+  userId: number;
+  type: string;
+  title: string;
+  message: string;
+  link: string | null;
+  refType: string | null;
+  refId: number | null;
+  isRead: boolean;
+  createdAt: string;
 }
 
 export interface ConstructionSchedule {
@@ -48,17 +62,54 @@ export interface ConstructionSchedule {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function dbToConstReq(r: any): ConstructionRequest {
   return {
-    id:            r.id,
-    status:        r.status,
-    siteName:      r.site_name      ?? "",
-    elevatorName:  r.elevator_name  ?? "",
-    manager:       r.manager        ?? "",
-    managerPhone:  r.manager_phone  ?? "",
-    requesterName: r.requester_name ?? "",
-    details:       r.details        ?? "",
-    requestedAt:   r.requested_at,
-    companyType:   r.company_type   ?? null,
+    id:              r.id,
+    status:          r.status,
+    siteName:        r.site_name         ?? "",
+    elevatorName:    r.elevator_name     ?? "",
+    manager:         r.manager           ?? "",
+    managerPhone:    r.manager_phone     ?? "",
+    requesterName:   r.requester_name    ?? "",
+    requesterUserId: r.requester_user_id ?? null,
+    details:         r.details           ?? "",
+    requestedAt:     r.requested_at,
+    companyType:     r.company_type      ?? null,
   };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function dbToNotification(r: any): NotificationItem {
+  return {
+    id:        r.id,
+    userId:    r.user_id,
+    type:      r.type       ?? "info",
+    title:     r.title      ?? "",
+    message:   r.message    ?? "",
+    link:      r.link       ?? null,
+    refType:   r.ref_type   ?? null,
+    refId:     r.ref_id     ?? null,
+    isRead:    !!r.is_read,
+    createdAt: r.created_at,
+  };
+}
+
+async function insertNotification(params: {
+  userId: number;
+  type: string;
+  title: string;
+  message: string;
+  link?: string | null;
+  refType?: string | null;
+  refId?: number | null;
+}): Promise<void> {
+  await supabase.from("notifications").insert({
+    user_id:  params.userId,
+    type:     params.type,
+    title:    params.title,
+    message:  params.message,
+    link:     params.link    ?? null,
+    ref_type: params.refType ?? null,
+    ref_id:   params.refId   ?? null,
+  });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -761,6 +812,16 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
     if (error) throw new MockApiError(error.message, 500);
     return (data ?? []).map(dbToAnnualEvent);
   }
+  if (path === "/api/notifications") {
+    const userId = params.get("userId");
+    if (!userId) throw new MockApiError("userId가 필요합니다", 400);
+    const limit = Number(params.get("limit") ?? 50);
+    const { data, error } = await supabase.from("notifications")
+      .select("*").eq("user_id", Number(userId))
+      .order("created_at", { ascending: false }).limit(limit);
+    if (error) throw new MockApiError(error.message, 500);
+    return (data ?? []).map(dbToNotification);
+  }
   throw new MockApiError("Not found", 404);
 }
 
@@ -939,14 +1000,15 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
   }
   if (path === "/api/construction-requests") {
     const { data, error } = await supabase.from("construction_requests").insert({
-      status:         "요청",
-      site_name:      body.siteName      || "",
-      elevator_name:  body.elevatorName  || "",
-      manager:        body.manager       || "",
-      manager_phone:  body.managerPhone  || "",
-      requester_name: body.requesterName || "",
-      details:        body.details       || "",
-      company_type:   body.companyType   || null,
+      status:            "요청",
+      site_name:         body.siteName      || "",
+      elevator_name:     body.elevatorName  || "",
+      manager:           body.manager       || "",
+      manager_phone:     body.managerPhone  || "",
+      requester_name:    body.requesterName || "",
+      requester_user_id: body.requesterUserId ?? null,
+      details:           body.details       || "",
+      company_type:      body.companyType   || null,
     }).select().single();
     if (error) throw new MockApiError(error.message, 500);
     return dbToConstReq(data);
@@ -966,12 +1028,28 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
       company_type:  body.companyType  || null,
     }).select().single();
     if (error) throw new MockApiError(error.message, 500);
-    // 연결된 공사요청 상태 업데이트
+    const sched = dbToConstSched(data);
+    // 연결된 공사요청 상태 업데이트 + 신청자 알림
     if (body.requestId) {
       await supabase.from("construction_requests")
         .update({ status: "일정등록됨" }).eq("id", body.requestId);
+      const { data: req } = await supabase.from("construction_requests")
+        .select("requester_user_id, site_name, elevator_name")
+        .eq("id", body.requestId).single();
+      if (req?.requester_user_id) {
+        const elev = req.elevator_name ? ` (${req.elevator_name})` : "";
+        await insertNotification({
+          userId:  req.requester_user_id,
+          type:    "schedule_registered",
+          title:   "공사요청에 일정이 등록되었습니다",
+          message: `${req.site_name}${elev} · ${sched.startDate}${sched.startDate !== sched.endDate ? ` ~ ${sched.endDate}` : ""}${sched.startTime ? ` ${sched.startTime}` : ""}`,
+          link:    "/construction/schedule",
+          refType: "construction_schedule",
+          refId:   sched.id,
+        });
+      }
     }
-    return dbToConstSched(data);
+    return sched;
   }
   if (path === "/api/annual-events") {
     const { data, error } = await supabase.from("annual_events").insert({
@@ -984,6 +1062,15 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
     }).select().single();
     if (error) throw new MockApiError(error.message, 500);
     return dbToAnnualEvent(data);
+  }
+  if (path === "/api/notifications/read-all") {
+    if (!body.userId) throw new MockApiError("userId가 필요합니다", 400);
+    const { error } = await supabase.from("notifications")
+      .update({ is_read: true })
+      .eq("user_id", Number(body.userId))
+      .eq("is_read", false);
+    if (error) throw new MockApiError(error.message, 500);
+    return { ok: true };
   }
   throw new MockApiError("Not found", 404);
 }
@@ -1232,6 +1319,10 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
   const constSchedEditId = extractId(path, "/api/construction-schedules");
   if (constSchedEditId) {
     const numId = Number(constSchedEditId);
+    // 변경 전 일정 (알림 의미 있는 변경 비교용)
+    const { data: before } = await supabase.from("construction_schedules")
+      .select("request_id, start_date, end_date, start_time, site_name, elevator_name, details")
+      .eq("id", numId).single();
     const patch: Record<string, unknown> = {};
     if (body.startDate    !== undefined) patch.start_date    = body.startDate;
     if (body.endDate      !== undefined) patch.end_date      = body.endDate;
@@ -1247,7 +1338,35 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
       .update(patch).eq("id", numId).select().single();
     if (error) throw new MockApiError(error.message, 500);
     if (!data) throw new MockApiError("not found", 404);
-    return dbToConstSched(data);
+    const updated = dbToConstSched(data);
+    // 의미 있는 변경(일정/시간/현장/호기/공사내용)이면 신청자에게 알림
+    if (before?.request_id) {
+      const meaningful =
+        (patch.start_date    !== undefined && patch.start_date    !== before.start_date) ||
+        (patch.end_date      !== undefined && patch.end_date      !== before.end_date) ||
+        (patch.start_time    !== undefined && patch.start_time    !== before.start_time) ||
+        (patch.site_name     !== undefined && patch.site_name     !== before.site_name) ||
+        (patch.elevator_name !== undefined && patch.elevator_name !== before.elevator_name) ||
+        (patch.details       !== undefined && patch.details       !== before.details);
+      if (meaningful) {
+        const { data: req } = await supabase.from("construction_requests")
+          .select("requester_user_id, site_name, elevator_name")
+          .eq("id", before.request_id).single();
+        if (req?.requester_user_id) {
+          const elev = req.elevator_name ? ` (${req.elevator_name})` : "";
+          await insertNotification({
+            userId:  req.requester_user_id,
+            type:    "schedule_updated",
+            title:   "공사일정이 수정되었습니다",
+            message: `${req.site_name}${elev} · ${updated.startDate}${updated.startDate !== updated.endDate ? ` ~ ${updated.endDate}` : ""}${updated.startTime ? ` ${updated.startTime}` : ""}`,
+            link:    "/construction/schedule",
+            refType: "construction_schedule",
+            refId:   updated.id,
+          });
+        }
+      }
+    }
+    return updated;
   }
 
   const constReqEditId = extractId(path, "/api/construction-requests");
@@ -1283,6 +1402,16 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
     if (error) throw new MockApiError(error.message, 500);
     if (!data) throw new MockApiError("not found", 404);
     return dbToAnnualEvent(data);
+  }
+
+  // PATCH /api/notifications/:id/read  → 단건 읽음 처리
+  const notifReadMatch = path.match(/^\/api\/notifications\/(\d+)\/read$/);
+  if (notifReadMatch) {
+    const numId = Number(notifReadMatch[1]);
+    const { error } = await supabase.from("notifications")
+      .update({ is_read: true }).eq("id", numId);
+    if (error) throw new MockApiError(error.message, 500);
+    return { ok: true };
   }
 
   throw new MockApiError("Not found", 404);

@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface Props {
   open: boolean;
@@ -17,16 +18,18 @@ export default function DraggableModal({
   header,
   children,
   panelClassName = "w-full max-w-lg max-h-[90vh]",
-  z = 50,
+  z = 60,
   onClose,
 }: Props) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [mounted, setMounted] = useState(false);
   const dragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(null);
   const pressedOnBackdrop = useRef(false);
 
+  useEffect(() => { setMounted(true); }, []);
   useEffect(() => { if (!open) setPos({ x: 0, y: 0 }); }, [open]);
 
-  if (!open) return null;
+  if (!open || !mounted || typeof document === "undefined") return null;
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     const target = e.target as HTMLElement;
@@ -55,7 +58,7 @@ export default function DraggableModal({
     pressedOnBackdrop.current = false;
   }
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 flex items-center justify-center bg-black/50 p-4"
       style={{ zIndex: z }}
@@ -81,6 +84,7 @@ export default function DraggableModal({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
