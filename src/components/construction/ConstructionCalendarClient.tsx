@@ -73,11 +73,9 @@ function CalendarContent() {
   const [companyType, setCompanyType] = useState<"TK" | "DS" | "">("");
   const [saving, setSaving] = useState(false);
 
-  // 일정 검색 모달
-  const [showSearchModal, setShowSearchModal] = useState(false);
-  const [searchStart, setSearchStart] = useState("");
-  const [searchEnd, setSearchEnd] = useState("");
-  const [searchSite, setSearchSite] = useState("");
+  // 현장명 검색 (인라인)
+  const [siteSearchInput, setSiteSearchInput] = useState("");
+  const [siteSearchKeyword, setSiteSearchKeyword] = useState("");
 
   // 연간일정 관리 모달
   const [showAnnualModal, setShowAnnualModal] = useState(false);
@@ -232,29 +230,6 @@ function CalendarContent() {
     }
   }
 
-  function openSearchModal() {
-    if (!searchStart || !searchEnd) {
-      const mm = String(month + 1).padStart(2, "0");
-      const lastDay = new Date(year, month + 1, 0).getDate();
-      setSearchStart(`${year}-${mm}-01`);
-      setSearchEnd(`${year}-${mm}-${String(lastDay).padStart(2, "0")}`);
-    }
-    setShowSearchModal(true);
-  }
-
-  const searchResults = useMemo(() => {
-    if (!showSearchModal || !searchStart || !searchEnd) return [] as ConstructionSchedule[];
-    const kw = searchSite.trim().toLowerCase();
-    return schedules
-      .filter(s => {
-        if (s.siteName === "공사휴무") return false;  // 휴무는 검색 대상 아님
-        if (s.endDate < searchStart || s.startDate > searchEnd) return false;
-        if (kw && !s.siteName.toLowerCase().includes(kw)) return false;
-        return true;
-      })
-      .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.startTime.localeCompare(b.startTime));
-  }, [schedules, showSearchModal, searchStart, searchEnd, searchSite]);
-
   function openAnnualModal() {
     setShowAnnualModal(true);
     setShowEventForm(false);
@@ -361,14 +336,42 @@ function CalendarContent() {
               </button>
             ))}
           </div>
+          <div className="flex items-center gap-1">
+            <input
+              type="text"
+              value={siteSearchInput}
+              onChange={e => setSiteSearchInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  setSiteSearchKeyword(siteSearchInput.trim());
+                }
+              }}
+              list="header-sites-list"
+              placeholder="현장명 검색 (예: 파크)"
+              className="w-40 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+            <datalist id="header-sites-list">{sites.map(s => <option key={s.id} value={s.name} />)}</datalist>
+            <button
+              type="button"
+              onClick={() => setSiteSearchKeyword(siteSearchInput.trim())}
+              className="px-3 py-1.5 bg-slate-600 text-white text-xs font-semibold rounded hover:bg-slate-700 transition-colors"
+            >
+              검색
+            </button>
+            {siteSearchKeyword && (
+              <button
+                type="button"
+                onClick={() => { setSiteSearchInput(""); setSiteSearchKeyword(""); }}
+                className="px-2 py-1.5 text-xs text-gray-500 dark:text-gray-300 hover:text-red-500"
+                title="검색 초기화"
+              >
+                ✕
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={openSearchModal}
-            className="px-3 py-2 bg-slate-600 text-white text-sm font-semibold rounded-lg shadow hover:bg-slate-700 transition-colors"
-          >
-            🔍 검색
-          </button>
           {canSchedule && (
             <button
               onClick={openAnnualModal}
@@ -407,6 +410,7 @@ function CalendarContent() {
 
             const daySchedules = schedules.filter(s => {
               if (s.startDate > cell.dateStr || s.endDate < cell.dateStr) return false;
+              if (siteSearchKeyword && !s.siteName.toLowerCase().includes(siteSearchKeyword.toLowerCase())) return false;
               if (companyFilter === "ALL") return true;
               if (s.siteName === "공사휴무") return true;
               return s.companyType === companyFilter;
@@ -464,10 +468,10 @@ function CalendarContent() {
                           <div className="truncate text-[11px] font-medium">{sch.startTime}</div>
                         )}
                         {sch.details && (
-                          <div className="truncate text-[11px] opacity-80">{sch.details}</div>
+                          <div className="truncate text-[11px] text-gray-700 dark:text-white">{sch.details}</div>
                         )}
                         {sch.workers && (
-                          <div className="truncate text-[11px] opacity-70">👷 {sch.workers}</div>
+                          <div className="truncate text-[11px] text-gray-700 dark:text-white">👷 {sch.workers}</div>
                         )}
                       </div>
                     );
@@ -726,86 +730,6 @@ function CalendarContent() {
                 </form>
               )}
             </div>
-      </DraggableModal>
-
-      {/* 일정 검색 모달 */}
-      <DraggableModal
-        open={showSearchModal}
-        panelClassName="w-full max-w-2xl max-h-[90vh]"
-        header={
-          <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between shrink-0">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">🔍 공사일정 검색</h3>
-            <button onClick={() => setShowSearchModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
-          </div>
-        }
-      >
-        <div className="flex flex-col overflow-hidden">
-          <div className="p-5 border-b border-gray-100 dark:border-gray-700 grid grid-cols-[1fr_1fr_1.5fr] gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">시작일</label>
-              <input type="date" value={searchStart} onChange={e => setSearchStart(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">종료일</label>
-              <input type="date" value={searchEnd} onChange={e => setSearchEnd(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">현장명</label>
-              <input
-                type="text"
-                value={searchSite}
-                onChange={e => setSearchSite(e.target.value)}
-                placeholder="현장명 일부 입력"
-                list="search-sites-list"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-              <datalist id="search-sites-list">{sites.map(s => <option key={s.id} value={s.name} />)}</datalist>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-5">
-            <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">검색 결과 {searchResults.length}건</div>
-            {searchResults.length === 0 ? (
-              <div className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">검색 조건에 맞는 일정이 없습니다.</div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {searchResults.map(s => {
-                  const isTk = s.companyType === "TK";
-                  const isHoliday = s.siteName === "공사휴무";
-                  return (
-                    <div
-                      key={s.id}
-                      onClick={() => { setShowSearchModal(false); openEditModal(s); }}
-                      className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-mono text-gray-500 dark:text-gray-400">
-                          {s.startDate === s.endDate ? s.startDate : `${s.startDate} ~ ${s.endDate}`}
-                          {s.startTime ? ` ${s.startTime}` : ""}
-                        </span>
-                        {isHoliday ? (
-                          <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">휴무</span>
-                        ) : isTk ? (
-                          <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">TK</span>
-                        ) : s.companyType === "DS" ? (
-                          <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">DS</span>
-                        ) : null}
-                      </div>
-                      <div className="font-semibold text-gray-800 dark:text-gray-100 truncate">
-                        {s.siteName}{s.elevatorName ? ` · ${s.elevatorName}` : ""}
-                      </div>
-                      {s.details && <div className="text-xs text-gray-600 dark:text-gray-300 truncate mt-0.5">{s.details}</div>}
-                      <div className="flex gap-3 text-[11px] text-gray-500 dark:text-gray-400 mt-1">
-                        {s.workers && <span>작업자: {s.workers}</span>}
-                        {s.manager && <span>담당: {s.manager}{s.managerPhone ? ` (${s.managerPhone})` : ""}</span>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
       </DraggableModal>
     </div>
   );
