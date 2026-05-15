@@ -55,6 +55,7 @@ function CalendarContent() {
   const [elevators, setElevators] = useState<{ id: number; unitName: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [companyFilter, setCompanyFilter] = useState<"ALL" | "TK" | "DS">("ALL");
 
   // 공사일정 모달
   const [showModal, setShowModal] = useState(false);
@@ -313,6 +314,24 @@ function CalendarContent() {
             <span className="font-bold w-24 text-center dark:text-white">{year}년 {month + 1}월</span>
             <button onClick={() => setCurrentDate(new Date(year, month + 1, 1))} className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white">&gt;</button>
           </div>
+          <div className="flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
+            {(["ALL", "TK", "DS"] as const).map(f => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setCompanyFilter(f)}
+                className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  companyFilter === f
+                    ? f === "TK" ? "bg-blue-600 text-white"
+                      : f === "DS" ? "bg-red-500 text-white"
+                      : "bg-slate-600 text-white"
+                    : "bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600"
+                }`}
+              >
+                {f === "ALL" ? "전체" : f}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {canSchedule && (
@@ -351,7 +370,12 @@ function CalendarContent() {
             const isHoliday = !!holidayName;
             const isRed = isSunday || isHoliday;
 
-            const daySchedules = schedules.filter(s => s.startDate <= cell.dateStr && s.endDate >= cell.dateStr);
+            const daySchedules = schedules.filter(s => {
+              if (s.startDate > cell.dateStr || s.endDate < cell.dateStr) return false;
+              if (companyFilter === "ALL") return true;
+              if (s.siteName === "공사휴무") return true;
+              return s.companyType === companyFilter;
+            });
             const dayEvents = annualEvents.filter(ev => ev.startDate <= cell.dateStr && ev.endDate >= cell.dateStr);
             const hasYeonga = dayEvents.some(ev => ev.type === "연차");
 
