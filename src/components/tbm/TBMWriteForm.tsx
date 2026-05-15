@@ -101,10 +101,11 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
       const usedIds = new Set(((tbmRows ?? []) as { schedule_id: number }[]).map(r => r.schedule_id));
 
       const { data } = await supabase.from("construction_schedules")
-        .select("id, site_name, elevator_name, start_date, end_date, details")
+        .select("id, site_name, elevator_name, start_date, end_date, details, company_type")
         .gte("end_date", fmt(start))
         .lte("start_date", fmt(end))
         .neq("site_name", "공사휴무")  // 공사휴무 제외
+        .or("company_type.is.null,company_type.neq.TK")  // TK 현장 제외 (TBM 대상 아님)
         .order("start_date", { ascending: false });
       // TBM이 이미 작성된 일정 제외
       const filtered = ((data ?? []) as Schedule[]).filter(s => !usedIds.has(s.id));
