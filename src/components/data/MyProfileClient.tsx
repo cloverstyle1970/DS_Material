@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, FormEvent } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { hashPassword } from "@/lib/password";
 
 const PHOTO_BUCKET = "employee-photos";
 const CERT_DOCS_BUCKET = "cert-docs";
@@ -18,10 +19,14 @@ declare global {
   }
 }
 
+type TabKey = "basic" | "family" | "career" | "vehicle" | "cert" | "rp";
+
 interface UserRow {
   id: number;
   name: string;
   ssn: string | null;
+  gender: "M" | "F" | null;
+  blood_type: string | null;
   hire_date: string | null;
   dept: string | null;
   rank: string | null;
@@ -45,6 +50,8 @@ interface FamilyMember {
   birth_date: string;
   occupation: string;
   cohabiting: boolean;
+  is_emergency: boolean;
+  phone: string;
 }
 
 interface Vehicle {
@@ -64,26 +71,91 @@ interface Certification {
   id?: number;
   cert_name: string;
   cert_number: string;
-  edu_completed_date: string;
-  edu_next_date: string;
+  self_check: boolean;
+  acquired_date: string;
+  expiry_date: string;
+  issuer: string;
   cert_doc_url: string | null;
-  doc_file: File | null;     // 새로 업로드할 파일
-  doc_preview: string;       // 표시용 (filename or 기존 URL)
+  doc_file: File | null;
+  doc_preview: string;
 }
 
-const EMPTY_FAMILY: FamilyMember = { relationship: "", name: "", gender: "", birth_date: "", occupation: "", cohabiting: true };
-const EMPTY_VEHICLE: Vehicle = { vehicle_type: "", plate_number: "", model: "", year_made: "", fuel_type: "", registration_date: "" };
-const EMPTY_CERT: Certification = { cert_name: "", cert_number: "", edu_completed_date: "", edu_next_date: "", cert_doc_url: null, doc_file: null, doc_preview: "" };
+interface Career {
+  id?: number;
+  company_name: string;
+  joined_date: string;
+  left_date: string;
+  dept: string;
+  rank: string;
+  duty: string;
+}
+
+interface RP {
+  id?: number;
+  kind: "상" | "벌" | "";
+  content: string;
+  occurred_on: string;
+}
+
+const EMPTY_FAMILY: FamilyMember = {
+  relationship: "", name: "", gender: "", birth_date: "", occupation: "",
+  cohabiting: true, is_emergency: false, phone: "",
+};
+const EMPTY_VEHICLE: Vehicle = {
+  vehicle_type: "", plate_number: "", model: "", year_made: "",
+  fuel_type: "", registration_date: "",
+};
+const EMPTY_CERT: Certification = {
+  cert_name: "", cert_number: "", self_check: false,
+  acquired_date: "", expiry_date: "", issuer: "",
+  cert_doc_url: null, doc_file: null, doc_preview: "",
+};
+const EMPTY_CAREER: Career = {
+  company_name: "", joined_date: "", left_date: "", dept: "", rank: "", duty: "",
+};
+const EMPTY_RP: RP = { kind: "", content: "", occurred_on: "" };
+
+const TABS: { key: TabKey; label: string; icon: string }[] = [
+  { key: "basic",   label: "기본정보",     icon: "👤" },
+  { key: "family",  label: "가족정보",     icon: "👨‍👩‍👧" },
+  { key: "career",  label: "경력",         icon: "💼" },
+  { key: "vehicle", label: "차량등록",     icon: "🚗" },
+  { key: "cert",    label: "교육 및 자격", icon: "📜" },
+  { key: "rp",      label: "상벌사항",     icon: "🏅" },
+];
+
+function formatPhone(value: string): string {
+  const d = value.replace(/\D/g, "").slice(0, 11);
+  if (d.length < 4) return d;
+  if (d.length < 8) return d.slice(0, 3) + "-" + d.slice(3);
+  if (d.length === 10) return d.slice(0, 3) + "-" + d.slice(3, 6) + "-" + d.slice(6);
+  return d.slice(0, 3) + "-" + d.slice(3, 7) + "-" + d.slice(7);
+}
+function formatYmd(value: string): string {
+  const d = value.replace(/\D/g, "").slice(0, 8);
+  if (d.length <= 4) return d;
+  if (d.length <= 6) return d.slice(0, 4) + "-" + d.slice(4);
+  return d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6);
+}
+function displaySsn(ssn: string | null | undefined): string {
+  if (!ssn) return "";
+  const d = ssn.replace(/\D/g, "");
+  if (d.length <= 6) return d;
+  return d.slice(0, 6) + "-" + d.slice(6, 13);
+}
 
 export default function MyProfileClient() {
   const { user } = useAuth();
 
-  // 기본 정보
+  const [tab, setTab] = useState<TabKey>("basic");
   const [loaded, setLoaded] = useState(false);
   const [row, setRow] = useState<UserRow | null>(null);
+
+  // 기본정보 편집 가능 필드
+  const [gender, setGender] = useState<"M" | "F" | "">("");
+  const [bloodType, setBloodType] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [emergency, setEmergency] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [addressBasic, setAddressBasic] = useState("");
   const [addressDetail, setAddressDetail] = useState("");
@@ -101,8 +173,10 @@ export default function MyProfileClient() {
   const [family, setFamily] = useState<FamilyMember[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [certs, setCerts] = useState<Certification[]>([]);
+  const [careers, setCareers] = useState<Career[]>([]);
+  const [rps, setRps] = useState<RP[]>([]);
 
-  // 회사차량 목록 (회사차량 구분 선택 시 lazy load)
+  // 회사차량
   const [companyVehicles, setCompanyVehicles] = useState<{id: number; plate_number: string; model: string; fuel_type: string; year_made: string | null}[]>([]);
   const [cvLoading, setCvLoading] = useState(false);
 
@@ -119,12 +193,17 @@ export default function MyProfileClient() {
     setCvLoading(false);
   }
 
-  // UX
   const [daumReady, setDaumReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // 다음 우편번호 스크립트
+  // 비밀번호 변경
+  const [currentPw, setCurrentPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [pwStatus, setPwStatus] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [pwSubmitting, setPwSubmitting] = useState(false);
+
   useEffect(() => {
     if (window.daum?.Postcode) { setDaumReady(true); return; }
     const existing = document.querySelector(`script[src="${DAUM_SCRIPT_SRC}"]`) as HTMLScriptElement | null;
@@ -135,24 +214,25 @@ export default function MyProfileClient() {
     document.body.appendChild(s);
   }, []);
 
-  // 데이터 로드
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const [u, fam, veh, cert] = await Promise.all([
+      const [u, fam, veh, cert, car, rp] = await Promise.all([
         supabase.from("users").select("*").eq("id", user.id).single(),
         supabase.from("user_family_members").select("*").eq("user_id", user.id).order("sort_order"),
         supabase.from("user_vehicles").select("*").eq("user_id", user.id).order("sort_order"),
         supabase.from("user_certifications").select("*").eq("user_id", user.id).order("sort_order"),
+        supabase.from("user_career_history").select("*").eq("user_id", user.id).order("sort_order"),
+        supabase.from("user_rewards_punishments").select("*").eq("user_id", user.id).order("sort_order"),
       ]);
       const r = u.data as UserRow | null;
       if (r) {
         setRow(r);
+        setGender((r.gender ?? "") as "M" | "F" | "");
+        setBloodType(r.blood_type ?? "");
         setPhone(r.phone ?? "");
         setEmail(r.email ?? "");
-        setEmergency(r.emergency_contact ?? "");
         setPostalCode(r.postal_code ?? "");
-        // address: 기본 주소만 분리 시도가 어려우므로 기본주소에 통째 표시, 상세주소는 빈값
         setAddressBasic(r.address ?? "");
         setAddressDetail("");
         setTopSize(r.uniform_top_size ?? "");
@@ -160,8 +240,18 @@ export default function MyProfileClient() {
         setShoesSize(r.safety_shoes_size ?? "");
         setPhotoUrl(r.photo_url ?? null);
       }
-      setFamily(((fam.data ?? []) as FamilyMember[]).map(f => ({ ...f, gender: (f.gender ?? "") as "M" | "F" | "" })));
-      // DB에서 null로 올 수 있는 필드들을 input controlled value 용으로 빈 문자열로 정규화
+      type FamilyRow = Partial<FamilyMember> & { gender?: string | null; phone?: string | null; is_emergency?: boolean | null };
+      setFamily(((fam.data ?? []) as FamilyRow[]).map(f => ({
+        id: f.id,
+        relationship: f.relationship ?? "",
+        name: f.name ?? "",
+        gender: ((f.gender ?? "") as "M" | "F" | ""),
+        birth_date: f.birth_date ?? "",
+        occupation: f.occupation ?? "",
+        cohabiting: f.cohabiting ?? true,
+        is_emergency: f.is_emergency ?? false,
+        phone: f.phone ?? "",
+      })));
       const vehData = ((veh.data ?? []) as Vehicle[]).map(v => ({
         ...v,
         plate_number: v.plate_number ?? "",
@@ -173,14 +263,38 @@ export default function MyProfileClient() {
         insurance_end_date: v.insurance_end_date ?? "",
       }));
       setVehicles(vehData);
-      // 회사차량이 등록되어 있으면 드롭다운 옵션을 미리 로드해 차량번호가 즉시 표시되도록 함
       if (vehData.some(v => v.vehicle_type === "회사차량")) {
         void loadCompanyVehicles();
       }
-      setCerts(((cert.data ?? []) as Array<Omit<Certification, "doc_file" | "doc_preview">>).map(c => ({
-        ...c,
+      type CertRow = Partial<Certification> & { self_check?: boolean | null; acquired_date?: string | null; expiry_date?: string | null; issuer?: string | null };
+      setCerts(((cert.data ?? []) as CertRow[]).map(c => ({
+        id: c.id,
+        cert_name: c.cert_name ?? "",
+        cert_number: c.cert_number ?? "",
+        self_check: c.self_check ?? false,
+        acquired_date: c.acquired_date ?? "",
+        expiry_date: c.expiry_date ?? "",
+        issuer: c.issuer ?? "",
+        cert_doc_url: c.cert_doc_url ?? null,
         doc_file: null,
         doc_preview: c.cert_doc_url ? "기존 파일" : "",
+      })));
+      type CareerRow = Partial<Career>;
+      setCareers(((car.data ?? []) as CareerRow[]).map(c => ({
+        id: c.id,
+        company_name: c.company_name ?? "",
+        joined_date: c.joined_date ?? "",
+        left_date: c.left_date ?? "",
+        dept: c.dept ?? "",
+        rank: c.rank ?? "",
+        duty: c.duty ?? "",
+      })));
+      type RpRow = Partial<RP> & { kind?: string | null };
+      setRps(((rp.data ?? []) as RpRow[]).map(r => ({
+        id: r.id,
+        kind: ((r.kind ?? "") as RP["kind"]),
+        content: r.content ?? "",
+        occurred_on: r.occurred_on ?? "",
       })));
       setLoaded(true);
     })();
@@ -188,27 +302,6 @@ export default function MyProfileClient() {
 
   if (!user) {
     return <div className="p-8 text-center text-sm text-gray-500">로그인이 필요합니다.</div>;
-  }
-
-  // ======= 헬퍼 =======
-  function formatPhone(value: string): string {
-    const d = value.replace(/\D/g, "").slice(0, 11);
-    if (d.length < 4) return d;
-    if (d.length < 8) return d.slice(0, 3) + "-" + d.slice(3);
-    if (d.length === 10) return d.slice(0, 3) + "-" + d.slice(3, 6) + "-" + d.slice(6);
-    return d.slice(0, 3) + "-" + d.slice(3, 7) + "-" + d.slice(7);
-  }
-  function formatYmd(value: string): string {
-    const d = value.replace(/\D/g, "").slice(0, 8);
-    if (d.length <= 4) return d;
-    if (d.length <= 6) return d.slice(0, 4) + "-" + d.slice(4);
-    return d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6);
-  }
-  function displaySsn(ssn: string | null | undefined): string {
-    if (!ssn) return "";
-    const d = ssn.replace(/\D/g, "");
-    if (d.length <= 6) return d;
-    return d.slice(0, 6) + "-" + d.slice(6, 13);
   }
 
   function openPostcode() {
@@ -235,44 +328,106 @@ export default function MyProfileClient() {
     return data.publicUrl;
   }
 
-  // ======= 저장 =======
+  async function handlePasswordChange() {
+    if (!user) return;
+    setPwStatus(null);
+    if (!currentPw) { setPwStatus({ type: "error", text: "현재 비밀번호를 입력하세요." }); return; }
+    if (newPw.length < 4) { setPwStatus({ type: "error", text: "새 비밀번호는 4자 이상이어야 합니다." }); return; }
+    if (newPw !== confirmPw) { setPwStatus({ type: "error", text: "새 비밀번호가 일치하지 않습니다." }); return; }
+    if (currentPw === newPw) { setPwStatus({ type: "error", text: "새 비밀번호가 현재 비밀번호와 같습니다." }); return; }
+
+    setPwSubmitting(true);
+    try {
+      const { data: r, error: fErr } = await supabase
+        .from("users")
+        .select("password_hash")
+        .eq("id", user.id)
+        .single();
+      if (fErr || !r) { setPwStatus({ type: "error", text: "사용자 정보를 불러오지 못했습니다." }); return; }
+      const stored = r.password_hash as string | null;
+      const curHash = await hashPassword(currentPw);
+      if (stored && curHash !== stored) {
+        setPwStatus({ type: "error", text: "현재 비밀번호가 올바르지 않습니다." });
+        return;
+      }
+      const newHash = await hashPassword(newPw);
+      const { error: uErr } = await supabase
+        .from("users")
+        .update({ password_hash: newHash })
+        .eq("id", user.id);
+      if (uErr) { setPwStatus({ type: "error", text: `비밀번호 변경 실패: ${uErr.message}` }); return; }
+      setPwStatus({ type: "success", text: "비밀번호가 변경되었습니다." });
+      setCurrentPw(""); setNewPw(""); setConfirmPw("");
+    } finally {
+      setPwSubmitting(false);
+    }
+  }
+
+  function setEmergency(targetIdx: number, on: boolean) {
+    setFamily(prev => prev.map((m, i) => ({
+      ...m,
+      is_emergency: i === targetIdx ? on : (on ? false : m.is_emergency),
+    })));
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!user || !row) return;
     setMessage(null);
 
-    // 차량/자격 필수필드 검증
+    // 긴급연락처 1명 필수
+    const emergency = family.find(m => m.is_emergency);
+    if (!emergency) {
+      setMessage({ type: "error", text: "[가족정보] 긴급연락처 1명을 지정하세요." });
+      setTab("family"); return;
+    }
+    if (!emergency.relationship.trim() || !emergency.name.trim() || !emergency.phone.trim()) {
+      setMessage({ type: "error", text: "[가족정보] 긴급연락처의 관계·성명·연락처는 모두 필수입니다." });
+      setTab("family"); return;
+    }
+
     for (let i = 0; i < vehicles.length; i++) {
       const v = vehicles[i];
       if (!v.vehicle_type || !v.plate_number.trim() || !v.model.trim() || !v.fuel_type) {
-        setMessage({ type: "error", text: `차량 #${i + 1}의 필수 항목(구분/차량번호/차종/유종)을 모두 입력하세요.` });
-        return;
+        setMessage({ type: "error", text: `[차량등록] 차량 #${i + 1}의 필수 항목(구분/차량번호/차종/유종)을 모두 입력하세요.` });
+        setTab("vehicle"); return;
       }
     }
     for (let i = 0; i < certs.length; i++) {
       if (!certs[i].cert_name.trim()) {
-        setMessage({ type: "error", text: `자격 #${i + 1}의 자격명을 입력하세요.` });
-        return;
+        setMessage({ type: "error", text: `[교육및자격] 자격 #${i + 1}의 자격명을 입력하세요.` });
+        setTab("cert"); return;
+      }
+    }
+    for (let i = 0; i < careers.length; i++) {
+      if (!careers[i].company_name.trim()) {
+        setMessage({ type: "error", text: `[경력] 경력 #${i + 1}의 회사명을 입력하세요.` });
+        setTab("career"); return;
+      }
+    }
+    for (let i = 0; i < rps.length; i++) {
+      if (!rps[i].kind || !rps[i].content.trim()) {
+        setMessage({ type: "error", text: `[상벌사항] #${i + 1}의 구분과 내용은 필수입니다.` });
+        setTab("rp"); return;
       }
     }
 
     setSaving(true);
     try {
-      // 1. 새 사진 업로드 (선택 시)
       let newPhotoUrl: string | null = photoUrl;
       if (photoFile) {
         const ext = photoFile.name.split(".").pop()?.toLowerCase() || "jpg";
         newPhotoUrl = await uploadFile(PHOTO_BUCKET, photoFile, ext);
       }
-
-      // 2. 주소 결합
       const fullAddress = [addressBasic, addressDetail].filter(Boolean).join(" ").trim();
 
-      // 3. users UPDATE (제한 필드 hire_date/dept/rank/status는 제외)
+      // users — 본인 수정 가능 필드만. hire_date/dept/rank/status/name/ssn 제외.
       const { error: uErr } = await supabase.from("users").update({
+        gender: gender || null,
+        blood_type: bloodType || null,
         phone: phone || null,
         email: email || null,
-        emergency_contact: emergency || null,
+        emergency_contact: `${emergency.relationship} ${emergency.name} ${emergency.phone}`.trim(),
         postal_code: postalCode || null,
         address: fullAddress || null,
         photo_url: newPhotoUrl,
@@ -282,7 +437,7 @@ export default function MyProfileClient() {
       }).eq("id", user.id);
       if (uErr) throw uErr;
 
-      // 4. 가족: 전체 삭제 + 재삽입
+      // 가족 — 전체 삭제 후 재삽입
       await supabase.from("user_family_members").delete().eq("user_id", user.id);
       const validFam = family.filter(m => m.relationship.trim() && m.name.trim());
       if (validFam.length > 0) {
@@ -295,14 +450,15 @@ export default function MyProfileClient() {
             birth_date: m.birth_date || null,
             occupation: m.occupation || null,
             cohabiting: m.cohabiting,
+            is_emergency: m.is_emergency,
+            phone: m.phone || null,
             sort_order: (i + 1) * 10,
           }))
         );
         if (fErr) throw fErr;
       }
 
-      // 5. 차량: 회사차량 행은 관리자(회사차량관리)가 관리하므로 보존.
-      //    개인이 입력하는 자차/렌트/기타 행만 삭제 후 재삽입.
+      // 차량 — 회사차량은 관리자가 관리하므로 보존
       await supabase.from("user_vehicles").delete().eq("user_id", user.id).neq("vehicle_type", "회사차량");
       const editableVehicles = vehicles.filter(v => v.vehicle_type !== "회사차량");
       if (editableVehicles.length > 0) {
@@ -321,7 +477,7 @@ export default function MyProfileClient() {
         if (vErr) throw vErr;
       }
 
-      // 6. 자격: 전체 삭제 + 재삽입 (새 파일은 업로드, 기존 파일 URL은 유지)
+      // 자격
       await supabase.from("user_certifications").delete().eq("user_id", user.id);
       if (certs.length > 0) {
         const certRows: Array<Record<string, unknown>> = [];
@@ -336,8 +492,10 @@ export default function MyProfileClient() {
             user_id: user.id,
             cert_name: c.cert_name.trim(),
             cert_number: c.cert_number || null,
-            edu_completed_date: c.edu_completed_date || null,
-            edu_next_date: c.edu_next_date || null,
+            self_check: c.self_check,
+            acquired_date: c.acquired_date || null,
+            expiry_date: c.expiry_date || null,
+            issuer: c.issuer || null,
             cert_doc_url: docUrl,
             sort_order: (i + 1) * 10,
           });
@@ -346,7 +504,39 @@ export default function MyProfileClient() {
         if (cErr) throw cErr;
       }
 
-      // 성공: state 동기화
+      // 경력
+      await supabase.from("user_career_history").delete().eq("user_id", user.id);
+      if (careers.length > 0) {
+        const { error: cErr } = await supabase.from("user_career_history").insert(
+          careers.map((c, i) => ({
+            user_id: user.id,
+            company_name: c.company_name.trim(),
+            joined_date: c.joined_date || null,
+            left_date: c.left_date || null,
+            dept: c.dept || null,
+            rank: c.rank || null,
+            duty: c.duty || null,
+            sort_order: (i + 1) * 10,
+          }))
+        );
+        if (cErr) throw cErr;
+      }
+
+      // 상벌
+      await supabase.from("user_rewards_punishments").delete().eq("user_id", user.id);
+      if (rps.length > 0) {
+        const { error: rpErr } = await supabase.from("user_rewards_punishments").insert(
+          rps.map((r, i) => ({
+            user_id: user.id,
+            kind: r.kind,
+            content: r.content.trim(),
+            occurred_on: r.occurred_on || null,
+            sort_order: (i + 1) * 10,
+          }))
+        );
+        if (rpErr) throw rpErr;
+      }
+
       if (newPhotoUrl !== photoUrl) {
         setPhotoUrl(newPhotoUrl);
         setPhotoFile(null);
@@ -380,8 +570,31 @@ export default function MyProfileClient() {
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
         <h1 className="text-base font-bold text-gray-900 dark:text-white">개인정보수정</h1>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-          본인의 정보만 수정할 수 있습니다 · 입사일·부서·직급·재직상태는 관리자만 변경 가능
+          본인의 정보만 수정할 수 있습니다 · 성명·주민번호·입사일·부서·직급·재직상태는 관리자만 변경 가능
         </p>
+      </div>
+
+      {/* 탭 */}
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 lg:px-6 overflow-x-auto">
+        <nav className="flex gap-1 max-w-6xl mx-auto">
+          {TABS.map(t => {
+            const active = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                className={`whitespace-nowrap px-3 py-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors ${
+                  active
+                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                }`}
+              >
+                <span className="mr-1">{t.icon}</span>{t.label}
+              </button>
+            );
+          })}
+        </nav>
       </div>
 
       <form onSubmit={handleSubmit}
@@ -401,395 +614,604 @@ export default function MyProfileClient() {
         }}
         className="p-4 lg:p-6 max-w-6xl mx-auto space-y-4">
 
-        {/* 사진 + 기본 정보 (사진은 좌, 정보는 우) */}
-        <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
-          <div className={sectionCls + " flex flex-col"}>
-            <label className={labelCls}>📷 프로필 사진 <span className="text-[10px] text-gray-400">(증명사진 3:4)</span></label>
-            <div className="w-full aspect-[3/4] rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 overflow-hidden flex items-center justify-center mb-3 mx-auto">
-              {(photoPreview || photoUrl) ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={photoPreview || photoUrl!} alt="프로필" className="w-full h-full object-cover" />
-              ) : (
-                <div className="text-center text-gray-400">
-                  <div className="text-5xl mb-1">👤</div>
-                  <div className="text-[10px]">사진 없음</div>
-                </div>
-              )}
-            </div>
-            <input ref={photoInputRef} type="file" accept="image/*" onChange={onPhotoChange} className="hidden" id="my-photo-input" />
-            <div className="flex gap-2">
-              <label htmlFor="my-photo-input" className="flex-1 text-center px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold cursor-pointer hover:bg-blue-700">
-                📁 사진 변경
-              </label>
-              {photoFile && (
-                <button type="button" onClick={() => { setPhotoFile(null); setPhotoPreview(""); if (photoInputRef.current) photoInputRef.current.value = ""; }}
-                  className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 text-xs font-semibold">
-                  취소
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* 우측 영역: 기본정보 + (연락처 좌·주소 우) */}
-          <div className="flex flex-col gap-4">
-            <div className={sectionCls}>
-              <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3">기본 정보</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                <div>
-                  <label className={labelCls}>성명</label>
-                  <input type="text" value={row.name} readOnly className={lockedCls} />
-                </div>
-                <div>
-                  <label className={labelCls}>주민등록번호</label>
-                  <input type="text" value={displaySsn(row.ssn)} readOnly className={lockedCls + " font-mono"} />
-                </div>
-                <div>
-                  <label className={labelCls}>입사일 🔒</label>
-                  <input type="text" value={row.hire_date ?? ""} readOnly className={lockedCls} />
-                </div>
-                <div>
-                  <label className={labelCls}>부서 🔒</label>
-                  <input type="text" value={row.dept ?? ""} readOnly className={lockedCls} />
-                </div>
-                <div>
-                  <label className={labelCls}>직급 🔒</label>
-                  <input type="text" value={row.rank ?? ""} readOnly className={lockedCls} />
-                </div>
-                <div>
-                  <label className={labelCls}>재직상태 🔒</label>
-                  <input type="text" value={row.status ?? ""} readOnly className={lockedCls} />
-                </div>
-              </div>
-            </div>
-
-            {/* 연락처(좌) + 주소(우) — 우측 영역 안에서 2열 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className={sectionCls}>
-                <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3">연락처</h2>
-                <div className="space-y-3">
-                  <div>
-                    <label className={labelCls}>휴대폰</label>
-                    <input type="tel" value={phone}
-                      onChange={e => setPhone(formatPhone(e.target.value))}
-                      placeholder="010-0000-0000" inputMode="numeric" maxLength={13}
-                      className={inputCls + " font-mono"} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>긴급연락처</label>
-                    <input type="text" value={emergency}
-                      onChange={e => setEmergency(e.target.value)}
-                      placeholder="예: 배우자 010-1234-5678 / 부친 02-123-4567"
-                      lang="ko" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>이메일</label>
-                    <input type="email" value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      placeholder="user@example.com" className={inputCls} />
-                  </div>
-                </div>
-              </div>
-
-              <div className={sectionCls}>
-                <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3">주소</h2>
-                <div className="space-y-3">
-                  <div className="flex gap-2">
-                    <input type="text" value={postalCode} readOnly placeholder="우편번호"
-                      className={inputCls + " font-mono w-32 cursor-not-allowed bg-gray-50 dark:bg-gray-900/40"} />
-                    <button type="button" onClick={openPostcode} disabled={!daumReady}
-                      className="px-3 py-2 rounded-lg bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800 disabled:opacity-50 whitespace-nowrap">
-                      {daumReady ? "🔍 우편번호" : "로딩..."}
-                    </button>
-                  </div>
-                  <input type="text" value={addressBasic} onChange={e => setAddressBasic(e.target.value)}
-                    placeholder="기본주소" lang="ko" className={inputCls} />
-                  <input type="text" value={addressDetail} onChange={e => setAddressDetail(e.target.value)}
-                    placeholder="상세주소 (예: 101동 1234호)" lang="ko" className={inputCls} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 근무복 */}
-        <div className={sectionCls}>
-          <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3">근무복 사이즈</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className={labelCls}>상의</label>
-              <input type="text" value={topSize} onChange={e => setTopSize(e.target.value)} placeholder="예: 95, L" className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>하의</label>
-              <input type="text" value={bottomSize} onChange={e => setBottomSize(e.target.value)} placeholder="예: 30, 32" className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>안전화</label>
-              <input type="text" value={shoesSize} onChange={e => setShoesSize(e.target.value)} placeholder="예: 250, 270" className={inputCls} />
-            </div>
-          </div>
-        </div>
-
-        {/* 가족 정보 */}
-        <div className={sectionCls}>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">가족 정보 ({family.length}명)</h2>
-            <button type="button" onClick={() => setFamily(p => [...p, { ...EMPTY_FAMILY }])}
-              className="px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800">+ 가족 추가</button>
-          </div>
-          {family.length === 0 && <div className="text-center py-4 text-xs text-gray-400">등록된 가족 없음</div>}
-          <div className="space-y-3">
-            {family.map((m, i) => (
-              <div key={i} className="rounded-lg border border-gray-200 dark:border-gray-600 p-3 bg-gray-50 dark:bg-gray-700/30">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-[11px] font-bold text-gray-500">가족 #{i + 1}</div>
-                  <button type="button" onClick={() => setFamily(p => p.filter((_, idx) => idx !== i))} className="text-[11px] text-red-500">삭제</button>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2">
-                  <div>
-                    <label className={labelCls}>관계</label>
-                    <select value={m.relationship}
-                      onChange={e => {
-                        const rel = e.target.value;
-                        const autoG: "M" | "F" | "" = rel === "부" || rel === "형제" ? "M" : rel === "모" || rel === "자매" ? "F" : m.gender;
-                        setFamily(p => p.map((f, idx) => idx === i ? { ...f, relationship: rel, gender: autoG } : f));
-                      }}
-                      className={inputCls}>
-                      <option value="">선택</option>
-                      {["배우자","부","모","자녀","형제","자매","기타"].map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelCls}>성명</label>
-                    <input type="text" value={m.name} onChange={e => setFamily(p => p.map((f, idx) => idx === i ? { ...f, name: e.target.value } : f))} lang="ko" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>성별 {(m.relationship === "부" || m.relationship === "모" || m.relationship === "형제" || m.relationship === "자매") && <span className="text-[10px] text-gray-400">(자동)</span>}</label>
-                    <select value={m.gender}
-                      onChange={e => setFamily(p => p.map((f, idx) => idx === i ? { ...f, gender: e.target.value as "M" | "F" | "" } : f))}
-                      disabled={m.relationship === "부" || m.relationship === "모" || m.relationship === "형제" || m.relationship === "자매"}
-                      className={inputCls + " disabled:opacity-70 disabled:cursor-not-allowed"}>
-                      <option value="">선택</option>
-                      <option value="M">남</option>
-                      <option value="F">여</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelCls}>생년월일</label>
-                    <input type="text" value={m.birth_date}
-                      onChange={e => setFamily(p => p.map((f, idx) => idx === i ? { ...f, birth_date: formatYmd(e.target.value) } : f))}
-                      placeholder="YYYYMMDD" inputMode="numeric" maxLength={10} className={inputCls + " font-mono"} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>직업</label>
-                    <input type="text" value={m.occupation} onChange={e => setFamily(p => p.map((f, idx) => idx === i ? { ...f, occupation: e.target.value } : f))} lang="ko" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>동거여부</label>
-                    <select value={m.cohabiting ? "Y" : "N"}
-                      onChange={e => setFamily(p => p.map((f, idx) => idx === i ? { ...f, cohabiting: e.target.value === "Y" } : f))}
-                      className={inputCls}>
-                      <option value="Y">동거</option>
-                      <option value="N">비동거</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 차량 정보 */}
-        <div className={sectionCls}>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">차량 정보 ({vehicles.length}대)</h2>
-            <button type="button" onClick={() => setVehicles(p => [...p, { ...EMPTY_VEHICLE }])}
-              className="px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800">+ 차량 추가</button>
-          </div>
-          {vehicles.length === 0 && <div className="text-center py-4 text-xs text-gray-400">등록된 차량 없음</div>}
-          <div className="space-y-3">
-            {vehicles.map((v, i) => {
-              const isCompanyAssigned = v.vehicle_type === "회사차량" && v.id !== undefined;
-              return (
-              <div key={i} className={"rounded-lg border p-3 " + (isCompanyAssigned
-                ? "border-blue-200 dark:border-blue-800 bg-blue-50/40 dark:bg-blue-900/10"
-                : "border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/30")}>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="text-[11px] font-bold text-gray-500">차량 #{i + 1}</div>
-                    {isCompanyAssigned && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
-                        🔒 회사차량 (관리자 관리)
-                      </span>
-                    )}
-                  </div>
-                  {!isCompanyAssigned && (
-                    <button type="button" onClick={() => setVehicles(p => p.filter((_, idx) => idx !== i))} className="text-[11px] text-red-500">삭제</button>
+        {/* ================= 기본정보 ================= */}
+        {tab === "basic" && (
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
+              <div className={sectionCls + " flex flex-col"}>
+                <label className={labelCls}>📷 프로필 사진 <span className="text-[10px] text-gray-400">(증명사진 3:4)</span></label>
+                <div className="w-full aspect-[3/4] rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 overflow-hidden flex items-center justify-center mb-3 mx-auto">
+                  {(photoPreview || photoUrl) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={photoPreview || photoUrl!} alt="프로필" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-center text-gray-400">
+                      <div className="text-5xl mb-1">👤</div>
+                      <div className="text-[10px]">사진 없음</div>
+                    </div>
                   )}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                  <div>
-                    <label className={labelCls}>구분 *</label>
-                    <select value={v.vehicle_type} onChange={e => {
-                      const t = e.target.value as Vehicle["vehicle_type"];
-                      setVehicles(p => p.map((x, idx) => idx === i ? { ...x, vehicle_type: t, plate_number: "", model: "", fuel_type: "", year_made: "" } : x));
-                      if (t === "회사차량") loadCompanyVehicles();
-                    }}
-                      disabled={isCompanyAssigned}
-                      className={inputCls + (isCompanyAssigned ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")}>
-                      <option value="">선택</option><option value="자차">자차</option><option value="렌트">렌트</option>
-                      {/* '회사차량' 구분은 회사차량관리(관리자)에서만 신규 등록 가능. 기존 행 표시용으로만 유지. */}
-                      {isCompanyAssigned && <option value="회사차량">회사차량</option>}
-                      <option value="기타">기타</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelCls}>차량번호 *</label>
-                    {v.vehicle_type === "회사차량" ? (
-                      isCompanyAssigned ? (
-                        <input type="text" value={v.plate_number} readOnly
-                          className={inputCls + " font-mono bg-gray-100 dark:bg-gray-600 cursor-not-allowed"} />
-                      ) : (
-                      <select value={v.plate_number} onChange={e => {
-                        const cv = companyVehicles.find(c => c.plate_number === e.target.value);
-                        setVehicles(p => p.map((x, idx) => idx === i ? {
-                          ...x,
-                          plate_number: e.target.value,
-                          model: cv?.model ?? "",
-                          fuel_type: (cv?.fuel_type ?? "") as Vehicle["fuel_type"],
-                          year_made: cv?.year_made ?? "",
-                        } : x));
-                      }} className={inputCls}>
-                        <option value="">{cvLoading ? "로딩 중..." : "차량 선택"}</option>
-                        {companyVehicles.map(cv => (
-                          <option key={cv.id} value={cv.plate_number}>{cv.plate_number} ({cv.model})</option>
-                        ))}
+                <input ref={photoInputRef} type="file" accept="image/*" onChange={onPhotoChange} className="hidden" id="my-photo-input" />
+                <div className="flex gap-2">
+                  <label htmlFor="my-photo-input" className="flex-1 text-center px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold cursor-pointer hover:bg-blue-700">
+                    📁 사진 변경
+                  </label>
+                  {photoFile && (
+                    <button type="button" onClick={() => { setPhotoFile(null); setPhotoPreview(""); if (photoInputRef.current) photoInputRef.current.value = ""; }}
+                      className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 text-xs font-semibold">
+                      취소
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-4">
+                <div className={sectionCls}>
+                  <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3">기본 정보</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div>
+                      <label className={labelCls}>성명 🔒</label>
+                      <input type="text" value={row.name} readOnly className={lockedCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>주민등록번호 🔒</label>
+                      <input type="text" value={displaySsn(row.ssn)} readOnly className={lockedCls + " font-mono"} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>성별</label>
+                      <select value={gender} onChange={e => setGender(e.target.value as "M" | "F" | "")} className={inputCls}>
+                        <option value="">선택</option>
+                        <option value="M">남</option>
+                        <option value="F">여</option>
                       </select>
-                      )
-                    ) : (
-                      <input type="text" value={v.plate_number} onChange={e => setVehicles(p => p.map((x, idx) => idx === i ? { ...x, plate_number: e.target.value } : x))} lang="ko" className={inputCls} />
-                    )}
+                    </div>
+                    <div>
+                      <label className={labelCls}>입사일 🔒</label>
+                      <input type="text" value={row.hire_date ?? ""} readOnly className={lockedCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>부서 🔒</label>
+                      <input type="text" value={row.dept ?? ""} readOnly className={lockedCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>직급 🔒</label>
+                      <input type="text" value={row.rank ?? ""} readOnly className={lockedCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>재직상태 🔒</label>
+                      <input type="text" value={row.status ?? ""} readOnly className={lockedCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>혈액형</label>
+                      <select value={bloodType} onChange={e => setBloodType(e.target.value)} className={inputCls}>
+                        <option value="">선택</option>
+                        {["A+","A-","B+","B-","O+","O-","AB+","AB-"].map(b => <option key={b} value={b}>{b}</option>)}
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label className={labelCls}>차종 *</label>
-                    <input type="text" value={v.model}
-                      onChange={e => setVehicles(p => p.map((x, idx) => idx === i ? { ...x, model: e.target.value } : x))}
-                      readOnly={v.vehicle_type === "회사차량"}
-                      lang="ko" className={inputCls + (v.vehicle_type === "회사차량" ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")} />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className={sectionCls}>
+                    <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3">연락처</h2>
+                    <div className="space-y-3">
+                      <div>
+                        <label className={labelCls}>휴대폰</label>
+                        <input type="tel" value={phone}
+                          onChange={e => setPhone(formatPhone(e.target.value))}
+                          placeholder="010-0000-0000" inputMode="numeric" maxLength={13}
+                          className={inputCls + " font-mono"} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>이메일</label>
+                        <input type="email" value={email}
+                          onChange={e => setEmail(e.target.value)}
+                          placeholder="user@example.com" className={inputCls} />
+                      </div>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400">긴급연락처는 [가족정보] 탭에서 1명을 지정합니다.</p>
+                    </div>
                   </div>
-                  <div>
-                    <label className={labelCls}>년식</label>
-                    <input type="text" value={v.year_made}
-                      onChange={e => setVehicles(p => p.map((x, idx) => idx === i ? { ...x, year_made: e.target.value.replace(/\D/g, "").slice(0, 4) } : x))}
-                      readOnly={v.vehicle_type === "회사차량"}
-                      inputMode="numeric" maxLength={4} className={inputCls + " font-mono" + (v.vehicle_type === "회사차량" ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>유종 *</label>
-                    <select value={v.fuel_type}
-                      onChange={e => setVehicles(p => p.map((x, idx) => idx === i ? { ...x, fuel_type: e.target.value as Vehicle["fuel_type"] } : x))}
-                      disabled={v.vehicle_type === "회사차량"}
-                      className={inputCls + (v.vehicle_type === "회사차량" ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")}>
-                      <option value="">선택</option><option value="가솔린">가솔린</option><option value="디젤">디젤</option><option value="가스">가스</option><option value="전기">전기</option><option value="기타">기타</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelCls}>차량등록일</label>
-                    <input type="text" value={v.registration_date ?? ""}
-                      onChange={e => setVehicles(p => p.map((x, idx) => idx === i ? { ...x, registration_date: formatYmd(e.target.value) } : x))}
-                      readOnly={isCompanyAssigned}
-                      placeholder="YYYYMMDD" inputMode="numeric" maxLength={10}
-                      className={inputCls + " font-mono" + (isCompanyAssigned ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>보험사 <span className="text-[10px] font-normal text-gray-400">(관리자 관리)</span></label>
-                    <input type="text" value={v.insurance_company ?? ""} readOnly
-                      placeholder="—"
-                      className={inputCls + " bg-gray-100 dark:bg-gray-600 cursor-not-allowed"} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>보험가입일 <span className="text-[10px] font-normal text-gray-400">(관리자 관리)</span></label>
-                    <input type="text" value={v.insurance_start_date ?? ""} readOnly
-                      placeholder="—"
-                      className={inputCls + " font-mono bg-gray-100 dark:bg-gray-600 cursor-not-allowed"} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>보험만기일 <span className="text-[10px] font-normal text-gray-400">(관리자 관리)</span></label>
-                    <input type="text" value={v.insurance_end_date ?? ""} readOnly
-                      placeholder="—"
-                      className={inputCls + " font-mono bg-gray-100 dark:bg-gray-600 cursor-not-allowed"} />
+
+                  <div className={sectionCls}>
+                    <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3">주소</h2>
+                    <div className="space-y-3">
+                      <div className="flex gap-2">
+                        <input type="text" value={postalCode} readOnly placeholder="우편번호"
+                          className={inputCls + " font-mono w-32 cursor-not-allowed bg-gray-50 dark:bg-gray-900/40"} />
+                        <button type="button" onClick={openPostcode} disabled={!daumReady}
+                          className="px-3 py-2 rounded-lg bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800 disabled:opacity-50 whitespace-nowrap">
+                          {daumReady ? "🔍 우편번호" : "로딩..."}
+                        </button>
+                      </div>
+                      <input type="text" value={addressBasic} onChange={e => setAddressBasic(e.target.value)}
+                        placeholder="기본주소" lang="ko" className={inputCls} />
+                      <input type="text" value={addressDetail} onChange={e => setAddressDetail(e.target.value)}
+                        placeholder="상세주소 (예: 101동 1234호)" lang="ko" className={inputCls} />
+                    </div>
                   </div>
                 </div>
               </div>
-              );
-            })}
-          </div>
-        </div>
+            </div>
 
-        {/* 자격 정보 */}
-        <div className={sectionCls}>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">자격 정보 ({certs.length}건)</h2>
-            <button type="button" onClick={() => setCerts(p => [...p, { ...EMPTY_CERT }])}
-              className="px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800">+ 자격 추가</button>
-          </div>
-          {certs.length === 0 && <div className="text-center py-4 text-xs text-gray-400">등록된 자격 없음</div>}
-          <div className="space-y-3">
-            {certs.map((c, i) => (
-              <div key={i} className="rounded-lg border border-gray-200 dark:border-gray-600 p-3 bg-gray-50 dark:bg-gray-700/30">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-[11px] font-bold text-gray-500">자격 #{i + 1}</div>
-                  <button type="button" onClick={() => setCerts(p => p.filter((_, idx) => idx !== i))} className="text-[11px] text-red-500">삭제</button>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
-                  <div>
-                    <label className={labelCls}>자격명 *</label>
-                    <input type="text" value={c.cert_name} onChange={e => setCerts(p => p.map((x, idx) => idx === i ? { ...x, cert_name: e.target.value } : x))} lang="ko" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>자격번호</label>
-                    <input type="text" value={c.cert_number} onChange={e => setCerts(p => p.map((x, idx) => idx === i ? { ...x, cert_number: e.target.value } : x))} className={inputCls + " font-mono"} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>교육이수일</label>
-                    <input type="text" value={c.edu_completed_date}
-                      onChange={e => setCerts(p => p.map((x, idx) => idx === i ? { ...x, edu_completed_date: formatYmd(e.target.value) } : x))}
-                      placeholder="YYYYMMDD" inputMode="numeric" maxLength={10} className={inputCls + " font-mono"} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>차기 교육이수일</label>
-                    <input type="text" value={c.edu_next_date}
-                      onChange={e => setCerts(p => p.map((x, idx) => idx === i ? { ...x, edu_next_date: formatYmd(e.target.value) } : x))}
-                      placeholder="YYYYMMDD" inputMode="numeric" maxLength={10} className={inputCls + " font-mono"} />
-                  </div>
+            <div className={sectionCls}>
+              <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3">신체정보 (근무복 사이즈)</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className={labelCls}>상의</label>
+                  <input type="text" value={topSize} onChange={e => setTopSize(e.target.value)} placeholder="예: 95, L" className={inputCls} />
                 </div>
                 <div>
-                  <label className={labelCls}>자격증 사본</label>
-                  <div className="flex items-center gap-2">
-                    <input id={`my-cert-doc-${i}`} type="file" accept="image/*,application/pdf"
-                      onChange={e => {
-                        const f = e.target.files?.[0] ?? null;
-                        setCerts(p => p.map((x, idx) => idx === i ? { ...x, doc_file: f, doc_preview: f ? f.name : (x.cert_doc_url ? "기존 파일" : "") } : x));
-                      }}
-                      className="hidden" />
-                    <label htmlFor={`my-cert-doc-${i}`} className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold cursor-pointer hover:bg-blue-700 whitespace-nowrap">📁 파일 선택</label>
-                    {c.cert_doc_url && !c.doc_file && (
-                      <a href={c.cert_doc_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">현재 파일 보기</a>
-                    )}
-                    <span className="text-xs text-gray-600 dark:text-gray-300 truncate flex-1">
-                      {c.doc_file ? c.doc_file.name : (c.cert_doc_url ? "기존 파일 등록됨" : "선택된 파일 없음")}
-                    </span>
-                    {(c.doc_file || c.cert_doc_url) && (
-                      <button type="button"
-                        onClick={() => setCerts(p => p.map((x, idx) => idx === i ? { ...x, doc_file: null, cert_doc_url: null, doc_preview: "" } : x))}
-                        className="text-xs text-red-500">지우기</button>
-                    )}
-                  </div>
+                  <label className={labelCls}>하의</label>
+                  <input type="text" value={bottomSize} onChange={e => setBottomSize(e.target.value)} placeholder="예: 30, 32" className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>안전화</label>
+                  <input type="text" value={shoesSize} onChange={e => setShoesSize(e.target.value)} placeholder="예: 250, 270" className={inputCls} />
                 </div>
               </div>
-            ))}
+            </div>
+
+            {/* 로그인 비밀번호 변경 */}
+            <div className={sectionCls}>
+              <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-1">🔐 로그인 비밀번호 변경</h2>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-3">새 비밀번호는 4자 이상이어야 합니다.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className={labelCls}>현재 비밀번호</label>
+                  <input type="password" value={currentPw}
+                    onChange={e => setCurrentPw(e.target.value)}
+                    autoComplete="current-password"
+                    className={inputCls + " font-mono"} />
+                </div>
+                <div>
+                  <label className={labelCls}>새 비밀번호</label>
+                  <input type="password" value={newPw}
+                    onChange={e => setNewPw(e.target.value)}
+                    minLength={4}
+                    autoComplete="new-password"
+                    className={inputCls + " font-mono"} />
+                </div>
+                <div>
+                  <label className={labelCls}>새 비밀번호 확인</label>
+                  <input type="password" value={confirmPw}
+                    onChange={e => setConfirmPw(e.target.value)}
+                    minLength={4}
+                    autoComplete="new-password"
+                    className={inputCls + " font-mono"} />
+                </div>
+              </div>
+              {pwStatus && (
+                <div className={`mt-3 px-3 py-2 rounded-lg text-xs ${
+                  pwStatus.type === "success"
+                    ? "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700"
+                    : "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-700"
+                }`}>{pwStatus.text}</div>
+              )}
+              <div className="mt-3 flex justify-end">
+                <button type="button" onClick={handlePasswordChange} disabled={pwSubmitting}
+                  className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold disabled:opacity-50">
+                  {pwSubmitting ? "변경 중..." : "비밀번호 변경"}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ================= 가족정보 ================= */}
+        {tab === "family" && (
+          <div className={sectionCls}>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">가족정보 ({family.length}명)</h2>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">⚠️ 긴급연락처 1명 필수 — 각 행의 [긴급연락처 지정] 체크</p>
+              </div>
+              <button type="button" onClick={() => setFamily(p => [...p, { ...EMPTY_FAMILY }])}
+                className="px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800">+ 가족 추가</button>
+            </div>
+            {family.length === 0 && <div className="text-center py-4 text-xs text-gray-400">등록된 가족 없음</div>}
+            <div className="space-y-3">
+              {family.map((m, i) => (
+                <div key={i} className={`rounded-lg border p-3 ${m.is_emergency ? "border-rose-400 bg-rose-50 dark:bg-rose-900/20" : "border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/30"}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-bold">
+                      <input type="checkbox" checked={m.is_emergency}
+                        onChange={e => setEmergency(i, e.target.checked)}
+                        className="rounded" />
+                      <span className={m.is_emergency ? "text-rose-600 dark:text-rose-300" : "text-gray-500 dark:text-gray-400"}>
+                        {m.is_emergency ? "🚨 긴급연락처" : "긴급연락처 지정"}
+                      </span>
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <div className="text-[11px] text-gray-400">#{i + 1}</div>
+                      <button type="button" onClick={() => setFamily(p => p.filter((_, idx) => idx !== i))} className="text-[11px] text-red-500">삭제</button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                    <div>
+                      <label className={labelCls}>관계 {m.is_emergency && <span className="text-red-500">*</span>}</label>
+                      <select value={m.relationship}
+                        onChange={e => {
+                          const rel = e.target.value;
+                          const autoG: "M" | "F" | "" = rel === "부" || rel === "형제" ? "M" : rel === "모" || rel === "자매" ? "F" : m.gender;
+                          setFamily(p => p.map((f, idx) => idx === i ? { ...f, relationship: rel, gender: autoG } : f));
+                        }}
+                        className={inputCls}>
+                        <option value="">선택</option>
+                        {["배우자","부","모","자녀","형제","자매","기타"].map(r => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelCls}>성명 {m.is_emergency && <span className="text-red-500">*</span>}</label>
+                      <input type="text" value={m.name} onChange={e => setFamily(p => p.map((f, idx) => idx === i ? { ...f, name: e.target.value } : f))} lang="ko" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>연락처 {m.is_emergency && <span className="text-red-500">*</span>}</label>
+                      <input type="tel" value={m.phone}
+                        onChange={e => setFamily(p => p.map((f, idx) => idx === i ? { ...f, phone: formatPhone(e.target.value) } : f))}
+                        placeholder="010-0000-0000" inputMode="numeric" maxLength={13}
+                        className={inputCls + " font-mono"} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>성별 {(m.relationship === "부" || m.relationship === "모" || m.relationship === "형제" || m.relationship === "자매") && <span className="text-[10px] text-gray-400">(자동)</span>}</label>
+                      <select value={m.gender}
+                        onChange={e => setFamily(p => p.map((f, idx) => idx === i ? { ...f, gender: e.target.value as "M" | "F" | "" } : f))}
+                        disabled={m.relationship === "부" || m.relationship === "모" || m.relationship === "형제" || m.relationship === "자매"}
+                        className={inputCls + " disabled:opacity-70 disabled:cursor-not-allowed"}>
+                        <option value="">선택</option>
+                        <option value="M">남</option>
+                        <option value="F">여</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelCls}>생년월일</label>
+                      <input type="text" value={m.birth_date}
+                        onChange={e => setFamily(p => p.map((f, idx) => idx === i ? { ...f, birth_date: formatYmd(e.target.value) } : f))}
+                        placeholder="YYYYMMDD" inputMode="numeric" maxLength={10} className={inputCls + " font-mono"} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>직업</label>
+                      <input type="text" value={m.occupation} onChange={e => setFamily(p => p.map((f, idx) => idx === i ? { ...f, occupation: e.target.value } : f))} lang="ko" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>동거여부</label>
+                      <select value={m.cohabiting ? "Y" : "N"}
+                        onChange={e => setFamily(p => p.map((f, idx) => idx === i ? { ...f, cohabiting: e.target.value === "Y" } : f))}
+                        className={inputCls}>
+                        <option value="Y">동거</option>
+                        <option value="N">비동거</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* ================= 경력 ================= */}
+        {tab === "career" && (
+          <div className={sectionCls}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">경력 ({careers.length}건)</h2>
+              <button type="button" onClick={() => setCareers(p => [...p, { ...EMPTY_CAREER }])}
+                className="px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800">+ 경력 추가</button>
+            </div>
+            {careers.length === 0 && <div className="text-center py-4 text-xs text-gray-400">등록된 경력 없음</div>}
+            <div className="space-y-3">
+              {careers.map((c, i) => (
+                <div key={i} className="rounded-lg border border-gray-200 dark:border-gray-600 p-3 bg-gray-50 dark:bg-gray-700/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-[11px] font-bold text-gray-500">경력 #{i + 1}</div>
+                    <button type="button" onClick={() => setCareers(p => p.filter((_, idx) => idx !== i))} className="text-[11px] text-red-500">삭제</button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    <div>
+                      <label className={labelCls}>회사명 *</label>
+                      <input type="text" value={c.company_name}
+                        onChange={e => setCareers(p => p.map((x, idx) => idx === i ? { ...x, company_name: e.target.value } : x))}
+                        lang="ko" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>근무부서</label>
+                      <input type="text" value={c.dept}
+                        onChange={e => setCareers(p => p.map((x, idx) => idx === i ? { ...x, dept: e.target.value } : x))}
+                        lang="ko" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>직급</label>
+                      <input type="text" value={c.rank}
+                        onChange={e => setCareers(p => p.map((x, idx) => idx === i ? { ...x, rank: e.target.value } : x))}
+                        lang="ko" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>입사일</label>
+                      <input type="text" value={c.joined_date}
+                        onChange={e => setCareers(p => p.map((x, idx) => idx === i ? { ...x, joined_date: formatYmd(e.target.value) } : x))}
+                        placeholder="YYYYMMDD" inputMode="numeric" maxLength={10}
+                        className={inputCls + " font-mono"} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>퇴사일</label>
+                      <input type="text" value={c.left_date}
+                        onChange={e => setCareers(p => p.map((x, idx) => idx === i ? { ...x, left_date: formatYmd(e.target.value) } : x))}
+                        placeholder="YYYYMMDD (재직 중이면 공백)" inputMode="numeric" maxLength={10}
+                        className={inputCls + " font-mono"} />
+                    </div>
+                    <div className="sm:col-span-2 lg:col-span-3">
+                      <label className={labelCls}>담당업무</label>
+                      <input type="text" value={c.duty}
+                        onChange={e => setCareers(p => p.map((x, idx) => idx === i ? { ...x, duty: e.target.value } : x))}
+                        placeholder="예: 승강기 정기점검, 자재 발주, 현장 관리" lang="ko" className={inputCls} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ================= 차량등록 ================= */}
+        {tab === "vehicle" && (
+          <div className={sectionCls}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">차량 정보 ({vehicles.length}대)</h2>
+              <button type="button" onClick={() => setVehicles(p => [...p, { ...EMPTY_VEHICLE }])}
+                className="px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800">+ 차량 추가</button>
+            </div>
+            {vehicles.length === 0 && <div className="text-center py-4 text-xs text-gray-400">등록된 차량 없음</div>}
+            <div className="space-y-3">
+              {vehicles.map((v, i) => {
+                const isCompanyAssigned = v.vehicle_type === "회사차량" && v.id !== undefined;
+                return (
+                <div key={i} className={"rounded-lg border p-3 " + (isCompanyAssigned
+                  ? "border-blue-200 dark:border-blue-800 bg-blue-50/40 dark:bg-blue-900/10"
+                  : "border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/30")}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="text-[11px] font-bold text-gray-500">차량 #{i + 1}</div>
+                      {isCompanyAssigned && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                          🔒 회사차량 (관리자 관리)
+                        </span>
+                      )}
+                    </div>
+                    {!isCompanyAssigned && (
+                      <button type="button" onClick={() => setVehicles(p => p.filter((_, idx) => idx !== i))} className="text-[11px] text-red-500">삭제</button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    <div>
+                      <label className={labelCls}>구분 *</label>
+                      <select value={v.vehicle_type} onChange={e => {
+                        const t = e.target.value as Vehicle["vehicle_type"];
+                        setVehicles(p => p.map((x, idx) => idx === i ? { ...x, vehicle_type: t, plate_number: "", model: "", fuel_type: "", year_made: "" } : x));
+                        if (t === "회사차량") loadCompanyVehicles();
+                      }}
+                        disabled={isCompanyAssigned}
+                        className={inputCls + (isCompanyAssigned ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")}>
+                        <option value="">선택</option><option value="자차">자차</option><option value="렌트">렌트</option>
+                        {isCompanyAssigned && <option value="회사차량">회사차량</option>}
+                        <option value="기타">기타</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelCls}>차량번호 *</label>
+                      {v.vehicle_type === "회사차량" ? (
+                        isCompanyAssigned ? (
+                          <input type="text" value={v.plate_number} readOnly
+                            className={inputCls + " font-mono bg-gray-100 dark:bg-gray-600 cursor-not-allowed"} />
+                        ) : (
+                        <select value={v.plate_number} onChange={e => {
+                          const cv = companyVehicles.find(c => c.plate_number === e.target.value);
+                          setVehicles(p => p.map((x, idx) => idx === i ? {
+                            ...x,
+                            plate_number: e.target.value,
+                            model: cv?.model ?? "",
+                            fuel_type: (cv?.fuel_type ?? "") as Vehicle["fuel_type"],
+                            year_made: cv?.year_made ?? "",
+                          } : x));
+                        }} className={inputCls}>
+                          <option value="">{cvLoading ? "로딩 중..." : "차량 선택"}</option>
+                          {companyVehicles.map(cv => (
+                            <option key={cv.id} value={cv.plate_number}>{cv.plate_number} ({cv.model})</option>
+                          ))}
+                        </select>
+                        )
+                      ) : (
+                        <input type="text" value={v.plate_number} onChange={e => setVehicles(p => p.map((x, idx) => idx === i ? { ...x, plate_number: e.target.value } : x))} lang="ko" className={inputCls} />
+                      )}
+                    </div>
+                    <div>
+                      <label className={labelCls}>차종 *</label>
+                      <input type="text" value={v.model}
+                        onChange={e => setVehicles(p => p.map((x, idx) => idx === i ? { ...x, model: e.target.value } : x))}
+                        readOnly={v.vehicle_type === "회사차량"}
+                        lang="ko" className={inputCls + (v.vehicle_type === "회사차량" ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>년식</label>
+                      <input type="text" value={v.year_made}
+                        onChange={e => setVehicles(p => p.map((x, idx) => idx === i ? { ...x, year_made: e.target.value.replace(/\D/g, "").slice(0, 4) } : x))}
+                        readOnly={v.vehicle_type === "회사차량"}
+                        inputMode="numeric" maxLength={4} className={inputCls + " font-mono" + (v.vehicle_type === "회사차량" ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>유종 *</label>
+                      <select value={v.fuel_type}
+                        onChange={e => setVehicles(p => p.map((x, idx) => idx === i ? { ...x, fuel_type: e.target.value as Vehicle["fuel_type"] } : x))}
+                        disabled={v.vehicle_type === "회사차량"}
+                        className={inputCls + (v.vehicle_type === "회사차량" ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")}>
+                        <option value="">선택</option><option value="가솔린">가솔린</option><option value="디젤">디젤</option><option value="가스">가스</option><option value="전기">전기</option><option value="기타">기타</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelCls}>차량등록일</label>
+                      <input type="text" value={v.registration_date ?? ""}
+                        onChange={e => setVehicles(p => p.map((x, idx) => idx === i ? { ...x, registration_date: formatYmd(e.target.value) } : x))}
+                        readOnly={isCompanyAssigned}
+                        placeholder="YYYYMMDD" inputMode="numeric" maxLength={10}
+                        className={inputCls + " font-mono" + (isCompanyAssigned ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>보험사 <span className="text-[10px] font-normal text-gray-400">(관리자 관리)</span></label>
+                      <input type="text" value={v.insurance_company ?? ""} readOnly
+                        placeholder="—"
+                        className={inputCls + " bg-gray-100 dark:bg-gray-600 cursor-not-allowed"} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>보험가입일 <span className="text-[10px] font-normal text-gray-400">(관리자 관리)</span></label>
+                      <input type="text" value={v.insurance_start_date ?? ""} readOnly
+                        placeholder="—"
+                        className={inputCls + " font-mono bg-gray-100 dark:bg-gray-600 cursor-not-allowed"} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>보험만기일 <span className="text-[10px] font-normal text-gray-400">(관리자 관리)</span></label>
+                      <input type="text" value={v.insurance_end_date ?? ""} readOnly
+                        placeholder="—"
+                        className={inputCls + " font-mono bg-gray-100 dark:bg-gray-600 cursor-not-allowed"} />
+                    </div>
+                  </div>
+                </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ================= 교육 및 자격 ================= */}
+        {tab === "cert" && (
+          <div className={sectionCls}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">교육 및 자격 ({certs.length}건)</h2>
+              <button type="button" onClick={() => setCerts(p => [...p, { ...EMPTY_CERT }])}
+                className="px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800">+ 자격 추가</button>
+            </div>
+            {certs.length === 0 && <div className="text-center py-4 text-xs text-gray-400">등록된 자격 없음</div>}
+            <div className="space-y-3">
+              {certs.map((c, i) => (
+                <div key={i} className="rounded-lg border border-gray-200 dark:border-gray-600 p-3 bg-gray-50 dark:bg-gray-700/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-bold">
+                      <input type="checkbox" checked={c.self_check}
+                        onChange={e => setCerts(p => p.map((x, idx) => idx === i ? { ...x, self_check: e.target.checked } : x))}
+                        className="rounded" />
+                      <span className={c.self_check ? "text-emerald-600 dark:text-emerald-300" : "text-gray-500 dark:text-gray-400"}>
+                        ✅ 자체점검여부
+                      </span>
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <div className="text-[11px] text-gray-400">#{i + 1}</div>
+                      <button type="button" onClick={() => setCerts(p => p.filter((_, idx) => idx !== i))} className="text-[11px] text-red-500">삭제</button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-2">
+                    <div>
+                      <label className={labelCls}>자격명 *</label>
+                      <input type="text" value={c.cert_name} onChange={e => setCerts(p => p.map((x, idx) => idx === i ? { ...x, cert_name: e.target.value } : x))} lang="ko" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>자격번호</label>
+                      <input type="text" value={c.cert_number} onChange={e => setCerts(p => p.map((x, idx) => idx === i ? { ...x, cert_number: e.target.value } : x))} className={inputCls + " font-mono"} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>발행기관</label>
+                      <input type="text" value={c.issuer}
+                        onChange={e => setCerts(p => p.map((x, idx) => idx === i ? { ...x, issuer: e.target.value } : x))}
+                        placeholder="예: 한국산업인력공단" lang="ko" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>취득일</label>
+                      <input type="text" value={c.acquired_date}
+                        onChange={e => setCerts(p => p.map((x, idx) => idx === i ? { ...x, acquired_date: formatYmd(e.target.value) } : x))}
+                        placeholder="YYYYMMDD" inputMode="numeric" maxLength={10} className={inputCls + " font-mono"} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>만료일</label>
+                      <input type="text" value={c.expiry_date}
+                        onChange={e => setCerts(p => p.map((x, idx) => idx === i ? { ...x, expiry_date: formatYmd(e.target.value) } : x))}
+                        placeholder="YYYYMMDD (없으면 공백)" inputMode="numeric" maxLength={10} className={inputCls + " font-mono"} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelCls}>자격증 사본</label>
+                    <div className="flex items-center gap-2">
+                      <input id={`my-cert-doc-${i}`} type="file" accept="image/*,application/pdf"
+                        onChange={e => {
+                          const f = e.target.files?.[0] ?? null;
+                          setCerts(p => p.map((x, idx) => idx === i ? { ...x, doc_file: f, doc_preview: f ? f.name : (x.cert_doc_url ? "기존 파일" : "") } : x));
+                        }}
+                        className="hidden" />
+                      <label htmlFor={`my-cert-doc-${i}`} className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold cursor-pointer hover:bg-blue-700 whitespace-nowrap">📁 파일 선택</label>
+                      {c.cert_doc_url && !c.doc_file && (
+                        <a href={c.cert_doc_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">현재 파일 보기</a>
+                      )}
+                      <span className="text-xs text-gray-600 dark:text-gray-300 truncate flex-1">
+                        {c.doc_file ? c.doc_file.name : (c.cert_doc_url ? "기존 파일 등록됨" : "선택된 파일 없음")}
+                      </span>
+                      {(c.doc_file || c.cert_doc_url) && (
+                        <button type="button"
+                          onClick={() => setCerts(p => p.map((x, idx) => idx === i ? { ...x, doc_file: null, cert_doc_url: null, doc_preview: "" } : x))}
+                          className="text-xs text-red-500">지우기</button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ================= 상벌사항 ================= */}
+        {tab === "rp" && (
+          <div className={sectionCls}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">상벌사항 ({rps.length}건)</h2>
+              <button type="button" onClick={() => setRps(p => [...p, { ...EMPTY_RP }])}
+                className="px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800">+ 상벌 추가</button>
+            </div>
+            {rps.length === 0 && <div className="text-center py-4 text-xs text-gray-400">등록된 상벌 없음</div>}
+            <div className="space-y-3">
+              {rps.map((r, i) => (
+                <div key={i} className={`rounded-lg border p-3 ${
+                  r.kind === "상" ? "border-amber-300 bg-amber-50 dark:bg-amber-900/20"
+                  : r.kind === "벌" ? "border-red-300 bg-red-50 dark:bg-red-900/20"
+                  : "border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/30"
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-[11px] font-bold text-gray-500">#{i + 1}</div>
+                    <button type="button" onClick={() => setRps(p => p.filter((_, idx) => idx !== i))} className="text-[11px] text-red-500">삭제</button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-[100px_1fr_140px] gap-2">
+                    <div>
+                      <label className={labelCls}>구분 *</label>
+                      <select value={r.kind}
+                        onChange={e => setRps(p => p.map((x, idx) => idx === i ? { ...x, kind: e.target.value as RP["kind"] } : x))}
+                        className={inputCls}>
+                        <option value="">선택</option>
+                        <option value="상">🏆 상</option>
+                        <option value="벌">⚠️ 벌</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelCls}>내용 *</label>
+                      <input type="text" value={r.content}
+                        onChange={e => setRps(p => p.map((x, idx) => idx === i ? { ...x, content: e.target.value } : x))}
+                        placeholder="예: 우수사원 표창, 안전수칙 위반 경고"
+                        lang="ko" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>일자</label>
+                      <input type="text" value={r.occurred_on}
+                        onChange={e => setRps(p => p.map((x, idx) => idx === i ? { ...x, occurred_on: formatYmd(e.target.value) } : x))}
+                        placeholder="YYYYMMDD" inputMode="numeric" maxLength={10}
+                        className={inputCls + " font-mono"} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {message && (
           <div className={`px-4 py-3 rounded-lg text-sm ${
