@@ -621,7 +621,12 @@ export default function EmployeeRegisterClient() {
                     </div>
                     <div>
                       <label className={labelCls}>입사일 <span className="text-red-500">*</span></label>
-                      <input type="date" value={form.hireDate} onChange={e => set("hireDate", e.target.value)} required className={inputCls} />
+                      <input type="text" value={form.hireDate}
+                        onChange={e => set("hireDate", formatDate(e.target.value))}
+                        placeholder="YYYYMMDD (예: 20260514)"
+                        inputMode="numeric" maxLength={10}
+                        required
+                        className={inputCls + " font-mono"} />
                     </div>
                     <div>
                       <label className={labelCls}>부서</label>
