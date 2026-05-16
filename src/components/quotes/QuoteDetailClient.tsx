@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAuth, isAdmin } from "@/context/AuthContext";
+import { useTabs, MAX_TABS } from "@/context/TabsContext";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
 
@@ -52,6 +53,18 @@ interface QuoteRevision {
   changed_at: string;
 }
 
+interface InvoiceRow {
+  id: number;
+  invoice_no: string;
+  invoice_type: "세금계산서" | "거래명세서";
+  issued_at: string;
+  issued_by_name: string | null;
+  status: "발행" | "취소";
+  supply_amount: number;
+  vat_amount: number;
+  total_amount: number;
+}
+
 interface QuoteItem {
   id: number;
   material_id: string | null;
@@ -62,6 +75,7 @@ interface QuoteItem {
   unit_price: number;
   amount: number;
   remark: string | null;
+  elevator_name: string | null;
   opinion_text: string | null;
   opinion_image_url: string | null;
 }
@@ -108,6 +122,11 @@ function QuoteDetailInner() {
   const [revisions, setRevisions] = useState<QuoteRevision[]>([]);
   const [revOpen, setRevOpen] = useState(false);
   const [revLoading, setRevLoading] = useState(false);
+  const [creatingMR, setCreatingMR] = useState(false);
+  const [issuingInv, setIssuingInv] = useState<"세금계산서" | "거래명세서" | null>(null);
+  const [invOpen, setInvOpen]       = useState(false);
+  const [invoices, setInvoices]     = useState<InvoiceRow[]>([]);
+  const { tabs, openTab } = useTabs();
 
   useEffect(() => {
     if (!Number.isFinite(id)) { setError("잘못된 견적서 ID입니다."); setLoading(false); return; }
@@ -167,6 +186,170 @@ function QuoteDetailInner() {
     setHeader({ ...header, progress_state: next });
   }
 
+  async function generateInvoiceNo(type: "세금계산서" | "거래명세서"): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = type === "세금계산서" ? `TX-${year}-` : `DN-${year}-`;
+    const { data } = await supabase.from("invoices")
+      .select("invoice_no").like("invoice_no", `${prefix}%`)
+      .order("invoice_no", { ascending: false }).limit(1);
+    let nextSeq = 1;
+    if (data && data.length > 0) {
+      const last = (data[0] as { invoice_no: string }).invoice_no;
+      const m = last.match(/-(\d+)$/);
+      if (m) nextSeq = parseInt(m[1], 10) + 1;
+    }
+    return `${prefix}${String(nextSeq).padStart(4, "0")}`;
+  }
+
+  async function issueInvoice(type: "세금계산서" | "거래명세서") {
+    if (!header || !user) return;
+    if (header.charge_type === "무상") {
+      alert("무상 견적은 발행 대상이 아닙니다.");
+      return;
+    }
+    if (header.progress_state !== "자재출고" && header.progress_state !== "세금계산서발급" && header.progress_state !== "입금완료" && header.progress_state !== "종료") {
+      if (!confirm(`현재 진행상태는 [${header.progress_state}] 입니다. 자재출고 이후 발행이 권장됩니다. 그래도 발행하시겠습니까?`)) return;
+    }
+    setIssuingInv(type);
+    try {
+      const invoice_no = await generateInvoiceNo(type);
+      const supply = header.total_amount;
+      const vat = type === "세금계산서" ? Math.round(supply / 10) : 0;
+      const total = supply + vat;
+      const { data: inserted, error: insErr } = await supabase.from("invoices").insert({
+        invoice_no,
+        quote_id:        header.id,
+        invoice_type:    type,
+        issued_by_id:    user.id,
+        issued_by_name:  user.name,
+        supply_amount:   supply,
+        vat_amount:      vat,
+        total_amount:    total,
+        customer_name:   header.customer_name,
+        site_name:       header.site_name,
+        note:            null,
+      }).select("id, invoice_no").single();
+      if (insErr || !inserted) throw insErr || new Error("발행 실패");
+
+      // 세금계산서 발행 시 진행상태 자동 갱신
+      if (type === "세금계산서" && header.progress_state !== "세금계산서발급" && header.progress_state !== "입금완료" && header.progress_state !== "종료") {
+        await snapshot(`진행상태: ${header.progress_state} → 세금계산서발급 (${invoice_no})`);
+        await supabase.from("quotes")
+          .update({ progress_state: "세금계산서발급", updated_at: new Date().toISOString() })
+          .eq("id", header.id);
+        setHeader({ ...header, progress_state: "세금계산서발급" });
+      }
+
+      // 인쇄 페이지 새 탭 오픈
+      const href = type === "세금계산서"
+        ? `/invoice/tax?id=${inserted.id}`
+        : `/invoice/delivery?id=${inserted.id}`;
+      const label = `${type} ${invoice_no}`;
+      const alreadyOpen = tabs.some(t => t.href === href);
+      if (!alreadyOpen && tabs.length >= MAX_TABS) {
+        alert(`발행은 완료됐지만 탭 한도 초과로 인쇄 페이지를 열 수 없습니다. (${invoice_no})`);
+        return;
+      }
+      openTab(href, label);
+      // 이력 즉시 갱신
+      void loadInvoices();
+    } catch (e) {
+      alert(`발행 실패: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setIssuingInv(null);
+    }
+  }
+
+  async function loadInvoices() {
+    if (!header) return;
+    const { data } = await supabase.from("invoices")
+      .select("id, invoice_no, invoice_type, issued_at, issued_by_name, status, supply_amount, vat_amount, total_amount")
+      .eq("quote_id", header.id)
+      .order("issued_at", { ascending: false });
+    setInvoices((data ?? []) as InvoiceRow[]);
+  }
+
+  async function openInvoices() {
+    setInvOpen(true);
+    await loadInvoices();
+  }
+
+  function openInvoicePrint(inv: InvoiceRow) {
+    const href = inv.invoice_type === "세금계산서"
+      ? `/invoice/tax?id=${inv.id}`
+      : `/invoice/delivery?id=${inv.id}`;
+    const alreadyOpen = tabs.some(t => t.href === href);
+    if (!alreadyOpen && tabs.length >= MAX_TABS) {
+      alert(`탭 한도 초과 (최대 ${MAX_TABS}개)`);
+      return;
+    }
+    openTab(href, `${inv.invoice_type} ${inv.invoice_no}`);
+  }
+
+  function goToOutbound() {
+    if (!header) return;
+    const href = `/claim/quote-outbound?quoteId=${header.id}`;
+    const alreadyOpen = tabs.some(t => t.href === href);
+    if (!alreadyOpen && tabs.length >= MAX_TABS) {
+      alert(`탭은 최대 ${MAX_TABS}개까지 열 수 있습니다.`);
+      return;
+    }
+    openTab(href, `출고관리 ${header.quote_no}`);
+  }
+
+  async function createMaterialRequest() {
+    if (!header || !user) return;
+    if (header.status !== "승인") { alert("결재 [승인] 후에만 자재신청을 생성할 수 있습니다."); return; }
+    if (header.progress_state !== "미시작") {
+      if (!confirm(`현재 진행상태가 [${header.progress_state}] 입니다. 그래도 자재신청을 추가 생성하시겠습니까?`)) return;
+    }
+    if (items.length === 0) { alert("자재 라인이 없습니다."); return; }
+
+    setCreatingMR(true);
+    try {
+      // quote_items → material_requests.items (JSONB) 매핑
+      const reqItems = items
+        .filter(it => it.material_id) // 자재코드가 없는 수기 라인은 출고 처리 불가
+        .map(it => ({
+          materialId:   it.material_id!,
+          materialName: it.material_name,
+          qty:          Math.max(1, Math.round(it.qty)),
+          elevatorName: it.elevator_name ?? null,
+        }));
+      if (reqItems.length === 0) {
+        alert("자재코드가 연결된 라인이 없습니다. 견적서에서 자재를 정식 등록 후 다시 시도해 주세요.");
+        return;
+      }
+      const { error: insErr } = await supabase.from("material_requests").insert({
+        status:         "신청",
+        site_name:      header.site_name,
+        items:          reqItems,
+        note:           `견적 ${header.quote_no} 자동 생성`,
+        requester_id:   user.id,
+        requester_name: user.name,
+        requester_dept: user.dept ?? "",
+        quote_id:       header.id,
+        request_type:   "유상견적",
+      });
+      if (insErr) throw insErr;
+
+      // 진행상태 → 자재신청
+      await snapshot(`진행상태: ${header.progress_state} → 자재신청 (자재신청 자동 생성, ${reqItems.length}건)`);
+      const { error: upErr } = await supabase.from("quotes")
+        .update({ progress_state: "자재신청", updated_at: new Date().toISOString() })
+        .eq("id", header.id);
+      if (upErr) throw upErr;
+      setHeader({ ...header, progress_state: "자재신청" });
+
+      // 출고 관리 탭 자동 오픈
+      goToOutbound();
+    } catch (e) {
+      alert(`자재신청 생성 실패: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setCreatingMR(false);
+    }
+  }
+
   async function openRevisions() {
     if (!header) return;
     setRevOpen(true);
@@ -203,9 +386,37 @@ function QuoteDetailInner() {
                                           : "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
           }`}>{header.charge_type}</span>
 
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto flex gap-2 flex-wrap">
             <button type="button" onClick={openRevisions}
               className="px-3 py-1.5 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">📜 수정 이력</button>
+            {admin && header.status === "승인" && header.progress_state === "미시작" && (
+              <button type="button" onClick={createMaterialRequest} disabled={creatingMR}
+                className="px-3 py-1.5 text-xs rounded bg-orange-500 text-white hover:bg-orange-600 font-semibold disabled:opacity-50">
+                {creatingMR ? "생성 중..." : "📦 자재신청 생성"}
+              </button>
+            )}
+            {admin && header.status === "승인" && header.progress_state !== "미시작" && (
+              <button type="button" onClick={goToOutbound}
+                className="px-3 py-1.5 text-xs rounded bg-orange-500 text-white hover:bg-orange-600 font-semibold">
+                📦 출고 관리
+              </button>
+            )}
+            {admin && header.status === "승인" && header.charge_type === "유상" && (
+              <>
+                <button type="button" onClick={() => issueInvoice("거래명세서")} disabled={issuingInv !== null}
+                  className="px-3 py-1.5 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700 font-semibold disabled:opacity-50">
+                  {issuingInv === "거래명세서" ? "발행 중..." : "📄 거래명세서 발행"}
+                </button>
+                <button type="button" onClick={() => issueInvoice("세금계산서")} disabled={issuingInv !== null}
+                  className="px-3 py-1.5 text-xs rounded bg-purple-600 text-white hover:bg-purple-700 font-semibold disabled:opacity-50">
+                  {issuingInv === "세금계산서" ? "발행 중..." : "🧾 세금계산서 발행"}
+                </button>
+                <button type="button" onClick={openInvoices}
+                  className="px-3 py-1.5 text-xs rounded border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20">
+                  📑 발행 이력
+                </button>
+              </>
+            )}
             {admin && header.status === "작성중" && (
               <button type="button" onClick={() => changeStatus("발행")}
                 className="px-3 py-1.5 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700">발행</button>
@@ -481,6 +692,72 @@ function QuoteDetailInner() {
           <div className="text-center text-[10px] text-gray-500 mt-3">2025년 승강기안전 국무총리상 수상기업 (주)대솔이엘</div>
         </div>
       </div>
+
+      {/* 발행 이력 모달 (화면 전용) */}
+      <DraggableModal
+        open={invOpen}
+        onClose={() => setInvOpen(false)}
+        panelClassName="w-full max-w-2xl max-h-[80vh]"
+        header={(
+          <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div>
+              <div className="text-base font-bold text-gray-900 dark:text-white">발행 이력</div>
+              <div className="text-xs text-gray-500 mt-0.5">{header.quote_no} · 총 {invoices.length}건</div>
+            </div>
+            <button onClick={() => setInvOpen(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          </div>
+        )}
+      >
+        <div className="p-5 overflow-y-auto">
+          {invoices.length === 0 ? (
+            <div className="text-center py-8 text-sm text-gray-400">발행 이력이 없습니다.</div>
+          ) : (
+            <table className="w-full text-xs">
+              <thead className="border-b border-gray-200 dark:border-gray-700">
+                <tr className="text-left text-gray-500 dark:text-gray-400">
+                  <th className="px-2 py-2">번호</th>
+                  <th className="px-2 py-2">유형</th>
+                  <th className="px-2 py-2">발행일</th>
+                  <th className="px-2 py-2">발행자</th>
+                  <th className="px-2 py-2 text-right">합계</th>
+                  <th className="px-2 py-2 text-center">상태</th>
+                  <th className="px-2 py-2"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {invoices.map(inv => (
+                  <tr key={inv.id} className="text-gray-700 dark:text-gray-300">
+                    <td className="px-2 py-2 font-mono font-bold text-blue-600 dark:text-blue-400">{inv.invoice_no}</td>
+                    <td className="px-2 py-2">
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
+                        inv.invoice_type === "세금계산서"
+                          ? "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
+                          : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                      }`}>{inv.invoice_type}</span>
+                    </td>
+                    <td className="px-2 py-2 font-mono">{fmtDateTime(inv.issued_at)}</td>
+                    <td className="px-2 py-2">{inv.issued_by_name ?? "-"}</td>
+                    <td className="px-2 py-2 text-right tabular-nums">{fmtNum(inv.total_amount)}</td>
+                    <td className="px-2 py-2 text-center">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                        inv.status === "발행"
+                          ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                          : "bg-gray-100 text-gray-500"
+                      }`}>{inv.status}</span>
+                    </td>
+                    <td className="px-2 py-2 text-right">
+                      <button type="button" onClick={() => openInvoicePrint(inv)}
+                        className="text-[10px] px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100">
+                        🖨 인쇄
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </DraggableModal>
 
       {/* 수정 이력 모달 (화면 전용) */}
       <DraggableModal
