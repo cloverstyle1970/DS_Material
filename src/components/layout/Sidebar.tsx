@@ -69,6 +69,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/serial-history",   label: "S/N 이력 추적",      icon: "🔖" },
       { href: "/stats/period",     label: "기간별 입출고 내역", icon: "📅" },
       { href: "/stats/sites",      label: "현장/호기별 현황",   icon: "📍" },
+      { href: "/stats/performance", label: "사원 실적 (매출)",   icon: "📈" },
       { href: "/inventory-check",  label: "재고실사",           icon: "📊", adminOnly: true },
     ],
   },

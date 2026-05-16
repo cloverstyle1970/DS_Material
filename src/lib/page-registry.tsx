@@ -26,6 +26,7 @@ import QuoteRequestsListClient from "@/components/claim/QuoteRequestsListClient"
 import QuoteOutboundClient from "@/components/claim/QuoteOutboundClient";
 import DeliveryNoteClient from "@/components/invoice/DeliveryNoteClient";
 import TaxInvoiceClient from "@/components/invoice/TaxInvoiceClient";
+import PerformanceStatsClient from "@/components/stats/PerformanceStatsClient";
 import DeptRankClient from "@/components/hr/DeptRankClient";
 import CompanyVehiclesClient from "@/components/hr/CompanyVehiclesClient";
 import MyProfileClient from "@/components/data/MyProfileClient";
@@ -283,6 +284,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
         <SiteStatsClient />
       </div>
     ),
+  },
+  "/stats/performance": {
+    label: "사원 실적 (매출)",
+    render: () => <PerformanceStatsClient />,
   },
   "/inventory-check": {
     label: "재고실사",

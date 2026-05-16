@@ -65,6 +65,20 @@ interface InvoiceRow {
   total_amount: number;
 }
 
+type PaymentMethod = "현금" | "계좌이체" | "카드" | "어음" | "기타";
+interface PaymentRow {
+  id: number;
+  payment_no: string;
+  paid_at: string;
+  amount: number;
+  method: PaymentMethod;
+  is_prepaid: boolean;
+  depositor_name: string | null;
+  note: string | null;
+  status: "확정" | "취소";
+  created_by_name: string | null;
+}
+
 interface QuoteItem {
   id: number;
   material_id: string | null;
@@ -126,6 +140,15 @@ function QuoteDetailInner() {
   const [issuingInv, setIssuingInv] = useState<"세금계산서" | "거래명세서" | null>(null);
   const [invOpen, setInvOpen]       = useState(false);
   const [invoices, setInvoices]     = useState<InvoiceRow[]>([]);
+  const [payments, setPayments]     = useState<PaymentRow[]>([]);
+  const [payListOpen, setPayListOpen] = useState(false);
+  const [payAddOpen, setPayAddOpen]   = useState(false);
+  const [payForm, setPayForm] = useState<{ amount: string; method: PaymentMethod; paid_at: string; is_prepaid: boolean; depositor_name: string; note: string }>({
+    amount: "", method: "계좌이체", paid_at: new Date().toISOString().slice(0, 10),
+    is_prepaid: false, depositor_name: "", note: "",
+  });
+  const [paySaving, setPaySaving] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
   const { tabs, openTab } = useTabs();
 
   useEffect(() => {
@@ -257,6 +280,109 @@ function QuoteDetailInner() {
       alert(`발행 실패: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setIssuingInv(null);
+    }
+  }
+
+  async function loadPayments() {
+    if (!header) return;
+    const { data } = await supabase.from("payments")
+      .select("id, payment_no, paid_at, amount, method, is_prepaid, depositor_name, note, status, created_by_name")
+      .eq("quote_id", header.id)
+      .order("paid_at", { ascending: false })
+      .order("id", { ascending: false });
+    setPayments((data ?? []) as PaymentRow[]);
+  }
+
+  async function openPayList() {
+    setPayListOpen(true);
+    await loadPayments();
+  }
+
+  function openPayAdd() {
+    setPayForm({
+      amount: "", method: "계좌이체",
+      paid_at: new Date().toISOString().slice(0, 10),
+      is_prepaid: !!(header && header.progress_state !== "자재출고" && header.progress_state !== "세금계산서발급" && header.progress_state !== "입금완료" && header.progress_state !== "종료"),
+      depositor_name: header?.customer_name ?? "",
+      note: "",
+    });
+    setPayAddOpen(true);
+  }
+
+  async function generatePaymentNo(): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = `PAY-${year}-`;
+    const { data } = await supabase.from("payments")
+      .select("payment_no").like("payment_no", `${prefix}%`)
+      .order("payment_no", { ascending: false }).limit(1);
+    let nextSeq = 1;
+    if (data && data.length > 0) {
+      const last = (data[0] as { payment_no: string }).payment_no;
+      const m = last.match(/-(\d+)$/);
+      if (m) nextSeq = parseInt(m[1], 10) + 1;
+    }
+    return `${prefix}${String(nextSeq).padStart(4, "0")}`;
+  }
+
+  async function savePayment() {
+    if (!header || !user) return;
+    const amt = Number(payForm.amount.replace(/[^0-9-]/g, ""));
+    if (!Number.isFinite(amt) || amt <= 0) { alert("금액을 입력하세요."); return; }
+    if (!payForm.paid_at) { alert("입금일을 입력하세요."); return; }
+    setPaySaving(true);
+    try {
+      const payment_no = await generatePaymentNo();
+      const { error } = await supabase.from("payments").insert({
+        payment_no,
+        quote_id:        header.id,
+        paid_at:         payForm.paid_at,
+        amount:          amt,
+        method:          payForm.method,
+        is_prepaid:      payForm.is_prepaid,
+        depositor_name:  payForm.depositor_name || null,
+        note:            payForm.note || null,
+        created_by_id:   user.id,
+        created_by_name: user.name,
+      });
+      if (error) throw error;
+      await loadPayments();
+
+      // 누적 입금 ≥ total_amount → 진행상태 '입금완료' 자동 전이
+      const sumPaid = (payments.reduce((s, p) => s + (p.status === "확정" ? p.amount : 0), 0)) + amt;
+      if (sumPaid >= header.total_amount && header.progress_state !== "입금완료" && header.progress_state !== "종료") {
+        await snapshot(`진행상태: ${header.progress_state} → 입금완료 (누적 ${sumPaid.toLocaleString()}원 ≥ ${header.total_amount.toLocaleString()}원)`);
+        await supabase.from("quotes")
+          .update({ progress_state: "입금완료", updated_at: new Date().toISOString() })
+          .eq("id", header.id);
+        setHeader({ ...header, progress_state: "입금완료" });
+      }
+      setPayAddOpen(false);
+    } catch (e) {
+      alert(`입금 등록 실패: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setPaySaving(false);
+    }
+  }
+
+  async function finalizeQuote() {
+    if (!header) return;
+    if (header.progress_state !== "입금완료") {
+      if (!confirm(`현재 진행상태는 [${header.progress_state}] 입니다. 그래도 종료 처리하시겠습니까?`)) return;
+    } else {
+      if (!confirm("견적을 [종료] 처리하시겠습니까? (완료된 거래로 마감됨)")) return;
+    }
+    setFinalizing(true);
+    try {
+      await snapshot(`진행상태: ${header.progress_state} → 종료`);
+      const { error } = await supabase.from("quotes")
+        .update({ progress_state: "종료", updated_at: new Date().toISOString() })
+        .eq("id", header.id);
+      if (error) throw error;
+      setHeader({ ...header, progress_state: "종료" });
+    } catch (e) {
+      alert(`종료 처리 실패: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setFinalizing(false);
     }
   }
 
@@ -415,6 +541,20 @@ function QuoteDetailInner() {
                   className="px-3 py-1.5 text-xs rounded border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20">
                   📑 발행 이력
                 </button>
+                <button type="button" onClick={openPayAdd}
+                  className="px-3 py-1.5 text-xs rounded bg-amber-500 text-white hover:bg-amber-600 font-semibold">
+                  💵 입금 등록
+                </button>
+                <button type="button" onClick={openPayList}
+                  className="px-3 py-1.5 text-xs rounded border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20">
+                  💼 입금 이력
+                </button>
+                {(header.progress_state === "입금완료" || header.progress_state === "세금계산서발급" || header.progress_state === "자재출고") && (
+                  <button type="button" onClick={finalizeQuote} disabled={finalizing}
+                    className="px-3 py-1.5 text-xs rounded bg-slate-700 text-white hover:bg-slate-800 font-semibold disabled:opacity-50">
+                    {finalizing ? "처리 중..." : "🏁 견적 종료"}
+                  </button>
+                )}
               </>
             )}
             {admin && header.status === "작성중" && (
@@ -692,6 +832,142 @@ function QuoteDetailInner() {
           <div className="text-center text-[10px] text-gray-500 mt-3">2025년 승강기안전 국무총리상 수상기업 (주)대솔이엘</div>
         </div>
       </div>
+
+      {/* 입금 등록 모달 */}
+      <DraggableModal
+        open={payAddOpen}
+        onClose={() => setPayAddOpen(false)}
+        panelClassName="w-full max-w-md"
+        header={(
+          <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div>
+              <div className="text-base font-bold text-gray-900 dark:text-white">💵 입금 등록</div>
+              <div className="text-xs text-gray-500 mt-0.5">{header.quote_no} · 총액 {fmtNum(header.total_amount)}원</div>
+            </div>
+            <button onClick={() => setPayAddOpen(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          </div>
+        )}
+      >
+        <div className="p-5 space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">금액 <span className="text-red-500">*</span></label>
+            <input type="text" inputMode="numeric" value={payForm.amount}
+              onChange={e => {
+                const v = e.target.value.replace(/[^0-9]/g, "");
+                setPayForm(f => ({ ...f, amount: v ? Number(v).toLocaleString() : "" }));
+              }}
+              placeholder={`최대 ${fmtNum(header.total_amount)}원`}
+              className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-right tabular-nums font-bold" />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">방법</label>
+              <select value={payForm.method}
+                onChange={e => setPayForm(f => ({ ...f, method: e.target.value as PaymentMethod }))}
+                className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm">
+                {(["계좌이체","현금","카드","어음","기타"] as const).map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">입금일</label>
+              <input type="date" value={payForm.paid_at}
+                onChange={e => setPayForm(f => ({ ...f, paid_at: e.target.value }))}
+                className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">입금자명</label>
+            <input type="text" value={payForm.depositor_name} lang="ko"
+              onChange={e => setPayForm(f => ({ ...f, depositor_name: e.target.value }))}
+              className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">비고</label>
+            <input type="text" value={payForm.note} lang="ko"
+              onChange={e => setPayForm(f => ({ ...f, note: e.target.value }))}
+              className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm" />
+          </div>
+          <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+            <input type="checkbox" checked={payForm.is_prepaid}
+              onChange={e => setPayForm(f => ({ ...f, is_prepaid: e.target.checked }))}
+              className="rounded" />
+            <span>선입금 (출고 전 입금)</span>
+          </label>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => setPayAddOpen(false)} disabled={paySaving}
+              className="px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-sm">취소</button>
+            <button type="button" onClick={savePayment} disabled={paySaving}
+              className="px-5 py-2 rounded bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 disabled:opacity-50">
+              {paySaving ? "등록 중..." : "💵 입금 등록"}
+            </button>
+          </div>
+        </div>
+      </DraggableModal>
+
+      {/* 입금 이력 모달 */}
+      <DraggableModal
+        open={payListOpen}
+        onClose={() => setPayListOpen(false)}
+        panelClassName="w-full max-w-3xl max-h-[80vh]"
+        header={(() => {
+          const sumPaid = payments.filter(p => p.status === "확정").reduce((s, p) => s + p.amount, 0);
+          const balance = header.total_amount - sumPaid;
+          return (
+            <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <div>
+                <div className="text-base font-bold text-gray-900 dark:text-white">💼 입금 이력</div>
+                <div className="text-xs text-gray-500 mt-0.5">
+                  {header.quote_no} · 총액 {fmtNum(header.total_amount)} · 누적입금 {fmtNum(sumPaid)} ·
+                  <span className={`ml-1 font-bold ${balance > 0 ? "text-amber-600" : "text-emerald-600"}`}>
+                    {balance > 0 ? `미수금 ${fmtNum(balance)}` : "완납"}
+                  </span>
+                </div>
+              </div>
+              <button onClick={() => setPayListOpen(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+            </div>
+          );
+        })()}
+      >
+        <div className="p-5 overflow-y-auto">
+          {payments.length === 0 ? (
+            <div className="text-center py-8 text-sm text-gray-400">입금 이력이 없습니다.</div>
+          ) : (
+            <table className="w-full text-xs">
+              <thead className="border-b border-gray-200 dark:border-gray-700">
+                <tr className="text-left text-gray-500 dark:text-gray-400">
+                  <th className="px-2 py-2">번호</th>
+                  <th className="px-2 py-2">입금일</th>
+                  <th className="px-2 py-2 text-right">금액</th>
+                  <th className="px-2 py-2">방법</th>
+                  <th className="px-2 py-2">입금자</th>
+                  <th className="px-2 py-2">선입금</th>
+                  <th className="px-2 py-2">등록자</th>
+                  <th className="px-2 py-2 text-center">상태</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {payments.map(p => (
+                  <tr key={p.id} className="text-gray-700 dark:text-gray-300">
+                    <td className="px-2 py-2 font-mono text-amber-600 dark:text-amber-400 font-bold">{p.payment_no}</td>
+                    <td className="px-2 py-2 font-mono">{p.paid_at}</td>
+                    <td className="px-2 py-2 text-right tabular-nums font-bold">{fmtNum(p.amount)}</td>
+                    <td className="px-2 py-2">{p.method}</td>
+                    <td className="px-2 py-2">{p.depositor_name ?? "-"}</td>
+                    <td className="px-2 py-2 text-center">{p.is_prepaid ? <span className="text-blue-500">✓</span> : "-"}</td>
+                    <td className="px-2 py-2 text-gray-500">{p.created_by_name ?? "-"}</td>
+                    <td className="px-2 py-2 text-center">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                        p.status === "확정" ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                        : "bg-gray-100 text-gray-500"
+                      }`}>{p.status}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </DraggableModal>
 
       {/* 발행 이력 모달 (화면 전용) */}
       <DraggableModal
