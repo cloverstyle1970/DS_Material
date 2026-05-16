@@ -63,14 +63,18 @@ export default function QuoteRequestsListClient() {
   const [selectedItems, setSelectedItems] = useState<QuoteRequestItem[]>([]);
 
   async function load() {
+    if (!user) return;
     setLoading(true);
-    const { data } = await supabase.from("quote_requests")
+    let query = supabase.from("quote_requests")
       .select("*").order("requested_at", { ascending: false });
+    // 비관리자는 본인 청구만 조회
+    if (!admin) query = query.eq("requester_id", user.id);
+    const { data } = await query;
     setList((data ?? []) as QuoteRequest[]);
     setLoading(false);
   }
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [user?.id, admin]);
 
   const filtered = useMemo(
     () => filter === "전체" ? list : list.filter(r => r.status === filter),
@@ -109,8 +113,19 @@ export default function QuoteRequestsListClient() {
     <div className="min-h-full bg-gray-50 dark:bg-gray-900 p-6">
       <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">📋 견적요청 목록</h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">보수원의 유상 청구 — 견적 담당자가 견적서를 작성합니다.</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">📋 견적요청 목록</h1>
+            {!admin && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                👤 본인 청구만 표시 중
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            {admin
+              ? "보수원의 유상 청구 — 견적 담당자가 견적서를 작성합니다."
+              : "내가 등록한 유상 견적요청 — 견적서 발행 여부를 확인할 수 있습니다."}
+          </p>
         </div>
         <div className="flex gap-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-xl">
           {STATUS_OPTIONS.map(s => (
