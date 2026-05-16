@@ -153,9 +153,25 @@ export default function PermissionGroupsClient() {
   // 사용자 추가 검색
   const [userSearch, setUserSearch] = useState("");
 
+  // 멤버 목록 페이지네이션
+  const MEMBER_PAGE_SIZE = 10;
+  const [memberPage, setMemberPage] = useState(1);
+
   // 세부권한 모달
   const [detailUser, setDetailUser] = useState<UserRow | null>(null);
   const [detailPerms, setDetailPerms] = useState<string[]>([]);
+
+  // 아코디언 펼침 상태 (섹션 id 집합) — 기본: 첫 번째 섹션만 펼침
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(() => new Set([PERMISSION_TREE[0].id]));
+  function toggleSection(id: string) {
+    setExpandedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  function expandAll() { setExpandedSections(new Set(PERMISSION_TREE.map(s => s.id))); }
+  function collapseAll() { setExpandedSections(new Set()); }
 
   async function reload() {
     const [g, u] = await Promise.all([
@@ -179,6 +195,7 @@ export default function PermissionGroupsClient() {
   useEffect(() => {
     const g = groups.find(x => x.id === selectedId);
     setEditing(g ? { ...g, permissions: [...g.permissions] } : null);
+    setMemberPage(1);
   }, [selectedId, groups]);
 
   if (!user) return <div className="p-8 text-center text-sm text-gray-500">로그인이 필요합니다.</div>;
@@ -192,11 +209,20 @@ export default function PermissionGroupsClient() {
   }
   if (!loaded) return <div className="p-12 text-center text-sm text-gray-500">로딩 중...</div>;
 
-  const members = users.filter(u => u.permission_group_id === selectedId);
-  const nonMembers = users.filter(u =>
-    u.permission_group_id !== selectedId &&
-    (userSearch.trim() === "" || u.name.includes(userSearch.trim()) || (u.dept ?? "").includes(userSearch.trim()))
-  );
+  const members = users
+    .filter(u => u.permission_group_id === selectedId)
+    .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  const memberTotalPages = Math.max(1, Math.ceil(members.length / MEMBER_PAGE_SIZE));
+  const memberPageSafe = Math.min(memberPage, memberTotalPages);
+  const membersOnPage = members.slice((memberPageSafe - 1) * MEMBER_PAGE_SIZE, memberPageSafe * MEMBER_PAGE_SIZE);
+
+  // 그룹 미지정 사용자만 추가 후보 (단일 그룹 정책 — 이미 다른 그룹에 속한 사용자는 해당 그룹에서 먼저 제거)
+  const nonMembers = users
+    .filter(u =>
+      u.permission_group_id == null &&
+      (userSearch.trim() === "" || u.name.includes(userSearch.trim()) || (u.dept ?? "").includes(userSearch.trim()))
+    )
+    .sort((a, b) => a.name.localeCompare(b.name, "ko"));
 
   const isAdminAll = editing?.permissions.includes("admin") ?? false;
   const editingPermSet = new Set(editing?.permissions ?? []);
@@ -433,15 +459,29 @@ export default function PermissionGroupsClient() {
               </div>
             </div>
 
-            {/* 권한 트리 */}
+            {/* 권한 트리 (아코디언) */}
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">사용 권한</h2>
-                <label className="inline-flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={isAdminAll}
-                    onChange={e => toggleAdminAll(e.target.checked)} className="rounded" />
-                  <span className="text-xs font-semibold text-rose-600 dark:text-rose-300">⚡ 전체 권한 (admin)</span>
-                </label>
+                <div className="flex items-center gap-3">
+                  {!isAdminAll && (
+                    <div className="flex items-center gap-1 text-[11px]">
+                      <button type="button" onClick={expandAll}
+                        className="px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200">
+                        ▾ 전체 펼치기
+                      </button>
+                      <button type="button" onClick={collapseAll}
+                        className="px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200">
+                        ▸ 전체 접기
+                      </button>
+                    </div>
+                  )}
+                  <label className="inline-flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={isAdminAll}
+                      onChange={e => toggleAdminAll(e.target.checked)} className="rounded" />
+                    <span className="text-xs font-semibold text-rose-600 dark:text-rose-300">⚡ 전체 권한 (admin)</span>
+                  </label>
+                </div>
               </div>
 
               {isAdminAll ? (
@@ -449,56 +489,72 @@ export default function PermissionGroupsClient() {
                   전체 권한이 부여되어 모든 메뉴/기능에 접근할 수 있습니다.
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {PERMISSION_TREE.map(sec => {
                     const sectionKeys = sec.items.flatMap(it => (it.ops ?? PERM_OPS).map(op => `menu:${it.href}:${op}`));
                     const allOn = sectionKeys.every(k => editingPermSet.has(k));
                     const someOn = sectionKeys.some(k => editingPermSet.has(k));
+                    const enabledCount = sectionKeys.filter(k => editingPermSet.has(k)).length;
+                    const isOpen = expandedSections.has(sec.id);
                     return (
                       <div key={sec.id} className="rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden">
-                        <div className={`flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-700/40 ${sec.color}`}>
-                          <div className="text-xs font-bold">{sec.label}</div>
-                          <label className="inline-flex items-center gap-1.5 cursor-pointer text-[11px] text-gray-600 dark:text-gray-300">
+                        <button type="button" onClick={() => toggleSection(sec.id)}
+                          className={`w-full flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-700/40 hover:bg-gray-100 dark:hover:bg-gray-700/60 transition-colors text-left ${sec.color}`}>
+                          <span className={`text-xs transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`}>▸</span>
+                          <span className="text-xs font-bold flex-1">{sec.label}</span>
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                            enabledCount === 0
+                              ? "bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400"
+                              : enabledCount === sectionKeys.length
+                                ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300"
+                                : "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
+                          }`}>
+                            {enabledCount} / {sectionKeys.length}
+                          </span>
+                          <label onClick={e => e.stopPropagation()}
+                            className="inline-flex items-center gap-1.5 cursor-pointer text-[11px] text-gray-600 dark:text-gray-300 ml-1">
                             <input type="checkbox" checked={allOn}
                               ref={el => { if (el) el.indeterminate = !allOn && someOn; }}
                               onChange={e => toggleAllInSection(sec, e.target.checked)} className="rounded" />
                             전체
                           </label>
-                        </div>
-                        <table className="w-full text-xs">
-                          <thead className="bg-gray-50 dark:bg-gray-700/20">
-                            <tr className="text-[10px] text-gray-500 dark:text-gray-400">
-                              <th className="text-left px-3 py-1.5">메뉴</th>
-                              <th className="px-2 py-1.5 w-16">조회</th>
-                              <th className="px-2 py-1.5 w-16">생성</th>
-                              <th className="px-2 py-1.5 w-16">수정</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {sec.items.map(item => {
-                              const ops = item.ops ?? PERM_OPS;
-                              return (
-                                <tr key={item.href} className="border-t border-gray-100 dark:border-gray-700/50">
-                                  <td className="px-3 py-2 text-gray-700 dark:text-gray-200">{item.label}<div className="text-[10px] text-gray-400 font-mono">{item.href}</div></td>
-                                  {(["read","create","update"] as PermOp[]).map(op => {
-                                    const key = `menu:${item.href}:${op}`;
-                                    const allowed = ops.includes(op);
-                                    return (
-                                      <td key={op} className="text-center px-2 py-2">
-                                        {allowed ? (
-                                          <input type="checkbox" checked={editingPermSet.has(key)}
-                                            onChange={() => togglePerm(key)} className="rounded" />
-                                        ) : (
-                                          <span className="text-gray-300 dark:text-gray-600">—</span>
-                                        )}
-                                      </td>
-                                    );
-                                  })}
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
+                        </button>
+                        {isOpen && (
+                          <table className="w-full text-xs">
+                            <thead className="bg-gray-50 dark:bg-gray-700/20">
+                              <tr className="text-[10px] text-gray-500 dark:text-gray-400">
+                                <th className="text-left px-3 py-1.5">메뉴</th>
+                                <th className="px-2 py-1.5 w-16">조회</th>
+                                <th className="px-2 py-1.5 w-16">생성</th>
+                                <th className="px-2 py-1.5 w-16">수정</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {sec.items.map(item => {
+                                const ops = item.ops ?? PERM_OPS;
+                                return (
+                                  <tr key={item.href} className="border-t border-gray-100 dark:border-gray-700/50">
+                                    <td className="px-3 py-2 text-gray-700 dark:text-gray-200">{item.label}<div className="text-[10px] text-gray-400 font-mono">{item.href}</div></td>
+                                    {(["read","create","update"] as PermOp[]).map(op => {
+                                      const key = `menu:${item.href}:${op}`;
+                                      const allowed = ops.includes(op);
+                                      return (
+                                        <td key={op} className="text-center px-2 py-2">
+                                          {allowed ? (
+                                            <input type="checkbox" checked={editingPermSet.has(key)}
+                                              onChange={() => togglePerm(key)} className="rounded" />
+                                          ) : (
+                                            <span className="text-gray-300 dark:text-gray-600">—</span>
+                                          )}
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        )}
                       </div>
                     );
                   })}
@@ -523,76 +579,113 @@ export default function PermissionGroupsClient() {
               {members.length === 0 ? (
                 <div className="text-center py-4 text-xs text-gray-400">이 그룹에 속한 사용자가 없습니다.</div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-[10px] text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
-                        <th className="text-left px-2 py-1.5">사번</th>
-                        <th className="text-left px-2 py-1.5">성명</th>
-                        <th className="text-left px-2 py-1.5">부서</th>
-                        <th className="text-left px-2 py-1.5">직급</th>
-                        <th className="text-left px-2 py-1.5">개별 권한</th>
-                        <th className="text-right px-2 py-1.5">작업</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {members.map(m => {
-                        const userPerms = m.permissions ?? [];
-                        const matched = editing.permissions.length > 0 &&
-                          userPerms.length === editing.permissions.length &&
-                          editing.permissions.every(p => userPerms.includes(p));
-                        return (
-                          <tr key={m.id} className="border-b border-gray-100 dark:border-gray-700/50">
-                            <td className="px-2 py-2 font-mono text-gray-500">{m.id}</td>
-                            <td className="px-2 py-2 font-semibold text-gray-700 dark:text-gray-200">{m.name}</td>
-                            <td className="px-2 py-2 text-gray-600 dark:text-gray-300">{m.dept ?? "—"}</td>
-                            <td className="px-2 py-2 text-gray-600 dark:text-gray-300">{m.rank ?? "—"}</td>
-                            <td className="px-2 py-2">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                matched
-                                  ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300"
-                                  : "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
-                              }`}>
-                                {matched ? "그룹과 동일" : `세부 (${userPerms.length}개)`}
-                              </span>
-                            </td>
-                            <td className="px-2 py-2 text-right whitespace-nowrap">
-                              <button type="button" onClick={() => openDetail(m)}
-                                className="text-blue-600 hover:underline mr-3">세부권한</button>
-                              <button type="button" onClick={() => assignUser(m.id, null, false)}
-                                className="text-red-500 hover:underline">제거</button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-[10px] text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+                          <th className="text-left px-2 py-1.5">사번</th>
+                          <th className="text-left px-2 py-1.5">성명</th>
+                          <th className="text-left px-2 py-1.5">부서</th>
+                          <th className="text-left px-2 py-1.5">직급</th>
+                          <th className="text-left px-2 py-1.5">개별 권한</th>
+                          <th className="text-right px-2 py-1.5">작업</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {membersOnPage.map(m => {
+                          const userPerms = m.permissions ?? [];
+                          const matched = editing.permissions.length > 0 &&
+                            userPerms.length === editing.permissions.length &&
+                            editing.permissions.every(p => userPerms.includes(p));
+                          return (
+                            <tr key={m.id} className="border-b border-gray-100 dark:border-gray-700/50">
+                              <td className="px-2 py-2 font-mono text-gray-500">{m.id}</td>
+                              <td className="px-2 py-2 font-semibold text-gray-700 dark:text-gray-200">{m.name}</td>
+                              <td className="px-2 py-2 text-gray-600 dark:text-gray-300">{m.dept ?? "—"}</td>
+                              <td className="px-2 py-2 text-gray-600 dark:text-gray-300">{m.rank ?? "—"}</td>
+                              <td className="px-2 py-2">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  matched
+                                    ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300"
+                                    : "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
+                                }`}>
+                                  {matched ? "그룹과 동일" : `세부 (${userPerms.length}개)`}
+                                </span>
+                              </td>
+                              <td className="px-2 py-2 text-right whitespace-nowrap">
+                                <button type="button" onClick={() => openDetail(m)}
+                                  className="text-blue-600 hover:underline mr-3">세부권한</button>
+                                <button type="button" onClick={() => assignUser(m.id, null, false)}
+                                  className="text-red-500 hover:underline">제거</button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* 페이지네이션 */}
+                  {memberTotalPages > 1 && (
+                    <div className="mt-3 flex items-center justify-between text-xs">
+                      <div className="text-gray-500 dark:text-gray-400">
+                        {(memberPageSafe - 1) * MEMBER_PAGE_SIZE + 1}–{Math.min(memberPageSafe * MEMBER_PAGE_SIZE, members.length)}
+                        <span className="mx-1">/</span>
+                        {members.length}명 <span className="text-[10px] text-gray-400">(가나다 순)</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => setMemberPage(1)} disabled={memberPageSafe === 1}
+                          className="px-2 py-1 rounded border border-gray-200 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700">«</button>
+                        <button type="button" onClick={() => setMemberPage(p => Math.max(1, p - 1))} disabled={memberPageSafe === 1}
+                          className="px-2 py-1 rounded border border-gray-200 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700">‹</button>
+                        {Array.from({ length: memberTotalPages }, (_, i) => i + 1)
+                          .filter(p => Math.abs(p - memberPageSafe) <= 2 || p === 1 || p === memberTotalPages)
+                          .map((p, idx, arr) => (
+                            <span key={p} className="flex items-center">
+                              {idx > 0 && arr[idx - 1] !== p - 1 && <span className="px-1 text-gray-400">…</span>}
+                              <button type="button" onClick={() => setMemberPage(p)}
+                                className={`min-w-[28px] px-2 py-1 rounded border transition-colors ${
+                                  p === memberPageSafe
+                                    ? "border-blue-500 bg-blue-600 text-white font-bold"
+                                    : "border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                }`}>{p}</button>
+                            </span>
+                          ))}
+                        <button type="button" onClick={() => setMemberPage(p => Math.min(memberTotalPages, p + 1))} disabled={memberPageSafe === memberTotalPages}
+                          className="px-2 py-1 rounded border border-gray-200 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700">›</button>
+                        <button type="button" onClick={() => setMemberPage(memberTotalPages)} disabled={memberPageSafe === memberTotalPages}
+                          className="px-2 py-1 rounded border border-gray-200 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700">»</button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* 멤버 추가 */}
               <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-2 mb-2">
                   <h3 className="text-xs font-bold text-gray-700 dark:text-gray-300">멤버 추가</h3>
+                  <span className="text-[10px] text-gray-400">미지정 사용자 {nonMembers.length}명 · 가나다 순</span>
                   <input type="text" value={userSearch}
                     onChange={e => setUserSearch(e.target.value)}
                     placeholder="이름·부서 검색"
                     className="flex-1 px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
                 </div>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-2">
+                  ℹ️ 사용자는 하나의 그룹에만 속할 수 있습니다. 이미 다른 그룹에 속한 사용자는 해당 그룹에서 먼저 제거하세요.
+                </p>
                 <div className="max-h-48 overflow-y-auto rounded border border-gray-200 dark:border-gray-700">
                   {nonMembers.length === 0 ? (
-                    <div className="text-center py-3 text-xs text-gray-400">표시할 사용자가 없습니다.</div>
+                    <div className="text-center py-3 text-xs text-gray-400">
+                      {userSearch ? "검색 조건에 맞는 미지정 사용자가 없습니다." : "그룹 미지정 사용자가 없습니다."}
+                    </div>
                   ) : (
                     nonMembers.slice(0, 30).map(u => (
                       <div key={u.id} className="flex items-center justify-between px-3 py-1.5 text-xs border-b border-gray-100 dark:border-gray-700/50 last:border-0">
                         <div>
                           <span className="font-semibold text-gray-700 dark:text-gray-200">{u.name}</span>
                           <span className="ml-2 text-gray-500 dark:text-gray-400">{u.dept ?? "—"} · {u.rank ?? "—"}</span>
-                          {u.permission_group_id && (
-                            <span className="ml-2 text-[10px] text-amber-600 dark:text-amber-400">
-                              (현재: {groups.find(g => g.id === u.permission_group_id)?.name ?? "?"})
-                            </span>
-                          )}
                         </div>
                         <div className="flex gap-1">
                           <button type="button" onClick={() => assignUser(u.id, editing.id, true)}
@@ -637,60 +730,88 @@ export default function PermissionGroupsClient() {
                 <span className="text-xs font-semibold text-rose-600 dark:text-rose-300">⚡ 전체 권한 (admin)</span>
               </label>
               {!detailPerms.includes("admin") && (
-                <div className="space-y-3">
-                  {PERMISSION_TREE.map(sec => {
-                    const sectionKeys = sec.items.flatMap(it => (it.ops ?? PERM_OPS).map(op => `menu:${it.href}:${op}`));
-                    const allOn = sectionKeys.every(k => detailPerms.includes(k));
-                    const someOn = sectionKeys.some(k => detailPerms.includes(k));
-                    return (
-                      <div key={sec.id} className="rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden">
-                        <div className={`flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-700/40 ${sec.color}`}>
-                          <div className="text-xs font-bold">{sec.label}</div>
-                          <label className="inline-flex items-center gap-1.5 cursor-pointer text-[11px] text-gray-600 dark:text-gray-300">
-                            <input type="checkbox" checked={allOn}
-                              ref={el => { if (el) el.indeterminate = !allOn && someOn; }}
-                              onChange={e => toggleDetailAll(sec, e.target.checked)} className="rounded" />
-                            전체
-                          </label>
-                        </div>
-                        <table className="w-full text-xs">
-                          <thead className="bg-gray-50 dark:bg-gray-700/20">
-                            <tr className="text-[10px] text-gray-500 dark:text-gray-400">
-                              <th className="text-left px-3 py-1.5">메뉴</th>
-                              <th className="px-2 py-1.5 w-16">조회</th>
-                              <th className="px-2 py-1.5 w-16">생성</th>
-                              <th className="px-2 py-1.5 w-16">수정</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {sec.items.map(item => {
-                              const ops = item.ops ?? PERM_OPS;
-                              return (
-                                <tr key={item.href} className="border-t border-gray-100 dark:border-gray-700/50">
-                                  <td className="px-3 py-2 text-gray-700 dark:text-gray-200">{item.label}</td>
-                                  {(["read","create","update"] as PermOp[]).map(op => {
-                                    const key = `menu:${item.href}:${op}`;
-                                    const allowed = ops.includes(op);
-                                    return (
-                                      <td key={op} className="text-center px-2 py-2">
-                                        {allowed ? (
-                                          <input type="checkbox" checked={detailPerms.includes(key)}
-                                            onChange={() => toggleDetailPerm(key)} className="rounded" />
-                                        ) : (
-                                          <span className="text-gray-300 dark:text-gray-600">—</span>
-                                        )}
-                                      </td>
-                                    );
-                                  })}
+                <>
+                  <div className="flex items-center gap-1 text-[11px] mb-2">
+                    <button type="button" onClick={expandAll}
+                      className="px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200">
+                      ▾ 전체 펼치기
+                    </button>
+                    <button type="button" onClick={collapseAll}
+                      className="px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200">
+                      ▸ 전체 접기
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {PERMISSION_TREE.map(sec => {
+                      const sectionKeys = sec.items.flatMap(it => (it.ops ?? PERM_OPS).map(op => `menu:${it.href}:${op}`));
+                      const allOn = sectionKeys.every(k => detailPerms.includes(k));
+                      const someOn = sectionKeys.some(k => detailPerms.includes(k));
+                      const enabledCount = sectionKeys.filter(k => detailPerms.includes(k)).length;
+                      const isOpen = expandedSections.has(sec.id);
+                      return (
+                        <div key={sec.id} className="rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden">
+                          <button type="button" onClick={() => toggleSection(sec.id)}
+                            className={`w-full flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-700/40 hover:bg-gray-100 dark:hover:bg-gray-700/60 transition-colors text-left ${sec.color}`}>
+                            <span className={`text-xs transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`}>▸</span>
+                            <span className="text-xs font-bold flex-1">{sec.label}</span>
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                              enabledCount === 0
+                                ? "bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400"
+                                : enabledCount === sectionKeys.length
+                                  ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300"
+                                  : "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
+                            }`}>
+                              {enabledCount} / {sectionKeys.length}
+                            </span>
+                            <label onClick={e => e.stopPropagation()}
+                              className="inline-flex items-center gap-1.5 cursor-pointer text-[11px] text-gray-600 dark:text-gray-300 ml-1">
+                              <input type="checkbox" checked={allOn}
+                                ref={el => { if (el) el.indeterminate = !allOn && someOn; }}
+                                onChange={e => toggleDetailAll(sec, e.target.checked)} className="rounded" />
+                              전체
+                            </label>
+                          </button>
+                          {isOpen && (
+                            <table className="w-full text-xs">
+                              <thead className="bg-gray-50 dark:bg-gray-700/20">
+                                <tr className="text-[10px] text-gray-500 dark:text-gray-400">
+                                  <th className="text-left px-3 py-1.5">메뉴</th>
+                                  <th className="px-2 py-1.5 w-16">조회</th>
+                                  <th className="px-2 py-1.5 w-16">생성</th>
+                                  <th className="px-2 py-1.5 w-16">수정</th>
                                 </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    );
-                  })}
-                </div>
+                              </thead>
+                              <tbody>
+                                {sec.items.map(item => {
+                                  const ops = item.ops ?? PERM_OPS;
+                                  return (
+                                    <tr key={item.href} className="border-t border-gray-100 dark:border-gray-700/50">
+                                      <td className="px-3 py-2 text-gray-700 dark:text-gray-200">{item.label}</td>
+                                      {(["read","create","update"] as PermOp[]).map(op => {
+                                        const key = `menu:${item.href}:${op}`;
+                                        const allowed = ops.includes(op);
+                                        return (
+                                          <td key={op} className="text-center px-2 py-2">
+                                            {allowed ? (
+                                              <input type="checkbox" checked={detailPerms.includes(key)}
+                                                onChange={() => toggleDetailPerm(key)} className="rounded" />
+                                            ) : (
+                                              <span className="text-gray-300 dark:text-gray-600">—</span>
+                                            )}
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </div>
             <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
