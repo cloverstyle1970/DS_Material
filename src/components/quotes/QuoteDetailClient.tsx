@@ -12,6 +12,10 @@ import DraggableModal from "@/components/common/DraggableModal";
 // ============================================================
 
 type Status = "작성중" | "발행" | "승인" | "취소";
+type ProgressState = "미시작" | "자재신청" | "자재출고" | "세금계산서발급" | "입금완료" | "종료";
+type ChargeType = "유상" | "무상";
+
+const PROGRESS_FLOW: ProgressState[] = ["미시작", "자재신청", "자재출고", "세금계산서발급", "입금완료", "종료"];
 
 interface QuoteHeader {
   id: number;
@@ -34,8 +38,18 @@ interface QuoteHeader {
   profit_rate: number;
   note: string | null;
   status: Status;
+  progress_state: ProgressState;
+  charge_type: ChargeType;
   created_by_name: string | null;
   created_at: string;
+}
+
+interface QuoteRevision {
+  id: number;
+  revision_no: number;
+  change_summary: string | null;
+  changed_by_name: string | null;
+  changed_at: string;
 }
 
 interface QuoteItem {
@@ -91,6 +105,9 @@ function QuoteDetailInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [openOpinionId, setOpenOpinionId] = useState<number | null>(null);
+  const [revisions, setRevisions] = useState<QuoteRevision[]>([]);
+  const [revOpen, setRevOpen] = useState(false);
+  const [revLoading, setRevLoading] = useState(false);
 
   useEffect(() => {
     if (!Number.isFinite(id)) { setError("잘못된 견적서 ID입니다."); setLoading(false); return; }
@@ -115,41 +132,144 @@ function QuoteDetailInner() {
 
   const admin = isAdmin(user);
 
+  // 변경 직전에 quote_revisions 스냅샷 기록 (실패해도 변경은 진행)
+  async function snapshot(summary: string) {
+    if (!header || !user) return;
+    try {
+      await supabase.rpc("snapshot_quote", {
+        p_quote_id:  header.id,
+        p_summary:   summary,
+        p_user_id:   user.id,
+        p_user_name: user.name,
+      });
+    } catch (e) {
+      console.warn("[quote] snapshot 실패 (계속 진행):", e);
+    }
+  }
+
   async function changeStatus(next: Status) {
     if (!header) return;
+    await snapshot(`결재상태: ${header.status} → ${next}`);
     const { error } = await supabase.from("quotes").update({ status: next, updated_at: new Date().toISOString() }).eq("id", header.id);
     if (error) { alert(`상태 변경 실패: ${error.message}`); return; }
     setHeader({ ...header, status: next });
   }
 
+  async function changeProgress(next: ProgressState) {
+    if (!header) return;
+    if (header.status !== "승인" && next !== "미시작") {
+      alert("진행상태 변경은 결재 [승인] 후에만 가능합니다.");
+      return;
+    }
+    await snapshot(`진행상태: ${header.progress_state} → ${next}`);
+    const { error } = await supabase.from("quotes").update({ progress_state: next, updated_at: new Date().toISOString() }).eq("id", header.id);
+    if (error) { alert(`진행상태 변경 실패: ${error.message}`); return; }
+    setHeader({ ...header, progress_state: next });
+  }
+
+  async function openRevisions() {
+    if (!header) return;
+    setRevOpen(true);
+    setRevLoading(true);
+    const { data, error } = await supabase.from("quote_revisions")
+      .select("id, revision_no, change_summary, changed_by_name, changed_at")
+      .eq("quote_id", header.id).order("revision_no", { ascending: false });
+    setRevLoading(false);
+    if (error) { alert(`수정 이력 로드 실패: ${error.message}`); return; }
+    setRevisions((data ?? []) as QuoteRevision[]);
+  }
+
+  function fmtDateTime(iso: string): string {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+  }
+
   return (
     <>
       {/* 화면 전용 툴바 (인쇄 시 숨김) */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex flex-wrap items-center gap-2 print:hidden">
-        <Link href="/quotes" className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400">← 목록</Link>
-        <span className="font-mono text-sm font-bold text-blue-600 dark:text-blue-400 ml-2">{header.quote_no}</span>
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-          header.status === "발행"   ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
-          : header.status === "승인" ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
-          : header.status === "취소" ? "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-300"
-          :                            "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
-        }`}>{header.status}</span>
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 print:hidden">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/quotes" className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400">← 목록</Link>
+          <span className="font-mono text-sm font-bold text-blue-600 dark:text-blue-400 ml-2">{header.quote_no}</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+            header.status === "발행"   ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+            : header.status === "승인" ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+            : header.status === "취소" ? "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-300"
+            :                            "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+          }`}>결재: {header.status}</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+            header.charge_type === "무상" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                                          : "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
+          }`}>{header.charge_type}</span>
 
-        <div className="ml-auto flex gap-2">
-          {admin && header.status === "작성중" && (
-            <button type="button" onClick={() => changeStatus("발행")}
-              className="px-3 py-1.5 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700">발행</button>
-          )}
-          {admin && header.status === "발행" && (
-            <button type="button" onClick={() => changeStatus("승인")}
-              className="px-3 py-1.5 text-xs rounded bg-green-700 text-white hover:bg-green-800">승인</button>
-          )}
-          {admin && header.status !== "취소" && (
-            <button type="button" onClick={() => { if (confirm("취소 처리하시겠습니까?")) changeStatus("취소"); }}
-              className="px-3 py-1.5 text-xs rounded bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 hover:bg-red-100">취소</button>
-          )}
-          <button type="button" onClick={() => window.print()}
-            className="px-3 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 font-semibold">🖨 인쇄</button>
+          <div className="ml-auto flex gap-2">
+            <button type="button" onClick={openRevisions}
+              className="px-3 py-1.5 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">📜 수정 이력</button>
+            {admin && header.status === "작성중" && (
+              <button type="button" onClick={() => changeStatus("발행")}
+                className="px-3 py-1.5 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700">발행</button>
+            )}
+            {admin && header.status === "발행" && (
+              <button type="button" onClick={() => changeStatus("승인")}
+                className="px-3 py-1.5 text-xs rounded bg-green-700 text-white hover:bg-green-800">승인</button>
+            )}
+            {admin && header.status !== "취소" && (
+              <button type="button" onClick={() => { if (confirm("취소 처리하시겠습니까?")) changeStatus("취소"); }}
+                className="px-3 py-1.5 text-xs rounded bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 hover:bg-red-100">취소</button>
+            )}
+            <button type="button" onClick={() => window.print()}
+              className="px-3 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 font-semibold">🖨 인쇄</button>
+          </div>
+        </div>
+
+        {/* 진행상태 스텝퍼 — 결재 [승인] 이후의 후속 진행 */}
+        <div className="mt-3 flex items-center gap-1 overflow-x-auto">
+          <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 mr-2 whitespace-nowrap">진행상태</span>
+          {PROGRESS_FLOW.map((s, i) => {
+            const curIdx = PROGRESS_FLOW.indexOf(header.progress_state);
+            const isCurrent = s === header.progress_state;
+            const isPast = i < curIdx;
+            const isNext = i === curIdx + 1;
+            const canClick = admin && header.status === "승인" && (isNext || isPast);
+            return (
+              <div key={s} className="flex items-center">
+                <button
+                  type="button"
+                  disabled={!canClick}
+                  onClick={() => {
+                    if (!canClick) return;
+                    if (isPast) {
+                      if (!confirm(`진행상태를 [${s}] 로 되돌리시겠습니까?`)) return;
+                    }
+                    changeProgress(s);
+                  }}
+                  title={
+                    !admin ? "관리자만 변경 가능"
+                    : header.status !== "승인" ? "결재 [승인] 후 변경 가능"
+                    : isCurrent ? "현재 단계"
+                    : isNext ? `다음 단계로 진행 (${s})`
+                    : isPast ? `이전 단계로 되돌리기 (${s})`
+                    : "건너뛰기 불가"
+                  }
+                  className={`px-2.5 py-1 text-[11px] rounded font-semibold whitespace-nowrap transition-colors ${
+                    isCurrent
+                      ? "bg-blue-600 text-white ring-2 ring-blue-300"
+                      : isPast
+                      ? "bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-300"
+                      : isNext
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300"
+                      : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed"
+                  } ${!canClick && !isCurrent ? "cursor-not-allowed opacity-70" : ""}`}
+                >
+                  {isPast && "✓ "}{s}
+                </button>
+                {i < PROGRESS_FLOW.length - 1 && (
+                  <span className={`mx-0.5 text-[10px] ${i < curIdx ? "text-blue-400" : "text-gray-300 dark:text-gray-600"}`}>→</span>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -361,6 +481,51 @@ function QuoteDetailInner() {
           <div className="text-center text-[10px] text-gray-500 mt-3">2025년 승강기안전 국무총리상 수상기업 (주)대솔이엘</div>
         </div>
       </div>
+
+      {/* 수정 이력 모달 (화면 전용) */}
+      <DraggableModal
+        open={revOpen}
+        onClose={() => setRevOpen(false)}
+        panelClassName="w-full max-w-2xl max-h-[80vh]"
+        header={(
+          <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div>
+              <div className="text-base font-bold text-gray-900 dark:text-white">견적서 수정 이력</div>
+              <div className="text-xs text-gray-500 mt-0.5">{header.quote_no} · 총 {revisions.length}건</div>
+            </div>
+            <button onClick={() => setRevOpen(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          </div>
+        )}
+      >
+        <div className="p-5 overflow-y-auto">
+          {revLoading ? (
+            <div className="text-center py-8 text-sm text-gray-500">로딩 중...</div>
+          ) : revisions.length === 0 ? (
+            <div className="text-center py-8 text-sm text-gray-400">수정 이력이 없습니다.</div>
+          ) : (
+            <table className="w-full text-xs">
+              <thead className="border-b border-gray-200 dark:border-gray-700">
+                <tr className="text-left text-gray-500 dark:text-gray-400">
+                  <th className="px-2 py-2 w-12">Rev</th>
+                  <th className="px-2 py-2 w-40">변경 시각</th>
+                  <th className="px-2 py-2 w-24">변경자</th>
+                  <th className="px-2 py-2">요약</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {revisions.map(r => (
+                  <tr key={r.id} className="text-gray-700 dark:text-gray-300">
+                    <td className="px-2 py-2 font-mono font-bold text-blue-600 dark:text-blue-400">#{r.revision_no}</td>
+                    <td className="px-2 py-2 font-mono">{fmtDateTime(r.changed_at)}</td>
+                    <td className="px-2 py-2">{r.changed_by_name ?? "-"}</td>
+                    <td className="px-2 py-2">{r.change_summary ?? "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </DraggableModal>
 
       {/* 소견서 모달 (화면 전용) */}
       {(() => {

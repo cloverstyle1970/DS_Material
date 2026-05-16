@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, hasMenuPermission, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -8,6 +8,8 @@ import { api } from "@/lib/api-client";
 import { MaterialRecord } from "@/lib/mock-materials";
 
 const MENU_HREF = "/quotes/new";
+const DEFAULT_ROW_COUNT = 5;
+const DEFAULT_MAT_TYPE: "DS" | "TK" = "DS";
 
 // ============================================================
 // 타입
@@ -20,6 +22,12 @@ interface QuoteSettings {
   profit_rate: number;
 }
 
+interface SiteOption {
+  id: number;
+  name: string;
+  alias?: string | null;
+}
+
 interface ItemRow {
   key: string;            // local
   material_id: string;
@@ -29,9 +37,10 @@ interface ItemRow {
   qty: number;
   unit_price: number;
   remark: string;
+  elevator_name: string;
   opinion_text: string;
   opinion_image_url: string;
-  // 검색 UI 상태
+  // 자재 검색 UI 상태
   searchOpen: boolean;
   searchResults: MaterialRecord[];
   searchFocusIndex: number;
@@ -42,6 +51,7 @@ function newRow(seed: Partial<ItemRow> = {}): ItemRow {
     key: crypto.randomUUID(),
     material_id: "", material_name: "", spec: "", unit: "EA",
     qty: 1, unit_price: 0, remark: "",
+    elevator_name: "",
     opinion_text: "", opinion_image_url: "",
     searchOpen: false, searchResults: [], searchFocusIndex: -1,
     ...seed,
@@ -54,6 +64,12 @@ function fmtNum(n: number): string {
 function parseNum(s: string): number {
   const v = s.replace(/[^0-9-]/g, "");
   return v === "" || v === "-" ? 0 : Number(v);
+}
+function parseDecimal(s: string): number {
+  const v = s.replace(/[^0-9.]/g, "");
+  if (v === "" || v === ".") return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
 }
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -70,28 +86,38 @@ export default function QuoteEntryClient() {
   // 헤더 입력
   const [quoteDate, setQuoteDate]         = useState(todayISO());
   const [siteName, setSiteName]           = useState("");
-  const [elevatorName, setElevatorName]   = useState("");
   const [workTitle, setWorkTitle]         = useState("승강기 노후부품 보완 건");
   const [customerName, setCustomerName]   = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [note, setNote]                   = useState("");
 
-  // 라인
-  const [rows, setRows] = useState<ItemRow[]>([newRow(), newRow(), newRow()]);
+  // 현장/호기 마스터
+  const [sites, setSites] = useState<SiteOption[]>([]);
+  const [elevatorOptions, setElevatorOptions] = useState<string[]>([]);
+  const elevatorDatalistId = "quote-entry-elevator-options";
 
-  // 인건비/비율
-  const [directLabor, setDirectLabor] = useState<number>(0);
+  // 자재 라인 (기본 5줄)
+  const [rows, setRows] = useState<ItemRow[]>(() => Array.from({ length: DEFAULT_ROW_COUNT }, () => newRow()));
+
+  // 자재 검색 시 매터타입 필터 (기본 DS)
+  const [matTypeFilter, setMatTypeFilter] = useState<"DS" | "TK" | "ALL">(DEFAULT_MAT_TYPE);
+
+  // 인건비 — 공/식 모드
+  const [laborMode, setLaborMode]           = useState<"공" | "식">("공");
+  const [laborManhours, setLaborManhours]   = useState<number>(1);     // 공모드=공수, 식모드=통합 공수합
+  const [laborUnitPrice, setLaborUnitPrice] = useState<number>(0);     // 1공당 단가
+
   const [indirectRate, setIndirectRate] = useState<number>(8);
   const [overheadRate, setOverheadRate] = useState<number>(10);
-  const [profitRate, setProfitRate] = useState<number>(8);
+  const [profitRate, setProfitRate]     = useState<number>(8);
   const [truncateAmount, setTruncateAmount] = useState<number>(0);
-  const [truncateManual, setTruncateManual] = useState<boolean>(false); // 사용자 수동 수정 여부
+  const [truncateManual, setTruncateManual] = useState<boolean>(false);
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // ============================================================
-  // 초기 설정 로드
+  // 초기 로드
   // ============================================================
 
   useEffect(() => {
@@ -99,13 +125,24 @@ export default function QuoteEntryClient() {
       const { data } = await supabase.from("quote_settings").select("*").eq("id", 1).single();
       if (data) {
         setSettings(data as QuoteSettings);
-        setDirectLabor(data.default_direct_labor ?? 0);
+        setLaborUnitPrice(data.default_direct_labor ?? 0);
         setIndirectRate(Number(data.indirect_labor_rate ?? 8));
         setOverheadRate(Number(data.overhead_rate ?? 10));
         setProfitRate(Number(data.profit_rate ?? 8));
       }
     })();
+    api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
   }, []);
+
+  // 현장 변경 시 호기 목록 로드
+  useEffect(() => {
+    if (!siteName.trim()) { setElevatorOptions([]); return; }
+    (async () => {
+      const { data } = await supabase.from("elevators")
+        .select("unit_name").eq("site_name", siteName).order("unit_name");
+      setElevatorOptions((data ?? []).map(e => (e as { unit_name: string }).unit_name).filter(Boolean));
+    })();
+  }, [siteName]);
 
   if (!user) return <div className="p-8 text-center text-sm text-gray-500">로그인이 필요합니다.</div>;
   const admin = isAdmin(user);
@@ -116,12 +153,14 @@ export default function QuoteEntryClient() {
   // ============================================================
 
   const materialSubtotal = rows.reduce((s, r) => s + (r.material_id ? r.qty * r.unit_price : 0), 0);
+  // 공모드: direct = unit_price * manhours
+  // 식모드: 식수=1 이지만 입력된 공수합 × 단가 로 동일하게 계산
+  const directLabor      = Math.round(laborUnitPrice * laborManhours);
   const indirectLabor    = Math.round(directLabor * indirectRate / 100);
   const laborSubtotal    = directLabor + indirectLabor;
   const overhead         = Math.round((materialSubtotal + laborSubtotal) * overheadRate / 100);
   const profit           = Math.round((laborSubtotal + overhead) * profitRate / 100);
 
-  // 절사금액 자동: 자재만 있으면 0, 그 외에는 합계의 천원 단위 절사
   const subBeforeTrunc = materialSubtotal + laborSubtotal + overhead + profit;
   const isMaterialOnly = laborSubtotal === 0 && overhead === 0 && profit === 0;
   useEffect(() => {
@@ -152,7 +191,8 @@ export default function QuoteEntryClient() {
       return;
     }
     try {
-      const data = await api.get<MaterialRecord[]>(`/api/materials?q=${encodeURIComponent(query)}`);
+      const matParam = matTypeFilter === "ALL" ? "" : `&matType=${matTypeFilter}`;
+      const data = await api.get<MaterialRecord[]>(`/api/materials?q=${encodeURIComponent(query)}${matParam}`);
       const sliced = data.slice(0, 12);
       patchRow(key, { searchResults: sliced, searchOpen: sliced.length > 0, searchFocusIndex: sliced.length === 1 ? 0 : -1 });
     } catch {
@@ -161,7 +201,6 @@ export default function QuoteEntryClient() {
   }
 
   async function applyMaterial(key: string, m: MaterialRecord) {
-    // 자재 마스터에서 소견서까지 가져오기 (캐시된 search 결과는 opinion_*가 없을 수 있음)
     let op_text = "";
     let op_image = "";
     try {
@@ -215,11 +254,15 @@ export default function QuoteEntryClient() {
     setSaving(true);
     try {
       const quote_no = await generateQuoteNo();
+      // 헤더 elevator_name 은 행 elevator 의 유니크 집합으로 자동 도출 (단일이면 그 값, 복수면 콤마 결합)
+      const elevSet = Array.from(new Set(validItems.map(r => r.elevator_name.trim()).filter(Boolean)));
+      const headerElevator = elevSet.length === 0 ? null : elevSet.join(", ");
+
       const { data: header, error: e1 } = await supabase.from("quotes").insert({
         quote_no,
         quote_date: quoteDate,
         site_name: siteName || null,
-        elevator_name: elevatorName || null,
+        elevator_name: headerElevator,
         work_title: workTitle || null,
         customer_name: customerName || null,
         customer_phone: customerPhone || null,
@@ -233,6 +276,9 @@ export default function QuoteEntryClient() {
         indirect_labor_rate: indirectRate,
         overhead_rate: overheadRate,
         profit_rate: profitRate,
+        labor_mode:       laborMode,
+        labor_manhours:   laborManhours,
+        labor_unit_price: laborUnitPrice,
         note: note || null,
         created_by_id: user.id,
         created_by_name: user.name,
@@ -250,6 +296,7 @@ export default function QuoteEntryClient() {
           unit_price: r.unit_price,
           amount: r.qty * r.unit_price,
           remark: r.remark || null,
+          elevator_name: r.elevator_name || null,
           opinion_text: r.opinion_text || null,
           opinion_image_url: r.opinion_image_url || null,
           sort_order: (i + 1) * 10,
@@ -259,10 +306,12 @@ export default function QuoteEntryClient() {
 
       setMessage({ type: "success", text: `견적서가 등록되었습니다. (${quote_no})` });
       // 폼 리셋
-      setRows([newRow(), newRow(), newRow()]);
-      setSiteName(""); setElevatorName(""); setCustomerName(""); setCustomerPhone("");
+      setRows(Array.from({ length: DEFAULT_ROW_COUNT }, () => newRow()));
+      setSiteName(""); setCustomerName(""); setCustomerPhone("");
       setNote("");
-      setDirectLabor(settings?.default_direct_labor ?? 0);
+      setLaborMode("공");
+      setLaborManhours(1);
+      setLaborUnitPrice(settings?.default_direct_labor ?? 0);
       setTruncateManual(false);
       setTruncateAmount(0);
     } catch (e) {
@@ -288,6 +337,11 @@ export default function QuoteEntryClient() {
         <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">자재비·인건비·일반관리비·이윤 자동 계산</p>
       </div>
 
+      {/* 호기 자동완성용 datalist */}
+      <datalist id={elevatorDatalistId}>
+        {elevatorOptions.map(e => <option key={e} value={e} />)}
+      </datalist>
+
       <div className="p-6 space-y-4 max-w-6xl">
         {/* 견적 정보 */}
         <div className={sectionCls}>
@@ -297,13 +351,14 @@ export default function QuoteEntryClient() {
               <label className={labelCls}>견적일자</label>
               <input type="date" value={quoteDate} onChange={e => setQuoteDate(e.target.value)} className={inputCls} />
             </div>
-            <div>
-              <label className={labelCls}>현장명</label>
-              <input type="text" value={siteName} onChange={e => setSiteName(e.target.value)} lang="ko" className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>호기</label>
-              <input type="text" value={elevatorName} onChange={e => setElevatorName(e.target.value)} lang="ko" className={inputCls} />
+            <div className="lg:col-span-2">
+              <label className={labelCls}>현장명 <span className="text-[10px] text-gray-400">(검색 또는 직접입력)</span></label>
+              <SiteInlineSearch value={siteName} onChange={setSiteName} sites={sites} inputCls={inputCls} />
+              {elevatorOptions.length > 0 && (
+                <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                  ※ 이 현장의 호기 {elevatorOptions.length}개 — 자재 행의 [호기] 입력란 클릭 시 자동완성됨
+                </div>
+              )}
             </div>
             <div className="lg:col-span-3">
               <label className={labelCls}>작업명</label>
@@ -322,22 +377,35 @@ export default function QuoteEntryClient() {
 
         {/* 자재비 라인 */}
         <div className={sectionCls}>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">📦 자재비</h2>
-            <button type="button" onClick={addRow}
-              className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700">+ 행 추가</button>
+            <div className="flex items-center gap-2 ml-auto">
+              <div className="flex gap-0.5 bg-gray-100 dark:bg-gray-700 p-0.5 rounded">
+                {(["DS", "TK", "ALL"] as const).map(t => (
+                  <button key={t} type="button" onClick={() => setMatTypeFilter(t)}
+                    className={`px-2.5 py-1 text-[11px] font-semibold rounded transition-colors ${
+                      matTypeFilter === t
+                        ? "bg-blue-600 text-white"
+                        : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                    }`}>{t === "ALL" ? "전체" : t}</button>
+                ))}
+              </div>
+              <button type="button" onClick={addRow}
+                className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700">+ 행 추가</button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-700/50 border-y border-gray-200 dark:border-gray-600 text-center text-[11px] font-bold text-gray-600 dark:text-gray-300">
                   <th className="px-2 py-2 w-10">NO</th>
+                  <th className="px-2 py-2 w-20">호기</th>
                   <th className="px-2 py-2">품      목</th>
                   <th className="px-2 py-2">규  격</th>
-                  <th className="px-2 py-2 w-16">단위</th>
-                  <th className="px-2 py-2 w-20">수량</th>
-                  <th className="px-2 py-2 w-28">단    가</th>
-                  <th className="px-2 py-2 w-32">금    액</th>
+                  <th className="px-2 py-2 w-14">단위</th>
+                  <th className="px-2 py-2 w-16">수량</th>
+                  <th className="px-2 py-2 w-24">단    가</th>
+                  <th className="px-2 py-2 w-28">금    액</th>
                   <th className="px-2 py-2">비  고</th>
                   <th className="px-2 py-2 w-12">소견</th>
                   <th className="px-2 py-2 w-10"></th>
@@ -349,6 +417,13 @@ export default function QuoteEntryClient() {
                   return (
                     <tr key={r.key} className="border-b border-gray-100 dark:border-gray-700 hover:bg-blue-50/20 dark:hover:bg-blue-900/10">
                       <td className="px-2 py-1.5 text-center text-gray-600 dark:text-gray-400">{i + 1}</td>
+                      <td className="px-1 py-0.5">
+                        <input type="text" lang="ko" value={r.elevator_name}
+                          list={elevatorDatalistId}
+                          onChange={e => patchRow(r.key, { elevator_name: e.target.value })}
+                          placeholder={elevatorOptions[0] ?? "호기"}
+                          className={cellInput + " text-center"} />
+                      </td>
                       <td className="px-1 py-0.5 relative">
                         <input type="text" lang="ko" value={r.material_name}
                           onChange={e => {
@@ -367,7 +442,7 @@ export default function QuoteEntryClient() {
                             else if (e.key === "Escape") patchRow(r.key, { searchOpen: false });
                           }}
                           onBlur={() => setTimeout(() => patchRow(r.key, { searchOpen: false }), 150)}
-                          placeholder="자재명·코드·규격 검색"
+                          placeholder={`자재명·코드 검색 (${matTypeFilter === "ALL" ? "전체" : matTypeFilter})`}
                           className={cellInput} />
                         {r.searchOpen && r.searchResults.length > 0 && (
                           <div className="absolute z-50 top-full left-0 mt-0.5 w-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl">
@@ -413,7 +488,7 @@ export default function QuoteEntryClient() {
                       </td>
                       <td className="px-1 py-0.5 text-center">
                         {r.opinion_text || r.opinion_image_url ? (
-                          <span title={r.opinion_text} className="text-blue-500" >📝</span>
+                          <span title={r.opinion_text} className="text-blue-500">📝</span>
                         ) : (
                           <span className="text-gray-300 dark:text-gray-600">—</span>
                         )}
@@ -425,7 +500,7 @@ export default function QuoteEntryClient() {
                   );
                 })}
                 <tr className="bg-gray-50 dark:bg-gray-700/40 border-t-2 border-gray-300 dark:border-gray-600 font-bold">
-                  <td colSpan={6} className="px-2 py-2 text-right text-gray-700 dark:text-gray-200">자재비 소계</td>
+                  <td colSpan={7} className="px-2 py-2 text-right text-gray-700 dark:text-gray-200">자재비 소계</td>
                   <td className="px-2 py-2 text-right tabular-nums text-blue-600 dark:text-blue-400">{fmtNum(materialSubtotal)}</td>
                   <td colSpan={3}></td>
                 </tr>
@@ -436,13 +511,45 @@ export default function QuoteEntryClient() {
 
         {/* 인건비 + 비율 */}
         <div className={sectionCls}>
-          <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3">👷 인건비 / 요율</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">👷 인건비 / 요율</h2>
+            <div className="flex gap-0.5 bg-gray-100 dark:bg-gray-700 p-0.5 rounded">
+              {(["공", "식"] as const).map(m => (
+                <button key={m} type="button" onClick={() => {
+                  setLaborMode(m);
+                  if (m === "식") setLaborManhours(prev => prev || 1);
+                }}
+                  className={`px-3 py-1 text-[11px] font-bold rounded transition-colors ${
+                    laborMode === m
+                      ? "bg-blue-600 text-white"
+                      : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                  }`}
+                  title={m === "공" ? "단위: 공 (1인 1일). 단가 × 공수" : "단위: 식 (여러 작업 통합). 식수=1, 통합 공수합 × 단가"}
+                >{m}</button>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div>
-              <label className={labelCls}>직접인건비 <span className="text-[10px] text-gray-400">(기본값 자동, 수정가능)</span></label>
-              <input type="text" inputMode="numeric" value={directLabor === 0 ? "" : fmtNum(directLabor)}
-                onChange={e => setDirectLabor(parseNum(e.target.value))}
+              <label className={labelCls}>1공 단가 <span className="text-[10px] text-gray-400">(기본값 자동)</span></label>
+              <input type="text" inputMode="numeric" value={laborUnitPrice === 0 ? "" : fmtNum(laborUnitPrice)}
+                onChange={e => setLaborUnitPrice(parseNum(e.target.value))}
                 className={inputCls + " text-right tabular-nums font-semibold"} />
+            </div>
+            <div>
+              <label className={labelCls}>
+                {laborMode === "공" ? "공수" : "통합 공수합"}
+                {laborMode === "식" && <span className="text-[10px] text-gray-400 ml-1">(여러 작업 합)</span>}
+              </label>
+              <input type="text" inputMode="decimal" value={laborManhours === 0 ? "" : String(laborManhours)}
+                onChange={e => setLaborManhours(parseDecimal(e.target.value))}
+                placeholder="예: 2.5"
+                className={inputCls + " text-right tabular-nums font-semibold"} />
+              <div className="text-[11px] text-gray-500 mt-1">
+                {laborMode === "공"
+                  ? `${laborManhours}공 × ${fmtNum(laborUnitPrice)}원 = ${fmtNum(directLabor)}원`
+                  : `1식 (${laborManhours}공 통합) × ${fmtNum(laborUnitPrice)}원 = ${fmtNum(directLabor)}원`}
+              </div>
             </div>
             <div>
               <label className={labelCls}>간접인건비율 (%)</label>
@@ -488,7 +595,13 @@ export default function QuoteEntryClient() {
                   <td className="py-1.5 text-right tabular-nums text-gray-800 dark:text-gray-100">{fmtNum(materialSubtotal)} 원</td>
                 </tr>
                 <tr>
-                  <td className="py-1.5 text-gray-600 dark:text-gray-300">2. 인건비 <span className="text-xs text-gray-400">(직접 + 간접)</span></td>
+                  <td className="py-1.5 text-gray-600 dark:text-gray-300">
+                    2. 인건비 <span className="text-xs text-gray-400">
+                      ({laborMode === "공"
+                        ? `${laborManhours}공 + 간접 ${indirectRate}%`
+                        : `1식(${laborManhours}공 통합) + 간접 ${indirectRate}%`})
+                    </span>
+                  </td>
                   <td className="py-1.5 text-right tabular-nums text-gray-800 dark:text-gray-100">{fmtNum(laborSubtotal)} 원</td>
                 </tr>
                 <tr>
@@ -552,6 +665,79 @@ export default function QuoteEntryClient() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// 현장명 인라인 자동완성 (직접입력도 가능)
+// ============================================================
+
+function SiteInlineSearch({
+  value, onChange, sites, inputCls,
+}: { value: string; onChange: (v: string) => void; sites: SiteOption[]; inputCls: string }) {
+  const [open, setOpen] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const ref = useRef<HTMLDivElement>(null);
+  const ulRef = useRef<HTMLUListElement>(null);
+  const q = value.trim().toLowerCase();
+  const suggestions = q
+    ? sites.filter(s =>
+        s.name.toLowerCase().includes(q) ||
+        (s.alias?.toLowerCase().includes(q) ?? false)
+      ).slice(0, 12)
+    : [];
+
+  useEffect(() => { setFocusedIndex(-1); }, [value]);
+
+  useEffect(() => {
+    if (focusedIndex >= 0 && ulRef.current) {
+      const el = ulRef.current.children[focusedIndex] as HTMLElement;
+      if (el) el.scrollIntoView({ block: "nearest" });
+    }
+  }, [focusedIndex]);
+
+  useEffect(() => {
+    function h(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!open || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setFocusedIndex(i => (i < suggestions.length - 1 ? i + 1 : i)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setFocusedIndex(i => (i > 0 ? i - 1 : 0)); }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      if (focusedIndex >= 0) { onChange(suggestions[focusedIndex].name); setOpen(false); }
+      else if (suggestions.length === 1) { onChange(suggestions[0].name); setOpen(false); }
+    }
+    else if (e.key === "Escape") setOpen(false);
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <input type="text" lang="ko" value={value}
+        onChange={e => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => value.trim() && setOpen(true)}
+        onKeyDown={handleKeyDown}
+        placeholder="현장명·별칭 검색 (직접입력 가능)"
+        className={inputCls} />
+      {open && suggestions.length > 0 && (
+        <ul ref={ulRef} className="absolute z-50 top-full left-0 mt-0.5 w-full max-w-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+          {suggestions.map((s, idx) => (
+            <li key={s.id}>
+              <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => { onChange(s.name); setOpen(false); }}
+                className={`w-full text-left px-3 py-2 text-xs text-gray-800 dark:text-gray-200 border-b border-gray-50 dark:border-gray-700 last:border-0 ${focusedIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-blue-50 dark:hover:bg-blue-900/20"}`}>
+                <span className="font-medium">{s.name}</span>
+                {s.alias && s.alias !== s.name && (
+                  <span className="ml-2 text-[10px] text-gray-400 dark:text-gray-500">({s.alias})</span>
+                )}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
