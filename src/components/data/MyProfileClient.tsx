@@ -141,9 +141,20 @@ export default function MyProfileClient() {
   const meIsAdmin = user ? isAdmin(user) : false;
 
   // 관리자 대리편집 대상 (null = 본인 편집)
-  const [adminTargetId, setAdminTargetId] = useState<number | null>(null);
-  const editingUserId = adminTargetId ?? user?.id ?? null;
-  const isAdminEditing = adminTargetId !== null;
+  // sessionStorage 값을 동기적으로 lazy-init해 첫 load부터 올바른 ID로 fire되게 함.
+  // 비-admin이거나 본인 ID와 같은 경우는 resolve effect에서 다시 정리한다.
+  const [adminTargetId, setAdminTargetId] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = sessionStorage.getItem(ADMIN_EDIT_USER_KEY);
+      const id = raw ? Number(raw) : NaN;
+      return Number.isFinite(id) ? id : null;
+    } catch { return null; }
+  });
+  // meIsAdmin이 아니면 sessionStorage 값을 무시 (비-admin은 무조건 본인 편집)
+  const effectiveTargetId = meIsAdmin ? adminTargetId : null;
+  const editingUserId = effectiveTargetId ?? user?.id ?? null;
+  const isAdminEditing = effectiveTargetId !== null && effectiveTargetId !== user?.id;
 
   // 부서/직급 마스터 — 대리편집 모드에서만 select 필요
   const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
@@ -253,8 +264,12 @@ export default function MyProfileClient() {
     })();
   }, [isAdminEditing, departments.length, ranks.length]);
 
+  // 마지막으로 fire한 load 요청 식별자. 더 늦게 도착한 stale 응답을 폐기해 race condition 차단.
+  const loadReqRef = useRef(0);
+
   useEffect(() => {
     if (!editingUserId) return;
+    const reqId = ++loadReqRef.current;
     setLoaded(false);
     (async () => {
       const [u, fam, veh, cert, car, rp] = await Promise.all([
@@ -265,6 +280,8 @@ export default function MyProfileClient() {
         supabase.from("user_career_history").select("*").eq("user_id", editingUserId).order("sort_order"),
         supabase.from("user_rewards_punishments").select("*").eq("user_id", editingUserId).order("sort_order"),
       ]);
+      // 후속 load가 시작됐다면 이 응답은 무시 (target 사용자가 admin 자신으로 덮어쓰이지 않도록)
+      if (reqId !== loadReqRef.current) return;
       const r = u.data as UserRow | null;
       if (r) {
         setRow(r);
