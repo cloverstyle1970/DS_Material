@@ -4,10 +4,13 @@ import { useState, useMemo, useEffect } from "react";
 import { UserRecord, Permission } from "@/lib/mock-users";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useTabs, MAX_TABS } from "@/context/TabsContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
 import DraggableModal from "@/components/common/DraggableModal";
 import PermissionsModal from "./PermissionsModal";
+
+export const ADMIN_EDIT_USER_KEY = "ds_admin_edit_user_id";
 
 type SortKey = "id" | "name" | "dept" | "rank" | "cert" | "hireDate" | "phone" | "status";
 type SortDir = "asc" | "desc";
@@ -71,10 +74,28 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
   const meIsAdmin = me ? isAdmin(me) : false;
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const { tabs, openTab } = useTabs();
 
   useEffect(() => {
     api.get<UserRecord[]>("/api/users").then(setUsers).catch(() => {});
   }, []);
+
+  // 관리자: 사원 이름 클릭 → 개인정보수정 탭에 대상 사용자로 진입
+  function openProfileEdit(u: UserRecord) {
+    if (!meIsAdmin) return;
+    try {
+      sessionStorage.setItem(ADMIN_EDIT_USER_KEY, String(u.id));
+      // MyProfileClient 가 같은 탭에 마운트돼 있으면 즉시 재로딩하도록 이벤트 발행
+      window.dispatchEvent(new CustomEvent("ds:admin-edit-user-changed", { detail: { userId: u.id } }));
+    } catch {}
+    const href = "/data/profile";
+    const alreadyOpen = tabs.some(t => t.href === href);
+    if (!alreadyOpen && tabs.length >= MAX_TABS) {
+      alert(`탭은 최대 ${MAX_TABS}개까지 열 수 있습니다. 다른 탭을 닫고 다시 시도해주세요.`);
+      return;
+    }
+    openTab(href, "개인정보수정");
+  }
 
   function toggleSort(key: SortKey) {
     if (key === sortKey) setSortDir(d => d === "asc" ? "desc" : "asc");
@@ -189,7 +210,19 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
                 <tr key={u.id} onClick={() => setSelected(u)}
                   className={`transition-colors cursor-pointer ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-50"}`}>
                   <td className={`px-4 py-3 text-center text-xs whitespace-nowrap ${isDark ? "text-gray-400" : "text-gray-400"}`}>{u.id}</td>
-                  <td className={`px-4 py-3 text-center font-medium whitespace-nowrap ${isDark ? "text-white" : "text-gray-800"}`}>{u.name}</td>
+                  <td className={`px-4 py-3 text-center font-medium whitespace-nowrap ${isDark ? "text-white" : "text-gray-800"}`}>
+                    {meIsAdmin ? (
+                      <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); openProfileEdit(u); }}
+                        title="개인정보수정으로 이동 (관리자 편집 모드)"
+                        className="inline-flex items-center gap-1 group hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                      >
+                        <span className="underline decoration-dotted decoration-slate-400 group-hover:decoration-blue-500">{u.name}</span>
+                        <span className="text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">✏️</span>
+                      </button>
+                    ) : u.name}
+                  </td>
                   <td className={`px-4 py-3 text-center whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"}`}>{u.dept ?? "-"}</td>
                   <td className={`px-4 py-3 text-center whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"}`}>{u.rank ?? "-"}</td>
                   <td className={`px-4 py-3 text-center text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>{u.cert ?? "-"}</td>
@@ -247,7 +280,7 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
         )}
       </div>
 
-      {/* 상세 모달 */}
+      {/* 상세 모달 (읽기 전용) */}
       <DraggableModal
         open={!!selected && !editPerms}
         onClose={() => setSelected(null)}
@@ -263,8 +296,12 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
             </div>
             <div className="flex items-center gap-2">
               {meIsAdmin && (
-                <button type="button" onClick={() => setEditPerms(selected)}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors font-medium">권한 수정</button>
+                <>
+                  <button type="button" onClick={() => { setSelected(null); openProfileEdit(selected); }}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors font-medium">📝 정보 수정</button>
+                  <button type="button" onClick={() => setEditPerms(selected)}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors font-medium">권한 수정</button>
+                </>
               )}
               <button type="button" onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none ml-1">×</button>
             </div>

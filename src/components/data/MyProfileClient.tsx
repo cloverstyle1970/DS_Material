@@ -1,10 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef, FormEvent } from "react";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { hashPassword } from "@/lib/password";
-import { formatDate as formatYmd, formatPhone } from "@/lib/input-format";
+import { formatDate as formatYmd, formatPhone, formatSsn } from "@/lib/input-format";
+
+// 사원관리(UsersClient)에서 관리자가 사원 이름을 클릭할 때 세팅됨
+// 같은 키를 UsersClient에서도 export 해 사용
+const ADMIN_EDIT_USER_KEY = "ds_admin_edit_user_id";
 
 const PHOTO_BUCKET = "employee-photos";
 const CERT_DOCS_BUCKET = "cert-docs";
@@ -134,12 +138,30 @@ function displaySsn(ssn: string | null | undefined): string {
 
 export default function MyProfileClient() {
   const { user } = useAuth();
+  const meIsAdmin = user ? isAdmin(user) : false;
+
+  // 관리자 대리편집 대상 (null = 본인 편집)
+  const [adminTargetId, setAdminTargetId] = useState<number | null>(null);
+  const editingUserId = adminTargetId ?? user?.id ?? null;
+  const isAdminEditing = adminTargetId !== null;
+
+  // 부서/직급 마스터 — 대리편집 모드에서만 select 필요
+  const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
+  const [ranks, setRanks] = useState<{ id: number; name: string }[]>([]);
 
   const [tab, setTab] = useState<TabKey>("basic");
   const [loaded, setLoaded] = useState(false);
   const [row, setRow] = useState<UserRow | null>(null);
 
-  // 기본정보 편집 가능 필드
+  // 관리자 모드 한정: 잠금 필드도 편집 가능
+  const [editName, setEditName]         = useState("");
+  const [editSsn, setEditSsn]           = useState("");
+  const [editHireDate, setEditHireDate] = useState("");
+  const [editDept, setEditDept]         = useState("");
+  const [editRank, setEditRank]         = useState("");
+  const [editStatus, setEditStatus]     = useState("재직");
+
+  // 기본정보 편집 가능 필드 (본인/관리자 공통)
   const [gender, setGender] = useState<"M" | "F" | "">("");
   const [bloodType, setBloodType] = useState("");
   const [phone, setPhone] = useState("");
@@ -202,20 +224,56 @@ export default function MyProfileClient() {
     document.body.appendChild(s);
   }, []);
 
+  // 관리자 대리편집 대상 resolve — sessionStorage 변화에 반응
   useEffect(() => {
-    if (!user) return;
+    function resolve() {
+      if (!user || !isAdmin(user)) { setAdminTargetId(null); return; }
+      try {
+        const raw = sessionStorage.getItem(ADMIN_EDIT_USER_KEY);
+        const id = raw ? Number(raw) : NaN;
+        setAdminTargetId(Number.isFinite(id) && id !== user.id ? id : null);
+      } catch { setAdminTargetId(null); }
+    }
+    resolve();
+    window.addEventListener("ds:admin-edit-user-changed", resolve);
+    return () => window.removeEventListener("ds:admin-edit-user-changed", resolve);
+  }, [user]);
+
+  // 부서/직급 마스터 — 대리편집 모드 진입 시 1회 로드
+  useEffect(() => {
+    if (!isAdminEditing) return;
+    if (departments.length > 0 && ranks.length > 0) return;
+    (async () => {
+      const [d, r] = await Promise.all([
+        supabase.from("departments").select("id, name").eq("is_active", true).order("sort_order"),
+        supabase.from("ranks").select("id, name").eq("is_active", true).order("sort_order"),
+      ]);
+      if (d.data) setDepartments(d.data as { id: number; name: string }[]);
+      if (r.data) setRanks(r.data as { id: number; name: string }[]);
+    })();
+  }, [isAdminEditing, departments.length, ranks.length]);
+
+  useEffect(() => {
+    if (!editingUserId) return;
+    setLoaded(false);
     (async () => {
       const [u, fam, veh, cert, car, rp] = await Promise.all([
-        supabase.from("users").select("*").eq("id", user.id).single(),
-        supabase.from("user_family_members").select("*").eq("user_id", user.id).order("sort_order"),
-        supabase.from("user_vehicles").select("*").eq("user_id", user.id).order("sort_order"),
-        supabase.from("user_certifications").select("*").eq("user_id", user.id).order("sort_order"),
-        supabase.from("user_career_history").select("*").eq("user_id", user.id).order("sort_order"),
-        supabase.from("user_rewards_punishments").select("*").eq("user_id", user.id).order("sort_order"),
+        supabase.from("users").select("*").eq("id", editingUserId).single(),
+        supabase.from("user_family_members").select("*").eq("user_id", editingUserId).order("sort_order"),
+        supabase.from("user_vehicles").select("*").eq("user_id", editingUserId).order("sort_order"),
+        supabase.from("user_certifications").select("*").eq("user_id", editingUserId).order("sort_order"),
+        supabase.from("user_career_history").select("*").eq("user_id", editingUserId).order("sort_order"),
+        supabase.from("user_rewards_punishments").select("*").eq("user_id", editingUserId).order("sort_order"),
       ]);
       const r = u.data as UserRow | null;
       if (r) {
         setRow(r);
+        setEditName(r.name ?? "");
+        setEditSsn(displaySsn(r.ssn));
+        setEditHireDate(r.hire_date ?? "");
+        setEditDept(r.dept ?? "");
+        setEditRank(r.rank ?? "");
+        setEditStatus(r.status ?? "재직");
         setGender((r.gender ?? "") as "M" | "F" | "");
         setBloodType(r.blood_type ?? "");
         setPhone(r.phone ?? "");
@@ -227,6 +285,9 @@ export default function MyProfileClient() {
         setBottomSize(r.uniform_bottom_size ?? "");
         setShoesSize(r.safety_shoes_size ?? "");
         setPhotoUrl(r.photo_url ?? null);
+        setPhotoFile(null);
+        setPhotoPreview("");
+        setMessage(null);
       }
       type FamilyRow = Partial<FamilyMember> & { gender?: string | null; phone?: string | null; is_emergency?: boolean | null };
       setFamily(((fam.data ?? []) as FamilyRow[]).map(f => ({
@@ -286,7 +347,12 @@ export default function MyProfileClient() {
       })));
       setLoaded(true);
     })();
-  }, [user]);
+  }, [editingUserId]);
+
+  function returnToSelf() {
+    try { sessionStorage.removeItem(ADMIN_EDIT_USER_KEY); } catch {}
+    setAdminTargetId(null);
+  }
 
   if (!user) {
     return <div className="p-8 text-center text-sm text-gray-500">로그인이 필요합니다.</div>;
@@ -309,7 +375,8 @@ export default function MyProfileClient() {
   }
 
   async function uploadFile(bucket: string, file: Blob, ext: string): Promise<string> {
-    const path = `${user!.id}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const ownerId = editingUserId ?? user!.id;
+    const path = `${ownerId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const { error: upErr } = await supabase.storage.from(bucket).upload(path, file, { cacheControl: "3600", upsert: false });
     if (upErr) throw upErr;
     const { data } = supabase.storage.from(bucket).getPublicUrl(path);
@@ -360,17 +427,18 @@ export default function MyProfileClient() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!user || !row) return;
+    if (!user || !row || !editingUserId) return;
     setMessage(null);
 
-    // 긴급연락처 1명 필수
-    const emergency = family.find(m => m.is_emergency);
-    if (!emergency) {
-      setMessage({ type: "error", text: "[가족정보] 긴급연락처 1명을 지정하세요." });
-      setTab("family"); return;
+    // 관리자 대리편집 모드: 잠금 필드 검증
+    if (isAdminEditing) {
+      if (!editName.trim()) { setMessage({ type: "error", text: "[기본정보] 성명은 필수입니다." }); setTab("basic"); return; }
     }
-    if (!emergency.relationship.trim() || !emergency.name.trim() || !emergency.phone.trim()) {
-      setMessage({ type: "error", text: "[가족정보] 긴급연락처의 관계·성명·연락처는 모두 필수입니다." });
+
+    // 긴급연락처 — 선택. 지정한 경우에만 필수필드 검증
+    const emergency = family.find(m => m.is_emergency);
+    if (emergency && (!emergency.relationship.trim() || !emergency.name.trim() || !emergency.phone.trim())) {
+      setMessage({ type: "error", text: "[가족정보] 긴급연락처 지정 시 관계·성명·연락처는 모두 필수입니다." });
       setTab("family"); return;
     }
 
@@ -409,29 +477,38 @@ export default function MyProfileClient() {
       }
       const fullAddress = [addressBasic, addressDetail].filter(Boolean).join(" ").trim();
 
-      // users — 본인 수정 가능 필드만. hire_date/dept/rank/status/name/ssn 제외.
-      const { error: uErr } = await supabase.from("users").update({
+      // users — 본인 수정 가능 필드. 관리자 대리편집 모드에서는 잠금 필드(name/ssn/hire_date/dept/rank/status)도 함께 갱신.
+      const usersPatch: Record<string, unknown> = {
         gender: gender || null,
         blood_type: bloodType || null,
         phone: phone || null,
         email: email || null,
-        emergency_contact: `${emergency.relationship} ${emergency.name} ${emergency.phone}`.trim(),
+        emergency_contact: emergency ? `${emergency.relationship} ${emergency.name} ${emergency.phone}`.trim() : null,
         postal_code: postalCode || null,
         address: fullAddress || null,
         photo_url: newPhotoUrl,
         uniform_top_size: topSize || null,
         uniform_bottom_size: bottomSize || null,
         safety_shoes_size: shoesSize || null,
-      }).eq("id", user.id);
+      };
+      if (isAdminEditing) {
+        usersPatch.name      = editName.trim();
+        usersPatch.ssn       = editSsn || null;
+        usersPatch.hire_date = editHireDate || null;
+        usersPatch.dept      = editDept || null;
+        usersPatch.rank      = editRank || null;
+        usersPatch.status    = editStatus || null;
+      }
+      const { error: uErr } = await supabase.from("users").update(usersPatch).eq("id", editingUserId);
       if (uErr) throw uErr;
 
       // 가족 — 전체 삭제 후 재삽입
-      await supabase.from("user_family_members").delete().eq("user_id", user.id);
+      await supabase.from("user_family_members").delete().eq("user_id", editingUserId);
       const validFam = family.filter(m => m.relationship.trim() && m.name.trim());
       if (validFam.length > 0) {
         const { error: fErr } = await supabase.from("user_family_members").insert(
           validFam.map((m, i) => ({
-            user_id: user.id,
+            user_id: editingUserId,
             relationship: m.relationship,
             name: m.name.trim(),
             gender: m.gender || null,
@@ -447,12 +524,12 @@ export default function MyProfileClient() {
       }
 
       // 차량 — 회사차량은 관리자가 관리하므로 보존
-      await supabase.from("user_vehicles").delete().eq("user_id", user.id).neq("vehicle_type", "회사차량");
+      await supabase.from("user_vehicles").delete().eq("user_id", editingUserId).neq("vehicle_type", "회사차량");
       const editableVehicles = vehicles.filter(v => v.vehicle_type !== "회사차량");
       if (editableVehicles.length > 0) {
         const { error: vErr } = await supabase.from("user_vehicles").insert(
           editableVehicles.map((v, i) => ({
-            user_id: user.id,
+            user_id: editingUserId,
             vehicle_type: v.vehicle_type,
             plate_number: v.plate_number.trim(),
             model: v.model.trim(),
@@ -466,7 +543,7 @@ export default function MyProfileClient() {
       }
 
       // 자격
-      await supabase.from("user_certifications").delete().eq("user_id", user.id);
+      await supabase.from("user_certifications").delete().eq("user_id", editingUserId);
       if (certs.length > 0) {
         const certRows: Array<Record<string, unknown>> = [];
         for (let i = 0; i < certs.length; i++) {
@@ -477,7 +554,7 @@ export default function MyProfileClient() {
             docUrl = await uploadFile(CERT_DOCS_BUCKET, c.doc_file, ext);
           }
           certRows.push({
-            user_id: user.id,
+            user_id: editingUserId,
             cert_name: c.cert_name.trim(),
             cert_number: c.cert_number || null,
             self_check: c.self_check,
@@ -493,11 +570,11 @@ export default function MyProfileClient() {
       }
 
       // 경력
-      await supabase.from("user_career_history").delete().eq("user_id", user.id);
+      await supabase.from("user_career_history").delete().eq("user_id", editingUserId);
       if (careers.length > 0) {
         const { error: cErr } = await supabase.from("user_career_history").insert(
           careers.map((c, i) => ({
-            user_id: user.id,
+            user_id: editingUserId,
             company_name: c.company_name.trim(),
             joined_date: c.joined_date || null,
             left_date: c.left_date || null,
@@ -511,11 +588,11 @@ export default function MyProfileClient() {
       }
 
       // 상벌
-      await supabase.from("user_rewards_punishments").delete().eq("user_id", user.id);
+      await supabase.from("user_rewards_punishments").delete().eq("user_id", editingUserId);
       if (rps.length > 0) {
         const { error: rpErr } = await supabase.from("user_rewards_punishments").insert(
           rps.map((r, i) => ({
-            user_id: user.id,
+            user_id: editingUserId,
             kind: r.kind,
             content: r.content.trim(),
             occurred_on: r.occurred_on || null,
@@ -530,7 +607,7 @@ export default function MyProfileClient() {
         setPhotoFile(null);
         setPhotoPreview("");
       }
-      setMessage({ type: "success", text: "개인정보가 저장되었습니다." });
+      setMessage({ type: "success", text: isAdminEditing ? `${editName.trim()} 님의 정보가 저장되었습니다.` : "개인정보가 저장되었습니다." });
     } catch (err) {
       console.error("[my-profile] save error:", err);
       const msg = err instanceof Error ? err.message : (() => { try { return JSON.stringify(err); } catch { return String(err); } })();
@@ -558,9 +635,24 @@ export default function MyProfileClient() {
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
         <h1 className="text-base font-bold text-gray-900 dark:text-white">개인정보수정</h1>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-          본인의 정보만 수정할 수 있습니다 · 성명·주민번호·입사일·부서·직급·재직상태는 관리자만 변경 가능
+          {isAdminEditing
+            ? "🛡️ 관리자 편집 모드 — 잠금 필드 포함 모든 정보를 수정할 수 있습니다."
+            : "본인의 정보만 수정할 수 있습니다 · 성명·주민번호·입사일·부서·직급·재직상태는 관리자만 변경 가능"}
         </p>
       </div>
+
+      {isAdminEditing && (
+        <div className="px-6 py-2 bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-800 flex items-center justify-between">
+          <div className="text-xs text-amber-800 dark:text-amber-200">
+            🔧 <strong>관리자 편집 모드</strong>
+            {row && <> — <span className="font-semibold">{row.name}</span> 님 (사원번호 #{row.id}) 의 정보를 편집 중</>}
+          </div>
+          <button type="button" onClick={returnToSelf}
+            className="text-xs px-3 py-1 rounded-lg bg-white dark:bg-gray-800 border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-800/50 font-medium">
+            ↩ 내 정보로 돌아가기
+          </button>
+        </div>
+      )}
 
       {/* 탭 */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 lg:px-6 overflow-x-auto">
@@ -638,12 +730,19 @@ export default function MyProfileClient() {
                   <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3">기본 정보</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     <div>
-                      <label className={labelCls}>성명 🔒</label>
-                      <input type="text" value={row.name} readOnly className={lockedCls} />
+                      <label className={labelCls}>성명 {isAdminEditing ? <span className="text-red-500">*</span> : "🔒"}</label>
+                      {isAdminEditing
+                        ? <input type="text" value={editName} onChange={e => setEditName(e.target.value)} lang="ko" required className={inputCls} />
+                        : <input type="text" value={row.name} readOnly className={lockedCls} />}
                     </div>
                     <div>
-                      <label className={labelCls}>주민등록번호 🔒</label>
-                      <input type="text" value={displaySsn(row.ssn)} readOnly className={lockedCls + " font-mono"} />
+                      <label className={labelCls}>주민등록번호 {isAdminEditing ? "" : "🔒"}</label>
+                      {isAdminEditing
+                        ? <input type="text" value={editSsn}
+                            onChange={e => setEditSsn(formatSsn(e.target.value))}
+                            placeholder="000000-0000000" inputMode="numeric" maxLength={14}
+                            className={inputCls + " font-mono"} />
+                        : <input type="text" value={displaySsn(row.ssn)} readOnly className={lockedCls + " font-mono"} />}
                     </div>
                     <div>
                       <label className={labelCls}>성별</label>
@@ -654,20 +753,53 @@ export default function MyProfileClient() {
                       </select>
                     </div>
                     <div>
-                      <label className={labelCls}>입사일 🔒</label>
-                      <input type="text" value={row.hire_date ?? ""} readOnly className={lockedCls} />
+                      <label className={labelCls}>입사일 {isAdminEditing ? "" : "🔒"}</label>
+                      {isAdminEditing
+                        ? <input type="text" value={editHireDate}
+                            onChange={e => setEditHireDate(formatYmd(e.target.value))}
+                            placeholder="YYYYMMDD" inputMode="numeric" maxLength={10}
+                            className={inputCls + " font-mono"} />
+                        : <input type="text" value={row.hire_date ?? ""} readOnly className={lockedCls} />}
                     </div>
                     <div>
-                      <label className={labelCls}>부서 🔒</label>
-                      <input type="text" value={row.dept ?? ""} readOnly className={lockedCls} />
+                      <label className={labelCls}>부서 {isAdminEditing ? "" : "🔒"}</label>
+                      {isAdminEditing ? (
+                        <select value={editDept} onChange={e => setEditDept(e.target.value)} className={inputCls}>
+                          <option value="">선택</option>
+                          {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                          {editDept && !departments.some(d => d.name === editDept) && (
+                            <option value={editDept}>{editDept} (마스터 외)</option>
+                          )}
+                        </select>
+                      ) : (
+                        <input type="text" value={row.dept ?? ""} readOnly className={lockedCls} />
+                      )}
                     </div>
                     <div>
-                      <label className={labelCls}>직급 🔒</label>
-                      <input type="text" value={row.rank ?? ""} readOnly className={lockedCls} />
+                      <label className={labelCls}>직급 {isAdminEditing ? "" : "🔒"}</label>
+                      {isAdminEditing ? (
+                        <select value={editRank} onChange={e => setEditRank(e.target.value)} className={inputCls}>
+                          <option value="">선택</option>
+                          {ranks.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+                          {editRank && !ranks.some(r => r.name === editRank) && (
+                            <option value={editRank}>{editRank} (마스터 외)</option>
+                          )}
+                        </select>
+                      ) : (
+                        <input type="text" value={row.rank ?? ""} readOnly className={lockedCls} />
+                      )}
                     </div>
                     <div>
-                      <label className={labelCls}>재직상태 🔒</label>
-                      <input type="text" value={row.status ?? ""} readOnly className={lockedCls} />
+                      <label className={labelCls}>재직상태 {isAdminEditing ? "" : "🔒"}</label>
+                      {isAdminEditing ? (
+                        <select value={editStatus} onChange={e => setEditStatus(e.target.value)} className={inputCls}>
+                          <option value="재직">재직</option>
+                          <option value="퇴사">퇴사</option>
+                          <option value="휴직">휴직</option>
+                        </select>
+                      ) : (
+                        <input type="text" value={row.status ?? ""} readOnly className={lockedCls} />
+                      )}
                     </div>
                     <div>
                       <label className={labelCls}>혈액형</label>
@@ -739,7 +871,8 @@ export default function MyProfileClient() {
               </div>
             </div>
 
-            {/* 로그인 비밀번호 변경 */}
+            {/* 로그인 비밀번호 변경 — 본인 편집 모드 전용 (관리자 대리편집에서는 숨김) */}
+            {!isAdminEditing && (
             <div className={sectionCls}>
               <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-1">🔐 로그인 비밀번호 변경</h2>
               <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-3">새 비밀번호는 4자 이상이어야 합니다.</p>
@@ -782,6 +915,7 @@ export default function MyProfileClient() {
                 </button>
               </div>
             </div>
+            )}
           </>
         )}
 
@@ -791,7 +925,7 @@ export default function MyProfileClient() {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">가족정보 ({family.length}명)</h2>
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">⚠️ 긴급연락처 1명 필수 — 각 행의 [긴급연락처 지정] 체크</p>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">긴급연락처 지정은 선택 사항 — 필요 시 가족 중 1명의 [긴급연락처 지정] 체크</p>
               </div>
               <button type="button" onClick={() => setFamily(p => [...p, { ...EMPTY_FAMILY }])}
                 className="px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800">+ 가족 추가</button>
