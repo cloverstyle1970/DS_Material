@@ -150,6 +150,7 @@ export default function QuoteRequestsListClient() {
                 <tr className="text-left text-xs font-semibold text-gray-500 dark:text-gray-400">
                   <th className="px-3 py-2">요청번호</th>
                   <th className="px-3 py-2">접수일시</th>
+                  <th className="px-3 py-2 text-center">구분</th>
                   <th className="px-3 py-2">현장</th>
                   <th className="px-3 py-2">호기</th>
                   <th className="px-3 py-2">작업명</th>
@@ -159,14 +160,19 @@ export default function QuoteRequestsListClient() {
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {loading ? (
-                  <tr><td colSpan={7} className="text-center py-10 text-gray-500">로딩 중...</td></tr>
+                  <tr><td colSpan={8} className="text-center py-10 text-gray-500">로딩 중...</td></tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={7} className="text-center py-10 text-gray-400">데이터가 없습니다.</td></tr>
+                  <tr><td colSpan={8} className="text-center py-10 text-gray-400">데이터가 없습니다.</td></tr>
                 ) : filtered.map(r => (
                   <tr key={r.id} onClick={() => openDetail(r)}
                     className={`cursor-pointer transition-colors ${selectedId === r.id ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-gray-50 dark:hover:bg-gray-800/50"}`}>
                     <td className="px-3 py-2 font-mono text-xs font-bold text-blue-600 dark:text-blue-400">{r.request_no}</td>
                     <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-300 font-mono">{fmtDT(r.requested_at)}</td>
+                    <td className="px-3 py-2 text-center">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                        유상견적요청
+                      </span>
+                    </td>
                     <td className="px-3 py-2 text-xs font-medium text-gray-800 dark:text-gray-100">{r.site_name ?? "-"}</td>
                     <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-300">{r.elevator_name ?? "-"}</td>
                     <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-200 truncate max-w-[200px]">{r.work_title ?? "-"}</td>
