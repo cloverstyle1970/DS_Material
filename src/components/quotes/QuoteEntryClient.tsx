@@ -11,6 +11,12 @@ const MENU_HREF = "/quotes/new";
 const DEFAULT_ROW_COUNT = 5;
 const DEFAULT_MAT_TYPE: "DS" | "TK" = "DS";
 
+// 무상(FM) 현장 — 계약구분이 다음 중 하나면 견적 대신 자재신청 권유
+const FM_CONTRACT_TYPES = new Set<string>(["TK-FM", "대솔FM", "DS-FM"]);
+
+// 과거 출고 이력 풍선말에 표시할 건수
+const PAST_ISSUANCE_LIMIT = 5;
+
 // ============================================================
 // 타입
 // ============================================================
@@ -26,6 +32,22 @@ interface SiteOption {
   id: number;
   name: string;
   alias?: string | null;
+}
+
+interface SiteContractInfo {
+  contract_type:  string | null;
+  contract_start: string | null;
+  contract_end:   string | null;
+  warranty_start: string | null;
+  warranty_end:   string | null;
+  company_type:   string | null;   // TK / DS
+}
+
+interface PastIssuance {
+  created_at: string;       // ISO
+  qty: number;
+  user_name: string | null;
+  note: string | null;
 }
 
 interface ItemRow {
@@ -44,6 +66,9 @@ interface ItemRow {
   searchOpen: boolean;
   searchResults: MaterialRecord[];
   searchFocusIndex: number;
+  // 과거 출고 이력 (site+elevator+material 매치)
+  pastIssuances: PastIssuance[];
+  pastLoading: boolean;
 }
 
 function newRow(seed: Partial<ItemRow> = {}): ItemRow {
@@ -54,8 +79,23 @@ function newRow(seed: Partial<ItemRow> = {}): ItemRow {
     elevator_name: "",
     opinion_text: "", opinion_image_url: "",
     searchOpen: false, searchResults: [], searchFocusIndex: -1,
+    pastIssuances: [], pastLoading: false,
     ...seed,
   };
+}
+
+function daysBetween(fromIso: string | null, toIso: string | null): number | null {
+  if (!fromIso || !toIso) return null;
+  const a = new Date(fromIso).getTime();
+  const b = new Date(toIso).getTime();
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  return Math.round((b - a) / 86400000);
+}
+
+function fmtYmd(iso: string | null | undefined): string {
+  if (!iso) return "-";
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : String(iso);
 }
 
 function fmtNum(n: number): string {
@@ -95,6 +135,11 @@ export default function QuoteEntryClient() {
   const [sites, setSites] = useState<SiteOption[]>([]);
   const [elevatorOptions, setElevatorOptions] = useState<string[]>([]);
   const elevatorDatalistId = "quote-entry-elevator-options";
+  const [siteInfo, setSiteInfo] = useState<SiteContractInfo | null>(null);
+
+  // 유상/무상
+  const [chargeType, setChargeType] = useState<"유상" | "무상">("유상");
+  const [chargeAutoApplied, setChargeAutoApplied] = useState(false); // FM 자동전환 사용자 인지 표시
 
   // 자재 라인 (기본 5줄)
   const [rows, setRows] = useState<ItemRow[]>(() => Array.from({ length: DEFAULT_ROW_COUNT }, () => newRow()));
@@ -134,13 +179,32 @@ export default function QuoteEntryClient() {
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
   }, []);
 
-  // 현장 변경 시 호기 목록 로드
+  // 현장 변경 시 호기 + 계약/하자 정보 로드
   useEffect(() => {
-    if (!siteName.trim()) { setElevatorOptions([]); return; }
+    if (!siteName.trim()) {
+      setElevatorOptions([]);
+      setSiteInfo(null);
+      setChargeAutoApplied(false);
+      return;
+    }
     (async () => {
-      const { data } = await supabase.from("elevators")
-        .select("unit_name").eq("site_name", siteName).order("unit_name");
-      setElevatorOptions((data ?? []).map(e => (e as { unit_name: string }).unit_name).filter(Boolean));
+      const [elev, site] = await Promise.all([
+        supabase.from("elevators")
+          .select("unit_name").eq("site_name", siteName).order("unit_name"),
+        supabase.from("sites")
+          .select("contract_type, contract_start, contract_end, warranty_start, warranty_end, company_type")
+          .eq("name", siteName).maybeSingle(),
+      ]);
+      setElevatorOptions((elev.data ?? []).map(e => (e as { unit_name: string }).unit_name).filter(Boolean));
+      const info = (site.data ?? null) as SiteContractInfo | null;
+      setSiteInfo(info);
+      // FM 계약구분이면 charge_type 자동 '무상' 권유 (사용자가 수동 변경한 경우 덮어쓰지 않음)
+      if (info?.contract_type && FM_CONTRACT_TYPES.has(info.contract_type)) {
+        setChargeType("무상");
+        setChargeAutoApplied(true);
+      } else {
+        setChargeAutoApplied(false);
+      }
     })();
   }, [siteName]);
 
@@ -218,8 +282,42 @@ export default function QuoteEntryClient() {
       opinion_text: op_text,
       opinion_image_url: op_image,
       searchResults: [], searchOpen: false, searchFocusIndex: -1,
+      pastIssuances: [], pastLoading: false,
+    });
+    // 과거 출고 이력 조회 (현장+호기+자재 매치)
+    // 행 elevator 가 비어 있으면 호기 자동완성 첫 값 사용
+    const row = rows.find(r => r.key === key);
+    const elev = (row?.elevator_name || "").trim();
+    void loadPastIssuances(key, m.id, elev);
+  }
+
+  // 과거 출고 이력 로드 — site+elevator+material 매치
+  async function loadPastIssuances(rowKey: string, materialId: string, elevator: string) {
+    if (!siteName.trim() || !materialId) return;
+    patchRow(rowKey, { pastLoading: true });
+    let q = supabase.from("transactions")
+      .select("created_at, qty, user_name, site_name, elevator_name, note")
+      .eq("type", "출고")
+      .eq("material_id", materialId)
+      .eq("site_name", siteName)
+      .order("created_at", { ascending: false })
+      .limit(PAST_ISSUANCE_LIMIT);
+    if (elevator) q = q.eq("elevator_name", elevator);
+    const { data } = await q;
+    patchRow(rowKey, {
+      pastLoading: false,
+      pastIssuances: (data ?? []) as PastIssuance[],
     });
   }
+
+  // 현장/호기 변경 시 이미 자재가 선택된 행들의 이력 재조회
+  useEffect(() => {
+    rows.forEach(r => {
+      if (!r.material_id) return;
+      void loadPastIssuances(r.key, r.material_id, r.elevator_name.trim());
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siteName]);
 
   // ============================================================
   // 저장
@@ -279,6 +377,7 @@ export default function QuoteEntryClient() {
         labor_mode:       laborMode,
         labor_manhours:   laborManhours,
         labor_unit_price: laborUnitPrice,
+        charge_type:      chargeType,
         note: note || null,
         created_by_id: user.id,
         created_by_name: user.name,
@@ -309,6 +408,8 @@ export default function QuoteEntryClient() {
       setRows(Array.from({ length: DEFAULT_ROW_COUNT }, () => newRow()));
       setSiteName(""); setCustomerName(""); setCustomerPhone("");
       setNote("");
+      setChargeType("유상");
+      setChargeAutoApplied(false);
       setLaborMode("공");
       setLaborManhours(1);
       setLaborUnitPrice(settings?.default_direct_labor ?? 0);
@@ -361,6 +462,27 @@ export default function QuoteEntryClient() {
               )}
             </div>
             <div className="lg:col-span-3">
+              <label className={labelCls}>구분</label>
+              <div className="flex items-center gap-2">
+                <div className="flex gap-0.5 bg-gray-100 dark:bg-gray-700 p-0.5 rounded">
+                  {(["유상", "무상"] as const).map(c => (
+                    <button key={c} type="button"
+                      onClick={() => { setChargeType(c); setChargeAutoApplied(false); }}
+                      className={`px-4 py-1 text-[11px] font-bold rounded transition-colors ${
+                        chargeType === c
+                          ? (c === "무상" ? "bg-amber-500 text-white" : "bg-blue-600 text-white")
+                          : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                      }`}>{c}</button>
+                  ))}
+                </div>
+                {chargeAutoApplied && (
+                  <span className="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 px-2 py-1 rounded border border-amber-200 dark:border-amber-700">
+                    🛡️ FM 현장({siteInfo?.contract_type}) — [무상] 자동 적용. 견적서 대신 [자재신청]을 사용해 주세요.
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="lg:col-span-3">
               <label className={labelCls}>작업명</label>
               <input type="text" value={workTitle} onChange={e => setWorkTitle(e.target.value)} lang="ko" className={inputCls} />
             </div>
@@ -374,6 +496,9 @@ export default function QuoteEntryClient() {
             </div>
           </div>
         </div>
+
+        {/* 현장 계약·하자기간 카드 */}
+        {siteInfo && <SiteContractCard info={siteInfo} siteName={siteName} />}
 
         {/* 자재비 라인 */}
         <div className={sectionCls}>
@@ -420,11 +545,19 @@ export default function QuoteEntryClient() {
                       <td className="px-1 py-0.5">
                         <input type="text" lang="ko" value={r.elevator_name}
                           list={elevatorDatalistId}
-                          onChange={e => patchRow(r.key, { elevator_name: e.target.value })}
+                          onChange={e => {
+                            const nv = e.target.value;
+                            patchRow(r.key, { elevator_name: nv });
+                            if (r.material_id) {
+                              // 호기가 변경되면 과거 이력 재조회
+                              setTimeout(() => loadPastIssuances(r.key, r.material_id, nv.trim()), 200);
+                            }
+                          }}
                           placeholder={elevatorOptions[0] ?? "호기"}
                           className={cellInput + " text-center"} />
                       </td>
                       <td className="px-1 py-0.5 relative">
+                        <div className="flex items-center gap-1">
                         <input type="text" lang="ko" value={r.material_name}
                           onChange={e => {
                             patchRow(r.key, { material_name: e.target.value });
@@ -444,6 +577,10 @@ export default function QuoteEntryClient() {
                           onBlur={() => setTimeout(() => patchRow(r.key, { searchOpen: false }), 150)}
                           placeholder={`자재명·코드 검색 (${matTypeFilter === "ALL" ? "전체" : matTypeFilter})`}
                           className={cellInput} />
+                          {r.material_id && (r.pastIssuances.length > 0 || r.pastLoading) && (
+                            <PastIssuanceBubble row={r} />
+                          )}
+                        </div>
                         {r.searchOpen && r.searchResults.length > 0 && (
                           <div className="absolute z-50 top-full left-0 mt-0.5 w-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl">
                             <ul className="max-h-52 overflow-y-auto">
@@ -739,5 +876,121 @@ function SiteInlineSearch({
         </ul>
       )}
     </div>
+  );
+}
+
+// ============================================================
+// 현장 계약·하자기간 카드
+// ============================================================
+
+function SiteContractCard({ info, siteName }: { info: SiteContractInfo; siteName: string }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const contractDays = daysBetween(today, info.contract_end);
+  const warrantyDays = daysBetween(today, info.warranty_end);
+  const isFm = info.contract_type ? FM_CONTRACT_TYPES.has(info.contract_type) : false;
+  const inWarranty = warrantyDays !== null && warrantyDays >= 0;
+
+  return (
+    <div className={`rounded-xl border p-4 ${
+      isFm
+        ? "bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700"
+        : "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"
+    }`}>
+      <div className="flex items-center gap-2 flex-wrap mb-3">
+        <span className="text-sm font-bold text-gray-800 dark:text-gray-100">📍 {siteName}</span>
+        {info.company_type && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
+            {info.company_type}
+          </span>
+        )}
+        {info.contract_type && (
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+            isFm
+              ? "bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-100"
+              : "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+          }`}>
+            {info.contract_type}{isFm && " (Full Maintenance)"}
+          </span>
+        )}
+        {inWarranty && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300">
+            🛡️ 하자기간 — D-{warrantyDays}
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
+        <div className="flex flex-col">
+          <span className="text-gray-500 dark:text-gray-400">계약기간</span>
+          <span className="font-mono text-gray-700 dark:text-gray-200">
+            {fmtYmd(info.contract_start)} ~ {fmtYmd(info.contract_end)}
+            {contractDays !== null && (
+              <span className={`ml-2 ${contractDays < 0 ? "text-red-500" : "text-gray-400"}`}>
+                ({contractDays < 0 ? `만료 ${-contractDays}일 경과` : `D-${contractDays}`})
+              </span>
+            )}
+          </span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-gray-500 dark:text-gray-400">하자기간</span>
+          <span className="font-mono text-gray-700 dark:text-gray-200">
+            {fmtYmd(info.warranty_start)} ~ {fmtYmd(info.warranty_end)}
+            {warrantyDays !== null && (
+              <span className={`ml-2 ${warrantyDays < 0 ? "text-gray-400" : "text-rose-500 font-bold"}`}>
+                ({warrantyDays < 0 ? `만료 ${-warrantyDays}일 경과` : `D-${warrantyDays}`})
+              </span>
+            )}
+          </span>
+        </div>
+      </div>
+      {isFm && (
+        <div className="mt-3 text-[11px] text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-900/40 px-3 py-2 rounded border border-amber-200 dark:border-amber-700">
+          ⚠️ FM(Full Maintenance) 현장입니다. 자재는 무상 제공 — 견적서 대신 [자재신청]을 사용해 주세요.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// 자재 라인 과거 출고 이력 풍선말
+// ============================================================
+
+function PastIssuanceBubble({ row }: { row: ItemRow }) {
+  const [open, setOpen] = useState(false);
+  if (row.pastLoading) {
+    return <span className="text-[9px] text-gray-400 px-1 whitespace-nowrap">…</span>;
+  }
+  const count = row.pastIssuances.length;
+  if (count === 0) return null;
+  return (
+    <span className="relative inline-block">
+      <button type="button"
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onClick={() => setOpen(o => !o)}
+        title={`이 현장·호기·자재의 과거 출고 ${count}건`}
+        className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-bold hover:bg-blue-200 dark:hover:bg-blue-800/50 cursor-help">
+        📜{count}
+      </button>
+      {open && (
+        <div className="absolute z-50 left-0 top-full mt-1 w-72 bg-slate-900 text-white rounded-lg shadow-xl p-2 text-[10px]">
+          <div className="font-bold text-[11px] mb-1.5 text-blue-300">
+            과거 출고 이력 (최근 {count}건)
+          </div>
+          <ul className="space-y-1">
+            {row.pastIssuances.map((p, i) => (
+              <li key={i} className="flex items-center gap-2 border-b border-slate-700 pb-1 last:border-0 last:pb-0">
+                <span className="font-mono text-slate-300 w-24 shrink-0">{fmtYmd(p.created_at)}</span>
+                <span className="text-amber-300 font-bold tabular-nums w-12 text-right">{p.qty}</span>
+                <span className="text-slate-400 truncate">{p.user_name ?? "-"}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-1 pt-1 border-t border-slate-700 text-[9px] text-slate-400">
+            마우스 호버 / 클릭으로 표시
+          </div>
+        </div>
+      )}
+    </span>
   );
 }
