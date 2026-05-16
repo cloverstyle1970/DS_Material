@@ -6,7 +6,7 @@ import * as XLSX from "xlsx";
 import { MaterialRequestRecord, RequestStatus, RequestType } from "@/lib/mock-material-requests";
 import { PurchaseOrderRecord, OrderStatus } from "@/lib/mock-purchase-orders";
 import { TransactionRecord } from "@/lib/mock-transactions";
-import { useAuth, isViewOnly } from "@/context/AuthContext";
+import { useAuth, isViewOnly, isAdmin } from "@/context/AuthContext";
 import StockHistoryClient from "@/components/stock/StockHistoryClient";
 import PurchaseOrderBulkUploadModal from "@/components/purchase/PurchaseOrderBulkUploadModal";
 import { api, getErrorMessage } from "@/lib/api-client";
@@ -261,6 +261,12 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
 
   const { user } = useAuth();
   const admin = user ? !isViewOnly(user) : false;
+  // 자재신청 가시성: 관리자(admin perm)는 전체, 그 외는 본인 신청만
+  const showOnlyMine = user ? !isAdmin(user) : false;
+  const visibleRequests = useMemo(
+    () => showOnlyMine && user ? requests.filter(r => r.requesterId === user.id) : requests,
+    [requests, showOnlyMine, user],
+  );
 
   // ── 자재신청 액션 ────────────────────────────────────────────────
   async function handleReqAction(id: number, action: string) {
@@ -341,8 +347,8 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
     }
   }
 
-  // ── 필터 ────────────────────────────────────────────────────────
-  const filteredReqs = requests.filter(r => {
+  // ── 필터 (가시성 = 본인만 또는 전체) ─────────────────────────────
+  const filteredReqs = visibleRequests.filter(r => {
     if (reqStatus !== "전체" && r.status !== reqStatus) return false;
     if (reqType !== "전체") {
       if (reqType === "기본") {
@@ -481,7 +487,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                   : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
               }`}>
               {t}
-              {t === "자재신청" && tabBadge(requests.filter(r => r.status === "신청").length, "bg-blue-100 text-blue-600")}
+              {t === "자재신청" && tabBadge(visibleRequests.filter(r => r.status === "신청").length, "bg-blue-100 text-blue-600")}
               {t === "발주"     && tabBadge(orders.filter(o => o.status === "발주").length,   "bg-indigo-100 text-indigo-600")}
             </button>
           ))}
@@ -491,6 +497,16 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
       {/* ═══ 자재신청 탭 ═══════════════════════════════════════════ */}
       {tab === "자재신청" && (
         <div className="space-y-3">
+          {showOnlyMine && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-200 text-amber-800 dark:bg-amber-800 dark:text-amber-100">
+                👤 본인 신청만 표시 중
+              </span>
+              <span className="text-[11px] text-amber-800 dark:text-amber-200">
+                관리자가 전체 신청을 처리합니다. 본 화면에서는 본인이 등록한 신청만 보입니다.
+              </span>
+            </div>
+          )}
           {/* 상태 필터 + 구분 필터 + 등록 */}
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
@@ -594,7 +610,9 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                 {sortedReqs.length === 0 ? (
                   <tr><td colSpan={admin ? 11 : 10} className="text-center py-16 text-gray-400 dark:text-gray-500">
-                    {requests.length === 0 ? "자재 신청 내역이 없습니다." : "조건에 맞는 내역이 없습니다."}
+                    {visibleRequests.length === 0
+                      ? (showOnlyMine ? "본인이 등록한 자재 신청 내역이 없습니다." : "자재 신청 내역이 없습니다.")
+                      : "조건에 맞는 내역이 없습니다."}
                   </td></tr>
                 ) : sortedReqs.map(r => {
                   const totalQty = r.items.reduce((s, i) => s + i.qty, 0);
