@@ -8,6 +8,7 @@ import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 import DraggableModal from "@/components/common/DraggableModal";
 import { getHolidaysForYear } from "@/lib/korean-holidays";
+import { formatPhone } from "@/lib/input-format";
 
 export interface ConstructionSchedule {
   id: number;
@@ -591,7 +592,7 @@ function CalendarContent() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">담당자 연락처</label>
-                  <input type="tel" value={managerPhone} onChange={e => setManagerPhone(e.target.value)} placeholder="예: 010-1234-5678" lang="ko" inputMode="tel" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                  <input type="tel" value={managerPhone} onChange={e => setManagerPhone(formatPhone(e.target.value))} placeholder="010-0000-0000 또는 02-000-0000" inputMode="tel" maxLength={14} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono" />
                 </div>
               </div>
               <div>

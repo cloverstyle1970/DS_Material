@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, FormEvent } from "react";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { hashPassword } from "@/lib/password";
+import { formatDate, formatPhone, formatSsn, genderFromSsn } from "@/lib/input-format";
 
 const STORAGE_BUCKET = "employee-photos";
 const CERT_DOCS_BUCKET = "cert-docs";
@@ -129,23 +130,6 @@ function emptyForm(): Form {
   };
 }
 
-function formatDateInput(value: string): string {
-  const d = value.replace(/\D/g, "").slice(0, 8);
-  if (d.length <= 4) return d;
-  if (d.length <= 6) return d.slice(0, 4) + "-" + d.slice(4);
-  return d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6);
-}
-
-// 주민번호 7번째 자리로 성별 자동 추정 (1·3·5·7 → 남, 2·4·6·8 → 여)
-function genderFromSsn(ssn: string): "M" | "F" | "" {
-  const m = ssn.replace(/\D/g, "");
-  if (m.length < 7) return "";
-  const c = m[6];
-  if ("1357".includes(c)) return "M";
-  if ("2468".includes(c)) return "F";
-  return "";
-}
-
 const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: "basic",   label: "기본정보",   icon: "👤" },
   { key: "family",  label: "가족정보",   icon: "👨‍👩‍👧" },
@@ -159,7 +143,7 @@ export default function EmployeeRegisterClient() {
   const { user } = useAuth();
   const [tab, setTab] = useState<TabKey>("basic");
   const [form, setForm] = useState<Form>(emptyForm());
-  const [family, setFamily] = useState<FamilyMember[]>([{ ...EMPTY_FAMILY, is_emergency: true }]);
+  const [family, setFamily] = useState<FamilyMember[]>([{ ...EMPTY_FAMILY }]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [certs, setCerts] = useState<Certification[]>([]);
   const [careers, setCareers] = useState<Career[]>([]);
@@ -266,20 +250,6 @@ export default function EmployeeRegisterClient() {
     if (photoInputRef.current) photoInputRef.current.value = "";
   }
 
-  function formatSsn(value: string): string {
-    const d = value.replace(/\D/g, "").slice(0, 13);
-    if (d.length <= 6) return d;
-    return d.slice(0, 6) + "-" + d.slice(6);
-  }
-
-  function formatPhone(value: string): string {
-    const d = value.replace(/\D/g, "").slice(0, 11);
-    if (d.length < 4) return d;
-    if (d.length < 8) return d.slice(0, 3) + "-" + d.slice(3);
-    if (d.length === 10) return d.slice(0, 3) + "-" + d.slice(3, 6) + "-" + d.slice(6);
-    return d.slice(0, 3) + "-" + d.slice(3, 7) + "-" + d.slice(7);
-  }
-
   // 긴급연락처 1명만 가능 — 토글 시 다른 행은 해제
   function setEmergency(targetIdx: number, on: boolean) {
     setFamily(prev => prev.map((m, i) => ({
@@ -302,7 +272,7 @@ export default function EmployeeRegisterClient() {
 
   function resetAll() {
     setForm(emptyForm());
-    setFamily([{ ...EMPTY_FAMILY, is_emergency: true }]);
+    setFamily([{ ...EMPTY_FAMILY }]);
     setVehicles([]);
     setCerts([]);
     setCareers([]);
@@ -318,7 +288,6 @@ export default function EmployeeRegisterClient() {
 
     // ---------------- 검증 ----------------
     if (!form.name.trim())     { setMessage({ type: "error", text: "[기본정보] 성명을 입력하세요." }); setTab("basic"); return; }
-    if (!form.ssn.trim())      { setMessage({ type: "error", text: "[기본정보] 주민등록번호를 입력하세요." }); setTab("basic"); return; }
     if (!form.hireDate)        { setMessage({ type: "error", text: "[기본정보] 입사일을 입력하세요." }); setTab("basic"); return; }
     if (!form.phone.trim())    { setMessage({ type: "error", text: "[기본정보] 휴대폰 번호를 입력하세요." }); setTab("basic"); return; }
     if (!form.initial_password.trim()) {
@@ -328,14 +297,10 @@ export default function EmployeeRegisterClient() {
       setMessage({ type: "error", text: "[기본정보] 초기 비밀번호는 4자 이상이어야 합니다." }); setTab("basic"); return;
     }
 
-    // 긴급연락처 1명 필수
+    // 긴급연락처 — 선택. 지정된 경우에만 필수필드 검증
     const emergency = family.find(m => m.is_emergency);
-    if (!emergency) {
-      setMessage({ type: "error", text: "[가족정보] 긴급연락처 1명을 지정하세요." });
-      setTab("family"); return;
-    }
-    if (!emergency.relationship.trim() || !emergency.name.trim() || !emergency.phone.trim()) {
-      setMessage({ type: "error", text: "[가족정보] 긴급연락처의 관계·성명·연락처는 모두 필수입니다." });
+    if (emergency && (!emergency.relationship.trim() || !emergency.name.trim() || !emergency.phone.trim())) {
+      setMessage({ type: "error", text: "[가족정보] 긴급연락처 지정 시 관계·성명·연락처는 모두 입력해야 합니다." });
       setTab("family"); return;
     }
 
@@ -395,8 +360,8 @@ export default function EmployeeRegisterClient() {
         status: form.status,
         phone: form.phone || null,
         email: form.email || null,
-        // 호환: 긴급연락처 텍스트 한 줄 요약을 emergency_contact 컬럼에도 저장
-        emergency_contact: `${emergency.relationship} ${emergency.name} ${emergency.phone}`.trim(),
+        // 호환: 긴급연락처가 지정된 경우 텍스트 한 줄 요약을 emergency_contact 컬럼에도 저장
+        emergency_contact: emergency ? `${emergency.relationship} ${emergency.name} ${emergency.phone}`.trim() : null,
         postal_code: form.postal_code || null,
         address: fullAddress || null,
         photo_url: photoUrl,
@@ -635,14 +600,13 @@ export default function EmployeeRegisterClient() {
                       <input type="text" value={form.name} onChange={e => set("name", e.target.value)} required lang="ko" className={inputCls} />
                     </div>
                     <div>
-                      <label className={labelCls}>주민등록번호 <span className="text-red-500">*</span></label>
+                      <label className={labelCls}>주민등록번호</label>
                       <input type="text" value={form.ssn}
                         onChange={e => {
                           const v = formatSsn(e.target.value);
                           setForm(f => ({ ...f, ssn: v, gender: genderFromSsn(v) || f.gender }));
                         }}
-                        placeholder="000000-0000000" inputMode="numeric" maxLength={14}
-                        required
+                        placeholder="000000-0000000 (선택)" inputMode="numeric" maxLength={14}
                         className={inputCls + " font-mono"} />
                     </div>
                     <div>
@@ -712,7 +676,7 @@ export default function EmployeeRegisterClient() {
                         <label className={labelCls}>휴대폰 <span className="text-red-500">*</span></label>
                         <input type="tel" value={form.phone}
                           onChange={e => set("phone", formatPhone(e.target.value))}
-                          placeholder="010-0000-0000" inputMode="numeric" maxLength={13}
+                          placeholder="010-0000-0000 또는 02-000-0000" inputMode="tel" maxLength={14}
                           required
                           className={inputCls + " font-mono"} />
                       </div>
@@ -797,7 +761,7 @@ export default function EmployeeRegisterClient() {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">가족정보 ({family.length}명)</h2>
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">⚠️ 긴급연락처 1명 필수 — 각 행의 [긴급연락처 지정] 체크</p>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">긴급연락처 지정은 선택 사항 — 필요 시 가족 중 1명의 [긴급연락처 지정] 체크</p>
               </div>
               <button type="button"
                 onClick={() => setFamily(prev => [...prev, { ...EMPTY_FAMILY }])}
@@ -858,7 +822,7 @@ export default function EmployeeRegisterClient() {
                       <label className={labelCls}>연락처 {m.is_emergency && <span className="text-red-500">*</span>}</label>
                       <input type="tel" value={m.phone}
                         onChange={e => setFamily(prev => prev.map((f, idx) => idx === i ? { ...f, phone: formatPhone(e.target.value) } : f))}
-                        placeholder="010-0000-0000" inputMode="numeric" maxLength={13}
+                        placeholder="010-0000-0000 또는 02-000-0000" inputMode="tel" maxLength={14}
                         className={inputCls + " font-mono"} />
                     </div>
                     <div>
@@ -881,7 +845,7 @@ export default function EmployeeRegisterClient() {
                     <div>
                       <label className={labelCls}>생년월일</label>
                       <input type="text" value={m.birth_date}
-                        onChange={e => setFamily(prev => prev.map((f, idx) => idx === i ? { ...f, birth_date: formatDateInput(e.target.value) } : f))}
+                        onChange={e => setFamily(prev => prev.map((f, idx) => idx === i ? { ...f, birth_date: formatDate(e.target.value) } : f))}
                         placeholder="YYYYMMDD" inputMode="numeric" maxLength={10}
                         className={inputCls + " font-mono"} />
                     </div>
@@ -956,14 +920,14 @@ export default function EmployeeRegisterClient() {
                     <div>
                       <label className={labelCls}>입사일</label>
                       <input type="text" value={c.joined_date}
-                        onChange={e => setCareers(prev => prev.map((x, idx) => idx === i ? { ...x, joined_date: formatDateInput(e.target.value) } : x))}
+                        onChange={e => setCareers(prev => prev.map((x, idx) => idx === i ? { ...x, joined_date: formatDate(e.target.value) } : x))}
                         placeholder="YYYYMMDD" inputMode="numeric" maxLength={10}
                         className={inputCls + " font-mono"} />
                     </div>
                     <div>
                       <label className={labelCls}>퇴사일</label>
                       <input type="text" value={c.left_date}
-                        onChange={e => setCareers(prev => prev.map((x, idx) => idx === i ? { ...x, left_date: formatDateInput(e.target.value) } : x))}
+                        onChange={e => setCareers(prev => prev.map((x, idx) => idx === i ? { ...x, left_date: formatDate(e.target.value) } : x))}
                         placeholder="YYYYMMDD (미입력 시 재직 중)" inputMode="numeric" maxLength={10}
                         className={inputCls + " font-mono"} />
                     </div>
@@ -1081,7 +1045,7 @@ export default function EmployeeRegisterClient() {
                     <div>
                       <label className={labelCls}>차량등록일</label>
                       <input type="text" value={v.registration_date}
-                        onChange={e => setVehicles(prev => prev.map((x, idx) => idx === i ? { ...x, registration_date: formatDateInput(e.target.value) } : x))}
+                        onChange={e => setVehicles(prev => prev.map((x, idx) => idx === i ? { ...x, registration_date: formatDate(e.target.value) } : x))}
                         placeholder="YYYYMMDD" inputMode="numeric" maxLength={10}
                         className={inputCls + " font-mono"} />
                     </div>
@@ -1151,14 +1115,14 @@ export default function EmployeeRegisterClient() {
                     <div>
                       <label className={labelCls}>취득일</label>
                       <input type="text" value={c.acquired_date}
-                        onChange={e => setCerts(prev => prev.map((x, idx) => idx === i ? { ...x, acquired_date: formatDateInput(e.target.value) } : x))}
+                        onChange={e => setCerts(prev => prev.map((x, idx) => idx === i ? { ...x, acquired_date: formatDate(e.target.value) } : x))}
                         placeholder="YYYYMMDD" inputMode="numeric" maxLength={10}
                         className={inputCls + " font-mono"} />
                     </div>
                     <div>
                       <label className={labelCls}>만료일</label>
                       <input type="text" value={c.expiry_date}
-                        onChange={e => setCerts(prev => prev.map((x, idx) => idx === i ? { ...x, expiry_date: formatDateInput(e.target.value) } : x))}
+                        onChange={e => setCerts(prev => prev.map((x, idx) => idx === i ? { ...x, expiry_date: formatDate(e.target.value) } : x))}
                         placeholder="YYYYMMDD (없으면 공백)" inputMode="numeric" maxLength={10}
                         className={inputCls + " font-mono"} />
                     </div>
@@ -1247,7 +1211,7 @@ export default function EmployeeRegisterClient() {
                     <div>
                       <label className={labelCls}>일자</label>
                       <input type="text" value={r.occurred_on}
-                        onChange={e => setRps(prev => prev.map((x, idx) => idx === i ? { ...x, occurred_on: formatDateInput(e.target.value) } : x))}
+                        onChange={e => setRps(prev => prev.map((x, idx) => idx === i ? { ...x, occurred_on: formatDate(e.target.value) } : x))}
                         placeholder="YYYYMMDD" inputMode="numeric" maxLength={10}
                         className={inputCls + " font-mono"} />
                     </div>

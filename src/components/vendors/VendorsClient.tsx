@@ -7,6 +7,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
 import DraggableModal from "@/components/common/DraggableModal";
+import { formatPhone } from "@/lib/input-format";
 
 // ── 공통 필드 입력 스타일 ───────────────────────────────────
 const field = "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-slate-400";
@@ -128,11 +129,15 @@ function VendorFormModal({ title, initial, saving, error, onSubmit, onClose, sub
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">전화번호</label>
-              <input value={f.phone} onChange={set("phone")} placeholder="031-000-0000" className={field} />
+              <input value={f.phone}
+                onChange={e => setF(p => ({ ...p, phone: formatPhone(e.target.value) }))}
+                placeholder="031-000-0000" inputMode="tel" maxLength={14} className={field + " font-mono"} />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">팩스번호</label>
-              <input value={f.fax} onChange={set("fax")} className={field} />
+              <input value={f.fax}
+                onChange={e => setF(p => ({ ...p, fax: formatPhone(e.target.value) }))}
+                placeholder="031-000-0000" inputMode="tel" maxLength={14} className={field + " font-mono"} />
             </div>
           </div>
 

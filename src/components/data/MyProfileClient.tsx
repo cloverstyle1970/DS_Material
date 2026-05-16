@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, FormEvent } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { hashPassword } from "@/lib/password";
+import { formatDate as formatYmd, formatPhone } from "@/lib/input-format";
 
 const PHOTO_BUCKET = "employee-photos";
 const CERT_DOCS_BUCKET = "cert-docs";
@@ -124,19 +125,6 @@ const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: "rp",      label: "상벌사항",     icon: "🏅" },
 ];
 
-function formatPhone(value: string): string {
-  const d = value.replace(/\D/g, "").slice(0, 11);
-  if (d.length < 4) return d;
-  if (d.length < 8) return d.slice(0, 3) + "-" + d.slice(3);
-  if (d.length === 10) return d.slice(0, 3) + "-" + d.slice(3, 6) + "-" + d.slice(6);
-  return d.slice(0, 3) + "-" + d.slice(3, 7) + "-" + d.slice(7);
-}
-function formatYmd(value: string): string {
-  const d = value.replace(/\D/g, "").slice(0, 8);
-  if (d.length <= 4) return d;
-  if (d.length <= 6) return d.slice(0, 4) + "-" + d.slice(4);
-  return d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6);
-}
 function displaySsn(ssn: string | null | undefined): string {
   if (!ssn) return "";
   const d = ssn.replace(/\D/g, "");
@@ -699,7 +687,7 @@ export default function MyProfileClient() {
                         <label className={labelCls}>휴대폰</label>
                         <input type="tel" value={phone}
                           onChange={e => setPhone(formatPhone(e.target.value))}
-                          placeholder="010-0000-0000" inputMode="numeric" maxLength={13}
+                          placeholder="010-0000-0000 또는 02-000-0000" inputMode="tel" maxLength={14}
                           className={inputCls + " font-mono"} />
                       </div>
                       <div>
@@ -848,7 +836,7 @@ export default function MyProfileClient() {
                       <label className={labelCls}>연락처 {m.is_emergency && <span className="text-red-500">*</span>}</label>
                       <input type="tel" value={m.phone}
                         onChange={e => setFamily(p => p.map((f, idx) => idx === i ? { ...f, phone: formatPhone(e.target.value) } : f))}
-                        placeholder="010-0000-0000" inputMode="numeric" maxLength={13}
+                        placeholder="010-0000-0000 또는 02-000-0000" inputMode="tel" maxLength={14}
                         className={inputCls + " font-mono"} />
                     </div>
                     <div>

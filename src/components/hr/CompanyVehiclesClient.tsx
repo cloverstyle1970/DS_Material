@@ -5,6 +5,7 @@ import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import Combobox from "@/components/tbm/Combobox";
 import DraggableModal from "@/components/common/DraggableModal";
+import { formatDate as sharedFormatYmd } from "@/lib/input-format";
 
 const MENU_HREF = "/hr/company-vehicles";
 const VEHICLE_DOCS_BUCKET = "vehicle-docs";
@@ -220,12 +221,7 @@ function vehicleTypeBadgeCls(type: string): string {
   }
 }
 
-function formatYmd(value: string): string {
-  const d = value.replace(/\D/g, "").slice(0, 8);
-  if (d.length <= 4) return d;
-  if (d.length <= 6) return d.slice(0, 4) + "-" + d.slice(4);
-  return d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6);
-}
+const formatYmd = sharedFormatYmd;
 function addOneYear(ymd: string): string {
   const m = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return "";

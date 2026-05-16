@@ -10,6 +10,7 @@ import { api, getErrorMessage } from "@/lib/api-client";
 import DraggableModal from "@/components/common/DraggableModal";
 import SerialEntryModal from "./SerialEntryModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
+import { formatDate as sharedFormatYmd } from "@/lib/input-format";
 
 interface SiteOption { id: number; name: string }
 
@@ -681,12 +682,7 @@ function StockAdjustModal({
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   }
   // 입력 자동 포맷: 숫자만 추출, 8자리까지, 4-2-2로 하이픈 삽입
-  function formatYmd(input: string): string {
-    const d = input.replace(/\D/g, "").slice(0, 8);
-    if (d.length <= 4) return d;
-    if (d.length <= 6) return d.slice(0, 4) + "-" + d.slice(4);
-    return d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6);
-  }
+  const formatYmd = sharedFormatYmd;
   const need = Math.max(0, row.qty - row.stockQty);
   const [adjDate, setAdjDate]    = useState(todayLocal());
   const [adjQty,  setAdjQty]     = useState<number>(need || 1);

@@ -10,6 +10,7 @@ import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
+import { formatPhone } from "@/lib/input-format";
 
 // ── 배지 ────────────────────────────────────────────────────────
 const COMPANY_STYLES: Record<string, string> = {
@@ -372,11 +373,11 @@ function AddSiteModal({ onClose, onSaved, editSite, existingElevators }: AddSite
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>현장전화</label>
-              <input value={sitePhone} onChange={e => setSitePhone(e.target.value)} placeholder="031-000-0000" className={fieldCls} />
+              <input value={sitePhone} onChange={e => setSitePhone(formatPhone(e.target.value))} placeholder="031-000-0000" inputMode="tel" maxLength={14} className={fieldCls + " font-mono"} />
             </div>
             <div>
               <label className={labelCls}>현장핸드폰</label>
-              <input value={siteMobile} onChange={e => setSiteMobile(e.target.value)} placeholder="010-0000-0000" className={fieldCls} />
+              <input value={siteMobile} onChange={e => setSiteMobile(formatPhone(e.target.value))} placeholder="010-0000-0000" inputMode="tel" maxLength={14} className={fieldCls + " font-mono"} />
             </div>
           </div>
           {/* 비상통화장치 */}
@@ -405,8 +406,8 @@ function AddSiteModal({ onClose, onSaved, editSite, existingElevators }: AddSite
                       ))}
                     </select>
                     <input value={d.number}
-                      onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, number: e.target.value } : x))}
-                      placeholder="전화번호" className={`${fieldCls} w-36 shrink-0`} />
+                      onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, number: formatPhone(e.target.value) } : x))}
+                      placeholder="전화번호" inputMode="tel" maxLength={14} className={`${fieldCls} w-36 shrink-0 font-mono`} />
                     <input value={d.note ?? ""}
                       onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, note: e.target.value } : x))}
                       placeholder="비고" className={`${fieldCls} flex-1`} />
@@ -423,7 +424,7 @@ function AddSiteModal({ onClose, onSaved, editSite, existingElevators }: AddSite
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>담당자 HP</label>
-              <input value={managerPhone} onChange={e => setManagerPhone(e.target.value)} className={fieldCls} />
+              <input value={managerPhone} onChange={e => setManagerPhone(formatPhone(e.target.value))} placeholder="010-0000-0000 또는 02-000-0000" inputMode="tel" maxLength={14} className={fieldCls + " font-mono"} />
             </div>
             <div>
               <label className={labelCls}>담당자 메일</label>

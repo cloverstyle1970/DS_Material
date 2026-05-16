@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { formatPhone } from "@/lib/input-format";
 
 const MENU_HREF = "/data/company-info";
 
@@ -130,8 +131,10 @@ export default function CompanyInfoClient() {
                 </div>
                 <div>
                   <label className={labelCls}>전화번호</label>
-                  <input type="text" value={info.company_phone}
-                    onChange={e => patch({ company_phone: e.target.value })} className={inputCls} />
+                  <input type="tel" value={info.company_phone}
+                    onChange={e => patch({ company_phone: formatPhone(e.target.value) })}
+                    placeholder="02-000-0000 또는 010-0000-0000" inputMode="tel" maxLength={14}
+                    className={inputCls + " font-mono"} />
                 </div>
                 <div>
                   <label className={labelCls}>이메일</label>
