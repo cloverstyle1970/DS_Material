@@ -39,6 +39,7 @@ interface Form {
   uniform_bottom_size: string;
   safety_shoes_size: string;
   initial_password: string;
+  permission_group_id: number | null;
 }
 
 const DEFAULT_PASSWORD = "1234";
@@ -124,6 +125,7 @@ function emptyForm(): Form {
     postal_code: "", address_basic: "", address_detail: "",
     uniform_top_size: "", uniform_bottom_size: "", safety_shoes_size: "",
     initial_password: DEFAULT_PASSWORD,
+    permission_group_id: null,
   };
 }
 
@@ -186,16 +188,19 @@ export default function EmployeeRegisterClient() {
   const [daumReady, setDaumReady] = useState(false);
   const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
   const [ranks, setRanks] = useState<{ id: number; name: string }[]>([]);
+  const [permGroups, setPermGroups] = useState<{ id: number; name: string; permissions: string[] }[]>([]);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     (async () => {
-      const [d, r] = await Promise.all([
+      const [d, r, p] = await Promise.all([
         supabase.from("departments").select("id, name").eq("is_active", true).order("sort_order"),
         supabase.from("ranks").select("id, name").eq("is_active", true).order("sort_order"),
+        supabase.from("permission_groups").select("id, name, permissions").order("sort_order"),
       ]);
       if (d.data) setDepartments(d.data as { id: number; name: string }[]);
       if (r.data) setRanks(r.data as { id: number; name: string }[]);
+      if (p.data) setPermGroups(p.data as { id: number; name: string; permissions: string[] }[]);
     })();
   }, []);
 
@@ -398,7 +403,10 @@ export default function EmployeeRegisterClient() {
         uniform_top_size: form.uniform_top_size || null,
         uniform_bottom_size: form.uniform_bottom_size || null,
         safety_shoes_size: form.safety_shoes_size || null,
-        permissions: [],
+        permission_group_id: form.permission_group_id,
+        permissions: form.permission_group_id
+          ? (permGroups.find(g => g.id === form.permission_group_id)?.permissions ?? [])
+          : [],
         password_hash: initialPwHash,
       };
       const { data: inserted, error: insErr } = await supabase.from("users")
@@ -678,6 +686,19 @@ export default function EmployeeRegisterClient() {
                       <select value={form.blood_type} onChange={e => set("blood_type", e.target.value)} className={inputCls}>
                         <option value="">선택</option>
                         {["A+","A-","B+","B-","O+","O-","AB+","AB-"].map(b => <option key={b} value={b}>{b}</option>)}
+                      </select>
+                    </div>
+                    <div className="sm:col-span-2 lg:col-span-3">
+                      <label className={labelCls}>🔑 사용자 권한그룹 <span className="text-[10px] text-gray-400">(선택 시 그룹 기본권한이 자동 적용. 세부권한은 [데이터관리 → 사용자권한그룹]에서 조정)</span></label>
+                      <select value={form.permission_group_id ?? ""}
+                        onChange={e => set("permission_group_id", e.target.value ? Number(e.target.value) : null)}
+                        className={inputCls}>
+                        <option value="">선택 안 함 (권한 없음)</option>
+                        {permGroups.map(g => (
+                          <option key={g.id} value={g.id}>
+                            {g.name} ({g.permissions.includes("admin") ? "전체 admin" : `${g.permissions.length}개`})
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>

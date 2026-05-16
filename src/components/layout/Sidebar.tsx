@@ -27,9 +27,10 @@ const NAV_GROUPS: NavGroup[] = [
     label: "데이터관리",
     color: "text-sky-400",
     items: [
-      { href: "/data/users",        label: "사원 관리",      icon: "👤", adminOnly: true },
-      { href: "/data/profile",      label: "개인정보수정",   icon: "🪪" },
-      { href: "/data/company-info", label: "회사 정보 관리", icon: "🏢", adminOnly: true },
+      { href: "/data/users",             label: "사원 관리",        icon: "👤", adminOnly: true },
+      { href: "/data/profile",           label: "개인정보수정",     icon: "🪪" },
+      { href: "/data/company-info",      label: "회사 정보 관리",   icon: "🏢", adminOnly: true },
+      { href: "/data/permission-groups", label: "사용자권한그룹",   icon: "🔑", adminOnly: true },
     ],
   },
   {
