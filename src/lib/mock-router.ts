@@ -428,6 +428,7 @@ function dbToRequest(r: any): MaterialRequestRecord {
   return {
     id:            r.id,
     status:        r.status,
+    requestType:   r.request_type   ?? null,
     siteName:      r.site_name      ?? null,
     items:         r.items          ?? [],
     note:          r.note           ?? null,
@@ -984,6 +985,7 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
       requester_id:   body.requesterId,
       requester_name: body.requesterName,
       requester_dept: body.requesterDept,
+      request_type:   body.requestType   ?? null,
     }).select().single();
     if (error) throw new MockApiError(error.message, 500);
     return dbToRequest(data);

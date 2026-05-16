@@ -1,4 +1,5 @@
 export type RequestStatus = "신청" | "처리중" | "완료" | "취소";
+export type RequestType   = "무상신청" | "당직선출고" | "유상견적";
 
 export interface MaterialRequestItem {
   materialId: string;
@@ -10,6 +11,7 @@ export interface MaterialRequestItem {
 export interface MaterialRequestRecord {
   id: number;
   status: RequestStatus;
+  requestType: RequestType | null;   // 보수원 청구등록의 모드. 기존 전표 입력 경로는 null
   siteName: string | null;
   items: MaterialRequestItem[];
   note: string | null;

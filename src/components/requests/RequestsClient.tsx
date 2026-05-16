@@ -3,7 +3,7 @@
 import { useState, useMemo, Fragment, useRef, useEffect } from "react";
 import Link from "next/link";
 import * as XLSX from "xlsx";
-import { MaterialRequestRecord, RequestStatus } from "@/lib/mock-material-requests";
+import { MaterialRequestRecord, RequestStatus, RequestType } from "@/lib/mock-material-requests";
 import { PurchaseOrderRecord, OrderStatus } from "@/lib/mock-purchase-orders";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
@@ -158,12 +158,19 @@ const REQ_COLS: { key: ReqSortKey | null; label: string; sortable: boolean }[] =
   { key: null,            label: "",         sortable: false }, // expand toggle
   { key: "requestedAt",   label: "신청일시", sortable: true  },
   { key: "status",        label: "상태",     sortable: true  },
+  { key: null,            label: "구분",     sortable: false },
   { key: "siteName",      label: "현장",     sortable: true  },
   { key: null,            label: "자재 요약", sortable: false },
   { key: "totalQty",      label: "총 수량",  sortable: true  },
   { key: "requesterName", label: "신청자",   sortable: true  },
   { key: null,            label: "메모",     sortable: false },
 ];
+
+const REQ_TYPE_CLS: Record<RequestType, string> = {
+  "무상신청":   "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  "당직선출고": "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
+  "유상견적":   "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+};
 
 const ORD_COLS: { key: OrdSortKey | null; label: string; sortable: boolean }[] = [
   { key: "orderedAt",     label: "발주일자",      sortable: true  },
@@ -225,6 +232,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
 
   // 자재신청 탭
   const [reqStatus,     setReqStatus]     = useState<RequestStatus | "전체">("전체");
+  const [reqType,       setReqType]       = useState<RequestType | "기본" | "전체">("전체");
   const [reqSearch,     setReqSearch]     = useState<ReqSearch>(defaultReq);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
 
@@ -336,6 +344,11 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
   // ── 필터 ────────────────────────────────────────────────────────
   const filteredReqs = requests.filter(r => {
     if (reqStatus !== "전체" && r.status !== reqStatus) return false;
+    if (reqType !== "전체") {
+      if (reqType === "기본") {
+        if (r.requestType != null) return false;
+      } else if (r.requestType !== reqType) return false;
+    }
     if (!inRange(r.requestedAt, reqSearch.dateFrom, reqSearch.dateTo)) return false;
     if (reqSearch.siteName     && !(r.siteName?.toLowerCase().includes(reqSearch.siteName.toLowerCase()))) return false;
     if (reqSearch.elevatorName && !r.items.some(i => i.elevatorName?.toLowerCase().includes(reqSearch.elevatorName.toLowerCase()))) return false;
@@ -478,12 +491,21 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
       {/* ═══ 자재신청 탭 ═══════════════════════════════════════════ */}
       {tab === "자재신청" && (
         <div className="space-y-3">
-          {/* 상태 필터 + 등록 */}
+          {/* 상태 필터 + 구분 필터 + 등록 */}
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
               {(["전체","신청","처리중","완료","취소"] as const).map(f => (
                 <button key={f} type="button" onClick={() => setReqStatus(f)}
                   className={`px-3 py-2 text-xs font-medium transition-colors ${reqStatus === f ? "bg-slate-700 text-white" : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
+                  {f}
+                </button>
+              ))}
+            </div>
+            <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
+              {(["전체","무상신청","당직선출고","유상견적","기본"] as const).map(f => (
+                <button key={f} type="button" onClick={() => setReqType(f)}
+                  className={`px-3 py-2 text-xs font-medium transition-colors ${reqType === f ? "bg-slate-700 text-white" : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"}`}
+                  title={f === "기본" ? "전표 입력 등 모드 정보가 없는 신청" : ""}>
                   {f}
                 </button>
               ))}
@@ -571,7 +593,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                 {sortedReqs.length === 0 ? (
-                  <tr><td colSpan={admin ? 10 : 9} className="text-center py-16 text-gray-400 dark:text-gray-500">
+                  <tr><td colSpan={admin ? 11 : 10} className="text-center py-16 text-gray-400 dark:text-gray-500">
                     {requests.length === 0 ? "자재 신청 내역이 없습니다." : "조건에 맞는 내역이 없습니다."}
                   </td></tr>
                 ) : sortedReqs.map(r => {
@@ -601,6 +623,15 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${reqStatusCls(r.status, kind)}`}>
                             {r.status === "신청" ? kind : r.status}
                           </span>
+                        </td>
+                        <td className="px-2 py-3 text-center">
+                          {r.requestType ? (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold whitespace-nowrap ${REQ_TYPE_CLS[r.requestType]}`}>
+                              {r.requestType}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-gray-300 dark:text-gray-600">—</span>
+                          )}
                         </td>
                         <td className="px-2 py-3 text-center text-gray-700 dark:text-gray-300 text-xs whitespace-nowrap">
                           {r.siteName ?? "-"}
@@ -643,7 +674,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                       </tr>
                       {isOpen && (
                         <tr className="bg-slate-50/60 dark:bg-gray-700/20">
-                          <td colSpan={admin ? 10 : 9} className="px-6 py-3">
+                          <td colSpan={admin ? 11 : 10} className="px-6 py-3">
                             <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 overflow-hidden">
                               <table className="w-full text-xs">
                                 <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50">
