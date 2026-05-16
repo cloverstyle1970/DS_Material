@@ -18,6 +18,42 @@ const MODES: { key: ClaimMode; label: string; icon: string; desc: string; color:
 
 interface SiteOption { id: number; name: string; alias?: string | null }
 
+// ─── 본인 청구 이력 ─────────────────────────────────
+type HistoryKind = "유상견적요청" | "무상신청" | "당직선출고";
+interface HistoryRow {
+  source: "quote_request" | "material_request";
+  rowId: number;
+  no: string | null;            // QR-YYYY-NNNN (유상견적요청만)
+  date: string;                 // ISO
+  siteName: string | null;
+  workTitle: string | null;
+  itemFirstName: string;
+  itemCount: number;
+  kind: HistoryKind;
+  status: string;
+  quoteId: number | null;       // 견적서로 연결된 ID (유상견적요청만)
+}
+
+const HIST_KIND_CLS: Record<HistoryKind, string> = {
+  "유상견적요청": "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  "무상신청":     "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  "당직선출고":   "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
+};
+
+function histStatusCls(status: string): string {
+  if (status === "취소") return "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-300";
+  if (status === "완료" || status === "견적발행") return "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300";
+  if (status === "처리중" || status === "견적작성중") return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300";
+  return "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200";
+}
+
+function fmtDT(iso: string): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 interface ItemRow {
   key: string;
   material_id: string;
@@ -66,9 +102,68 @@ export default function ClaimEntryClient() {
   const [saving, setSaving]     = useState(false);
   const [message, setMessage]   = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // 청구 이력 (본인)
+  const [history, setHistory]   = useState<HistoryRow[]>([]);
+  const [histLoading, setHistLoading] = useState(false);
+  const [histKindFilter, setHistKindFilter] = useState<"전체" | HistoryKind>("전체");
+
   useEffect(() => {
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
   }, []);
+
+  async function loadHistory() {
+    if (!user) return;
+    setHistLoading(true);
+    const [qr, mr] = await Promise.all([
+      supabase.from("quote_requests")
+        .select("id, request_no, requested_at, site_name, work_title, status, quote_id, quote_request_items(material_name)")
+        .eq("requester_id", user.id)
+        .order("requested_at", { ascending: false })
+        .limit(20),
+      supabase.from("material_requests")
+        .select("id, requested_at, site_name, items, note, request_type, status")
+        .eq("requester_id", user.id)
+        .in("request_type", ["무상신청", "당직선출고"])  // 유상견적 자동생성분은 quote_requests 측에서 보임
+        .order("requested_at", { ascending: false })
+        .limit(20),
+    ]);
+    const rows: HistoryRow[] = [];
+    for (const r of (qr.data ?? []) as Array<{
+      id: number; request_no: string; requested_at: string;
+      site_name: string | null; work_title: string | null;
+      status: string; quote_id: number | null;
+      quote_request_items: { material_name: string }[] | null;
+    }>) {
+      const items = r.quote_request_items ?? [];
+      rows.push({
+        source: "quote_request", rowId: r.id, no: r.request_no,
+        date: r.requested_at, siteName: r.site_name, workTitle: r.work_title,
+        itemFirstName: items[0]?.material_name ?? "-",
+        itemCount: items.length,
+        kind: "유상견적요청", status: r.status, quoteId: r.quote_id,
+      });
+    }
+    for (const r of (mr.data ?? []) as Array<{
+      id: number; requested_at: string; site_name: string | null;
+      items: { materialName?: string }[] | null;
+      note: string | null; request_type: string; status: string;
+    }>) {
+      const items = r.items ?? [];
+      const kind = r.request_type === "당직선출고" ? "당직선출고" : "무상신청";
+      rows.push({
+        source: "material_request", rowId: r.id, no: null,
+        date: r.requested_at, siteName: r.site_name, workTitle: r.note,
+        itemFirstName: items[0]?.materialName ?? "-",
+        itemCount: items.length,
+        kind, status: r.status, quoteId: null,
+      });
+    }
+    rows.sort((a, b) => b.date.localeCompare(a.date));
+    setHistory(rows.slice(0, 20));
+    setHistLoading(false);
+  }
+
+  useEffect(() => { void loadHistory(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [user?.id]);
 
   // 현장 변경 시 호기 + 계약구분 확인 → FM 자동 모드 권유
   useEffect(() => {
@@ -192,6 +287,8 @@ export default function ClaimEntryClient() {
       // 폼 리셋
       setRows(Array.from({ length: DEFAULT_ROW_COUNT }, () => newRow()));
       setSiteName(""); setWorkTitle(""); setReason("");
+      // 이력 즉시 갱신
+      void loadHistory();
     } catch (err) {
       setMessage({ type: "error", text: err instanceof Error ? err.message : String(err) });
     } finally {
@@ -380,6 +477,103 @@ export default function ClaimEntryClient() {
             className="px-6 py-2 rounded bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
             {saving ? "접수 중..." : `📨 ${MODES.find(m => m.key === mode)?.label} 접수`}
           </button>
+        </div>
+
+        {/* ─── 본인 청구 이력 ───────────────────────────────── */}
+        <div className={sectionCls}>
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div>
+              <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">📜 내 청구 이력 (최근 20건)</h2>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                유상견적요청은 견적요청 목록 페이지에서, 무상·당직 신청은 자재신청 관리 페이지에서 처리 상황을 추적할 수 있습니다.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex gap-0.5 bg-gray-100 dark:bg-gray-700 p-0.5 rounded">
+                {(["전체", "유상견적요청", "무상신청", "당직선출고"] as const).map(f => (
+                  <button key={f} type="button" onClick={() => setHistKindFilter(f)}
+                    className={`px-2.5 py-1 text-[11px] font-semibold rounded transition-colors ${
+                      histKindFilter === f
+                        ? "bg-blue-600 text-white"
+                        : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                    }`}>{f}</button>
+                ))}
+              </div>
+              <button type="button" onClick={() => void loadHistory()} disabled={histLoading}
+                className="px-2.5 py-1 text-[11px] rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
+                {histLoading ? "..." : "🔄"}
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50 dark:bg-gray-700/50 border-y border-gray-200 dark:border-gray-600 text-[11px] font-bold text-gray-600 dark:text-gray-300">
+                <tr>
+                  <th className="px-2 py-2 text-center w-36">접수일시</th>
+                  <th className="px-2 py-2 text-center w-24">구분</th>
+                  <th className="px-2 py-2 text-left">현장</th>
+                  <th className="px-2 py-2 text-left">자재 요약</th>
+                  <th className="px-2 py-2 text-center w-28">상태</th>
+                  <th className="px-2 py-2 text-center w-32">번호 / 추적</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(() => {
+                  const filtered = histKindFilter === "전체" ? history : history.filter(h => h.kind === histKindFilter);
+                  if (histLoading && history.length === 0) {
+                    return <tr><td colSpan={6} className="px-2 py-6 text-center text-gray-400">로딩 중...</td></tr>;
+                  }
+                  if (filtered.length === 0) {
+                    return <tr><td colSpan={6} className="px-2 py-6 text-center text-gray-400">
+                      {history.length === 0 ? "아직 청구 이력이 없습니다." : "선택한 구분에 해당하는 이력이 없습니다."}
+                    </td></tr>;
+                  }
+                  return filtered.map(h => (
+                    <tr key={`${h.source}-${h.rowId}`} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                      <td className="px-2 py-1.5 text-center text-gray-600 dark:text-gray-300 font-mono tabular-nums whitespace-nowrap">
+                        {fmtDT(h.date)}
+                      </td>
+                      <td className="px-2 py-1.5 text-center">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${HIST_KIND_CLS[h.kind]}`}>
+                          {h.kind}
+                        </span>
+                      </td>
+                      <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200 truncate max-w-[180px]">
+                        {h.siteName ?? "-"}
+                        {h.workTitle && <span className="ml-1 text-gray-400 dark:text-gray-500 text-[10px]">· {h.workTitle}</span>}
+                      </td>
+                      <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200">
+                        <span className="font-medium">{h.itemFirstName}</span>
+                        {h.itemCount > 1 && (
+                          <span className="ml-1 text-gray-400 dark:text-gray-500 text-[10px]">외 {h.itemCount - 1}건</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-1.5 text-center">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${histStatusCls(h.status)}`}>
+                          {h.status}
+                        </span>
+                      </td>
+                      <td className="px-2 py-1.5 text-center text-[10px]">
+                        {h.source === "quote_request" ? (
+                          h.quoteId ? (
+                            <a href={`/quotes/detail?id=${h.quoteId}`}
+                              className="font-mono font-bold text-blue-600 dark:text-blue-400 hover:underline">
+                              📄 견적서
+                            </a>
+                          ) : (
+                            <span className="font-mono text-gray-500 dark:text-gray-400">{h.no}</span>
+                          )
+                        ) : (
+                          <span className="text-gray-400 dark:text-gray-500">자재신청#{h.rowId}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ));
+                })()}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
