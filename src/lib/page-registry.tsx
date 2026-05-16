@@ -94,6 +94,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
     label: "견적서 작성",
     render: () => <QuoteEntryClient />,
   },
+  "/quotes/edit": {
+    label: "견적서 수정",
+    render: () => <QuoteEntryClient />,
+  },
   "/quotes/detail": {
     label: "견적서 상세",
     render: () => <QuoteDetailClient />,

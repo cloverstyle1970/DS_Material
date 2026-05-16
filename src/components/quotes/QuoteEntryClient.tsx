@@ -6,6 +6,7 @@ import { useAuth, hasMenuPermission, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { api } from "@/lib/api-client";
 import { MaterialRecord } from "@/lib/mock-materials";
+import QuotePrintPaper, { QuotePrintCompany } from "@/components/quotes/QuotePrintPaper";
 
 const MENU_HREF = "/quotes/new";
 const DEFAULT_ROW_COUNT = 5;
@@ -130,8 +131,15 @@ function QuoteEntryInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromRequestId = searchParams.get("fromRequest");
+  const editIdStr = searchParams.get("id");
+  const editId = editIdStr && Number.isFinite(Number(editIdStr)) ? Number(editIdStr) : null;
+  const isEditMode = editId !== null;
 
   const [settings, setSettings] = useState<QuoteSettings | null>(null);
+  const [editLoading, setEditLoading] = useState<boolean>(isEditMode);
+  const [editLoadError, setEditLoadError] = useState<string | null>(null);
+  const [editLockedReason, setEditLockedReason] = useState<string | null>(null);
+  const [editQuoteNo, setEditQuoteNo] = useState<string | null>(null);
 
   // 헤더 입력
   const [quoteDate, setQuoteDate]         = useState(todayISO());
@@ -162,6 +170,9 @@ function QuoteEntryInner() {
   const [laborManhours, setLaborManhours]   = useState<number>(1);     // 공모드=공수, 식모드=통합 공수합
   const [laborUnitPrice, setLaborUnitPrice] = useState<number>(0);     // 1공당 단가
 
+  // 인건비/요율 적용 여부 (체크 해제 시 인건비·일반관리비·이윤 모두 0)
+  const [laborEnabled, setLaborEnabled] = useState<boolean>(true);
+
   const [indirectRate, setIndirectRate] = useState<number>(8);
   const [overheadRate, setOverheadRate] = useState<number>(10);
   const [profitRate, setProfitRate]     = useState<number>(8);
@@ -174,6 +185,10 @@ function QuoteEntryInner() {
   // 견적요청 프리필 (fromRequest=N)
   const [sourceRequestId, setSourceRequestId] = useState<number | null>(null);
   const [sourceRequestNo, setSourceRequestNo] = useState<string | null>(null);
+
+  // 미리보기 (출력물)
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [company, setCompany] = useState<QuotePrintCompany | null>(null);
 
   // ============================================================
   // 초기 로드
@@ -188,6 +203,14 @@ function QuoteEntryInner() {
         setIndirectRate(Number(data.indirect_labor_rate ?? 8));
         setOverheadRate(Number(data.overhead_rate ?? 10));
         setProfitRate(Number(data.profit_rate ?? 8));
+        setCompany({
+          company_name:    data.company_name    ?? null,
+          company_biz_no:  data.company_biz_no  ?? null,
+          company_address: data.company_address ?? null,
+          company_phone:   data.company_phone   ?? null,
+          company_email:   data.company_email   ?? null,
+          company_ceo:     data.company_ceo     ?? null,
+        });
       }
     })();
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
@@ -249,6 +272,95 @@ function QuoteEntryInner() {
     })();
   }, [fromRequestId]);
 
+  // ============================================================
+  // 수정 모드 — 기존 quote 로드
+  // ============================================================
+  useEffect(() => {
+    if (!isEditMode || editId === null) return;
+    let cancelled = false;
+    (async () => {
+      setEditLoading(true);
+      setEditLoadError(null);
+      setEditLockedReason(null);
+      const [hdr, items] = await Promise.all([
+        supabase.from("quotes").select("*").eq("id", editId).maybeSingle(),
+        supabase.from("quote_items").select("*").eq("quote_id", editId).order("sort_order"),
+      ]);
+      if (cancelled) return;
+      if (hdr.error || !hdr.data) {
+        setEditLoadError(`견적서 로드 실패: ${hdr.error?.message ?? "데이터 없음"}`);
+        setEditLoading(false);
+        return;
+      }
+      const h = hdr.data as {
+        id: number; quote_no: string; quote_date: string;
+        site_name: string | null; work_title: string | null;
+        customer_name: string | null; customer_phone: string | null;
+        note: string | null; status: string; charge_type: "유상" | "무상" | null;
+        labor_mode: "공" | "식" | null; labor_manhours: number | null; labor_unit_price: number | null;
+        indirect_labor_rate: number | null; overhead_rate: number | null; profit_rate: number | null;
+        truncate_amount: number | null;
+        direct_labor: number | null; indirect_labor: number | null;
+        overhead: number | null; profit: number | null;
+      };
+      setEditQuoteNo(h.quote_no);
+      if (h.status !== "작성중") {
+        setEditLockedReason(`현재 결재상태가 [${h.status}] 입니다. 작성중인 견적서만 수정할 수 있습니다.`);
+      }
+      // 헤더 프리필
+      setQuoteDate(h.quote_date);
+      setSiteName(h.site_name ?? "");
+      setWorkTitle(h.work_title ?? "");
+      setCustomerName(h.customer_name ?? "");
+      setCustomerPhone(h.customer_phone ?? "");
+      setNote(h.note ?? "");
+      setChargeType(h.charge_type ?? "유상");
+      setChargeAutoApplied(false);
+      setLaborMode(h.labor_mode ?? "공");
+      setLaborManhours(Number(h.labor_manhours ?? 0));
+      setLaborUnitPrice(Number(h.labor_unit_price ?? 0));
+      setIndirectRate(Number(h.indirect_labor_rate ?? 8));
+      setOverheadRate(Number(h.overhead_rate ?? 10));
+      setProfitRate(Number(h.profit_rate ?? 8));
+      // 저장 시점에 인건비/요율이 모두 0이었으면 미적용 상태로 복원
+      const savedLaborTotal = Number(h.direct_labor ?? 0)
+        + Number(h.indirect_labor ?? 0)
+        + Number(h.overhead ?? 0)
+        + Number(h.profit ?? 0);
+      setLaborEnabled(savedLaborTotal > 0);
+      // 저장된 절사금액 보존(수동 모드로 처리) — 자동 재계산이 덮어쓰지 않도록
+      setTruncateAmount(Number(h.truncate_amount ?? 0));
+      setTruncateManual(true);
+      // 아이템 프리필
+      const its = (items.data ?? []) as Array<{
+        material_id: string | null; material_name: string;
+        spec: string | null; unit: string | null;
+        qty: number; unit_price: number;
+        remark: string | null; elevator_name: string | null;
+        opinion_text: string | null; opinion_image_url: string | null;
+      }>;
+      if (its.length > 0) {
+        setRows(its.map(it => newRow({
+          material_id:       it.material_id ?? "",
+          material_name:     it.material_name,
+          spec:              it.spec ?? "",
+          unit:              it.unit ?? "EA",
+          qty:               Number(it.qty),
+          unit_price:        Number(it.unit_price),
+          remark:            it.remark ?? "",
+          elevator_name:     it.elevator_name ?? "",
+          opinion_text:      it.opinion_text ?? "",
+          opinion_image_url: it.opinion_image_url ?? "",
+        })));
+      } else {
+        // 아이템이 없는 견적은 기본 1행
+        setRows([newRow()]);
+      }
+      setEditLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [isEditMode, editId]);
+
   // 현장 변경 시 호기 + 계약/하자 정보 로드
   useEffect(() => {
     if (!siteName.trim()) {
@@ -268,8 +380,8 @@ function QuoteEntryInner() {
       setElevatorOptions((elev.data ?? []).map(e => (e as { unit_name: string }).unit_name).filter(Boolean));
       const info = (site.data ?? null) as SiteContractInfo | null;
       setSiteInfo(info);
-      // FM 계약구분이면 charge_type 자동 '무상' 권유 (사용자가 수동 변경한 경우 덮어쓰지 않음)
-      if (info?.contract_type && FM_CONTRACT_TYPES.has(info.contract_type)) {
+      // FM 계약구분이면 charge_type 자동 '무상' 권유 (수정 모드에서는 사용자가 저장한 값을 보존)
+      if (!isEditMode && info?.contract_type && FM_CONTRACT_TYPES.has(info.contract_type)) {
         setChargeType("무상");
         setChargeAutoApplied(true);
       } else {
@@ -289,11 +401,12 @@ function QuoteEntryInner() {
   const materialSubtotal = rows.reduce((s, r) => s + (r.material_id ? r.qty * r.unit_price : 0), 0);
   // 공모드: direct = unit_price * manhours
   // 식모드: 식수=1 이지만 입력된 공수합 × 단가 로 동일하게 계산
-  const directLabor      = Math.round(laborUnitPrice * laborManhours);
-  const indirectLabor    = Math.round(directLabor * indirectRate / 100);
+  // laborEnabled=false 면 인건비·요율 모두 미적용 (자재비만 합계에 반영)
+  const directLabor      = laborEnabled ? Math.round(laborUnitPrice * laborManhours) : 0;
+  const indirectLabor    = laborEnabled ? Math.round(directLabor * indirectRate / 100) : 0;
   const laborSubtotal    = directLabor + indirectLabor;
-  const overhead         = Math.round((materialSubtotal + laborSubtotal) * overheadRate / 100);
-  const profit           = Math.round((laborSubtotal + overhead) * profitRate / 100);
+  const overhead         = laborEnabled ? Math.round((materialSubtotal + laborSubtotal) * overheadRate / 100) : 0;
+  const profit           = laborEnabled ? Math.round((laborSubtotal + overhead) * profitRate / 100) : 0;
 
   const subBeforeTrunc = materialSubtotal + laborSubtotal + overhead + profit;
   const isMaterialOnly = laborSubtotal === 0 && overhead === 0 && profit === 0;
@@ -414,6 +527,10 @@ function QuoteEntryInner() {
   async function save() {
     setMessage(null);
     if (!canCreate || !user) { setMessage({ type: "error", text: "견적서 작성 권한이 없습니다." }); return; }
+    if (isEditMode && editLockedReason) {
+      setMessage({ type: "error", text: editLockedReason });
+      return;
+    }
     const validItems = rows.filter(r => r.material_id || r.material_name.trim());
     if (validItems.length === 0) {
       setMessage({ type: "error", text: "자재 라인을 1개 이상 입력해주세요." });
@@ -421,13 +538,11 @@ function QuoteEntryInner() {
     }
     setSaving(true);
     try {
-      const quote_no = await generateQuoteNo();
       // 헤더 elevator_name 은 행 elevator 의 유니크 집합으로 자동 도출 (단일이면 그 값, 복수면 콤마 결합)
       const elevSet = Array.from(new Set(validItems.map(r => r.elevator_name.trim()).filter(Boolean)));
       const headerElevator = elevSet.length === 0 ? null : elevSet.join(", ");
 
-      const { data: header, error: e1 } = await supabase.from("quotes").insert({
-        quote_no,
+      const headerPayload = {
         quote_date: quoteDate,
         site_name: siteName || null,
         elevator_name: headerElevator,
@@ -449,28 +564,67 @@ function QuoteEntryInner() {
         labor_unit_price: laborUnitPrice,
         charge_type:      chargeType,
         note: note || null,
+      };
+      const itemsPayload = (quoteId: number) => validItems.map((r, i) => ({
+        quote_id: quoteId,
+        material_id: r.material_id || null,
+        material_name: r.material_name,
+        spec: r.spec || null,
+        unit: r.unit || null,
+        qty: r.qty,
+        unit_price: r.unit_price,
+        amount: r.qty * r.unit_price,
+        remark: r.remark || null,
+        elevator_name: r.elevator_name || null,
+        opinion_text: r.opinion_text || null,
+        opinion_image_url: r.opinion_image_url || null,
+        sort_order: (i + 1) * 10,
+      }));
+
+      if (isEditMode && editId !== null) {
+        // ─────────── 수정 모드 ───────────
+        // 변경 전 스냅샷 (실패해도 진행)
+        try {
+          await supabase.rpc("snapshot_quote", {
+            p_quote_id:  editId,
+            p_summary:   "견적서 수정 (작성중)",
+            p_user_id:   user.id,
+            p_user_name: user.name,
+          });
+        } catch (e) { console.warn("[quote-edit] snapshot 실패", e); }
+
+        const { error: e1 } = await supabase.from("quotes")
+          .update({ ...headerPayload, updated_at: new Date().toISOString() })
+          .eq("id", editId);
+        if (e1) throw e1;
+
+        // items 는 전체 DELETE 후 INSERT (1:N 단순 정합성)
+        const { error: e2 } = await supabase.from("quote_items").delete().eq("quote_id", editId);
+        if (e2) throw e2;
+        const { error: e3 } = await supabase.from("quote_items").insert(itemsPayload(editId));
+        if (e3) throw e3;
+
+        setMessage({
+          type: "success",
+          text: `견적서가 수정되었습니다. (${editQuoteNo ?? `#${editId}`})`,
+        });
+        setSaving(false);
+        // 잠시 메시지 표시 후 상세로 이동
+        setTimeout(() => router.push(`/quotes/detail?id=${editId}`), 600);
+        return;
+      }
+
+      // ─────────── 신규 작성 모드 ───────────
+      const quote_no = await generateQuoteNo();
+      const { data: header, error: e1 } = await supabase.from("quotes").insert({
+        quote_no,
+        ...headerPayload,
         created_by_id: user.id,
         created_by_name: user.name,
       }).select().single();
       if (e1 || !header) throw e1 || new Error("견적서 생성 실패");
 
-      const { error: e2 } = await supabase.from("quote_items").insert(
-        validItems.map((r, i) => ({
-          quote_id: header.id,
-          material_id: r.material_id || null,
-          material_name: r.material_name,
-          spec: r.spec || null,
-          unit: r.unit || null,
-          qty: r.qty,
-          unit_price: r.unit_price,
-          amount: r.qty * r.unit_price,
-          remark: r.remark || null,
-          elevator_name: r.elevator_name || null,
-          opinion_text: r.opinion_text || null,
-          opinion_image_url: r.opinion_image_url || null,
-          sort_order: (i + 1) * 10,
-        }))
-      );
+      const { error: e2 } = await supabase.from("quote_items").insert(itemsPayload(header.id));
       if (e2) throw e2;
 
       // 견적요청으로부터 진입한 경우 → quote_request.quote_id 연결 + 상태 갱신
@@ -495,6 +649,7 @@ function QuoteEntryInner() {
       setLaborMode("공");
       setLaborManhours(1);
       setLaborUnitPrice(settings?.default_direct_labor ?? 0);
+      setLaborEnabled(true);
       setTruncateManual(false);
       setTruncateAmount(0);
       setSourceRequestId(null);
@@ -515,11 +670,25 @@ function QuoteEntryInner() {
   const inputCls   = "w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100";
   const cellInput  = "w-full px-2 py-1 text-xs text-gray-900 dark:text-gray-100 border-0 bg-transparent focus:outline-none focus:bg-yellow-50 dark:focus:bg-yellow-900/20 focus:ring-1 focus:ring-blue-300";
 
+  if (isEditMode && editLoading) {
+    return <div className="p-12 text-center text-sm text-gray-500">견적서 불러오는 중...</div>;
+  }
+  if (isEditMode && editLoadError) {
+    return <div className="p-12 text-center text-sm text-red-500">{editLoadError}</div>;
+  }
+
   return (
     <div className="min-h-full bg-gray-50 dark:bg-gray-900">
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
         <div className="flex items-center gap-2 flex-wrap">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">견적서 작성</h1>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+            {isEditMode ? "견적서 수정" : "견적서 작성"}
+          </h1>
+          {isEditMode && editQuoteNo && (
+            <span className="text-[11px] px-2.5 py-1 rounded-full font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-mono">
+              ✏️ {editQuoteNo}
+            </span>
+          )}
           {sourceRequestNo && (
             <span className="text-[11px] px-2.5 py-1 rounded-full font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
               📋 견적요청 {sourceRequestNo} 에서 가져옴
@@ -527,6 +696,11 @@ function QuoteEntryInner() {
           )}
         </div>
         <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">자재비·인건비·일반관리비·이윤 자동 계산</p>
+        {isEditMode && editLockedReason && (
+          <div className="mt-3 text-xs px-3 py-2 rounded bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-700">
+            🔒 {editLockedReason}
+          </div>
+        )}
       </div>
 
       {/* 호기 자동완성용 datalist */}
@@ -740,8 +914,20 @@ function QuoteEntryInner() {
         {/* 인건비 + 비율 */}
         <div className={sectionCls}>
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">👷 인건비 / 요율</h2>
-            <div className="flex gap-0.5 bg-gray-100 dark:bg-gray-700 p-0.5 rounded">
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                <input type="checkbox" checked={laborEnabled}
+                  onChange={e => setLaborEnabled(e.target.checked)}
+                  className="w-4 h-4 accent-blue-600" />
+                <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">👷 인건비 / 요율 적용</h2>
+              </label>
+              {!laborEnabled && (
+                <span className="text-[11px] text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
+                  미적용 — 자재비만 합계 반영
+                </span>
+              )}
+            </div>
+            <div className={`flex gap-0.5 bg-gray-100 dark:bg-gray-700 p-0.5 rounded ${!laborEnabled ? "opacity-50 pointer-events-none" : ""}`}>
               {(["공", "식"] as const).map(m => (
                 <button key={m} type="button" onClick={() => {
                   setLaborMode(m);
@@ -757,7 +943,7 @@ function QuoteEntryInner() {
               ))}
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 ${!laborEnabled ? "opacity-50 pointer-events-none" : ""}`}>
             <div>
               <label className={labelCls}>1공 단가 <span className="text-[10px] text-gray-400">(기본값 자동)</span></label>
               <input type="text" inputMode="numeric" value={laborUnitPrice === 0 ? "" : fmtNum(laborUnitPrice)}
@@ -825,19 +1011,25 @@ function QuoteEntryInner() {
                 <tr>
                   <td className="py-1.5 text-gray-600 dark:text-gray-300">
                     2. 인건비 <span className="text-xs text-gray-400">
-                      ({laborMode === "공"
-                        ? `${laborManhours}공 + 간접 ${indirectRate}%`
-                        : `1식(${laborManhours}공 통합) + 간접 ${indirectRate}%`})
+                      {laborEnabled
+                        ? `(${laborMode === "공"
+                            ? `${laborManhours}공 + 간접 ${indirectRate}%`
+                            : `1식(${laborManhours}공 통합) + 간접 ${indirectRate}%`})`
+                        : "(미적용)"}
                     </span>
                   </td>
                   <td className="py-1.5 text-right tabular-nums text-gray-800 dark:text-gray-100">{fmtNum(laborSubtotal)} 원</td>
                 </tr>
                 <tr>
-                  <td className="py-1.5 text-gray-600 dark:text-gray-300">3. 일반관리비 ({overheadRate}%)</td>
+                  <td className="py-1.5 text-gray-600 dark:text-gray-300">
+                    3. 일반관리비 {laborEnabled ? `(${overheadRate}%)` : <span className="text-xs text-gray-400">(미적용)</span>}
+                  </td>
                   <td className="py-1.5 text-right tabular-nums text-gray-800 dark:text-gray-100">{fmtNum(overhead)} 원</td>
                 </tr>
                 <tr>
-                  <td className="py-1.5 text-gray-600 dark:text-gray-300">4. 이윤 ({profitRate}%)</td>
+                  <td className="py-1.5 text-gray-600 dark:text-gray-300">
+                    4. 이윤 {laborEnabled ? `(${profitRate}%)` : <span className="text-xs text-gray-400">(미적용)</span>}
+                  </td>
                   <td className="py-1.5 text-right tabular-nums text-gray-800 dark:text-gray-100">{fmtNum(profit)} 원</td>
                 </tr>
                 <tr>
@@ -884,15 +1076,109 @@ function QuoteEntryInner() {
           )}
 
           <div className="mt-4 flex justify-end gap-2">
-            <button type="button" onClick={() => router.push("/dashboard")}
-              className="px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">취소</button>
-            <button type="button" onClick={save} disabled={saving}
+            <button type="button"
+              onClick={() => router.push(isEditMode && editId !== null ? `/quotes/detail?id=${editId}` : "/dashboard")}
+              className="px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">
+              {isEditMode ? "← 상세로" : "취소"}
+            </button>
+            <button type="button" onClick={() => setPreviewOpen(true)}
+              className="px-4 py-2 rounded border border-blue-300 dark:border-blue-700 text-sm text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-semibold">
+              👁 미리보기
+            </button>
+            <button type="button" onClick={save}
+              disabled={saving || (isEditMode && !!editLockedReason)}
               className="px-5 py-2 rounded bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
-              {saving ? "저장 중..." : "견적서 저장"}
+              {saving
+                ? "저장 중..."
+                : isEditMode ? "수정 저장" : "견적서 저장"}
             </button>
           </div>
         </div>
       </div>
+
+      {/* 미리보기 오버레이 (출력물) */}
+      {previewOpen && (
+        <div className="fixed inset-0 z-50 bg-gray-100 dark:bg-gray-900 overflow-auto quote-preview-overlay">
+          {/* 상단 툴바 — 인쇄 시 숨김 */}
+          <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm px-4 py-2 flex items-center gap-2 print:hidden">
+            <span className="text-sm font-bold text-gray-800 dark:text-gray-100">
+              👁 견적서 미리보기
+              <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
+                {isEditMode && editQuoteNo ? `(${editQuoteNo})` : "(저장 전)"}
+              </span>
+            </span>
+            <div className="ml-auto flex gap-2">
+              <button type="button" onClick={() => window.print()}
+                className="px-3 py-1.5 text-xs rounded bg-blue-600 text-white font-semibold hover:bg-blue-700">
+                🖨 인쇄
+              </button>
+              <button type="button" onClick={() => setPreviewOpen(false)}
+                className="px-3 py-1.5 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                ✕ 닫기
+              </button>
+            </div>
+          </div>
+
+          <div className="p-6 print:p-0">
+            <QuotePrintPaper
+              preview={!isEditMode || !editQuoteNo}
+              header={{
+                quote_no:           isEditMode && editQuoteNo ? editQuoteNo : "(저장 전 미리보기)",
+                quote_date:         quoteDate,
+                site_name:          siteName || null,
+                elevator_name:      (() => {
+                  const elevSet = Array.from(new Set(rows.filter(r => r.material_id || r.material_name.trim()).map(r => r.elevator_name.trim()).filter(Boolean)));
+                  return elevSet.length === 0 ? null : elevSet.join(", ");
+                })(),
+                work_title:         workTitle || null,
+                customer_name:      customerName || null,
+                customer_phone:     customerPhone || null,
+                material_subtotal:  materialSubtotal,
+                direct_labor:       directLabor,
+                indirect_labor:     indirectLabor,
+                indirect_labor_rate: indirectRate,
+                overhead,
+                overhead_rate:       overheadRate,
+                profit,
+                profit_rate:         profitRate,
+                truncate_amount:     truncateAmount,
+                total_amount:        totalAmount,
+                note:                note || null,
+              }}
+              items={rows
+                .filter(r => r.material_id || r.material_name.trim())
+                .map((r, i) => ({
+                  id: i,
+                  material_name: r.material_name,
+                  spec: r.spec || null,
+                  unit: r.unit || null,
+                  qty: r.qty,
+                  unit_price: r.unit_price,
+                  amount: r.qty * r.unit_price,
+                  remark: r.remark || null,
+                  opinion_text: r.opinion_text || null,
+                  opinion_image_url: r.opinion_image_url || null,
+                }))
+              }
+              company={company}
+            />
+          </div>
+
+          {/* 인쇄 시 미리보기만 출력되도록 격리 */}
+          <style jsx global>{`
+            @media print {
+              body * { visibility: hidden !important; }
+              .quote-preview-overlay, .quote-preview-overlay * { visibility: visible !important; }
+              .quote-preview-overlay {
+                position: absolute !important;
+                left: 0; top: 0; right: 0;
+                background: white !important;
+                overflow: visible !important;
+              }
+            }
+          `}</style>
+        </div>
+      )}
     </div>
   );
 }
