@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth, hasMenuPermission, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { api } from "@/lib/api-client";
@@ -118,8 +118,18 @@ function todayISO(): string {
 // ============================================================
 
 export default function QuoteEntryClient() {
+  return (
+    <Suspense fallback={<div className="p-12 text-center text-sm text-gray-500">로딩 중...</div>}>
+      <QuoteEntryInner />
+    </Suspense>
+  );
+}
+
+function QuoteEntryInner() {
   const { user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromRequestId = searchParams.get("fromRequest");
 
   const [settings, setSettings] = useState<QuoteSettings | null>(null);
 
@@ -161,6 +171,10 @@ export default function QuoteEntryClient() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // 견적요청 프리필 (fromRequest=N)
+  const [sourceRequestId, setSourceRequestId] = useState<number | null>(null);
+  const [sourceRequestNo, setSourceRequestNo] = useState<string | null>(null);
+
   // ============================================================
   // 초기 로드
   // ============================================================
@@ -178,6 +192,62 @@ export default function QuoteEntryClient() {
     })();
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
   }, []);
+
+  // fromRequest 프리필
+  useEffect(() => {
+    if (!fromRequestId) return;
+    const qrId = Number(fromRequestId);
+    if (!Number.isFinite(qrId)) return;
+    (async () => {
+      const [hdr, items] = await Promise.all([
+        supabase.from("quote_requests").select("*").eq("id", qrId).maybeSingle(),
+        supabase.from("quote_request_items").select("*").eq("quote_request_id", qrId).order("sort_order"),
+      ]);
+      const h = hdr.data as {
+        id: number; request_no: string; site_name: string | null;
+        work_title: string | null; reason: string | null;
+        requester_name: string | null;
+      } | null;
+      if (!h) return;
+      setSourceRequestId(h.id);
+      setSourceRequestNo(h.request_no);
+      setSiteName(h.site_name ?? "");
+      if (h.work_title) setWorkTitle(h.work_title);
+      if (h.reason) setNote(h.reason);
+      if (h.requester_name) setCustomerName(h.requester_name);
+      // items
+      const its = (items.data ?? []) as Array<{
+        material_id: string | null; material_name: string;
+        spec: string | null; unit: string | null;
+        qty: number; elevator_name: string | null; remark: string | null;
+      }>;
+      if (its.length > 0) {
+        // 자재 master 가격 보강을 위해 각 자재 1회 조회
+        const enriched = await Promise.all(its.map(async it => {
+          let unitPrice = 0;
+          if (it.material_id) {
+            try {
+              const full = await api.get<MaterialRecord>(`/api/materials/${encodeURIComponent(it.material_id)}`);
+              unitPrice = full.sellPrice ?? 0;
+            } catch { /* skip */ }
+          }
+          return newRow({
+            material_id:   it.material_id ?? "",
+            material_name: it.material_name,
+            spec:          it.spec ?? "",
+            unit:          it.unit ?? "EA",
+            qty:           it.qty,
+            unit_price:    unitPrice,
+            elevator_name: it.elevator_name ?? "",
+            remark:        it.remark ?? "",
+          });
+        }));
+        setRows(enriched);
+      }
+      // 견적요청 상태 → '견적작성중'
+      await supabase.from("quote_requests").update({ status: "견적작성중" }).eq("id", qrId);
+    })();
+  }, [fromRequestId]);
 
   // 현장 변경 시 호기 + 계약/하자 정보 로드
   useEffect(() => {
@@ -403,7 +473,19 @@ export default function QuoteEntryClient() {
       );
       if (e2) throw e2;
 
-      setMessage({ type: "success", text: `견적서가 등록되었습니다. (${quote_no})` });
+      // 견적요청으로부터 진입한 경우 → quote_request.quote_id 연결 + 상태 갱신
+      if (sourceRequestId && header.id) {
+        await supabase.from("quote_requests")
+          .update({ quote_id: header.id, status: "견적발행" })
+          .eq("id", sourceRequestId);
+      }
+
+      setMessage({
+        type: "success",
+        text: sourceRequestNo
+          ? `견적서가 등록되었습니다. (${quote_no}) — 견적요청 ${sourceRequestNo} 연결 완료`
+          : `견적서가 등록되었습니다. (${quote_no})`,
+      });
       // 폼 리셋
       setRows(Array.from({ length: DEFAULT_ROW_COUNT }, () => newRow()));
       setSiteName(""); setCustomerName(""); setCustomerPhone("");
@@ -415,6 +497,8 @@ export default function QuoteEntryClient() {
       setLaborUnitPrice(settings?.default_direct_labor ?? 0);
       setTruncateManual(false);
       setTruncateAmount(0);
+      setSourceRequestId(null);
+      setSourceRequestNo(null);
     } catch (e) {
       setMessage({ type: "error", text: e instanceof Error ? e.message : String(e) });
     } finally {
@@ -434,7 +518,14 @@ export default function QuoteEntryClient() {
   return (
     <div className="min-h-full bg-gray-50 dark:bg-gray-900">
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">견적서 작성</h1>
+        <div className="flex items-center gap-2 flex-wrap">
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">견적서 작성</h1>
+          {sourceRequestNo && (
+            <span className="text-[11px] px-2.5 py-1 rounded-full font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+              📋 견적요청 {sourceRequestNo} 에서 가져옴
+            </span>
+          )}
+        </div>
         <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">자재비·인건비·일반관리비·이윤 자동 계산</p>
       </div>
 

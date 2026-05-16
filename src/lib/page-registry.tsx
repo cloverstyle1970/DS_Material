@@ -21,6 +21,8 @@ import TBMClient from "@/components/tbm/TBMClient";
 import TBMAdminClient from "@/components/tbm/TBMAdminClient";
 import TBMMasterClient from "@/components/tbm/TBMMasterClient";
 import EmployeeRegisterClient from "@/components/hr/EmployeeRegisterClient";
+import ClaimEntryClient from "@/components/claim/ClaimEntryClient";
+import QuoteRequestsListClient from "@/components/claim/QuoteRequestsListClient";
 import DeptRankClient from "@/components/hr/DeptRankClient";
 import CompanyVehiclesClient from "@/components/hr/CompanyVehiclesClient";
 import MyProfileClient from "@/components/data/MyProfileClient";
@@ -150,6 +152,14 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
         </main>
       </>
     ),
+  },
+  "/claim/new": {
+    label: "보수원 청구 등록",
+    render: () => <ClaimEntryClient />,
+  },
+  "/claim/quote-requests": {
+    label: "견적요청 목록",
+    render: () => <QuoteRequestsListClient />,
   },
   "/requests": {
     label: "자재 신청 관리",
