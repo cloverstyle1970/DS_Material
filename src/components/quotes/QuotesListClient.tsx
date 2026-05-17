@@ -140,16 +140,25 @@ export default function QuotesListClient() {
             className="px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
         </div>
         <div className="flex gap-1">
-          {(["all","작성중","발행","승인","취소"] as StatusFilter[]).map(f => (
-            <button key={f} type="button" onClick={() => setStatusFilter(f)}
-              className={`px-3 py-1 text-[11px] font-semibold rounded-full border ${
-                statusFilter === f
-                  ? "bg-slate-700 text-white border-slate-700"
-                  : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600"
-              }`}>
-              {f === "all" ? `전체 (${rows.length})` : `${f} (${counts[f as Status]})`}
-            </button>
-          ))}
+          {(["all","작성중","발행","승인","취소"] as StatusFilter[]).map(f => {
+            const active = statusFilter === f;
+            const activeCls =
+              f === "작성중" ? "bg-gray-600 text-white border-gray-600 shadow-sm" :
+              f === "발행"   ? "bg-blue-600 text-white border-blue-600 shadow-sm" :
+              f === "승인"   ? "bg-green-600 text-white border-green-600 shadow-sm" :
+              f === "취소"   ? "bg-red-500 text-white border-red-500 shadow-sm" :
+                                "bg-gray-900 text-white border-gray-900 shadow-sm";
+            return (
+              <button key={f} type="button" onClick={() => setStatusFilter(f)}
+                className={`px-3 py-1 text-[11px] font-semibold rounded-full border ${
+                  active
+                    ? activeCls
+                    : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600"
+                }`}>
+                {f === "all" ? `전체 (${rows.length})` : `${f} (${counts[f as Status]})`}
+              </button>
+            );
+          })}
         </div>
         <input type="text" lang="ko" value={search} onChange={e => setSearch(e.target.value)}
           placeholder="견적번호·현장·작업명·고객 검색"
