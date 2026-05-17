@@ -403,17 +403,23 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
               </td></tr>
             ) : paginated.map(m => {
               const isChecked = selected.has(m.id);
+              // 수리품 행은 보라색 톤으로 강조
+              const rowBg = isChecked
+                ? (isDark ? "bg-gray-700" : "bg-slate-50")
+                : m.isRepair
+                  ? (isDark ? "bg-green-950/30 hover:bg-green-900/40" : "bg-green-100 hover:bg-green-200")
+                  : (isDark ? "hover:bg-gray-800" : "hover:bg-gray-50");
               return (
                 <tr key={m.id}
                   onClick={() => toggleOne(m.id)}
-                  className={`transition-colors cursor-pointer ${isChecked ? isDark ? "bg-gray-700" : "bg-slate-50" : isDark ? "hover:bg-gray-800" : "hover:bg-gray-50"}`}>
+                  className={`transition-colors cursor-pointer ${rowBg}`}>
                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                     <input type="checkbox" checked={isChecked} onChange={() => toggleOne(m.id)}
                       className="w-4 h-4 rounded border-gray-300 accent-slate-700 cursor-pointer" />
                   </td>
                   <td className="px-4 py-3 text-center">
                     {m.isRepair
-                      ? <span className={`text-xs px-2 py-0.5 rounded-full ${isDark ? "bg-purple-900/60 text-purple-300" : "bg-purple-100 text-purple-700"}`}>수리품</span>
+                      ? <span className={`text-xs px-2 py-0.5 rounded-full ${isDark ? "bg-green-900/60 text-green-300" : "bg-green-100 text-green-700"}`}>수리품</span>
                       : <span className={`text-xs px-2 py-0.5 rounded-full ${
                           isDark
                             ? m.id.startsWith("D") ? "bg-red-900/60 text-red-300" : "bg-blue-900/60 text-blue-300"
@@ -440,7 +446,13 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
                     <StockCell material={m} editable={!viewOnly} />
                   </td>
                   {!viewOnly && (
-                    <td className={`px-4 py-3 sticky right-0 z-10 ${isChecked ? isDark ? "bg-gray-700" : "bg-slate-50" : isDark ? "bg-gray-900" : "bg-white"}`} onClick={e => e.stopPropagation()}>
+                    <td className={`px-4 py-3 sticky right-0 z-10 ${
+                      isChecked
+                        ? (isDark ? "bg-gray-700" : "bg-slate-50")
+                        : m.isRepair
+                          ? (isDark ? "bg-green-950/40" : "bg-green-100")
+                          : (isDark ? "bg-gray-900" : "bg-white")
+                    }`} onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
@@ -454,7 +466,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
                             type="button"
                             onClick={() => setRepairTarget(m)}
                             title="수리품 등록"
-                            className={`text-xs px-2.5 py-1 rounded-lg border font-bold transition-colors whitespace-nowrap ${isDark ? "border-purple-700 text-purple-300 hover:bg-purple-900/40 hover:text-purple-200" : "border-purple-300 text-purple-600 hover:bg-purple-50 hover:text-purple-800 hover:border-purple-400"}`}
+                            className={`text-xs px-2.5 py-1 rounded-lg border font-bold transition-colors whitespace-nowrap ${isDark ? "border-green-700 text-green-300 hover:bg-green-900/40 hover:text-green-200" : "border-green-300 text-green-600 hover:bg-green-50 hover:text-green-800 hover:border-green-400"}`}
                           >
                             R
                           </button>
