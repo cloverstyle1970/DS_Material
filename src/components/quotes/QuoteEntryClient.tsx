@@ -775,7 +775,9 @@ function QuoteEntryInner() {
                   <button key={t} type="button" onClick={() => setMatTypeFilter(t)}
                     className={`px-2.5 py-1 text-[11px] font-semibold rounded transition-colors ${
                       matTypeFilter === t
-                        ? "bg-blue-600 text-white"
+                        ? t === "DS" ? "bg-red-500 text-white shadow-sm"
+                          : t === "TK" ? "bg-blue-600 text-white shadow-sm"
+                          : "bg-gray-900 text-white shadow-sm"
                         : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
                     }`}>{t === "ALL" ? "전체" : t}</button>
                 ))}
