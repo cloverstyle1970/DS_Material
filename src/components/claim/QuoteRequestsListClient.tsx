@@ -130,16 +130,25 @@ export default function QuoteRequestsListClient() {
           </p>
         </div>
         <div className="flex gap-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-xl">
-          {STATUS_OPTIONS.map(s => (
-            <button key={s} type="button" onClick={() => setFilter(s)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                filter === s
-                  ? "bg-white dark:bg-gray-900 text-gray-800 dark:text-white shadow-sm"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-              }`}>
-              {s} <span className="opacity-60 ml-1">{s === "전체" ? list.length : list.filter(r => r.status === s).length}</span>
-            </button>
-          ))}
+          {STATUS_OPTIONS.map(s => {
+            const active = filter === s;
+            const activeCls =
+              s === "신청"       ? "bg-amber-500 text-white shadow-sm" :
+              s === "견적작성중" ? "bg-blue-600 text-white shadow-sm" :
+              s === "견적발행"   ? "bg-green-600 text-white shadow-sm" :
+              s === "취소"       ? "bg-gray-500 text-white shadow-sm" :
+                                   "bg-gray-900 text-white shadow-sm";
+            return (
+              <button key={s} type="button" onClick={() => setFilter(s)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                  active
+                    ? activeCls
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                }`}>
+                {s} <span className="opacity-60 ml-1">{s === "전체" ? list.length : list.filter(r => r.status === s).length}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
