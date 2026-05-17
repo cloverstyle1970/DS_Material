@@ -35,6 +35,8 @@ export const PERMISSION_MENUS: PermissionMenuGroup[] = [
   {
     group: "자재관리",
     items: [
+      { href: "/claim/new",            label: "견적 및 자재청구 등록" },
+      { href: "/claim/quote-requests", label: "견적요청 목록" },
       { href: "/material",         label: "자재품목 관리" },
       { href: "/requests",         label: "자재 신청 관리" },
       { href: "/purchase-orders",  label: "발주 관리" },
@@ -44,6 +46,7 @@ export const PERMISSION_MENUS: PermissionMenuGroup[] = [
       { href: "/serial-history",   label: "S/N 이력 추적" },
       { href: "/stats/period",     label: "기간별 입출고 내역" },
       { href: "/stats/sites",      label: "현장/호기별 현황" },
+      { href: "/stats/performance", label: "사원 실적 (매출)" },
       { href: "/inventory-check",  label: "재고실사" },
     ],
   },

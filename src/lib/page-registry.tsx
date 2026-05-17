@@ -167,7 +167,7 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
     ),
   },
   "/claim/new": {
-    label: "보수원 청구 등록",
+    label: "견적 및 자재청구 등록",
     render: () => <ClaimEntryClient />,
   },
   "/claim/quote-requests": {

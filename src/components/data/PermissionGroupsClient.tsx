@@ -53,6 +53,8 @@ const PERMISSION_TREE: MenuSection[] = [
   {
     id: "material", label: "자재관리", color: "text-amber-500",
     items: [
+      { href: "/claim/new",            label: "견적 및 자재청구 등록" },
+      { href: "/claim/quote-requests", label: "견적요청 목록" },
       { href: "/material",         label: "자재품목 관리" },
       { href: "/requests",         label: "자재 신청 관리" },
       { href: "/purchase-orders",  label: "발주 관리" },
@@ -62,6 +64,7 @@ const PERMISSION_TREE: MenuSection[] = [
       { href: "/serial-history",   label: "S/N 이력 추적", ops: ["read"] },
       { href: "/stats/period",     label: "기간별 입출고 내역", ops: ["read"] },
       { href: "/stats/sites",      label: "현장/호기별 현황", ops: ["read"] },
+      { href: "/stats/performance", label: "사원 실적 (매출)", ops: ["read"] },
       { href: "/inventory-check",  label: "재고실사" },
     ],
   },
@@ -88,6 +91,7 @@ const PERMISSION_TREE: MenuSection[] = [
       { href: "/hr/company-vehicles",  label: "회사차량관리" },
       { href: "/hr/employee-register", label: "사원등록" },
       { href: "/hr/dept-rank",         label: "부서/직급관리" },
+      { href: "/hr/team-crew",         label: "팀구성 관리" },
     ],
   },
 ];
@@ -388,6 +392,12 @@ export default function PermissionGroupsClient() {
             {groups.map(g => {
               const memCnt = users.filter(u => u.permission_group_id === g.id).length;
               const active = g.id === selectedId;
+              // 편집 중인 그룹은 저장 전 local 상태(editing.permissions)를 노출
+              const livePerms = editing && editing.id === g.id ? editing.permissions : g.permissions;
+              const isDirty = editing && editing.id === g.id && (
+                editing.permissions.length !== g.permissions.length ||
+                editing.permissions.some(p => !g.permissions.includes(p))
+              );
               return (
                 <button key={g.id} type="button" onClick={() => setSelectedId(g.id)}
                   className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${
@@ -399,10 +409,14 @@ export default function PermissionGroupsClient() {
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border ${colorCls(g.color)}`}>
                       {g.name}
                     </span>
-                    {g.is_system_role && <span className="text-[10px] font-bold text-rose-500">SYS</span>}
+                    <div className="flex items-center gap-1">
+                      {isDirty && <span title="저장되지 않은 변경" className="text-[10px] font-bold text-amber-600 dark:text-amber-400">●</span>}
+                      {g.is_system_role && <span className="text-[10px] font-bold text-rose-500">SYS</span>}
+                    </div>
                   </div>
                   <div className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">
-                    👤 {memCnt}명 · 🔑 {g.permissions.includes("admin") ? "전체(admin)" : `${g.permissions.length}개`}
+                    👤 {memCnt}명 · 🔑 {livePerms.includes("admin") ? "전체(admin)" : `${livePerms.length}개`}
+                    {isDirty && <span className="ml-1 text-amber-600 dark:text-amber-400">(미저장)</span>}
                   </div>
                 </button>
               );

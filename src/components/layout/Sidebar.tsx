@@ -58,7 +58,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "자재관리",
     color: "text-amber-400",
     items: [
-      { href: "/claim/new",            label: "보수원 청구 등록",   icon: "🔧" },
+      { href: "/claim/new",            label: "견적 및 자재청구 등록",   icon: "🔧" },
       { href: "/claim/quote-requests", label: "견적요청 목록",      icon: "📝" },
       { href: "/material",         label: "자재품목 관리",      icon: "🗄️" },
       { href: "/requests",         label: "자재 신청 관리",     icon: "📋" },

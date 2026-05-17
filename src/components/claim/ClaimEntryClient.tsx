@@ -306,7 +306,7 @@ export default function ClaimEntryClient() {
   return (
     <div className="min-h-full bg-gray-50 dark:bg-gray-900">
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">🔧 보수원 청구 등록</h1>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white">🔧 견적 및 자재청구 등록</h1>
         <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">유상/무상/당직 모드 선택 후 자재 청구를 접수합니다.</p>
       </div>
 
@@ -475,7 +475,7 @@ export default function ClaimEntryClient() {
         <div className="flex justify-end gap-2">
           <button type="button" onClick={submit} disabled={saving}
             className="px-6 py-2 rounded bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
-            {saving ? "접수 중..." : `📨 ${MODES.find(m => m.key === mode)?.label} 접수`}
+            {saving ? "저장 중..." : `💾 ${MODES.find(m => m.key === mode)?.label} 저장`}
           </button>
         </div>
 
