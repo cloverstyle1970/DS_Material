@@ -282,16 +282,36 @@ export default function PermissionGroupsClient() {
 
   async function syncMembers() {
     if (!editing || members.length === 0) return;
-    if (!confirm(`그룹 [${editing.name}] 의 권한 ${editing.permissions.length}개를 멤버 ${members.length}명 모두에게 적용합니다.\n각 사용자의 기존 세부권한은 덮어쓰기 됩니다. 계속할까요?`)) return;
+    // 그룹에 미저장 변경이 있으면 sync 전에 함께 저장 (그러지 않으면 reload 후 체크박스가 풀려 보임)
+    const savedGroup = groups.find(g => g.id === editing.id);
+    const dirty = !savedGroup || savedGroup.permissions.length !== editing.permissions.length ||
+      editing.permissions.some(p => !savedGroup.permissions.includes(p));
+    const msg = dirty
+      ? `그룹 [${editing.name}] 의 현재 편집 중인 권한 ${editing.permissions.length}개를\n① 그룹에 저장 + ② 멤버 ${members.length}명 모두에게 적용합니다.\n각 사용자의 기존 세부권한은 덮어쓰기 됩니다. 계속할까요?`
+      : `그룹 [${editing.name}] 의 권한 ${editing.permissions.length}개를 멤버 ${members.length}명 모두에게 적용합니다.\n각 사용자의 기존 세부권한은 덮어쓰기 됩니다. 계속할까요?`;
+    if (!confirm(msg)) return;
     setSaving(true); setMessage(null);
     try {
+      if (dirty) {
+        const { error: gErr } = await supabase
+          .from("permission_groups")
+          .update({
+            name: editing.name.trim(),
+            description: editing.description?.trim() || null,
+            color: editing.color,
+            sort_order: editing.sort_order,
+            permissions: editing.permissions,
+          })
+          .eq("id", editing.id);
+        if (gErr) throw gErr;
+      }
       const ids = members.map(m => m.id);
       const { error } = await supabase
         .from("users")
         .update({ permissions: editing.permissions })
         .in("id", ids);
       if (error) throw error;
-      setMessage({ type: "success", text: `${members.length}명에게 그룹 권한 적용 완료` });
+      setMessage({ type: "success", text: `${members.length}명에게 그룹 권한 적용 완료${dirty ? " (그룹도 저장됨)" : ""}` });
       await reload();
     } catch (err) {
       setMessage({ type: "error", text: `적용 실패: ${err instanceof Error ? err.message : String(err)}` });
