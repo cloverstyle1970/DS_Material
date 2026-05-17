@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { useTabs, MAX_TABS } from "@/context/TabsContext";
 import { supabase } from "@/lib/supabase";
+import { visibleUserIds } from "@/lib/crew";
 
 interface QuoteRequest {
   id: number;
@@ -67,8 +68,9 @@ export default function QuoteRequestsListClient() {
     setLoading(true);
     let query = supabase.from("quote_requests")
       .select("*").order("requested_at", { ascending: false });
-    // 비관리자는 본인 청구만 조회
-    if (!admin) query = query.eq("requester_id", user.id);
+    // 비관리자는 같은 팀(users.dept) 청구만 조회
+    const ids = await visibleUserIds(user);
+    if (ids) query = query.in("requester_id", ids);
     const { data } = await query;
     setList((data ?? []) as QuoteRequest[]);
     setLoading(false);

@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { api } from "@/lib/api-client";
 import { MaterialRecord } from "@/lib/mock-materials";
+import { visibleUserIds } from "@/lib/crew";
 
 const DEFAULT_ROW_COUNT = 5;
 
@@ -114,19 +115,18 @@ export default function ClaimEntryClient() {
   async function loadHistory() {
     if (!user) return;
     setHistLoading(true);
-    const [qr, mr] = await Promise.all([
-      supabase.from("quote_requests")
-        .select("id, request_no, requested_at, site_name, work_title, status, quote_id, quote_request_items(material_name)")
-        .eq("requester_id", user.id)
-        .order("requested_at", { ascending: false })
-        .limit(20),
-      supabase.from("material_requests")
-        .select("id, requested_at, site_name, items, note, request_type, status")
-        .eq("requester_id", user.id)
-        .in("request_type", ["무상신청", "당직선출고"])  // 유상견적 자동생성분은 quote_requests 측에서 보임
-        .order("requested_at", { ascending: false })
-        .limit(20),
-    ]);
+    const ids = await visibleUserIds(user);
+    let qrQ = supabase.from("quote_requests")
+      .select("id, request_no, requested_at, site_name, work_title, status, quote_id, quote_request_items(material_name)")
+      .order("requested_at", { ascending: false })
+      .limit(20);
+    let mrQ = supabase.from("material_requests")
+      .select("id, requested_at, site_name, items, note, request_type, status")
+      .in("request_type", ["무상신청", "당직선출고"])  // 유상견적 자동생성분은 quote_requests 측에서 보임
+      .order("requested_at", { ascending: false })
+      .limit(20);
+    if (ids) { qrQ = qrQ.in("requester_id", ids); mrQ = mrQ.in("requester_id", ids); }
+    const [qr, mr] = await Promise.all([qrQ, mrQ]);
     const rows: HistoryRow[] = [];
     for (const r of (qr.data ?? []) as Array<{
       id: number; request_no: string; requested_at: string;
@@ -479,13 +479,13 @@ export default function ClaimEntryClient() {
           </button>
         </div>
 
-        {/* ─── 본인 청구 이력 ───────────────────────────────── */}
+        {/* ─── 팀 청구 이력 ───────────────────────────────── */}
         <div className={sectionCls}>
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <div>
-              <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">📜 내 청구 이력 (최근 20건)</h2>
+              <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">📜 팀 청구 이력 (최근 20건)</h2>
               <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                유상견적요청은 견적요청 목록 페이지에서, 무상·당직 신청은 자재신청 관리 페이지에서 처리 상황을 추적할 수 있습니다.
+                같은 팀({user?.dept ?? "-"}) 사원들의 청구 내역을 함께 표시합니다. 유상견적요청은 견적요청 목록 페이지에서, 무상·당직 신청은 자재신청 관리 페이지에서 처리 상황을 추적할 수 있습니다.
               </p>
             </div>
             <div className="flex items-center gap-2">

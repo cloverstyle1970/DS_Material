@@ -28,6 +28,7 @@ import DeliveryNoteClient from "@/components/invoice/DeliveryNoteClient";
 import TaxInvoiceClient from "@/components/invoice/TaxInvoiceClient";
 import PerformanceStatsClient from "@/components/stats/PerformanceStatsClient";
 import DeptRankClient from "@/components/hr/DeptRankClient";
+import TeamCrewClient from "@/components/hr/TeamCrewClient";
 import CompanyVehiclesClient from "@/components/hr/CompanyVehiclesClient";
 import MyProfileClient from "@/components/data/MyProfileClient";
 import CompanyInfoClient from "@/components/data/CompanyInfoClient";
@@ -73,6 +74,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/hr/dept-rank": {
     label: "부서/직급관리",
     render: () => <DeptRankClient />,
+  },
+  "/hr/team-crew": {
+    label: "팀구성 관리",
+    render: () => <TeamCrewClient />,
   },
   "/hr/company-vehicles": {
     label: "회사차량관리",

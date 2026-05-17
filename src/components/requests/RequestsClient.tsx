@@ -261,12 +261,13 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
 
   const { user } = useAuth();
   const admin = user ? !isViewOnly(user) : false;
-  // 자재신청 가시성: 관리자(admin perm)는 전체, 그 외는 본인 신청만
-  const showOnlyMine = user ? !isAdmin(user) : false;
-  const visibleRequests = useMemo(
-    () => showOnlyMine && user ? requests.filter(r => r.requesterId === user.id) : requests,
-    [requests, showOnlyMine, user],
-  );
+  // 자재신청 가시성: 관리자(admin perm)는 전체, 그 외는 같은 팀(users.dept) 신청만
+  const restrictToTeam = user ? !isAdmin(user) : false;
+  const visibleRequests = useMemo(() => {
+    if (!restrictToTeam || !user) return requests;
+    const dept = (user.dept ?? "").trim();
+    return requests.filter(r => dept ? r.requesterDept === dept : r.requesterId === user.id);
+  }, [requests, restrictToTeam, user]);
 
   // ── 자재신청 액션 ────────────────────────────────────────────────
   async function handleReqAction(id: number, action: string) {
@@ -497,13 +498,13 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
       {/* ═══ 자재신청 탭 ═══════════════════════════════════════════ */}
       {tab === "자재신청" && (
         <div className="space-y-3">
-          {showOnlyMine && (
+          {restrictToTeam && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
               <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-200 text-amber-800 dark:bg-amber-800 dark:text-amber-100">
-                👤 본인 신청만 표시 중
+                👥 같은 팀 신청만 표시 중
               </span>
               <span className="text-[11px] text-amber-800 dark:text-amber-200">
-                관리자가 전체 신청을 처리합니다. 본 화면에서는 본인이 등록한 신청만 보입니다.
+                관리자가 전체 신청을 처리합니다. 본 화면에서는 본인이 속한 팀({user?.dept ?? "-"}) 사원들의 신청만 보입니다.
               </span>
             </div>
           )}
@@ -611,7 +612,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                 {sortedReqs.length === 0 ? (
                   <tr><td colSpan={admin ? 11 : 10} className="text-center py-16 text-gray-400 dark:text-gray-500">
                     {visibleRequests.length === 0
-                      ? (showOnlyMine ? "본인이 등록한 자재 신청 내역이 없습니다." : "자재 신청 내역이 없습니다.")
+                      ? (restrictToTeam ? "같은 팀의 자재 신청 내역이 없습니다." : "자재 신청 내역이 없습니다.")
                       : "조건에 맞는 내역이 없습니다."}
                   </td></tr>
                 ) : sortedReqs.map(r => {

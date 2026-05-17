@@ -29,6 +29,7 @@ interface Form {
   blood_type: string;
   hireDate: string;
   dept: string;
+  crew_id: number | null;
   rank: string;
   status: string;
   phone: string;
@@ -121,7 +122,7 @@ function todayStr(): string {
 function emptyForm(): Form {
   return {
     name: "", ssn: "", gender: "", blood_type: "",
-    hireDate: todayStr(), dept: "", rank: "", status: "재직",
+    hireDate: todayStr(), dept: "", crew_id: null, rank: "", status: "재직",
     phone: "", email: "",
     postal_code: "", address_basic: "", address_detail: "",
     uniform_top_size: "", uniform_bottom_size: "", safety_shoes_size: "",
@@ -173,18 +174,21 @@ export default function EmployeeRegisterClient() {
   const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
   const [ranks, setRanks] = useState<{ id: number; name: string }[]>([]);
   const [permGroups, setPermGroups] = useState<{ id: number; name: string; permissions: string[] }[]>([]);
+  const [crews, setCrews] = useState<{ id: number; department_id: number; name: string; is_active: boolean }[]>([]);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     (async () => {
-      const [d, r, p] = await Promise.all([
+      const [d, r, p, c] = await Promise.all([
         supabase.from("departments").select("id, name").eq("is_active", true).order("sort_order"),
         supabase.from("ranks").select("id, name").eq("is_active", true).order("sort_order"),
         supabase.from("permission_groups").select("id, name, permissions").order("sort_order"),
+        supabase.from("crews").select("id, department_id, name, is_active").eq("is_active", true).order("sort_order"),
       ]);
       if (d.data) setDepartments(d.data as { id: number; name: string }[]);
       if (r.data) setRanks(r.data as { id: number; name: string }[]);
       if (p.data) setPermGroups(p.data as { id: number; name: string; permissions: string[] }[]);
+      if (c.data) setCrews(c.data as { id: number; department_id: number; name: string; is_active: boolean }[]);
     })();
   }, []);
 
@@ -356,6 +360,7 @@ export default function EmployeeRegisterClient() {
         blood_type: form.blood_type || null,
         hire_date: form.hireDate,
         dept: form.dept || null,
+        crew_id: form.crew_id,
         rank: form.rank || null,
         status: form.status,
         phone: form.phone || null,
@@ -630,10 +635,28 @@ export default function EmployeeRegisterClient() {
                     </div>
                     <div>
                       <label className={labelCls}>부서</label>
-                      <select value={form.dept} onChange={e => set("dept", e.target.value)} className={inputCls}>
+                      <select value={form.dept}
+                        onChange={e => { set("dept", e.target.value); set("crew_id", null); }}
+                        className={inputCls}>
                         <option value="">선택하세요</option>
                         {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                       </select>
+                    </div>
+                    <div>
+                      <label className={labelCls}>조</label>
+                      {(() => {
+                        const selectedDept = departments.find(d => d.name === form.dept);
+                        const deptCrews = selectedDept ? crews.filter(c => c.department_id === selectedDept.id) : [];
+                        return (
+                          <select value={form.crew_id ?? ""}
+                            onChange={e => set("crew_id", e.target.value ? Number(e.target.value) : null)}
+                            disabled={!selectedDept || deptCrews.length === 0}
+                            className={inputCls}>
+                            <option value="">{!selectedDept ? "부서 먼저 선택" : deptCrews.length === 0 ? "등록된 조 없음" : "미배정"}</option>
+                            {deptCrews.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
+                        );
+                      })()}
                     </div>
                     <div>
                       <label className={labelCls}>직급</label>

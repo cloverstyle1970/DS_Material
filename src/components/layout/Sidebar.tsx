@@ -103,6 +103,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/hr/company-vehicles",   label: "회사차량관리",   icon: "🚗", section: "관리" },
       { href: "/hr/employee-register",  label: "사원등록",       icon: "🧑‍💼", section: "인사", adminOnly: true },
       { href: "/hr/dept-rank",          label: "부서/직급관리", icon: "🏢", section: "인사", adminOnly: true },
+      { href: "/hr/team-crew",          label: "팀구성 관리",    icon: "🧑‍🤝‍🧑", section: "인사", adminOnly: true },
       { href: "#hr-transfer",           label: "인사 이동",      icon: "🔄", section: "인사" },
     ],
   },
