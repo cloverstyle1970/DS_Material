@@ -559,16 +559,16 @@ function QuoteDetailInner() {
                 )}
               </>
             )}
+            {admin && (header.status === "작성중" || header.status === "발행") && (
+              <button type="button"
+                onClick={() => router.push(`/quotes/edit?id=${header.id}`)}
+                className="px-3 py-1.5 text-xs rounded bg-yellow-500 text-white hover:bg-yellow-600 font-semibold">
+                ✏️ 수정
+              </button>
+            )}
             {admin && header.status === "작성중" && (
-              <>
-                <button type="button"
-                  onClick={() => router.push(`/quotes/edit?id=${header.id}`)}
-                  className="px-3 py-1.5 text-xs rounded bg-yellow-500 text-white hover:bg-yellow-600 font-semibold">
-                  ✏️ 수정
-                </button>
-                <button type="button" onClick={() => changeStatus("발행")}
-                  className="px-3 py-1.5 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700">발행</button>
-              </>
+              <button type="button" onClick={() => changeStatus("발행")}
+                className="px-3 py-1.5 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700">발행</button>
             )}
             {admin && header.status === "발행" && (
               <button type="button" onClick={() => changeStatus("승인")}

@@ -339,8 +339,8 @@ function QuoteEntryInner() {
         overhead: number | null; profit: number | null;
       };
       setEditQuoteNo(h.quote_no);
-      if (h.status !== "작성중") {
-        setEditLockedReason(`현재 결재상태가 [${h.status}] 입니다. 작성중인 견적서만 수정할 수 있습니다.`);
+      if (h.status !== "작성중" && h.status !== "발행") {
+        setEditLockedReason(`현재 결재상태가 [${h.status}] 입니다. 작성중·발행 상태의 견적서만 수정할 수 있습니다.`);
       }
       // 헤더 프리필
       setQuoteDate(h.quote_date);
