@@ -107,6 +107,17 @@ export default function QuoteRequestsListClient() {
     setList(prev => prev.map(r => r.id === id ? { ...r, status: next } : r));
   }
 
+  async function deleteRequest(r: QuoteRequest) {
+    if (r.status === "견적발행") { alert("이미 견적이 발행된 요청은 삭제할 수 없습니다."); return; }
+    if (!confirm(`견적요청 [${r.request_no}] 을(를) 삭제합니다.\n삭제된 데이터는 복구할 수 없습니다. 계속할까요?`)) return;
+    if (!confirm("정말 삭제하시겠습니까? (마지막 확인)")) return;
+    // quote_request_items 는 ON DELETE CASCADE 로 자동 정리됨
+    const { error } = await supabase.from("quote_requests").delete().eq("id", r.id);
+    if (error) { alert(`삭제 실패: ${error.message}`); return; }
+    setList(prev => prev.filter(x => x.id !== r.id));
+    if (selectedId === r.id) { setSelectedId(null); setSelectedItems([]); }
+  }
+
   if (!user) return <div className="p-8 text-center text-sm text-gray-500">로그인이 필요합니다.</div>;
 
   const selected = selectedId ? list.find(r => r.id === selectedId) : null;
@@ -265,10 +276,22 @@ export default function QuoteRequestsListClient() {
                       📝 견적서 작성
                     </button>
                   )}
+                  {selected.status === "견적작성중" && selected.quote_id == null && (
+                    <button type="button" onClick={() => goToQuoteEntry(selected)}
+                      className="flex-1 px-3 py-2 rounded bg-amber-600 text-white text-xs font-bold hover:bg-amber-700">
+                      ✏️ 견적서 이어서 작성
+                    </button>
+                  )}
                   {(selected.status === "신청" || selected.status === "견적작성중") && (
                     <button type="button" onClick={() => { if (confirm("취소 처리하시겠습니까?")) changeStatus(selected.id, "취소"); }}
                       className="px-3 py-2 rounded text-xs font-semibold border border-red-300 dark:border-red-700 text-red-600 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30">
                       취소
+                    </button>
+                  )}
+                  {selected.status !== "견적발행" && (
+                    <button type="button" onClick={() => deleteRequest(selected)}
+                      className="px-3 py-2 rounded text-xs font-bold bg-red-600 text-white hover:bg-red-700">
+                      🗑 삭제
                     </button>
                   )}
                 </div>

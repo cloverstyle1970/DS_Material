@@ -112,6 +112,18 @@ function parseDecimal(s: string): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 }
+function formatError(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  if (e && typeof e === "object") {
+    const o = e as { message?: string; details?: string; hint?: string; code?: string };
+    const parts = [o.message, o.details, o.hint, o.code].filter(Boolean);
+    if (parts.length > 0) return parts.join(" — ");
+    try { return JSON.stringify(e); } catch { return "(unknown error)"; }
+  }
+  return String(e);
+}
+
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -170,7 +182,6 @@ function QuoteEntryInner() {
   const [siteName, setSiteName]           = useState("");
   const [workTitle, setWorkTitle]         = useState("승강기 노후부품 보완 건");
   const [customerName, setCustomerName]   = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
   const [note, setNote]                   = useState("");
 
   // 현장/호기 마스터
@@ -319,7 +330,7 @@ function QuoteEntryInner() {
       const h = hdr.data as {
         id: number; quote_no: string; quote_date: string;
         site_name: string | null; work_title: string | null;
-        customer_name: string | null; customer_phone: string | null;
+        customer_name: string | null;
         note: string | null; status: string; charge_type: "유상" | "무상" | null;
         labor_mode: "공" | "식" | null; labor_manhours: number | null; labor_unit_price: number | null;
         indirect_labor_rate: number | null; overhead_rate: number | null; profit_rate: number | null;
@@ -336,7 +347,6 @@ function QuoteEntryInner() {
       setSiteName(h.site_name ?? "");
       setWorkTitle(h.work_title ?? "");
       setCustomerName(h.customer_name ?? "");
-      setCustomerPhone(h.customer_phone ?? "");
       setNote(h.note ?? "");
       setChargeType(h.charge_type ?? "유상");
       setChargeAutoApplied(false);
@@ -572,7 +582,7 @@ function QuoteEntryInner() {
         elevator_name: headerElevator,
         work_title: workTitle || null,
         customer_name: customerName || null,
-        customer_phone: customerPhone || null,
+        customer_phone: null,
         material_subtotal: materialSubtotal,
         direct_labor: directLabor,
         indirect_labor: indirectLabor,
@@ -666,7 +676,7 @@ function QuoteEntryInner() {
       });
       // 폼 리셋
       setRows(Array.from({ length: DEFAULT_ROW_COUNT }, () => newRow()));
-      setSiteName(""); setCustomerName(""); setCustomerPhone("");
+      setSiteName(""); setCustomerName("");
       setNote("");
       setChargeType("유상");
       setChargeAutoApplied(false);
@@ -679,7 +689,8 @@ function QuoteEntryInner() {
       setSourceRequestId(null);
       setSourceRequestNo(null);
     } catch (e) {
-      setMessage({ type: "error", text: e instanceof Error ? e.message : String(e) });
+      console.error("[quote-save] 실패", e);
+      setMessage({ type: "error", text: formatError(e) });
     } finally {
       setSaving(false);
     }
@@ -771,17 +782,13 @@ function QuoteEntryInner() {
                 )}
               </div>
             </div>
-            <div className="lg:col-span-3">
+            <div className="lg:col-span-2">
               <label className={labelCls}>작업명</label>
               <input type="text" value={workTitle} onChange={e => setWorkTitle(e.target.value)} lang="ko" className={inputCls} />
             </div>
             <div>
-              <label className={labelCls}>고객명</label>
+              <label className={labelCls}>{sourceRequestId ? "견적요청자" : "고객명"}</label>
               <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)} lang="ko" className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>고객 연락처</label>
-              <input type="text" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className={inputCls} />
             </div>
           </div>
         </div>
@@ -1158,7 +1165,7 @@ function QuoteEntryInner() {
                 })(),
                 work_title:         workTitle || null,
                 customer_name:      customerName || null,
-                customer_phone:     customerPhone || null,
+                customer_phone:     null,
                 material_subtotal:  materialSubtotal,
                 direct_labor:       directLabor,
                 indirect_labor:     indirectLabor,

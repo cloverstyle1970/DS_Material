@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth, hasMenuPermission, isAdmin } from "@/context/AuthContext";
 import { matchMenuHref } from "@/lib/permissions";
@@ -42,19 +42,25 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
 
   // pathname → 탭 자동 동기화 (URL 직접 진입, 뒤로가기, hydration 후 등)
   // tabs를 deps에 포함해 TabsProvider의 localStorage 복원 이후에도 재실행되도록 함
+  const prevTabsRef = useRef<typeof tabs>([]);
   useEffect(() => {
     if (!isAuthenticated || !user) return;
     const entry = PAGE_REGISTRY[pathname];
-    if (!entry) return;
+    if (!entry) { prevTabsRef.current = tabs; return; }
     // 이미 열려 있으면 activeHref만 동기화 (새로고침 후 active 표시 복원)
     if (tabs.some(t => t.href === pathname)) {
       if (activeHref !== pathname) setActive(pathname);
+      prevTabsRef.current = tabs;
       return;
     }
     // 활성 탭 X 클릭으로 닫는 중인 상태:
     // closeTab이 activeHref를 다음 탭으로 바꾼 직후, URL이 아직 옛 pathname을 가리키므로
-    // 아래 #2 useEffect의 router.push로 곧 정리됨. 그 사이 옛 탭을 다시 추가하지 않도록 보류.
-    if (activeHref && activeHref !== pathname && PAGE_REGISTRY[activeHref]) return;
+    // 아래 #2 useEffect의 router.push로 곧 정리됨. 그 사이 방금 닫힌 탭을 다시 추가하지 않도록 보류.
+    // 단순히 activeHref ≠ pathname 만으로 판단하면 다른 페이지에서 router.push 로 들어온 경우도
+    // 막혀 버리므로, 직전 tabs 에서 pathname 이 제거되었을 때만 skip.
+    const wasJustClosed = prevTabsRef.current.some(t => t.href === pathname);
+    prevTabsRef.current = tabs;
+    if (wasJustClosed) return;
     // dashboard/settings/profile는 메뉴 외 공통 페이지 — 권한 체크 우회
     const isAlwaysAllowed = pathname === "/dashboard" || pathname === "/settings" || pathname === "/data/profile";
     const allowed = isAlwaysAllowed || isAdmin(user) || hasMenuPermission(user, pathname, "read");
