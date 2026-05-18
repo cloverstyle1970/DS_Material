@@ -240,6 +240,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
         { key: "sellPrice",  label: "판매단가", align: "right" },
         { key: "storageLoc", label: "보관장소" },
         { key: "stockQty",   label: "재고"     },
+        { key: null,         label: "사진"     },
       ]
     : [
         { key: null,         label: "구분"     },
@@ -251,6 +252,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
         { key: "sellPrice",  label: "판매단가", align: "right" },
         { key: "storageLoc", label: "보관장소" },
         { key: "stockQty",   label: "재고"     },
+        { key: null,         label: "사진"     },
       ];
   const colSpan = COLUMNS.length + 1 + (viewOnly ? 0 : 1); // checkbox + edit
   const isDark = theme === "dark";
@@ -444,6 +446,20 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
                   <td className={`px-4 py-3 text-center ${isDark ? "text-gray-300" : "text-gray-500"}`}>{m.storageLoc ?? "-"}</td>
                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                     <StockCell material={m} editable={!viewOnly} />
+                  </td>
+                  <td className="px-2 py-3" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-center gap-1">
+                      {[m.referenceImageUrl1, m.referenceImageUrl2].filter((u): u is string => !!u).map((url, i) => (
+                        <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                          className="block w-9 h-9 rounded border border-gray-200 dark:border-gray-600 overflow-hidden bg-gray-50 dark:bg-gray-700 hover:ring-2 hover:ring-slate-400">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={url} alt="" className="w-full h-full object-cover" />
+                        </a>
+                      ))}
+                      {!m.referenceImageUrl1 && !m.referenceImageUrl2 && (
+                        <span className="text-[10px] text-gray-300 dark:text-gray-600">-</span>
+                      )}
+                    </div>
                   </td>
                   {!viewOnly && (
                     <td className={`px-4 py-3 sticky right-0 z-10 ${

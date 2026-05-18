@@ -16,6 +16,8 @@ export interface MaterialRecord {
   eCountCd: string | null;
   opinionText: string | null;
   opinionImageUrl: string | null;
+  referenceImageUrl1: string | null;
+  referenceImageUrl2: string | null;
   createdAt: string;
 }
 

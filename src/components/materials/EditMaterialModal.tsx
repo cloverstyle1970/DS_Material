@@ -8,6 +8,7 @@ import RegisterRepairModal from "./RegisterRepairModal";
 import DraggableModal from "@/components/common/DraggableModal";
 
 const OPINION_BUCKET = "material-opinions";
+const REFERENCE_BUCKET = "material-references";
 
 interface Props {
   material: MaterialRecord;
@@ -29,6 +30,11 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
   const [opinionImageUrl, setOpinionImageUrl] = useState(material.opinionImageUrl ?? "");
   const [opinionFile,     setOpinionFile]     = useState<File | null>(null);
   const [opinionUploading, setOpinionUploading] = useState(false);
+  const [refUrl1, setRefUrl1] = useState(material.referenceImageUrl1 ?? "");
+  const [refUrl2, setRefUrl2] = useState(material.referenceImageUrl2 ?? "");
+  const [refFile1, setRefFile1] = useState<File | null>(null);
+  const [refFile2, setRefFile2] = useState<File | null>(null);
+  const [refUploading, setRefUploading] = useState(false);
   const [saving,       setSaving]       = useState(false);
   const [error,        setError]        = useState("");
   const [showRepair,   setShowRepair]   = useState(false);
@@ -50,6 +56,20 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
     }
   }
 
+  async function uploadReferenceImage(file: File, slot: 1 | 2): Promise<string> {
+    setRefUploading(true);
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
+      const path = `${material.id}/ref${slot}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await supabase.storage.from(REFERENCE_BUCKET).upload(path, file, { cacheControl: "3600", upsert: false });
+      if (upErr) throw upErr;
+      const { data } = supabase.storage.from(REFERENCE_BUCKET).getPublicUrl(path);
+      return data.publicUrl;
+    } finally {
+      setRefUploading(false);
+    }
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!name.trim()) { setError("부품명을 입력해 주세요."); return; }
@@ -60,10 +80,16 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
       if (opinionFile) {
         finalImageUrl = await uploadOpinionImage(opinionFile);
       }
+      let finalRef1 = refUrl1;
+      if (refFile1) finalRef1 = await uploadReferenceImage(refFile1, 1);
+      let finalRef2 = refUrl2;
+      if (refFile2) finalRef2 = await uploadReferenceImage(refFile2, 2);
       await api.patch(`/api/materials/${encodeURIComponent(material.id)}`, {
         name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty, isRepair,
         opinionText: opinionText.trim(),
         opinionImageUrl: finalImageUrl || "",
+        referenceImageUrl1: finalRef1 || "",
+        referenceImageUrl2: finalRef2 || "",
       });
       onSaved();
     } catch (e) {
@@ -203,6 +229,57 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
             </div>
           </div>
 
+          {/* 참조 사진 (자재 자체 식별/유지보수용, 최대 2장) */}
+          <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+              📷 참조 사진 <span className="text-[10px] text-gray-400">(자재 식별·메모용, 최대 2장)</span>
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              {([1, 2] as const).map(slot => {
+                const url = slot === 1 ? refUrl1 : refUrl2;
+                const file = slot === 1 ? refFile1 : refFile2;
+                const setUrl = slot === 1 ? setRefUrl1 : setRefUrl2;
+                const setFile = slot === 1 ? setRefFile1 : setRefFile2;
+                const preview = file ? URL.createObjectURL(file) : (url || "");
+                return (
+                  <div key={slot} className="space-y-1.5">
+                    <div className="text-[11px] text-gray-500 dark:text-gray-400">사진 {slot}</div>
+                    {preview ? (
+                      <a href={preview} target="_blank" rel="noopener noreferrer"
+                        className="block w-full aspect-square rounded border border-gray-200 dark:border-gray-600 overflow-hidden bg-gray-50 dark:bg-gray-700">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={preview} alt={`참조 ${slot}`} className="w-full h-full object-cover" />
+                      </a>
+                    ) : (
+                      <div className="w-full aspect-square rounded border border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center text-[11px] text-gray-400">
+                        없음
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1">
+                      <input id={`ref-img-${slot}`} type="file" accept="image/*"
+                        onChange={e => setFile(e.target.files?.[0] ?? null)} className="hidden" />
+                      <label htmlFor={`ref-img-${slot}`}
+                        className="flex-1 text-center px-2 py-1 rounded bg-blue-600 text-white text-[11px] font-semibold cursor-pointer hover:bg-blue-700">
+                        📁 선택
+                      </label>
+                      {(file || url) && (
+                        <button type="button"
+                          onClick={() => { setFile(null); setUrl(""); }}
+                          className="px-2 py-1 rounded text-[11px] text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30">
+                          지우기
+                        </button>
+                      )}
+                    </div>
+                    {file && (
+                      <div className="text-[10px] text-gray-500 truncate" title={file.name}>{file.name}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {refUploading && <div className="text-[11px] text-gray-500 mt-1">참조 사진 업로드 중...</div>}
+          </div>
+
           {error && <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/30 rounded-lg px-4 py-2.5">{error}</p>}
 
           <div className="flex gap-3 pt-2">
@@ -210,7 +287,7 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
               className="flex-1 rounded-lg border border-gray-200 dark:border-gray-600 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
               취소
             </button>
-            <button type="submit" disabled={saving || !name.trim()}
+            <button type="submit" disabled={saving || opinionUploading || refUploading || !name.trim()}
               className="flex-1 rounded-lg bg-slate-700 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 transition-colors">
               {saving ? "저장 중..." : "수정 저장"}
             </button>
