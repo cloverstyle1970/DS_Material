@@ -91,14 +91,14 @@ export default function QuoteRequestsListClient() {
   }
 
   function goToQuoteEntry(r: QuoteRequest) {
-    const href = `/quotes/new?fromRequest=${r.id}`;
-    const label = "견적서 작성";
-    const alreadyOpen = tabs.some(t => t.href === href);
+    const alreadyOpen = tabs.some(t => t.href === "/quotes/new");
     if (!alreadyOpen && tabs.length >= MAX_TABS) {
       alert(`탭은 최대 ${MAX_TABS}개까지 열 수 있습니다.`);
       return;
     }
-    openTab(href, label);
+    try { sessionStorage.setItem("ds:quote_from_request", String(r.id)); } catch {}
+    window.dispatchEvent(new CustomEvent("ds:quote_from_request_changed", { detail: { id: r.id } }));
+    openTab("/quotes/new", "견적서 작성");
   }
 
   async function changeStatus(id: number, next: QuoteRequest["status"]) {

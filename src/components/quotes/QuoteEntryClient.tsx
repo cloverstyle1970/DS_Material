@@ -130,7 +130,31 @@ function QuoteEntryInner() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const fromRequestId = searchParams.get("fromRequest");
+  // fromRequest: 우선 쿼리스트링 → 없으면 sessionStorage(탭 시스템으로 진입한 경우)
+  const [fromRequestId, setFromRequestId] = useState<string | null>(() => searchParams.get("fromRequest"));
+  useEffect(() => {
+    const qp = searchParams.get("fromRequest");
+    if (qp) { setFromRequestId(qp); return; }
+    try {
+      const stored = sessionStorage.getItem("ds:quote_from_request");
+      if (stored) {
+        setFromRequestId(stored);
+        sessionStorage.removeItem("ds:quote_from_request");
+      }
+    } catch {}
+  }, [searchParams]);
+  // 이미 마운트된 상태에서 견적요청 목록이 다시 견적서 작성을 호출했을 때 갱신
+  useEffect(() => {
+    function handler(e: Event) {
+      const detail = (e as CustomEvent<{ id: number | string }>).detail;
+      if (detail?.id != null) {
+        setFromRequestId(String(detail.id));
+        try { sessionStorage.removeItem("ds:quote_from_request"); } catch {}
+      }
+    }
+    window.addEventListener("ds:quote_from_request_changed", handler);
+    return () => window.removeEventListener("ds:quote_from_request_changed", handler);
+  }, []);
   const editIdStr = searchParams.get("id");
   const editId = editIdStr && Number.isFinite(Number(editIdStr)) ? Number(editIdStr) : null;
   const isEditMode = editId !== null;
