@@ -151,8 +151,9 @@ export default function PurchaseOrderEntry() {
           userId: user.id, userName: user.name,
         });
       }
+      window.dispatchEvent(new CustomEvent("ds:purchase_orders_changed"));
       if (goList) {
-        window.location.href = "/purchase-orders";
+        router.push("/purchase-orders");
       } else {
         clearAll();
       }
@@ -433,7 +434,7 @@ function SiteInlineSearch({ value, onChange, sites }: { value: string; onChange:
 
   return (
     <div ref={ref} className="relative">
-      <input type="text" lang="ko" value={value} onChange={e => { onChange(e.target.value); setOpen(true); }} onFocus={() => value.trim() && setOpen(true)} onKeyDown={handleKeyDown} className={inputCls} />
+      <input type="text" lang="ko" value={value} onChange={e => { onChange(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onKeyDown={handleKeyDown} className={inputCls} />
       {open && suggestions.length > 0 && (
         <ul ref={ulRef} className="absolute z-50 top-full left-0 mt-0.5 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-52 overflow-y-auto">
           {suggestions.map((s, idx) => (
@@ -458,7 +459,10 @@ function VendorInlineSearch({ value, onChange, vendors }: { value: string; onCha
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
   const ulRef = useRef<HTMLUListElement>(null);
-  const suggestions = value.trim() ? vendors.filter(v => v.name.toLowerCase().includes(value.toLowerCase())).slice(0, 10) : [];
+  // 빈 입력일 때도 매입거래처 전체 목록을 펼쳐 볼 수 있도록 노출 (최대 50)
+  const suggestions = value.trim()
+    ? vendors.filter(v => v.name.toLowerCase().includes(value.toLowerCase())).slice(0, 20)
+    : vendors.slice(0, 50);
 
   useEffect(() => { setFocusedIndex(-1); }, [value]);
 
@@ -499,7 +503,7 @@ function VendorInlineSearch({ value, onChange, vendors }: { value: string; onCha
 
   return (
     <div ref={ref} className="relative">
-      <input type="text" lang="ko" value={value} onChange={e => { onChange(e.target.value); setOpen(true); }} onFocus={() => value.trim() && setOpen(true)} onKeyDown={handleKeyDown} className={inputCls} />
+      <input type="text" lang="ko" value={value} onChange={e => { onChange(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onKeyDown={handleKeyDown} className={inputCls} />
       {open && suggestions.length > 0 && (
         <ul ref={ulRef} className="absolute z-50 top-full left-0 mt-0.5 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-52 overflow-y-auto">
           {suggestions.map((v, idx) => (

@@ -210,6 +210,21 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
   const [matModelMap, setMatModelMap] = useState<Map<string, string>>(new Map()); // materialId → modelNo(규격)
 
   useEffect(() => {
+    function refreshOrders() {
+      api.get<PurchaseOrderRecord[]>("/api/purchase-orders").then(setOrders).catch(() => {});
+    }
+    function refreshRequests() {
+      api.get<MaterialRequestRecord[]>("/api/material-requests").then(setRequests).catch(() => {});
+    }
+    window.addEventListener("ds:purchase_orders_changed", refreshOrders);
+    window.addEventListener("ds:material_requests_changed", refreshRequests);
+    return () => {
+      window.removeEventListener("ds:purchase_orders_changed", refreshOrders);
+      window.removeEventListener("ds:material_requests_changed", refreshRequests);
+    };
+  }, []);
+
+  useEffect(() => {
     api.get<MaterialRequestRecord[]>("/api/material-requests").then(setRequests).catch(() => {});
     api.get<PurchaseOrderRecord[]>("/api/purchase-orders").then(setOrders).catch(() => {});
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});

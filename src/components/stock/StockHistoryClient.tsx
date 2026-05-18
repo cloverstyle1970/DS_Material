@@ -73,6 +73,16 @@ export default function StockHistoryClient({ mode, initial }: Props) {
       .then(setTransactions).catch(() => {});
   }, [mode]);
   useEffect(() => {
+    function refresh(e: Event) {
+      const detail = (e as CustomEvent<{ mode?: string }>).detail;
+      if (detail?.mode && detail.mode !== mode) return; // 다른 모드 이벤트는 무시
+      api.get<TransactionRecord[]>(`/api/transactions?type=${encodeURIComponent(mode)}`)
+        .then(setTransactions).catch(() => {});
+    }
+    window.addEventListener("ds:transactions_changed", refresh);
+    return () => window.removeEventListener("ds:transactions_changed", refresh);
+  }, [mode]);
+  useEffect(() => {
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
     api.get<{ name: string; status: string | null }[]>("/api/users")
       .then(data => setUserNames(data.filter(u => u.status === "재직").map(u => u.name).sort()))
