@@ -12,6 +12,8 @@ import PurchaseOrderBulkUploadModal from "@/components/purchase/PurchaseOrderBul
 import { api, getErrorMessage } from "@/lib/api-client";
 import DraggableModal from "@/components/common/DraggableModal";
 import Autocomplete from "@/components/common/Autocomplete";
+import ElevatorPicker from "@/components/common/ElevatorPicker";
+import type { ElevatorRecord } from "@/lib/mock-elevators";
 
 interface SiteOption   { id: number; name: string }
 interface VendorOption { id: number; name: string }
@@ -957,6 +959,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
           onSave={data => handleOrdAction(editingOrder.id, "수정", data)}
           sites={sites}
           vendors={vendors}
+          requesterNames={requesterNames}
         />
       )}
 
@@ -1060,21 +1063,37 @@ function EditOrderModal({
   onClose,
   onSave,
   sites,
-  vendors
+  vendors,
+  requesterNames,
 }: {
   order: PurchaseOrderRecord;
   onClose: () => void;
   onSave: (data: Record<string, unknown>) => void;
   sites: SiteOption[];
   vendors: VendorOption[];
+  requesterNames: string[];
 }) {
   const [qty, setQty] = useState(order.qty.toString());
-  const [unitPrice, setUnitPrice] = useState(order.unitPrice?.toString() ?? "");
+  const [unitPrice, setUnitPrice] = useState<string>(
+    order.unitPrice != null ? order.unitPrice.toLocaleString() : ""
+  );
   const [siteName, setSiteName] = useState(order.siteName ?? "");
   const [elevatorName, setElevatorName] = useState(order.elevatorName ?? "");
   const [vendorName, setVendorName] = useState(order.vendorName ?? "");
   const [requesterName, setRequesterName] = useState(order.requesterName ?? "");
   const [note, setNote] = useState(order.note ?? "");
+  const [elevators, setElevators] = useState<ElevatorRecord[]>([]);
+
+  useEffect(() => {
+    if (!siteName) { setElevators([]); return; }
+    api.get<ElevatorRecord[]>(`/api/elevators?site=${encodeURIComponent(siteName)}`)
+      .then(setElevators).catch(() => setElevators([]));
+  }, [siteName]);
+
+  const unitPriceNum = (() => {
+    const s = unitPrice.replace(/,/g, "");
+    return s === "" ? null : Number(s);
+  })();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1084,7 +1103,7 @@ function EditOrderModal({
     }
     onSave({
       qty: Number(qty),
-      unitPrice: unitPrice ? Number(unitPrice) : null,
+      unitPrice: unitPriceNum,
       siteName,
       elevatorName,
       vendorName,
@@ -1119,8 +1138,17 @@ function EditOrderModal({
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">단가</label>
-              <input type="number" value={unitPrice} onChange={e => setUnitPrice(e.target.value)} min="0"
-                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+              <input
+                type="text"
+                inputMode="numeric"
+                value={unitPrice}
+                onChange={e => {
+                  const digits = e.target.value.replace(/[^0-9]/g, "");
+                  setUnitPrice(digits === "" ? "" : Number(digits).toLocaleString());
+                }}
+                placeholder="0"
+                className="w-full px-3 py-2 text-sm text-right border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              />
             </div>
           </div>
 
@@ -1135,15 +1163,24 @@ function EditOrderModal({
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">신청자</label>
-              <input type="text" value={requesterName} onChange={e => setRequesterName(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+              <input
+                type="text"
+                list="edit-order-requester-names"
+                value={requesterName}
+                onChange={e => setRequesterName(e.target.value)}
+                placeholder="입력 또는 선택"
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              />
+              <datalist id="edit-order-requester-names">
+                {requesterNames.map(n => <option key={n} value={n} />)}
+              </datalist>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">현장</label>
-              <select value={siteName} onChange={e => setSiteName(e.target.value)}
+              <select value={siteName} onChange={e => { setSiteName(e.target.value); setElevatorName(""); }}
                 className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
                 <option value="">(선택 안함)</option>
                 {sites.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
@@ -1151,8 +1188,17 @@ function EditOrderModal({
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">호기</label>
-              <input type="text" value={elevatorName} onChange={e => setElevatorName(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+              {elevators.length > 0 ? (
+                <ElevatorPicker value={elevatorName} elevators={elevators} onChange={setElevatorName} />
+              ) : (
+                <input
+                  type="text"
+                  value={elevatorName}
+                  onChange={e => setElevatorName(e.target.value)}
+                  placeholder={siteName ? "호기 정보 없음" : "현장 먼저 선택"}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                />
+              )}
             </div>
           </div>
 
