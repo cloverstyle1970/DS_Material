@@ -34,6 +34,8 @@ export default function MyDashboardContent() {
   const [upcomingSchedules, setUpcomingSchedules] = useState<ConstructionSchedule[]>([]);
   const [myTbm, setMyTbm] = useState<TbmRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [notifEnabled, setNotifEnabled] = useState<boolean>(true);
+  const [notifPrefSaving, setNotifPrefSaving] = useState(false);
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const sevenDaysLater = useMemo(() => {
@@ -68,10 +70,15 @@ export default function MyDashboardContent() {
         .order("created_at", { ascending: false })
         .limit(5);
 
+      // 알림 수신 설정
+      const { data: prefData } = await supabase.from("users")
+        .select("notifications_enabled").eq("id", user.id).single();
+
       setNotifications(notifs);
       setMyRequests(mine);
       setUpcomingSchedules(upcoming);
       setMyTbm((tbmData ?? []) as TbmRow[]);
+      setNotifEnabled(prefData?.notifications_enabled !== false);
     } catch (e) {
       console.error(e);
     } finally {
@@ -104,6 +111,23 @@ export default function MyDashboardContent() {
       setNotifications(prev => prev.map(x => ({ ...x, isRead: true })));
     } catch (e) {
       alert(getErrorMessage(e));
+    }
+  }
+
+  async function toggleNotifEnabled() {
+    if (!user || notifPrefSaving) return;
+    const next = !notifEnabled;
+    setNotifEnabled(next);
+    setNotifPrefSaving(true);
+    try {
+      const { error } = await supabase.from("users")
+        .update({ notifications_enabled: next }).eq("id", user.id);
+      if (error) throw error;
+    } catch (e) {
+      setNotifEnabled(!next);
+      alert(getErrorMessage(e));
+    } finally {
+      setNotifPrefSaving(false);
     }
   }
 
@@ -147,6 +171,30 @@ export default function MyDashboardContent() {
                   모두 읽음 처리
                 </button>
               )}
+            </div>
+            <div className="flex items-center justify-between py-2 px-2 -mx-2 mb-2 rounded bg-gray-50 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-700">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">인앱 알림 받기</span>
+                <span className="text-[10px] text-gray-400">
+                  {notifEnabled ? "켜짐" : "꺼짐 — 새 알림이 저장되지 않습니다"}
+                </span>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={notifEnabled}
+                onClick={toggleNotifEnabled}
+                disabled={notifPrefSaving}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${
+                  notifEnabled ? "bg-blue-500" : "bg-gray-300 dark:bg-gray-600"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    notifEnabled ? "translate-x-4" : "translate-x-0.5"
+                  }`}
+                />
+              </button>
             </div>
             {loading ? (
               <div className="text-sm text-gray-400 py-4">불러오는 중...</div>

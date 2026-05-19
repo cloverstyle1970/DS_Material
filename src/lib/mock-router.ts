@@ -101,6 +101,10 @@ async function insertNotification(params: {
   refType?: string | null;
   refId?: number | null;
 }): Promise<void> {
+  // 수신자가 알림을 꺼두었으면 스킵 (전역 on/off)
+  const { data: u } = await supabase.from("users")
+    .select("notifications_enabled").eq("id", params.userId).single();
+  if (u && u.notifications_enabled === false) return;
   await supabase.from("notifications").insert({
     user_id:  params.userId,
     type:     params.type,
@@ -1185,6 +1189,26 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
         .update({ status: "완료", processed_at: new Date().toISOString(), processor_id: processorId, processor_name: processorName })
         .eq("id", numId).select().single();
       if (updateErr) throw new MockApiError(updateErr.message, 500);
+      // 신청자에게 출고 완료 알림 (처리자 본인 제외)
+      const requesterId = request.requesterId;
+      if (requesterId && requesterId !== Number(processorId)) {
+        const first = request.items[0];
+        const summary = !first
+          ? ""
+          : request.items.length === 1
+            ? `${first.materialName}${first.qty > 1 ? ` x${first.qty}` : ""}`
+            : `${first.materialName} 외 ${request.items.length - 1}건`;
+        const sitePart = request.siteName ? `${request.siteName} · ` : "";
+        await insertNotification({
+          userId:  requesterId,
+          type:    "request_outbound",
+          title:   "신청하신 자재가 출고되었습니다",
+          message: `${sitePart}${summary}`,
+          link:    "/requests",
+          refType: "material_request",
+          refId:   numId,
+        });
+      }
       return { request: dbToRequest(updated), transactions: records };
     }
     if (action === "취소") {
@@ -1230,6 +1254,41 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
         .update({ status: "입고완료", received_at: receivedAt })
         .eq("id", numId).select().single();
       if (updateErr) throw new MockApiError(updateErr.message, 500);
+      // 입고 알림: 발주 담당자 + (연결된 신청자) — 처리자 본인 제외
+      const sitePart = order.siteName
+        ? `${order.siteName}${order.elevatorName ? ` (${order.elevatorName})` : ""} · `
+        : "";
+      const inboundMsg = `${sitePart}${order.materialName} x${order.qty}`;
+      const notified = new Set<number>();
+      const processorUid = Number(userId);
+      if (order.userId && order.userId !== processorUid) {
+        await insertNotification({
+          userId:  order.userId,
+          type:    "purchase_received",
+          title:   "발주하신 자재가 입고되었습니다",
+          message: inboundMsg,
+          link:    "/stock/history",
+          refType: "purchase_order",
+          refId:   numId,
+        });
+        notified.add(order.userId);
+      }
+      if (order.requestId) {
+        const { data: req } = await supabase.from("material_requests")
+          .select("requester_id").eq("id", order.requestId).single();
+        const reqUid = req?.requester_id;
+        if (reqUid && reqUid !== processorUid && !notified.has(reqUid)) {
+          await insertNotification({
+            userId:  reqUid,
+            type:    "request_inbound",
+            title:   "신청하신 자재가 입고되었습니다",
+            message: inboundMsg,
+            link:    "/requests",
+            refType: "material_request",
+            refId:   order.requestId,
+          });
+        }
+      }
       return { order: dbToOrder(updated), transaction: txs?.[0] ?? null, transactions: txs };
     }
     if (action === "취소") {
@@ -1560,12 +1619,31 @@ async function routeDELETE(path: string, body: AnyBody): Promise<unknown> {
   const constSchedId = extractId(path, "/api/construction-schedules");
   if (constSchedId) {
     const numId = Number(constSchedId);
-    // 연결된 공사요청 상태 '요청'으로 복구
+    // 연결된 공사요청 상태 '요청'으로 복구 + 신청자 알림
     const { data: sched } = await supabase.from("construction_schedules")
-      .select("request_id").eq("id", numId).single();
+      .select("request_id, start_date, end_date, start_time")
+      .eq("id", numId).single();
     if (sched?.request_id) {
       await supabase.from("construction_requests")
         .update({ status: "요청" }).eq("id", sched.request_id).eq("status", "일정등록됨");
+      const { data: req } = await supabase.from("construction_requests")
+        .select("requester_user_id, site_name, elevator_name")
+        .eq("id", sched.request_id).single();
+      if (req?.requester_user_id) {
+        const elev = req.elevator_name ? ` (${req.elevator_name})` : "";
+        const dateRange = sched.start_date === sched.end_date
+          ? sched.start_date
+          : `${sched.start_date} ~ ${sched.end_date}`;
+        await insertNotification({
+          userId:  req.requester_user_id,
+          type:    "schedule_deleted",
+          title:   "공사일정이 취소되었습니다",
+          message: `${req.site_name}${elev} · ${dateRange}${sched.start_time ? ` ${sched.start_time}` : ""}`,
+          link:    "/construction/schedule",
+          refType: "construction_request",
+          refId:   sched.request_id,
+        });
+      }
     }
     const { error } = await supabase.from("construction_schedules").delete().eq("id", numId);
     if (error) throw new MockApiError(error.message, 500);
