@@ -157,12 +157,14 @@ export default function InboundEntry() {
     }
     setSaving(true);
     try {
+      const batchId = crypto.randomUUID();
       for (const r of valid) {
         await api.post("/api/transactions", {
           type: "입고", materialId: r.materialId, materialName: r.materialName,
           qty: r.qty, siteName: r.siteName || null,
           serialNos: r.serialNos.length > 0 ? r.serialNos : null,
           note: r.remark || reference || null, userId: user.id, userName: user.name,
+          batchId,
         });
       }
       window.dispatchEvent(new CustomEvent("ds:transactions_changed", { detail: { mode: "입고" } }));

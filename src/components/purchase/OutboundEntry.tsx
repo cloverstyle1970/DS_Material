@@ -163,6 +163,7 @@ export default function OutboundEntry() {
     }
     setSaving(true);
     try {
+      const batchId = crypto.randomUUID();
       for (const r of valid) {
         await api.post("/api/transactions", {
           type: "출고", materialId: r.materialId, materialName: r.materialName,
@@ -171,6 +172,7 @@ export default function OutboundEntry() {
           serialNos: r.serialNos.length > 0 ? r.serialNos : null,
           requiresReturn: r.requiresReturn,
           note: r.remark || reference || null, userId: user.id, userName: user.name,
+          batchId,
         });
       }
       if (goList) router.push("/outbound");

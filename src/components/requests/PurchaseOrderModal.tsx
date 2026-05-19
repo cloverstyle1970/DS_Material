@@ -182,6 +182,7 @@ export default function PurchaseOrderModal({ vendors, sites, pendingRequests, us
       const elevatorName = elevatorId !== ""
         ? (elevators.find(e => e.id === elevatorId)?.unitName ?? null)
         : null;
+      const batchId = crypto.randomUUID();
       for (const item of selectedItems) {
         await api.post("/api/purchase-orders", {
           materialId: item.material.id,
@@ -196,6 +197,7 @@ export default function PurchaseOrderModal({ vendors, sites, pendingRequests, us
           note: note || null,
           userId: user.id,
           userName: user.name,
+          batchId,
         });
       }
       onSaved();
