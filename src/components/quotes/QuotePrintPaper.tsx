@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
+import { fmtNum } from "@/lib/format";
 
 export interface QuotePrintCompany {
   company_name:    string | null;
@@ -57,9 +58,6 @@ interface Props {
   footerExtra?: ReactNode;
 }
 
-function fmtNum(n: number): string {
-  return Number(n || 0).toLocaleString();
-}
 function fmtDate(iso: string): string {
   const m = iso?.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return iso ?? "";

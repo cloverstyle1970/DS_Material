@@ -6,6 +6,7 @@ import Header from "@/components/layout/Header";
 import StatCard from "@/components/dashboard/StatCard";
 import RequestTable from "@/components/dashboard/RequestTable";
 import { DashboardStats, RecentRequest } from "@/lib/types";
+import { fmtNum } from "@/lib/format";
 
 const EMPTY_STATS: DashboardStats = {
   todayRequests: 0,
@@ -49,11 +50,11 @@ export default function DashboardContent() {
             <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 flex flex-col justify-center shadow-sm">
                <div className="flex justify-between items-center mb-3">
                  <span className="text-sm font-medium text-slate-500 dark:text-slate-400">TK 현장</span>
-                 <span className="font-bold text-slate-800 dark:text-slate-100">{stats.tkeSites.toLocaleString()}곳</span>
+                 <span className="font-bold text-slate-800 dark:text-slate-100">{fmtNum(stats.tkeSites)}곳</span>
                </div>
                <div className="flex justify-between items-center">
                  <span className="text-sm font-medium text-slate-500 dark:text-slate-400">DS 현장</span>
-                 <span className="font-bold text-slate-800 dark:text-slate-100">{stats.dsSites.toLocaleString()}곳</span>
+                 <span className="font-bold text-slate-800 dark:text-slate-100">{fmtNum(stats.dsSites)}곳</span>
                </div>
             </div>
             <StatCard label="총 유지보수 호기" value={stats.totalElevators} unit="대" color="green" />
@@ -62,21 +63,21 @@ export default function DashboardContent() {
                  <div>
                    <div className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">TK</div>
                    <p className="text-3xl font-bold text-slate-700 dark:text-slate-200">
-                     {stats.tkeElevators.toLocaleString()}
+                     {fmtNum(stats.tkeElevators)}
                      <span className="text-base font-normal ml-1">대</span>
                    </p>
                  </div>
                  <div>
                    <div className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">DS</div>
                    <p className="text-3xl font-bold text-slate-700 dark:text-slate-200">
-                     {stats.dsElevators.toLocaleString()}
+                     {fmtNum(stats.dsElevators)}
                      <span className="text-base font-normal ml-1">대</span>
                    </p>
                  </div>
                  <div>
                    <div className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">기타</div>
                    <p className="text-3xl font-bold text-slate-700 dark:text-slate-200">
-                     {stats.otherElevators.toLocaleString()}
+                     {fmtNum(stats.otherElevators)}
                      <span className="text-base font-normal ml-1">대</span>
                    </p>
                  </div>

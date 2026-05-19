@@ -8,6 +8,7 @@ import { MaterialRequestRecord } from "@/lib/mock-material-requests";
 import { ElevatorRecord } from "@/lib/mock-elevators";
 import type { PurchaseOrderRecord } from "@/lib/mock-purchase-orders";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { fmtNum, parseNum } from "@/lib/format";
 import DraggableModal from "@/components/common/DraggableModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 
@@ -31,8 +32,6 @@ function newRow(seed: Partial<Row> = {}): Row {
   return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, elevatorName: "", remark: "", reqId: null, editingId: null, ...seed };
 }
 
-function fmtNum(n: number) { return n.toLocaleString(); }
-function parseNum(s: string) { const v = s.replace(/[^0-9]/g, ""); return v === "" ? 0 : Number(v); }
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
 // note → orderRefNo + formType + remark 역파싱
@@ -755,7 +754,7 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
                       <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{m.id}</span>
                       {m.modelNo && <span className="text-[10px] text-gray-500 dark:text-gray-400 border-l border-gray-300 dark:border-gray-600 pl-2">{m.modelNo}</span>}
                       {m.alias && <span className="text-[10px] text-gray-400 dark:text-gray-500">{m.alias}</span>}
-                      <span className="text-[10px] text-gray-300 dark:text-gray-500 ml-auto">재고 {m.stockQty}</span>
+                      <span className="text-[10px] text-gray-300 dark:text-gray-500 ml-auto">재고 {fmtNum(m.stockQty)}</span>
                     </div>
                   </div>
                 </button>

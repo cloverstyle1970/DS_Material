@@ -6,6 +6,7 @@ import { api, getErrorMessage } from "@/lib/api-client";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { useAuth } from "@/context/AuthContext";
 import DraggableModal from "@/components/common/DraggableModal";
+import { fmtNumOr } from "@/lib/format";
 
 interface Props {
   onClose: () => void;
@@ -279,7 +280,7 @@ export default function PurchaseOrderBulkUploadModal({ onClose, onSaved }: Props
                         <td className="px-2 py-2 break-words">{r.materialName || <span className="text-slate-400">-</span>}</td>
                         <td className="px-2 py-2 text-right tabular-nums">{r.qty || "-"}</td>
                         <td className="px-2 py-2 break-words">{r.vendorName || "-"}</td>
-                        <td className="px-2 py-2 text-right tabular-nums">{r.unitPrice != null ? r.unitPrice.toLocaleString() : "-"}</td>
+                        <td className="px-2 py-2 text-right tabular-nums">{fmtNumOr(r.unitPrice)}</td>
                         <td className="px-2 py-2 break-words">
                           <div>{r.siteName || "-"}</div>
                           <div className="text-slate-500 text-[11px]">{r.elevatorName || ""}</div>

@@ -8,6 +8,7 @@ import { TransactionRecord } from "@/lib/mock-transactions";
 import SiteSearchInput from "@/components/ui/SiteSearchInput";
 import { api, getErrorMessage } from "@/lib/api-client";
 import DraggableModal from "@/components/common/DraggableModal";
+import { fmtNum } from "@/lib/format";
 
 interface SiteOption { id: number; name: string }
 
@@ -248,7 +249,7 @@ export default function StockTxModal({ initialType, sites, user, onClose, onSave
                             <div className="flex items-center gap-2">
                               <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{fmtDate(o.orderedAt)}</span>
                               <span className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">{o.materialName}</span>
-                              <span className="ml-auto text-xs font-semibold text-blue-600 dark:text-blue-400 shrink-0">{o.qty}개</span>
+                              <span className="ml-auto text-xs font-semibold text-blue-600 dark:text-blue-400 shrink-0">{fmtNum(o.qty)}개</span>
                             </div>
                             <div className="flex gap-2 mt-0.5 text-xs text-gray-400 dark:text-gray-500">
                               <span className="font-mono">{o.materialId}</span>
@@ -280,7 +281,7 @@ export default function StockTxModal({ initialType, sites, user, onClose, onSave
                             <div className="flex gap-2 mt-0.5 text-xs text-gray-400 dark:text-gray-500">
                               <span className="font-mono">{t.materialId}</span>
                               {t.siteName && <span>· {t.siteName}</span>}
-                              <span className="ml-auto">입고 {t.qty}개</span>
+                              <span className="ml-auto">입고 {fmtNum(t.qty)}개</span>
                             </div>
                           </button>
                         ))
@@ -335,7 +336,7 @@ export default function StockTxModal({ initialType, sites, user, onClose, onSave
                           </div>
                           <div className="flex gap-3 mt-0.5">
                             {m.alias && <span className="text-xs text-gray-400 dark:text-gray-500">{m.alias}</span>}
-                            <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">재고 {m.stockQty}</span>
+                            <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">재고 {fmtNum(m.stockQty)}</span>
                           </div>
                         </button>
                       </li>
@@ -350,7 +351,7 @@ export default function StockTxModal({ initialType, sites, user, onClose, onSave
                   <span className="ml-auto">
                     현재 재고:
                     <span className={`ml-1 font-semibold ${selected.stockQty === 0 ? "text-red-500" : "text-slate-700 dark:text-slate-300"}`}>
-                      {selected.stockQty}
+                      {fmtNum(selected.stockQty)}
                     </span>
                   </span>
                 </div>

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth, hasMenuPermission, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { api } from "@/lib/api-client";
+import { fmtNum, parseNum } from "@/lib/format";
 import { MaterialRecord } from "@/lib/mock-materials";
 import QuotePrintPaper, { QuotePrintCompany } from "@/components/quotes/QuotePrintPaper";
 
@@ -99,13 +100,6 @@ function fmtYmd(iso: string | null | undefined): string {
   return m ? `${m[1]}-${m[2]}-${m[3]}` : String(iso);
 }
 
-function fmtNum(n: number): string {
-  return n.toLocaleString();
-}
-function parseNum(s: string): number {
-  const v = s.replace(/[^0-9-]/g, "");
-  return v === "" || v === "-" ? 0 : Number(v);
-}
 function parseDecimal(s: string): number {
   const v = s.replace(/[^0-9.]/g, "");
   if (v === "" || v === ".") return 0;
@@ -890,7 +884,7 @@ function QuoteEntryInner() {
                                     <div className="flex items-center gap-2 mt-0.5">
                                       <span className="text-[10px] font-mono text-slate-400">{m.id}</span>
                                       {m.modelNo && <span className="text-[10px] text-gray-500">{m.modelNo}</span>}
-                                      <span className="text-[10px] ml-auto text-gray-400">{(m.sellPrice ?? 0).toLocaleString()}원</span>
+                                      <span className="text-[10px] ml-auto text-gray-400">{fmtNum(m.sellPrice ?? 0)}원</span>
                                     </div>
                                   </button>
                                 </li>
@@ -1391,7 +1385,7 @@ function PastIssuanceBubble({ row }: { row: ItemRow }) {
             {row.pastIssuances.map((p, i) => (
               <li key={i} className="flex items-center gap-2 border-b border-slate-700 pb-1 last:border-0 last:pb-0">
                 <span className="font-mono text-slate-300 w-24 shrink-0">{fmtYmd(p.created_at)}</span>
-                <span className="text-amber-300 font-bold tabular-nums w-12 text-right">{p.qty}</span>
+                <span className="text-amber-300 font-bold tabular-nums w-12 text-right">{fmtNum(p.qty)}</span>
                 <span className="text-slate-400 truncate">{p.user_name ?? "-"}</span>
               </li>
             ))}

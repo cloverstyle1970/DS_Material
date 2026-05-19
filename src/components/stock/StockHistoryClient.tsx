@@ -7,6 +7,7 @@ import { TransactionRecord } from "@/lib/mock-transactions";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { fmtNum } from "@/lib/format";
 import DraggableModal from "@/components/common/DraggableModal";
 import Autocomplete from "@/components/common/Autocomplete";
 import TransactionBulkUploadModal from "./TransactionBulkUploadModal";
@@ -305,7 +306,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
             <button type="button" onClick={() => setSearch(defaultSearch())}
               className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 underline">초기화</button>
           )}
-          <span className="ml-auto text-xs text-gray-400 dark:text-gray-500 shrink-0">{sorted.length}건</span>
+          <span className="ml-auto text-xs text-gray-400 dark:text-gray-500 shrink-0">{fmtNum(sorted.length)}건</span>
         </div>
 
         {admin && isInbound && selectedIds.size > 0 && (
@@ -398,10 +399,10 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                 <td className="px-2 py-3 text-left font-medium text-black dark:text-white max-w-[200px] truncate">{t.materialName}</td>
                 <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{matMap.get(t.materialId) || "-"}</td>
                 <td className="px-2 py-3 text-center tabular-nums text-black dark:text-white">
-                  {t.qty}
+                  {fmtNum(t.qty)}
                 </td>
                 <td className="px-2 py-3 text-center tabular-nums text-black dark:text-white whitespace-nowrap">
-                  {t.prevStock} → <span className="font-medium">{t.afterStock}</span>
+                  {fmtNum(t.prevStock)} → <span className="font-medium">{fmtNum(t.afterStock)}</span>
                 </td>
                 <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">
                   {t.siteName ?? "-"}{t.elevatorName ? <span className="ml-1 opacity-70">({t.elevatorName})</span> : null}
@@ -657,7 +658,7 @@ function BulkOutboundModal({
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
-            대상 <span className="text-orange-600 dark:text-orange-400 font-semibold">{targets.length}건</span>
+            대상 <span className="text-orange-600 dark:text-orange-400 font-semibold">{fmtNum(targets.length)}건</span>
           </label>
           <div className="max-h-64 overflow-auto rounded-lg border border-gray-200 dark:border-gray-700">
             <table className="w-full text-xs">
@@ -674,7 +675,7 @@ function BulkOutboundModal({
                   <tr key={t.id}>
                     <td className="px-3 py-3 font-mono text-gray-700 dark:text-gray-300">{t.materialId}</td>
                     <td className="px-3 py-3 text-gray-800 dark:text-gray-200">{t.materialName}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-gray-700 dark:text-gray-300">{t.qty}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-gray-700 dark:text-gray-300">{fmtNum(t.qty)}</td>
                     <td className="px-3 py-3 text-gray-500 dark:text-gray-400">{t.createdAt.substring(0, 10)}</td>
                   </tr>
                 ))}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
+import { fmtNum } from "@/lib/format";
 
 // ============================================================
 // 타입
@@ -590,7 +591,7 @@ export default function UniformSafetyClient() {
                         {(r.items ?? []).map(it => (
                           <span key={it.id} className="mr-3">
                             {it.category_label && <span className="text-gray-400">[{it.category_label}]</span>} {it.material_name}
-                            {it.size && <span className="text-gray-500"> ({it.size})</span>} ×{it.qty}
+                            {it.size && <span className="text-gray-500"> ({it.size})</span>} ×{fmtNum(it.qty)}
                           </span>
                         ))}
                       </div>

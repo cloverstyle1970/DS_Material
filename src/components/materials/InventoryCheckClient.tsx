@@ -8,6 +8,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
+import { fmtNum } from "@/lib/format";
 
 type MatType = "전체" | "DS" | "TK";
 type CheckMode = "qty" | "sn";
@@ -298,8 +299,8 @@ export default function InventoryCheckClient() {
           {/* 건수 */}
           <span className="text-sm text-gray-500 shrink-0">
             {mode === "qty"
-              ? (q ? `검색 ${filtered.length.toLocaleString()}종` : `전체 ${materials.length.toLocaleString()}종`)
-              : `재고 unit ${units.length.toLocaleString()}건 / 확인 ${confirmedUnits.size}건`
+              ? (q ? `검색 ${fmtNum(filtered.length)}종` : `전체 ${fmtNum(materials.length)}종`)
+              : `재고 unit ${fmtNum(units.length)}건 / 확인 ${fmtNum(confirmedUnits.size)}건`
             }
           </span>
         </div>
@@ -399,7 +400,7 @@ export default function InventoryCheckClient() {
                     <td className="px-4 py-3 text-center font-medium text-gray-900 dark:text-gray-100">{m.name}</td>
                     <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400">{m.modelNo ?? "-"}</td>
                     <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400">{m.storageLoc ?? "-"}</td>
-                    <td className="px-4 py-3 text-center text-gray-700 dark:text-gray-300 font-medium">{m.stockQty}</td>
+                    <td className="px-4 py-3 text-center text-gray-700 dark:text-gray-300 font-medium">{fmtNum(m.stockQty)}</td>
                     <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
                       {isChecked ? (
                         <input
@@ -424,7 +425,7 @@ export default function InventoryCheckClient() {
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 dark:border-gray-700">
             <span className="text-xs text-gray-500 dark:text-gray-400">
-              {((safePage - 1) * PAGE_SIZE + 1).toLocaleString()}–{Math.min(safePage * PAGE_SIZE, filtered.length).toLocaleString()} / {filtered.length.toLocaleString()}종
+              {fmtNum((safePage - 1) * PAGE_SIZE + 1)}–{fmtNum(Math.min(safePage * PAGE_SIZE, filtered.length))} / {fmtNum(filtered.length)}종
             </span>
             <div className="flex items-center gap-1">
               <button onClick={() => changePage(safePage - 1)} disabled={safePage === 1}

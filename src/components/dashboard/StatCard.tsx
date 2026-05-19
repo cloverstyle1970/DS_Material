@@ -1,3 +1,5 @@
+import { fmtNum } from "@/lib/format";
+
 interface StatCardProps {
   label: string;
   value: number;
@@ -24,7 +26,7 @@ export default function StatCard({ label, value, unit = "건", color }: StatCard
     <div className={`rounded-xl border p-5 ${COLOR_MAP[color]}`}>
       <p className="text-sm font-medium mb-2">{label}</p>
       <p className={`text-3xl font-bold ${NUM_COLOR_MAP[color]}`}>
-        {value.toLocaleString()}
+        {fmtNum(value)}
         <span className="text-base font-normal ml-1">{unit}</span>
       </p>
     </div>

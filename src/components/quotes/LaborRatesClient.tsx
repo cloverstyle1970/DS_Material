@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
+import { fmtNum, parseNum } from "@/lib/format";
 
 const MENU_HREF = "/quotes/labor-rates";
 
@@ -19,8 +20,6 @@ interface LaborRate {
   sort_order: number;
 }
 
-function fmtNum(n: number) { return n.toLocaleString(); }
-function parseNum(s: string) { const v = s.replace(/[^0-9]/g, ""); return v === "" ? 0 : Number(v); }
 
 export default function LaborRatesClient() {
   const { user } = useAuth();

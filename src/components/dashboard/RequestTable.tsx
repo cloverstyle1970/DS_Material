@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { RecentRequest, RequestStatus } from "@/lib/types";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
 import TimeAgo from "./TimeAgo";
+import { fmtNum } from "@/lib/format";
 
 const STATUS_LABEL: Record<RequestStatus, string> = {
   pending:    "대기",
@@ -75,7 +76,7 @@ export default function RequestTable({ requests }: { requests: RecentRequest[] }
       <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">최근 자재 신청</h2>
         <span className="text-xs text-gray-400 dark:text-gray-500">
-          전체 {sorted.length.toLocaleString()}건
+          전체 {fmtNum(sorted.length)}건
         </span>
       </div>
       <div className="overflow-auto max-h-[calc(100vh-250px)]">
@@ -118,7 +119,7 @@ export default function RequestTable({ requests }: { requests: RecentRequest[] }
               <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400">{r.siteName}</td>
               <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400">{r.hoGiNo}</td>
               <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200">{r.materialName}</td>
-              <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400 tabular-nums">{r.qty}</td>
+              <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400 tabular-nums">{fmtNum(r.qty)}</td>
               <td className="px-4 py-3 text-center">
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_CLASS[r.status]}`}>
                   {STATUS_LABEL[r.status]}
@@ -134,7 +135,7 @@ export default function RequestTable({ requests }: { requests: RecentRequest[] }
       {totalPages > 1 && (
         <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-800/60">
           <span className="text-xs text-gray-500 dark:text-gray-400">
-            {((safePage - 1) * PAGE_SIZE + 1).toLocaleString()}–{Math.min(safePage * PAGE_SIZE, sorted.length).toLocaleString()} / {sorted.length.toLocaleString()}건
+            {fmtNum((safePage - 1) * PAGE_SIZE + 1)}–{fmtNum(Math.min(safePage * PAGE_SIZE, sorted.length))} / {fmtNum(sorted.length)}건
           </span>
           <div className="flex items-center gap-1">
             <button onClick={() => changePage(1)} disabled={safePage === 1}

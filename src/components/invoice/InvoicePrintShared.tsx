@@ -89,7 +89,7 @@ export function useInvoiceData(invoiceId: number) {
   return { invoice, quote, items, company, loading, error };
 }
 
-export function fmtNum(n: number): string { return n.toLocaleString(); }
+export { fmtNum } from "@/lib/format";
 export function fmtDate(iso: string): string {
   const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? `${m[1]}년 ${m[2]}월 ${m[3]}일` : String(iso);

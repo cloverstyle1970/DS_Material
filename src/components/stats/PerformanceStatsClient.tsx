@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { fmtNum } from "@/lib/format";
 
 // ============================================================
 // 타입
@@ -81,8 +82,6 @@ function shiftAnchor(period: Period, anchor: string, dir: -1 | 1): string {
   else d.setFullYear(d.getFullYear() + dir);
   return d.toISOString().slice(0, 10);
 }
-
-function fmtNum(n: number): string { return n.toLocaleString(); }
 
 // ============================================================
 // 메인

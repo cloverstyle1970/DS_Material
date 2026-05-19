@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { fmtNum, parseNum } from "@/lib/format";
 
 const MENU_HREF = "/quotes/settings";
 
@@ -19,14 +20,6 @@ const EMPTY: Settings = {
   overhead_rate: 10,
   profit_rate: 8,
 };
-
-function fmtNum(n: number): string {
-  return n.toLocaleString();
-}
-function parseNum(s: string): number {
-  const v = s.replace(/[^0-9-]/g, "");
-  return v === "" || v === "-" ? 0 : Number(v);
-}
 
 export default function QuoteSettingsClient() {
   const { user } = useAuth();

@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { api, ApiError, getErrorMessage } from "@/lib/api-client";
 import DraggableModal from "@/components/common/DraggableModal";
+import { fmtNum } from "@/lib/format";
 
 interface Props {
   parent: MaterialRecord;
@@ -83,8 +84,8 @@ export default function RegisterRepairModal({ parent, onClose, onSaved }: Props)
               <span className="text-gray-400 dark:text-gray-500 shrink-0 w-16">단가 기준</span>
               <span className="text-gray-500 dark:text-gray-400">
                 신품가의 50% 자동 적용
-                {parent.buyPrice  != null && <span className="ml-1.5">구매 {parent.buyPrice.toLocaleString()} → <span className="text-slate-700 dark:text-slate-300 font-medium">{Math.round(parent.buyPrice * 0.5).toLocaleString()}</span></span>}
-                {parent.sellPrice != null && <span className="ml-1.5">/ 판매 {parent.sellPrice.toLocaleString()} → <span className="text-slate-700 dark:text-slate-300 font-medium">{Math.round(parent.sellPrice * 0.5).toLocaleString()}</span></span>}
+                {parent.buyPrice  != null && <span className="ml-1.5">구매 {fmtNum(parent.buyPrice)} → <span className="text-slate-700 dark:text-slate-300 font-medium">{fmtNum(Math.round(parent.buyPrice * 0.5))}</span></span>}
+                {parent.sellPrice != null && <span className="ml-1.5">/ 판매 {fmtNum(parent.sellPrice)} → <span className="text-slate-700 dark:text-slate-300 font-medium">{fmtNum(Math.round(parent.sellPrice * 0.5))}</span></span>}
               </span>
             </div>
           )}

@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { PurchaseOrderRecord } from "@/lib/mock-purchase-orders";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { fmtNum, parseNum } from "@/lib/format";
 import DraggableModal from "@/components/common/DraggableModal";
 import SerialEntryModal from "./SerialEntryModal";
 
@@ -30,8 +31,6 @@ function newRow(seed: Partial<Row> = {}): Row {
 }
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
-function fmtNum(n: number) { return n.toLocaleString(); }
-function parseNum(s: string) { const v = s.replace(/[^0-9]/g, ""); return v === "" ? 0 : Number(v); }
 
 export default function InboundEntry() {
   const router = useRouter();
@@ -492,7 +491,7 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
                       <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{m.id}</span>
                       {m.modelNo && <span className="text-[10px] text-gray-500 dark:text-gray-400 border-l border-gray-300 dark:border-gray-600 pl-2">{m.modelNo}</span>}
                       {m.alias && <span className="text-[10px] text-gray-400 dark:text-gray-500">{m.alias}</span>}
-                      <span className="text-[10px] text-gray-300 dark:text-gray-500 ml-auto">단가 {m.buyPrice ? fmtNum(m.buyPrice) : "-"} / 재고 {m.stockQty}</span>
+                      <span className="text-[10px] text-gray-300 dark:text-gray-500 ml-auto">단가 {m.buyPrice ? fmtNum(m.buyPrice) : "-"} / 재고 {fmtNum(m.stockQty)}</span>
                     </div>
                   </div>
                 </button>
@@ -727,7 +726,7 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
                   <td className="px-2 py-1.5 font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">{o.materialId}</td>
                   <td className="px-2 py-1.5 dark:text-gray-200 font-medium whitespace-nowrap">{o.materialName}</td>
                   <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400 whitespace-nowrap">{mats[o.materialId] || "-"}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums dark:text-gray-300 whitespace-nowrap">{o.qty}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums dark:text-gray-300 whitespace-nowrap">{fmtNum(o.qty)}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums dark:text-gray-300 whitespace-nowrap">{o.unitPrice ? fmtNum(o.unitPrice) : "-"}</td>
                   <td className="px-2 py-1.5 dark:text-gray-300 whitespace-nowrap">{o.vendorName ?? "-"}</td>
                   <td className="px-2 py-1.5 dark:text-gray-300 whitespace-nowrap">{o.siteName ?? "-"}</td>

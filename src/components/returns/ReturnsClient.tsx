@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { fmtNum } from "@/lib/format";
 
 type Tab = "pending" | "returned";
 
@@ -127,7 +128,7 @@ export default function ReturnsClient() {
         </div>
 
         <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">
-          {filtered.length.toLocaleString()}건
+          {fmtNum(filtered.length)}건
           {selected.size > 0 && <span className="ml-1.5 text-emerald-600 dark:text-emerald-400 font-medium">(선택 {selected.size})</span>}
         </span>
 
@@ -188,7 +189,7 @@ export default function ReturnsClient() {
                   <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(t.createdAt)}</td>
                   <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[220px] truncate">{t.materialName}</td>
                   <td className="px-4 py-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{t.materialId}</td>
-                  <td className="px-4 py-3 text-center tabular-nums text-orange-500">{t.qty}</td>
+                  <td className="px-4 py-3 text-center tabular-nums text-orange-500">{fmtNum(t.qty)}</td>
                   <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">
                     {t.siteName ?? "-"}{t.elevatorName ? <span className="text-gray-400 ml-1">({t.elevatorName})</span> : null}
                   </td>

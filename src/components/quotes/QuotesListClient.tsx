@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { fmtNum } from "@/lib/format";
 
 const MENU_HREF = "/quotes";
 
@@ -22,10 +23,6 @@ interface QuoteRow {
   status: Status;
   created_by_name: string | null;
   created_at: string;
-}
-
-function fmtNum(n: number): string {
-  return n.toLocaleString();
 }
 
 export default function QuotesListClient() {

@@ -6,6 +6,7 @@ import { api, getErrorMessage } from "@/lib/api-client";
 import { MaterialUnitRecord, MaterialUnitStatus } from "@/lib/mock-material-units";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
+import { fmtNum } from "@/lib/format";
 
 const STATUS_OPTIONS: { v: MaterialUnitStatus | "전체"; label: string; color: string }[] = [
   { v: "전체",     label: "전체",     color: "bg-gray-700 text-white" },
@@ -146,7 +147,7 @@ export default function SerialHistoryClient() {
           )}
         </div>
 
-        <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">{units.length.toLocaleString()}건</span>
+        <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">{fmtNum(units.length)}건</span>
 
         {canDownload && (
           <button type="button" onClick={downloadExcel} disabled={units.length === 0}

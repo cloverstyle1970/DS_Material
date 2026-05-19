@@ -11,6 +11,7 @@ import { useAuth, isViewOnly, isAdmin } from "@/context/AuthContext";
 import StockHistoryClient from "@/components/stock/StockHistoryClient";
 import PurchaseOrderBulkUploadModal from "@/components/purchase/PurchaseOrderBulkUploadModal";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { fmtNum, fmtNumOr } from "@/lib/format";
 import DraggableModal from "@/components/common/DraggableModal";
 import Autocomplete from "@/components/common/Autocomplete";
 
@@ -730,7 +731,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                                         <td className="px-3 py-2 text-center">
                                           <span className={`px-1.5 py-0.5 rounded font-medium ${KIND_CLS[itemKind]}`}>{itemKind}</span>
                                         </td>
-                                        <td className="px-3 py-2 text-center tabular-nums text-gray-700 dark:text-gray-300">{item.qty}</td>
+                                        <td className="px-3 py-2 text-center tabular-nums text-gray-700 dark:text-gray-300">{fmtNum(item.qty)}</td>
                                       </tr>
                                     );
                                   })}
@@ -901,13 +902,13 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                     <td className="px-2 py-3 text-left font-mono text-black dark:text-white whitespace-nowrap">{o.materialId}</td>
                     <td className="px-2 py-3 text-left font-medium text-black dark:text-white max-w-[160px] truncate">{o.materialName}</td>
                     <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{matModelMap.get(o.materialId) || "-"}</td>
-                    <td className="px-2 py-3 text-right tabular-nums text-black dark:text-white">{o.qty}</td>
+                    <td className="px-2 py-3 text-right tabular-nums text-black dark:text-white">{fmtNum(o.qty)}</td>
                     <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.siteName ?? "-"}</td>
                     <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.elevatorName ?? "-"}</td>
                     <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.requesterName ?? "-"}</td>
                     <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.vendorName ?? "-"}</td>
                     <td className="px-2 py-3 text-right tabular-nums text-black dark:text-white">
-                      {o.unitPrice != null ? o.unitPrice.toLocaleString() : "-"}
+                      {fmtNumOr(o.unitPrice)}
                     </td>
                     <td className="px-2 py-3 text-left text-black dark:text-white max-w-[160px] truncate">
                       {(o.note ?? "").replace(/^\[[^\]]*\]\s*/, "").trim() || "-"}
@@ -1021,7 +1022,7 @@ function BulkInboundModal({
                   <tr key={o.id}>
                     <td className="px-3 py-3 font-mono text-gray-700 dark:text-gray-300">{o.materialId}</td>
                     <td className="px-3 py-3 text-gray-800 dark:text-gray-200">{o.materialName}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-gray-700 dark:text-gray-300">{o.qty}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-gray-700 dark:text-gray-300">{fmtNum(o.qty)}</td>
                     <td className="px-3 py-3 text-gray-600 dark:text-gray-400">{o.vendorName ?? "-"}</td>
                   </tr>
                 ))}

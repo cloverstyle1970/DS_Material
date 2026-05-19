@@ -7,6 +7,7 @@ import { MaterialRecord } from "@/lib/mock-materials";
 import { ElevatorRecord } from "@/lib/mock-elevators";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { fmtNum, parseNum } from "@/lib/format";
 import DraggableModal from "@/components/common/DraggableModal";
 import SerialEntryModal from "./SerialEntryModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
@@ -36,8 +37,6 @@ function newRow(seed: Partial<Row> = {}): Row {
 }
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
-function fmtNum(n: number) { return n.toLocaleString(); }
-function parseNum(s: string) { const v = s.replace(/[^0-9]/g, ""); return v === "" ? 0 : Number(v); }
 
 export default function OutboundEntry() {
   const router   = useRouter();
@@ -277,12 +276,12 @@ export default function OutboundEntry() {
                     {r.materialId && (
                       r.qty > r.stockQty ? (
                         <button type="button" onClick={() => setAdjustRowId(r.id)}
-                          title={`재고 부족: 보유 ${r.stockQty} / 필요 ${r.qty}`}
+                          title={`재고 부족: 보유 ${fmtNum(r.stockQty)} / 필요 ${fmtNum(r.qty)}`}
                           className="text-[10px] px-1 py-0.5 rounded bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-300 font-semibold whitespace-nowrap">
-                          ⚠ 재고{r.stockQty} · 조정
+                          ⚠ 재고{fmtNum(r.stockQty)} · 조정
                         </button>
                       ) : (
-                        <span className="text-[10px] text-gray-400 dark:text-gray-500 text-right">재고 {r.stockQty}</span>
+                        <span className="text-[10px] text-gray-400 dark:text-gray-500 text-right">재고 {fmtNum(r.stockQty)}</span>
                       )
                     )}
                   </div>
@@ -537,7 +536,7 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
                       <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{m.id}</span>
                       {m.modelNo && <span className="text-[10px] text-gray-500 dark:text-gray-400 border-l border-gray-300 dark:border-gray-600 pl-2">{m.modelNo}</span>}
                       {m.alias && <span className="text-[10px] text-gray-400 dark:text-gray-500">{m.alias}</span>}
-                      <span className={`text-[10px] ml-auto font-semibold ${m.stockQty === 0 ? "text-red-400" : "text-gray-400 dark:text-gray-500"}`}>재고 {m.stockQty}</span>
+                      <span className={`text-[10px] ml-auto font-semibold ${m.stockQty === 0 ? "text-red-400" : "text-gray-400 dark:text-gray-500"}`}>재고 {fmtNum(m.stockQty)}</span>
                     </div>
                   </div>
                 </button>
@@ -630,7 +629,7 @@ function InboundRefPopup({ onSelect, onClose }: { onSelect: (t: TransactionRecor
       panelClassName="w-[700px] max-h-[70vh]"
       header={
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-700">
-          <h3 className="text-sm font-semibold dark:text-gray-100">입고내역 참조 ({records.length}건)</h3>
+          <h3 className="text-sm font-semibold dark:text-gray-100">입고내역 참조 ({fmtNum(records.length)}건)</h3>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none">×</button>
         </div>
       }
@@ -653,8 +652,8 @@ function InboundRefPopup({ onSelect, onClose }: { onSelect: (t: TransactionRecor
                   <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400">{t.createdAt.slice(0, 10)}</td>
                   <td className="px-2 py-1.5 font-medium dark:text-gray-200">{t.materialName}</td>
                   <td className="px-2 py-1.5 font-mono text-slate-500 dark:text-slate-400">{t.materialId}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums text-blue-600">{t.qty}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums font-semibold dark:text-gray-300">{t.afterStock}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums text-blue-600">{fmtNum(t.qty)}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums font-semibold dark:text-gray-300">{fmtNum(t.afterStock)}</td>
                   <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400">{t.siteName ?? "—"}</td>
                 </tr>
               ))}
@@ -764,15 +763,15 @@ function StockAdjustModal({
             {row.spec && <div><span className="text-gray-500">규격: </span><span className="text-gray-700 dark:text-gray-300">{row.spec}</span></div>}
             <div className="pt-1 border-t border-gray-200 dark:border-gray-600 flex items-center justify-between">
               <span className="text-gray-500">현재 재고</span>
-              <span className="font-bold text-gray-800 dark:text-gray-100">{row.stockQty}</span>
+              <span className="font-bold text-gray-800 dark:text-gray-100">{fmtNum(row.stockQty)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-gray-500">필요 수량</span>
-              <span className="font-bold text-orange-600 dark:text-orange-400">{row.qty}</span>
+              <span className="font-bold text-orange-600 dark:text-orange-400">{fmtNum(row.qty)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-gray-500">부족분</span>
-              <span className="font-bold text-red-600 dark:text-red-400">{need}</span>
+              <span className="font-bold text-red-600 dark:text-red-400">{fmtNum(need)}</span>
             </div>
           </div>
 

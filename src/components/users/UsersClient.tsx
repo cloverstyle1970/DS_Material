@@ -6,6 +6,7 @@ import { useAuth, isAdmin } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useTabs, MAX_TABS } from "@/context/TabsContext";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { fmtNum } from "@/lib/format";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
 import DraggableModal from "@/components/common/DraggableModal";
 import PermissionsModal from "./PermissionsModal";
@@ -171,10 +172,10 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
 
         <span className="text-sm text-gray-500 shrink-0">
           {q
-            ? `검색 ${filtered.length.toLocaleString()}명`
+            ? `검색 ${fmtNum(filtered.length)}명`
             : statusFilter !== "전체"
-              ? `${statusFilter} ${filtered.length.toLocaleString()}명`
-              : `전체 ${users.length.toLocaleString()}명`}
+              ? `${statusFilter} ${fmtNum(filtered.length)}명`
+              : `전체 ${fmtNum(users.length)}명`}
         </span>
       </div>
 
@@ -251,7 +252,7 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
         {totalPages > 1 && (
           <div className={`flex items-center justify-between px-5 py-3 border-t ${isDark ? "border-gray-700 bg-gray-800/60" : "border-gray-100 bg-gray-50/60"}`}>
             <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-              {((safePage - 1) * PAGE_SIZE + 1).toLocaleString()}–{Math.min(safePage * PAGE_SIZE, sorted.length).toLocaleString()} / {sorted.length.toLocaleString()}명
+              {fmtNum((safePage - 1) * PAGE_SIZE + 1)}–{fmtNum(Math.min(safePage * PAGE_SIZE, sorted.length))} / {fmtNum(sorted.length)}명
             </span>
             <div className="flex items-center gap-1">
               <button onClick={() => changePage(1)} disabled={safePage === 1}

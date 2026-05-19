@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { api } from "@/lib/api-client";
+import { fmtNum } from "@/lib/format";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 
 interface Transaction {
@@ -172,19 +173,19 @@ export default function SiteStatsClient() {
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">조회 입고 수량</p>
-          <p className="text-2xl font-bold text-blue-600">{totalIn.toLocaleString()}<span className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1">건</span></p>
+          <p className="text-2xl font-bold text-blue-600">{fmtNum(totalIn)}<span className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1">건</span></p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">조회 출고 수량</p>
-          <p className="text-2xl font-bold text-orange-500">{totalOut.toLocaleString()}<span className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1">건</span></p>
+          <p className="text-2xl font-bold text-orange-500">{fmtNum(totalOut)}<span className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1">건</span></p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">관련 현장 수</p>
-          <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{siteStats.length}<span className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1">곳</span></p>
+          <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{fmtNum(siteStats.length)}<span className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1">곳</span></p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">투입 자재 종수</p>
-          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{materialStats.length}<span className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1">종</span></p>
+          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{fmtNum(materialStats.length)}<span className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1">종</span></p>
         </div>
       </div>
 
@@ -215,9 +216,9 @@ export default function SiteStatsClient() {
                 {siteStats.map(s => (
                   <tr key={s.site} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                     <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[160px] truncate">{s.site}</td>
-                    <td className="px-4 py-3 text-center text-blue-600 font-medium tabular-nums">+{s.inQty}</td>
-                    <td className="px-4 py-3 text-center text-orange-500 font-medium tabular-nums">-{s.outQty}</td>
-                    <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 tabular-nums">{s.materials.size}</td>
+                    <td className="px-4 py-3 text-center text-blue-600 font-medium tabular-nums">{fmtNum(s.inQty)}</td>
+                    <td className="px-4 py-3 text-center text-orange-500 font-medium tabular-nums">{fmtNum(s.outQty)}</td>
+                    <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 tabular-nums">{fmtNum(s.materials.size)}</td>
                     <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(s.lastDate)}</td>
                   </tr>
                 ))}
@@ -257,8 +258,8 @@ export default function SiteStatsClient() {
                     <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                       <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[150px] truncate">{m.name}</td>
                       <td className="px-4 py-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{m.id}</td>
-                      <td className="px-4 py-3 text-center text-blue-600 tabular-nums">{m.inQty > 0 ? `+${m.inQty}` : "—"}</td>
-                      <td className="px-4 py-3 text-center text-orange-500 tabular-nums">{m.outQty > 0 ? `-${m.outQty}` : "—"}</td>
+                      <td className="px-4 py-3 text-center text-blue-600 tabular-nums">{m.inQty > 0 ? fmtNum(m.inQty) : "—"}</td>
+                      <td className="px-4 py-3 text-center text-orange-500 tabular-nums">{m.outQty > 0 ? fmtNum(m.outQty) : "—"}</td>
                       <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(m.lastDate)}</td>
                     </tr>
                   ))}
@@ -297,7 +298,7 @@ export default function SiteStatsClient() {
                     <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[180px] truncate">{t.materialName}</td>
                     <td className="px-4 py-3 text-center tabular-nums">
                       <span className={t.type === "입고" ? "text-blue-600" : "text-orange-500"}>
-                        {t.qty}
+                        {fmtNum(t.qty)}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{t.siteName ?? "—"}</td>

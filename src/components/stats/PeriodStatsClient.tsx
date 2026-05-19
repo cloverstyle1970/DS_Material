@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { api } from "@/lib/api-client";
+import { fmtNum } from "@/lib/format";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 
 interface Transaction {
@@ -190,24 +191,24 @@ export default function PeriodStatsClient() {
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">총 입고 수량</p>
-          <p className="text-2xl font-bold text-blue-600">{totalInQty.toLocaleString()}<span className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1">건</span></p>
-          {totalInAmt > 0 && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{totalInAmt.toLocaleString()}원</p>}
+          <p className="text-2xl font-bold text-blue-600">{fmtNum(totalInQty)}<span className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1">건</span></p>
+          {totalInAmt > 0 && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{fmtNum(totalInAmt)}원</p>}
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">총 출고 수량</p>
-          <p className="text-2xl font-bold text-orange-500">{totalOutQty.toLocaleString()}<span className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1">건</span></p>
-          {totalOutAmt > 0 && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{totalOutAmt.toLocaleString()}원</p>}
+          <p className="text-2xl font-bold text-orange-500">{fmtNum(totalOutQty)}<span className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1">건</span></p>
+          {totalOutAmt > 0 && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{fmtNum(totalOutAmt)}원</p>}
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">순 재고 증감</p>
           <p className={`text-2xl font-bold ${totalInQty - totalOutQty >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-            {totalInQty - totalOutQty >= 0 ? "+" : ""}{(totalInQty - totalOutQty).toLocaleString()}
+            {fmtNum(Math.abs(totalInQty - totalOutQty))}
             <span className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1">건</span>
           </p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">처리 자재 종수</p>
-          <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{pivotData.length.toLocaleString()}<span className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1">종</span></p>
+          <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{fmtNum(pivotData.length)}<span className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1">종</span></p>
         </div>
       </div>
 
@@ -239,11 +240,11 @@ export default function PeriodStatsClient() {
                     <div className="w-full flex items-end gap-0.5 h-32">
                       <div className="flex-1 bg-blue-400 rounded-t transition-all"
                         style={{ height: `${Math.max(inH, 2)}%` }}
-                        title={`입고: ${periodSummary[p]?.inQty ?? 0}건`}
+                        title={`입고: ${fmtNum(periodSummary[p]?.inQty ?? 0)}건`}
                       />
                       <div className="flex-1 bg-orange-400 rounded-t transition-all"
                         style={{ height: `${Math.max(outH, 2)}%` }}
-                        title={`출고: ${periodSummary[p]?.outQty ?? 0}건`}
+                        title={`출고: ${fmtNum(periodSummary[p]?.outQty ?? 0)}건`}
                       />
                     </div>
                     <span className="text-xs text-gray-400 dark:text-gray-500 truncate w-full text-center">
@@ -301,8 +302,8 @@ export default function PeriodStatsClient() {
                           <td key={p} className="px-3 py-3 text-center">
                             {hasData ? (
                               <div className="space-y-0.5">
-                                {cell.in  > 0 && <div className="text-blue-600 font-medium">+{cell.in}</div>}
-                                {cell.out > 0 && <div className="text-orange-500 font-medium">-{cell.out}</div>}
+                                {cell.in  > 0 && <div className="text-blue-600 font-medium">{fmtNum(cell.in)}</div>}
+                                {cell.out > 0 && <div className="text-orange-500 font-medium">{fmtNum(cell.out)}</div>}
                               </div>
                             ) : (
                               <span className="text-gray-200 dark:text-gray-600">—</span>
@@ -310,7 +311,7 @@ export default function PeriodStatsClient() {
                           </td>
                         );
                       })}
-                      <td className="px-4 py-3 text-center font-bold text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/30 sticky right-0">{rowTotal}</td>
+                      <td className="px-4 py-3 text-center font-bold text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/30 sticky right-0">{fmtNum(rowTotal)}</td>
                     </tr>
                   );
                 })}
@@ -322,12 +323,12 @@ export default function PeriodStatsClient() {
                     const total = pivotData.reduce((s, m) => s + (m.periods[p]?.in ?? 0) + (m.periods[p]?.out ?? 0), 0);
                     return (
                       <td key={p} className="px-3 py-3 text-center text-gray-700 dark:text-gray-300">
-                        {total > 0 ? total : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                        {total > 0 ? fmtNum(total) : <span className="text-gray-300 dark:text-gray-600">—</span>}
                       </td>
                     );
                   })}
                   <td className="px-4 py-3 text-center text-gray-800 dark:text-gray-200 bg-gray-200 dark:bg-gray-600/50 sticky right-0">
-                    {pivotData.reduce((s, m) => s + Object.values(m.periods).reduce((s2, p) => s2 + p.in + p.out, 0), 0)}
+                    {fmtNum(pivotData.reduce((s, m) => s + Object.values(m.periods).reduce((s2, p) => s2 + p.in + p.out, 0), 0))}
                   </td>
                 </tr>
               </tbody>

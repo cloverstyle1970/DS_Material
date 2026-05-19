@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { ElevatorRecord } from "@/lib/mock-elevators";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { fmtNum } from "@/lib/format";
 import DraggableModal from "@/components/common/DraggableModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 
@@ -26,7 +27,6 @@ function newRow(seed: Partial<Row> = {}): Row {
 }
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
-function fmtNum(n: number) { return n.toLocaleString(); }
 
 export default function MaterialRequestEntry() {
   const router = useRouter();
@@ -418,7 +418,7 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
                       <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{m.id}</span>
                       {m.modelNo && <span className="text-[10px] text-gray-500 dark:text-gray-400 border-l border-gray-300 dark:border-gray-600 pl-2">{m.modelNo}</span>}
                       {m.alias && <span className="text-[10px] text-gray-400 dark:text-gray-500">{m.alias}</span>}
-                      <span className="text-[10px] text-gray-300 dark:text-gray-500 ml-auto">재고 {m.stockQty}</span>
+                      <span className="text-[10px] text-gray-300 dark:text-gray-500 ml-auto">재고 {fmtNum(m.stockQty)}</span>
                     </div>
                   </div>
                 </button>
@@ -599,7 +599,7 @@ function MaterialPopup({ onSelect, onClose }: { onSelect: (m: MaterialRecord) =>
                   <td className="px-2 py-1.5 font-mono text-slate-500 dark:text-slate-400">{m.id}</td>
                   <td className="px-2 py-1.5 dark:text-gray-200">{m.name}</td>
                   <td className="px-2 py-1.5 text-gray-700 dark:text-gray-300">{m.modelNo ?? "-"}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums dark:text-gray-300">{m.stockQty}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums dark:text-gray-300">{fmtNum(m.stockQty)}</td>
                 </tr>
               ))}
             </tbody>

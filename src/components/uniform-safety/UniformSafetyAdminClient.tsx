@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { fmtNum } from "@/lib/format";
 
 const MENU_HREF = "/uniform-safety/admin";
 
@@ -379,7 +380,7 @@ export default function UniformSafetyAdminClient() {
                     ) : materialAgg.map(m => (
                       <tr key={m.id} className="text-center">
                         <td className="px-3 py-2 text-gray-800 dark:text-gray-200 font-medium">{m.name} <span className="font-mono text-gray-400 ml-1">{m.id}</span></td>
-                        <td className="px-3 py-2 text-orange-600 dark:text-orange-400 font-bold">{m.qty}</td>
+                        <td className="px-3 py-2 text-orange-600 dark:text-orange-400 font-bold">{fmtNum(m.qty)}</td>
                         <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{m.recipientCount}</td>
                         <td className="px-3 py-2 text-gray-500 font-mono">{m.lastDate}</td>
                       </tr>
@@ -413,7 +414,7 @@ export default function UniformSafetyAdminClient() {
                       {r.items.map(it => (
                         <span key={it.id} className="mr-3">
                           {it.category_label && <span className="text-gray-400">[{it.category_label}]</span>} {it.material_name}
-                          {it.size && <span className="text-gray-500"> ({it.size})</span>} ×{it.qty}
+                          {it.size && <span className="text-gray-500"> ({it.size})</span>} ×{fmtNum(it.qty)}
                         </span>
                       ))}
                     </div>
@@ -473,7 +474,7 @@ function RequestCard({
             <span className="font-medium text-gray-800 dark:text-gray-200">{it.material_name}</span>
             <span className="font-mono text-gray-400 text-[11px]">{it.material_id}</span>
             {it.size && <span className="text-blue-600 dark:text-blue-400 font-bold">사이즈 {it.size}</span>}
-            <span className="ml-auto font-bold text-orange-600 dark:text-orange-400">×{it.qty}</span>
+            <span className="ml-auto font-bold text-orange-600 dark:text-orange-400">×{fmtNum(it.qty)}</span>
           </div>
         ))}
       </div>

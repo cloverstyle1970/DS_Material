@@ -8,6 +8,7 @@ import { api, getErrorMessage } from "@/lib/api-client";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
 import DraggableModal from "@/components/common/DraggableModal";
 import { formatPhone } from "@/lib/input-format";
+import { fmtNum } from "@/lib/format";
 
 // ── 공통 필드 입력 스타일 ───────────────────────────────────
 const field = "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-slate-400";
@@ -367,10 +368,10 @@ export default function VendorsClient({ initial }: Props) {
 
         <span className="text-sm text-gray-500 shrink-0">
           {q
-            ? `검색 ${filtered.length.toLocaleString()}건`
+            ? `검색 ${fmtNum(filtered.length)}건`
             : typeFilter !== "전체"
-              ? `${typeFilter} ${filtered.length.toLocaleString()}건`
-              : `전체 ${vendors.length.toLocaleString()}건`}
+              ? `${typeFilter} ${fmtNum(filtered.length)}건`
+              : `전체 ${fmtNum(vendors.length)}건`}
         </span>
 
         {admin && (
@@ -437,7 +438,7 @@ export default function VendorsClient({ initial }: Props) {
         {totalPages > 1 && (
           <div className={`flex items-center justify-between px-5 py-3 border-t ${isDark ? "border-gray-700 bg-gray-800/60" : "border-gray-100 bg-gray-50/60"}`}>
             <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-              {((safePage - 1) * PAGE_SIZE + 1).toLocaleString()}–{Math.min(safePage * PAGE_SIZE, sorted.length).toLocaleString()} / {sorted.length.toLocaleString()}건
+              {fmtNum((safePage - 1) * PAGE_SIZE + 1)}–{fmtNum(Math.min(safePage * PAGE_SIZE, sorted.length))} / {fmtNum(sorted.length)}건
             </span>
             <div className="flex items-center gap-1">
               <button onClick={() => changePage(1)} disabled={safePage === 1}

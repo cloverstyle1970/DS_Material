@@ -8,6 +8,7 @@ import { useTabs, MAX_TABS } from "@/context/TabsContext";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
 import QuotePrintPaper from "@/components/quotes/QuotePrintPaper";
+import { fmtNum } from "@/lib/format";
 
 // ============================================================
 // 타입
@@ -104,9 +105,6 @@ interface CompanyInfo {
   company_ceo: string | null;
 }
 
-function fmtNum(n: number): string {
-  return n.toLocaleString();
-}
 function fmtDate(iso: string): string {
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return iso;
@@ -352,7 +350,7 @@ function QuoteDetailInner() {
       // 누적 입금 ≥ total_amount → 진행상태 '입금완료' 자동 전이
       const sumPaid = (payments.reduce((s, p) => s + (p.status === "확정" ? p.amount : 0), 0)) + amt;
       if (sumPaid >= header.total_amount && header.progress_state !== "입금완료" && header.progress_state !== "종료") {
-        await snapshot(`진행상태: ${header.progress_state} → 입금완료 (누적 ${sumPaid.toLocaleString()}원 ≥ ${header.total_amount.toLocaleString()}원)`);
+        await snapshot(`진행상태: ${header.progress_state} → 입금완료 (누적 ${fmtNum(sumPaid)}원 ≥ ${fmtNum(header.total_amount)}원)`);
         await supabase.from("quotes")
           .update({ progress_state: "입금완료", updated_at: new Date().toISOString() })
           .eq("id", header.id);
@@ -664,7 +662,7 @@ function QuoteDetailInner() {
             <input type="text" inputMode="numeric" value={payForm.amount}
               onChange={e => {
                 const v = e.target.value.replace(/[^0-9]/g, "");
-                setPayForm(f => ({ ...f, amount: v ? Number(v).toLocaleString() : "" }));
+                setPayForm(f => ({ ...f, amount: v ? fmtNum(Number(v)) : "" }));
               }}
               placeholder={`최대 ${fmtNum(header.total_amount)}원`}
               className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-right tabular-nums font-bold" />

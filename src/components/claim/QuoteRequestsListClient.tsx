@@ -6,6 +6,7 @@ import { useAuth, isAdmin } from "@/context/AuthContext";
 import { useTabs, MAX_TABS } from "@/context/TabsContext";
 import { supabase } from "@/lib/supabase";
 import { visibleUserIds } from "@/lib/crew";
+import { fmtNum } from "@/lib/format";
 
 interface QuoteRequest {
   id: number;
@@ -260,7 +261,7 @@ export default function QuoteRequestsListClient() {
                           <div className="font-medium">{it.material_name}</div>
                           {it.spec && <div className="text-[10px] text-gray-500">{it.spec}</div>}
                         </td>
-                        <td className="px-2 py-1 text-right tabular-nums">{it.qty} {it.unit ?? ""}</td>
+                        <td className="px-2 py-1 text-right tabular-nums">{fmtNum(it.qty)} {it.unit ?? ""}</td>
                         <td className="px-2 py-1 text-gray-600 dark:text-gray-300">{it.remark ?? "-"}</td>
                       </tr>
                     ))}

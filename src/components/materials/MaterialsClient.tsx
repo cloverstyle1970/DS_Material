@@ -9,6 +9,7 @@ import BulkUploadModal from "./BulkUploadModal";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { fmtNumOr, fmtNum } from "@/lib/format";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
 
 const LOW_STOCK_THRESHOLD = 5;
@@ -53,7 +54,7 @@ function StockCell({ material, editable }: { material: MaterialRecord; editable:
       onClick={() => editable && setEditing(true)}
       className={`${qty === 0 ? "text-red-600" : qty <= LOW_STOCK_THRESHOLD ? "text-orange-500" : "text-gray-700"} ${editable ? "cursor-pointer group" : ""} flex items-center gap-1.5`}
     >
-      <span className="font-medium">{qty}</span>
+      <span className="font-medium">{fmtNum(qty)}</span>
       {editable && <span className="text-gray-300 text-xs opacity-0 group-hover:opacity-100 transition-opacity">✏️</span>}
     </span>
   );
@@ -296,10 +297,10 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
           {/* 건수 */}
           <span className="text-sm text-gray-500 shrink-0">
             {q
-              ? `검색 ${filtered.length.toLocaleString()}종`
+              ? `검색 ${fmtNum(filtered.length)}종`
               : matType !== "전체"
-                ? `${matType} ${filtered.length.toLocaleString()}종`
-                : `전체 ${materials.length.toLocaleString()}종`}
+                ? `${matType} ${fmtNum(filtered.length)}종`
+                : `전체 ${fmtNum(materials.length)}종`}
             {selected.size > 0 && <span className="ml-2 text-slate-600 font-medium">(선택 {selected.size}개)</span>}
           </span>
 
@@ -437,11 +438,11 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
                   <td className={`px-4 py-3 text-center ${isDark ? "text-gray-300" : "text-gray-500"}`}>{m.unit ?? "-"}</td>
                   {!viewOnly && (
                     <td className={`px-4 py-3 text-center tabular-nums ${isDark ? "text-gray-300" : "text-gray-500"}`}>
-                      {m.buyPrice != null ? m.buyPrice.toLocaleString() : "-"}
+                      {fmtNumOr(m.buyPrice)}
                     </td>
                   )}
                   <td className={`px-4 py-3 text-center tabular-nums font-medium ${isDark ? "text-gray-100" : "text-gray-700"}`}>
-                    {m.sellPrice != null ? m.sellPrice.toLocaleString() : "-"}
+                    {fmtNumOr(m.sellPrice)}
                   </td>
                   <td className={`px-4 py-3 text-center ${isDark ? "text-gray-300" : "text-gray-500"}`}>{m.storageLoc ?? "-"}</td>
                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
@@ -515,7 +516,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
                 : isDark ? "border-gray-700 bg-gray-800/60" : "border-gray-200 bg-gray-50"
           }`}>
             <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-              {((safePage - 1) * PAGE_SIZE + 1).toLocaleString()}–{Math.min(safePage * PAGE_SIZE, filtered.length).toLocaleString()} / {filtered.length.toLocaleString()}종
+              {fmtNum((safePage - 1) * PAGE_SIZE + 1)}–{fmtNum(Math.min(safePage * PAGE_SIZE, filtered.length))} / {fmtNum(filtered.length)}종
             </span>
             <div className="flex items-center gap-1">
               <button onClick={() => changePage(1)} disabled={safePage === 1}

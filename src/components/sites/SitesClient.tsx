@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
 import { formatPhone } from "@/lib/input-format";
+import { fmtNum } from "@/lib/format";
 
 // ── 배지 ────────────────────────────────────────────────────────
 const COMPANY_STYLES: Record<string, string> = {
@@ -857,7 +858,7 @@ export default function SitesClient({ initial, elevators }: Props) {
                   }}
                   className="h-3.5 w-3.5 rounded cursor-pointer"
                 />
-                <span>{checkedSiteIds.size > 0 ? `${checkedSiteIds.size}건 선택` : `${filteredSites.length.toLocaleString()}건`}</span>
+                <span>{checkedSiteIds.size > 0 ? `${fmtNum(checkedSiteIds.size)}건 선택` : `${fmtNum(filteredSites.length)}건`}</span>
               </label>
               {totalPages > 1 && (
                 <div className="flex items-center gap-0.5">

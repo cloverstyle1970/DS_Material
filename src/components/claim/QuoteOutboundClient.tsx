@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { fmtNum } from "@/lib/format";
 
 // ============================================================
 // 타입
@@ -387,17 +388,17 @@ function Inner() {
                           <div className="text-[10px] text-purple-600 dark:text-purple-300 mt-0.5">⚠️ S/N 추적 자재 — [출고 관리]에서 처리</div>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-gray-800 dark:text-gray-100 font-medium">{r.it.qty}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-bold">{r.outbound}</td>
-                      <td className={`px-3 py-2 text-right tabular-nums font-bold ${remain > 0 ? "text-amber-600 dark:text-amber-400" : "text-gray-400"}`}>{remain}</td>
-                      <td className={`px-3 py-2 text-right tabular-nums ${r.stock <= 0 ? "text-rose-500" : "text-gray-700 dark:text-gray-200"}`}>{r.stock}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-gray-800 dark:text-gray-100 font-medium">{fmtNum(r.it.qty)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-bold">{fmtNum(r.outbound)}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums font-bold ${remain > 0 ? "text-amber-600 dark:text-amber-400" : "text-gray-400"}`}>{fmtNum(remain)}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums ${r.stock <= 0 ? "text-rose-500" : "text-gray-700 dark:text-gray-200"}`}>{fmtNum(r.stock)}</td>
                       <td className="px-3 py-2 text-center">
                         <div className="flex items-center justify-center gap-1.5">
                           <span className={`text-[10px] ${status.cls}`}>{status.txt}</span>
                           {admin && req.status !== "완료" && canIssue && (
                             <button type="button" onClick={() => issueOne(r)} disabled={actionKey !== null}
                               className="px-2 py-0.5 text-[10px] font-bold rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
-                              출고{r.stock < remain ? ` ${r.stock}` : ""}
+                              출고{r.stock < remain ? ` ${fmtNum(r.stock)}` : ""}
                             </button>
                           )}
                           {admin && req.status !== "완료" && r.stock <= 0 && (
