@@ -447,9 +447,11 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                 <td className="px-2 py-3 text-center text-black dark:text-white max-w-[140px] truncate">{t.note ?? "-"}</td>
                 {admin && (
                   <td className="px-2 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 items-center">
+                      <Link href={isInbound ? `/inbound/edit/${t.id}` : `/outbound/edit/${t.id}`}
+                        className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors">전표수정</Link>
                       <button type="button" disabled={actionLoading === t.id} onClick={() => setEditingTx(t)}
-                        className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors">수정</button>
+                        className="text-xs px-2 py-1 rounded-lg bg-gray-50 text-gray-700 hover:bg-gray-100 transition-colors">단건수정</button>
                       <button type="button" disabled={actionLoading === t.id} onClick={() => handleDelete(t.id)}
                         className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors">취소</button>
                     </div>

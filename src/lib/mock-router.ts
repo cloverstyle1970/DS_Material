@@ -397,6 +397,7 @@ function dbToTransaction(r: any): TransactionRecord {
     userId:             r.user_id,
     userName:           r.user_name,
     createdAt:          r.created_at,
+    batchId:            r.batch_id               ?? null,
   };
 }
 
@@ -408,6 +409,7 @@ async function supabaseAddTransaction(data: {
   elevatorName?: string | null;
   serialNos?: string[] | null;
   requiresReturn?: boolean;
+  batchId?: string | null;
 }): Promise<{ records?: TransactionRecord[]; error?: string }> {
   const { data: result, error } = await supabase.rpc("add_transaction", {
     p_type:            data.type,
@@ -421,6 +423,7 @@ async function supabaseAddTransaction(data: {
     p_elevator_name:   data.elevatorName ?? null,
     p_serial_nos:      data.serialNos && data.serialNos.length > 0 ? data.serialNos : null,
     p_requires_return: data.requiresReturn ?? false,
+    p_batch_id:        data.batchId ?? null,
   });
   if (error) return { error: error.message };
   if (result?.error) return { error: result.error };
@@ -1603,6 +1606,18 @@ async function routeDELETE(path: string, body: AnyBody): Promise<unknown> {
   if (userId) {
     const { error } = await supabase.from("users").delete().eq("id", Number(userId));
     if (error) throw new MockApiError(error.message, 500);
+    return { ok: true };
+  }
+
+  const txBatchId = extractId(path, "/api/transactions/batch");
+  if (txBatchId) {
+    const { data: txs, error: fetchErr } = await supabase.from("transactions").select("id").eq("batch_id", txBatchId);
+    if (fetchErr) throw new MockApiError(fetchErr.message, 500);
+    if (txs) {
+      for (const tx of txs) {
+        await routeDELETE(`/api/transactions/${tx.id}`, null);
+      }
+    }
     return { ok: true };
   }
 

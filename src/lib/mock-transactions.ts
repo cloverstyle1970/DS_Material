@@ -22,6 +22,7 @@ export interface TransactionRecord {
   userId: number;
   userName: string;
   createdAt: string;
+  batchId?: string | null;
 }
 
 const transactions: TransactionRecord[] = [];
@@ -45,6 +46,7 @@ export interface AddTransactionInput {
   note: string | null;
   userId: number;
   userName: string;
+  batchId?: string | null;
 }
 
 /**
@@ -81,6 +83,7 @@ export function addTransaction(data: AddTransactionInput): { record?: Transactio
     prevStock:          result.prevStock,
     afterStock:         result.afterStock,
     createdAt:          new Date().toISOString(),
+    batchId:            data.batchId ?? null,
   };
   transactions.push(record);
   return { record };

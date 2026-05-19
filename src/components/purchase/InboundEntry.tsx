@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { PurchaseOrderRecord } from "@/lib/mock-purchase-orders";
+import { TransactionRecord } from "@/lib/mock-transactions";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNum, parseNum } from "@/lib/format";
 import DraggableModal from "@/components/common/DraggableModal";
@@ -24,6 +25,7 @@ interface Row {
   remark: string;
   orderId: number | null;
   serialNos: string[];
+  existingId?: number;
 }
 
 function newRow(seed: Partial<Row> = {}): Row {
@@ -32,9 +34,10 @@ function newRow(seed: Partial<Row> = {}): Row {
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
-export default function InboundEntry() {
+export default function InboundEntry({ editId }: { editId?: number } = {}) {
   const router = useRouter();
   const { user } = useAuth();
+  const isEdit = editId != null && editId > 0;
 
   const [inboundDate, setInboundDate] = useState(todayISO());
   const [vendorName,  setVendorName]  = useState("");
@@ -59,6 +62,52 @@ export default function InboundEntry() {
   const [saving, setSaving] = useState(false);
   const [popup,  setPopup]  = useState<null | "order">(null);
   const [serialEditRowId, setSerialEditRowId] = useState<string | null>(null);
+  const [editBatchId, setEditBatchId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isEdit || !editId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const all = await api.get<TransactionRecord[]>("/api/transactions?type=입고");
+        const target = all.find(t => t.id === editId);
+        if (!target) { alert("내역을 찾을 수 없습니다."); router.push("/inbound"); return; }
+        
+        const siblings = target.batchId
+          ? all.filter(t => t.batchId === target.batchId).sort((a, b) => a.id - b.id)
+          : [target];
+          
+        if (cancelled) return;
+        
+        setInboundDate(target.createdAt.slice(0, 10));
+        setReference(target.note || "");
+        setEditBatchId(target.batchId || null);
+        
+        const loaded: Row[] = [];
+        for (const t of siblings) {
+          loaded.push({
+            id: crypto.randomUUID(),
+            existingId: t.id,
+            materialId: t.materialId,
+            materialName: t.materialName,
+            spec: "",
+            qty: t.qty,
+            unitPrice: 0,
+            siteName: t.siteName || "",
+            remark: t.note || "",
+            orderId: null,
+            serialNos: t.serialNo ? [t.serialNo] : [],
+          });
+        }
+        
+        while (loaded.length < 5) loaded.push(newRow());
+        setRows(loaded);
+      } catch (e) {
+        if (!cancelled) alert(getErrorMessage(e));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isEdit, editId, router]);
 
   function patchRow(id: string, patch: Partial<Row>) {
     setRows(prev => prev.map(r => {
@@ -157,7 +206,15 @@ export default function InboundEntry() {
     }
     setSaving(true);
     try {
-      const batchId = crypto.randomUUID();
+      if (isEdit) {
+        if (editBatchId) {
+          await api.delete(`/api/transactions/batch/${editBatchId}`);
+        } else {
+          await api.delete(`/api/transactions/${editId}`);
+        }
+      }
+      
+      const batchId = isEdit && editBatchId ? editBatchId : crypto.randomUUID();
       for (const r of valid) {
         await api.post("/api/transactions", {
           type: "입고", materialId: r.materialId, materialName: r.materialName,
@@ -165,6 +222,7 @@ export default function InboundEntry() {
           serialNos: r.serialNos.length > 0 ? r.serialNos : null,
           note: r.remark || reference || null, userId: user.id, userName: user.name,
           batchId,
+          createdAt: isEdit ? inboundDate : undefined,
         });
       }
       window.dispatchEvent(new CustomEvent("ds:transactions_changed", { detail: { mode: "입고" } }));

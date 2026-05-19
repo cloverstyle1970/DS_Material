@@ -30,6 +30,7 @@ interface Row {
   remark: string;
   inboundRef: number | null;
   serialNos: string[];
+  existingId?: number;
 }
 
 function newRow(seed: Partial<Row> = {}): Row {
@@ -38,9 +39,10 @@ function newRow(seed: Partial<Row> = {}): Row {
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
-export default function OutboundEntry() {
+export default function OutboundEntry({ editId }: { editId?: number } = {}) {
   const router   = useRouter();
   const { user } = useAuth();
+  const isEdit = editId != null && editId > 0;
 
   const [outboundDate, setOutboundDate] = useState(todayISO());
   const [siteName,     setSiteName]     = useState("");
@@ -48,6 +50,60 @@ export default function OutboundEntry() {
   const [sites,        setSites]        = useState<SiteOption[]>([]);
   const [reference,    setReference]    = useState("");
   const [matType,      setMatType]      = useState<"전체" | "DS" | "TK">("전체");
+
+  const [saving, setSaving] = useState(false);
+  const [serialEditRowId, setSerialEditRowId] = useState<string | null>(null);
+  const [editBatchId, setEditBatchId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isEdit || !editId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const all = await api.get<TransactionRecord[]>("/api/transactions?type=출고");
+        const target = all.find(t => t.id === editId);
+        if (!target) { alert("내역을 찾을 수 없습니다."); router.push("/outbound"); return; }
+        
+        const siblings = target.batchId
+          ? all.filter(t => t.batchId === target.batchId).sort((a, b) => a.id - b.id)
+          : [target];
+          
+        if (cancelled) return;
+        
+        setOutboundDate(target.createdAt.slice(0, 10));
+        setSiteName(target.siteName || "");
+        setReference(target.note || "");
+        setEditBatchId(target.batchId || null);
+        
+        const loaded: Row[] = [];
+        for (const t of siblings) {
+          loaded.push({
+            id: crypto.randomUUID(),
+            existingId: t.id,
+            materialId: t.materialId,
+            materialName: t.materialName,
+            spec: "",
+            qty: t.qty,
+            unitPrice: 0,
+            buyPrice: 0,
+            stockQty: 0,
+            storageLoc: "",
+            elevatorName: t.elevatorName || "",
+            remark: t.note || "",
+            inboundRef: null,
+            serialNos: t.serialNo ? [t.serialNo] : [],
+            requiresReturn: !!t.requiresReturn,
+          });
+        }
+        
+        while (loaded.length < 5) loaded.push(newRow());
+        setRows(loaded);
+      } catch (e) {
+        if (!cancelled) alert(getErrorMessage(e));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isEdit, editId, router]);
 
   useEffect(() => {
     if (!user) return;
@@ -62,9 +118,7 @@ export default function OutboundEntry() {
   }, []);
 
   const [rows,  setRows]  = useState<Row[]>([newRow(), newRow(), newRow(), newRow(), newRow()]);
-  const [saving, setSaving] = useState(false);
   const [popup,  setPopup]  = useState<null | "inbound">(null);
-  const [serialEditRowId, setSerialEditRowId] = useState<string | null>(null);
   const [adjustRowId, setAdjustRowId] = useState<string | null>(null);
 
   async function refreshRowStock(rowId: string, materialId: string) {
@@ -163,7 +217,15 @@ export default function OutboundEntry() {
     }
     setSaving(true);
     try {
-      const batchId = crypto.randomUUID();
+      if (isEdit) {
+        if (editBatchId) {
+          await api.delete(`/api/transactions/batch/${editBatchId}`);
+        } else {
+          await api.delete(`/api/transactions/${editId}`);
+        }
+      }
+      
+      const batchId = isEdit && editBatchId ? editBatchId : crypto.randomUUID();
       for (const r of valid) {
         await api.post("/api/transactions", {
           type: "출고", materialId: r.materialId, materialName: r.materialName,
@@ -173,6 +235,7 @@ export default function OutboundEntry() {
           requiresReturn: r.requiresReturn,
           note: r.remark || reference || null, userId: user.id, userName: user.name,
           batchId,
+          createdAt: isEdit ? outboundDate : undefined,
         });
       }
       if (goList) router.push("/outbound");
