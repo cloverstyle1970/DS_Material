@@ -486,6 +486,7 @@ function orderToDb(d: any): Record<string, unknown> {
   if (d.userId        !== undefined) obj.user_id        = d.userId;
   if (d.userName      !== undefined) obj.user_name      = d.userName;
   if (d.status        !== undefined) obj.status         = d.status;
+  if (d.orderedAt     !== undefined) obj.ordered_at     = d.orderedAt;
   if (d.receivedAt    !== undefined) obj.received_at    = d.receivedAt;
   return obj;
 }

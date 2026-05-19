@@ -137,6 +137,10 @@ export default function PurchaseOrderEntry() {
     if (valid.length === 0) { alert("품목을 1개 이상 입력해 주세요."); return; }
     setSaving(true);
     try {
+      // 사용자가 오늘 외 날짜 지정 시 그 날짜 자정(UTC), 오늘이면 현재 시각으로 저장
+      const orderedAtIso = orderDate === todayISO()
+        ? new Date().toISOString()
+        : new Date(`${orderDate}T00:00:00Z`).toISOString();
       for (const r of valid) {
         await api.post("/api/purchase-orders", {
           materialId: r.materialId, materialName: r.materialName, qty: r.qty,
@@ -149,6 +153,7 @@ export default function PurchaseOrderEntry() {
             r.remark || reference || "",
           ].filter(Boolean).join(" ") || null,
           userId: user.id, userName: user.name,
+          orderedAt: orderedAtIso,
         });
       }
       window.dispatchEvent(new CustomEvent("ds:purchase_orders_changed"));
