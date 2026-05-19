@@ -464,6 +464,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
       {editingTx && (
         <EditTransactionModal
           tx={editingTx}
+          mode={mode}
           onClose={() => setEditingTx(null)}
           onSave={handleSaveEdit}
           sites={sites}
@@ -497,11 +498,13 @@ export default function StockHistoryClient({ mode, initial }: Props) {
 
 function EditTransactionModal({
   tx,
+  mode,
   onClose,
   onSave,
   sites,
 }: {
   tx: TransactionRecord;
+  mode: "입고" | "출고";
   onClose: () => void;
   onSave: (data: Record<string, unknown>) => void;
   sites: SiteOption[];
@@ -509,6 +512,8 @@ function EditTransactionModal({
   const [qty, setQty] = useState(tx.qty.toString());
   const [siteName, setSiteName] = useState(tx.siteName ?? "");
   const [note, setNote] = useState(tx.note ?? "");
+  const [serialNo, setSerialNo] = useState(tx.serialNo ?? "");
+  const isOutbound = mode === "출고";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -516,7 +521,9 @@ function EditTransactionModal({
       alert("유효한 수량을 입력해주세요.");
       return;
     }
-    onSave({ qty: Number(qty), siteName, note });
+    const payload: Record<string, unknown> = { qty: Number(qty), siteName, note };
+    if (isOutbound) payload.serialNo = serialNo.trim() || null;
+    onSave(payload);
   };
 
   return (
@@ -552,6 +559,20 @@ function EditTransactionModal({
               {sites.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
             </select>
           </div>
+
+          {isOutbound && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">S/N</label>
+              <input
+                type="text"
+                value={serialNo}
+                onChange={e => setSerialNo(e.target.value)}
+                placeholder="시리얼 번호"
+                className="w-full px-3 py-2 text-sm font-mono border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              />
+              <p className="mt-1 text-[10px] text-gray-400">S/N 추적 자재는 자재단위(<code>material_units</code>)의 사용 상태가 자동 동기화됩니다 (기존 S/N → 재고, 새 S/N → 출고/반납대기).</p>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">비고</label>

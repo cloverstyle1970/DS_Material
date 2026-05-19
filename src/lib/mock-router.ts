@@ -467,6 +467,7 @@ function dbToOrder(r: any): PurchaseOrderRecord {
     userName:      r.user_name,
     orderedAt:     r.ordered_at,
     receivedAt:    r.received_at    ?? null,
+    batchId:       r.batch_id       ?? null,
   };
 }
 
@@ -488,6 +489,7 @@ function orderToDb(d: any): Record<string, unknown> {
   if (d.status        !== undefined) obj.status         = d.status;
   if (d.orderedAt     !== undefined) obj.ordered_at     = d.orderedAt;
   if (d.receivedAt    !== undefined) obj.received_at    = d.receivedAt;
+  if (d.batchId       !== undefined) obj.batch_id       = d.batchId;
   return obj;
 }
 
@@ -1307,6 +1309,8 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
       if (body.unitPrice !== undefined) patch.unit_price = body.unitPrice ? Number(body.unitPrice) : null;
       if (body.note !== undefined) patch.note = body.note || null;
       if (body.requesterName !== undefined) patch.requester_name = body.requesterName || null;
+      if (body.orderedAt !== undefined) patch.ordered_at = body.orderedAt;
+      if (body.batchId !== undefined) patch.batch_id = body.batchId;
 
       const { data, error } = await supabase.from("purchase_orders")
         .update(patch).eq("id", numId).select().single();
@@ -1328,7 +1332,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
   const txId = extractId(path, "/api/transactions");
   if (txId) {
     const numId = Number(txId);
-    const { action, qty, siteName, note, userName, userId } = body;
+    const { action, qty, siteName, note, userName, userId, serialNo } = body;
 
     if (action === "반납등록") {
       const { data: result, error } = await supabase.rpc("mark_return_completed", {
@@ -1359,6 +1363,56 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
     if (siteName !== undefined) patch.site_name = siteName || null;
     if (note !== undefined) patch.note = note || null;
     if (userName !== undefined) patch.user_name = userName;
+
+    // ── S/N 변경: 출고 트랜잭션은 material_units 동기화 시도 ──
+    if (serialNo !== undefined) {
+      const newSerial = typeof serialNo === "string" ? serialNo.trim() || null : null;
+      const oldSerial = tx.serial_no ?? null;
+
+      if (newSerial === oldSerial) {
+        // S/N 변경 없음 — 현장만 바뀌었다면 추적 unit의 current_site 동기화
+        if (tx.type === "출고" && tx.material_unit_id != null && siteName !== undefined) {
+          await supabase.from("material_units").update({
+            current_site: siteName || null,
+            last_event_at: new Date().toISOString(),
+          }).eq("id", tx.material_unit_id);
+        }
+      } else if (tx.type !== "출고") {
+        // 입고는 단순 텍스트 갱신 (입고 unit 자체 rename은 별도 기능)
+        patch.serial_no = newSerial;
+      } else {
+        if (tx.return_status === "returned") {
+          throw new MockApiError("반납 완료된 출고 트랜잭션의 S/N은 수정할 수 없습니다.", 400);
+        }
+        const { data: mat } = await supabase.from("materials")
+          .select("track_serial").eq("id", tx.material_id).single();
+        const isTracked = !!mat?.track_serial;
+
+        if (!isTracked) {
+          // 비추적 자재: serial_no 텍스트만 갱신 (unit 무관)
+          patch.serial_no = newSerial;
+        } else {
+          // 추적 자재: 원자적 unit 동기화는 RPC 에 위임
+          const { data: result, error: rpcErr } = await supabase.rpc("edit_transaction_serial", {
+            p_transaction_id: numId,
+            p_new_serial:     newSerial,
+          });
+          if (rpcErr) {
+            // RPC 미배포(마이그레이션 미실행)면 안내 메시지
+            if (/edit_transaction_serial/i.test(rpcErr.message)) {
+              throw new MockApiError(
+                "S/N 자동 동기화 RPC가 배포되지 않았습니다. scripts/migration-edit-transaction-serial.sql 실행 필요.",
+                500,
+              );
+            }
+            throw new MockApiError(rpcErr.message, 500);
+          }
+          if (result?.error) throw new MockApiError(result.error, 400);
+          // RPC 가 transactions 행을 이미 갱신했으므로 patch 에서 serial_no/material_unit_id 빼고
+          // 나머지 필드(site, note, qty)만 이어서 patch
+        }
+      }
+    }
 
     if (qty !== undefined) {
       const newQty = Number(qty);

@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { MaterialRequestRecord } from "@/lib/mock-material-requests";
 import { ElevatorRecord } from "@/lib/mock-elevators";
+import type { PurchaseOrderRecord } from "@/lib/mock-purchase-orders";
 import { api, getErrorMessage } from "@/lib/api-client";
 import DraggableModal from "@/components/common/DraggableModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
@@ -23,19 +24,38 @@ interface Row {
   elevatorName: string;
   remark: string;
   reqId: number | null;
+  editingId: number | null;   // 기존 PO id (편집 모드에서 로드된 행)
 }
 
 function newRow(seed: Partial<Row> = {}): Row {
-  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, elevatorName: "", remark: "", reqId: null, ...seed };
+  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, elevatorName: "", remark: "", reqId: null, editingId: null, ...seed };
 }
 
 function fmtNum(n: number) { return n.toLocaleString(); }
 function parseNum(s: string) { const v = s.replace(/[^0-9]/g, ""); return v === "" ? 0 : Number(v); }
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
-export default function PurchaseOrderEntry() {
+// note → orderRefNo + formType + remark 역파싱
+function parseNoteForEdit(note: string | null): { orderRefNo: string; formType: "기본" | "긴급" | "수리"; remark: string } {
+  if (!note) return { orderRefNo: "", formType: "기본", remark: "" };
+  let s = note.trim();
+  let orderRefNo = "";
+  let formType: "기본" | "긴급" | "수리" = "기본";
+  while (true) {
+    const m = s.match(/^\[([^\]]+)\]\s*/);
+    if (!m) break;
+    const tag = m[1];
+    if (tag === "긴급" || tag === "수리") formType = tag;
+    else if (!orderRefNo) orderRefNo = tag;
+    s = s.slice(m[0].length);
+  }
+  return { orderRefNo, formType, remark: s };
+}
+
+export default function PurchaseOrderEntry({ editId }: { editId?: number } = {}) {
   const router = useRouter();
   const { user } = useAuth();
+  const isEdit = editId != null && editId > 0;
 
   const [orderDate,   setOrderDate]   = useState(todayISO());
   const [sites,       setSites]       = useState<SiteOption[]>([]);
@@ -49,6 +69,9 @@ export default function PurchaseOrderEntry() {
   const [matType,     setMatType]     = useState<"전체" | "DS" | "TK">("전체");
   const [formType,    setFormType]    = useState<"기본" | "긴급" | "수리">("기본");
   const [requesterNames, setRequesterNames] = useState<string[]>([]);
+  const [batchId, setBatchId] = useState<string | null>(null);
+  const [removedExistingIds, setRemovedExistingIds] = useState<Set<number>>(new Set());
+  const [editLoading, setEditLoading] = useState(isEdit);
 
   useEffect(() => {
     if (!user) return;
@@ -72,8 +95,67 @@ export default function PurchaseOrderEntry() {
   const [orderRefNo,  setOrderRefNo]  = useState("");
   const [files,       setFiles]       = useState<File[]>([]);
   const [popup,       setPopup]       = useState<null | "request">(null);
-  const [rows,        setRows]        = useState<Row[]>([newRow(), newRow(), newRow(), newRow(), newRow()]);
+  const [rows,        setRows]        = useState<Row[]>(() =>
+    isEdit ? [] : [newRow(), newRow(), newRow(), newRow(), newRow()]
+  );
   const [saving,      setSaving]      = useState(false);
+
+  // 편집 모드: 진입한 PO와 동일 batch_id를 가진 모든 PO 로드
+  useEffect(() => {
+    if (!isEdit || !editId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const all = await api.get<PurchaseOrderRecord[]>("/api/purchase-orders");
+        const target = all.find(o => o.id === editId);
+        if (!target) { alert("발주 내역을 찾을 수 없습니다."); router.push("/purchase-orders"); return; }
+        const siblings = target.batchId
+          ? all.filter(o => o.batchId === target.batchId).sort((a, b) => a.id - b.id)
+          : [target];
+        const ids = [...new Set(siblings.map(o => o.materialId))];
+        const matMap = new Map<string, MaterialRecord>();
+        await Promise.all(ids.map(async mid => {
+          try {
+            const list = await api.get<MaterialRecord[]>(`/api/materials?q=${encodeURIComponent(mid)}`);
+            const m = list.find(x => x.id === mid);
+            if (m) matMap.set(mid, m);
+          } catch {}
+        }));
+        if (cancelled) return;
+        const head = siblings[0];
+        const noteHead = parseNoteForEdit(head.note);
+        setVendorName(head.vendorName ?? "");
+        setSiteName(head.siteName ?? "");
+        setManagerName(head.requesterName ?? "");
+        setOrderRefNo(noteHead.orderRefNo);
+        setFormType(noteHead.formType);
+        setOrderDate(head.orderedAt.slice(0, 10));
+        setBatchId(target.batchId ?? null);
+        const loaded = siblings.map(o => {
+          const parsed = parseNoteForEdit(o.note);
+          const m = matMap.get(o.materialId);
+          return newRow({
+            editingId: o.id,
+            materialId: o.materialId,
+            materialName: o.materialName,
+            spec: m?.modelNo ?? "",
+            qty: o.qty,
+            unitPrice: o.unitPrice ?? 0,
+            elevatorName: o.elevatorName ?? "",
+            remark: parsed.remark,
+            reqId: o.requestId,
+          });
+        });
+        // 신규 행 추가가 가능하도록 마지막에 빈 행 1개 부착
+        setRows([...loaded, newRow()]);
+      } catch (e) {
+        alert(getErrorMessage(e));
+      } finally {
+        if (!cancelled) setEditLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isEdit, editId, router]);
 
   useEffect(() => {
     if (!siteName) {
@@ -89,9 +171,19 @@ export default function PurchaseOrderEntry() {
 
   function addRow() { setRows(prev => [...prev, newRow()]); }
   function removeRow(id: string) {
+    const tgt = rows.find(r => r.id === id);
+    if (tgt?.editingId) {
+      if (!confirm("기존 발주 행을 삭제하면 저장 시 영구 삭제됩니다. 진행할까요?")) return;
+      setRemovedExistingIds(set => {
+        const next = new Set(set);
+        next.add(tgt.editingId!);
+        return next;
+      });
+    }
     setRows(prev => prev.length <= 1 ? [newRow()] : prev.filter(r => r.id !== id));
   }
   function clearAll() {
+    if (isEdit) return;
     setRows([newRow(), newRow(), newRow(), newRow(), newRow()]);
     setVendorName(""); setSiteName(""); setReference(""); setOrderRefNo(""); setFiles([]);
   }
@@ -134,30 +226,62 @@ export default function PurchaseOrderEntry() {
   async function save(goList: boolean) {
     if (!user) return;
     const valid = rows.filter(r => r.materialId && r.qty > 0);
-    if (valid.length === 0) { alert("품목을 1개 이상 입력해 주세요."); return; }
+    if (valid.length === 0 && removedExistingIds.size === 0) {
+      alert("품목을 1개 이상 입력해 주세요.");
+      return;
+    }
     setSaving(true);
     try {
       // 사용자가 오늘 외 날짜 지정 시 그 날짜 자정(UTC), 오늘이면 현재 시각으로 저장
       const orderedAtIso = orderDate === todayISO()
         ? new Date().toISOString()
         : new Date(`${orderDate}T00:00:00Z`).toISOString();
+      // 편집 모드: 기존 배치 id 유지(있으면), 없으면 새로 생성하여 같은 묶음으로 묶음
+      // 신규 모드: 매 저장마다 새 batch_id
+      const effectiveBatchId = isEdit ? (batchId ?? crypto.randomUUID()) : crypto.randomUUID();
+
+      const buildNote = (rowRemark: string) => [
+        orderRefNo ? `[${orderRefNo}]` : "",
+        formType !== "기본" ? `[${formType}]` : "",
+        rowRemark || reference || "",
+      ].filter(Boolean).join(" ") || null;
+
       for (const r of valid) {
-        await api.post("/api/purchase-orders", {
-          materialId: r.materialId, materialName: r.materialName, qty: r.qty,
-          vendorName: vendorName || null, unitPrice: r.unitPrice || null, requestId: r.reqId,
-          siteName: siteName || null, elevatorName: r.elevatorName || null,
-          requesterName: managerName || null,
-          note: [
-            orderRefNo ? `[${orderRefNo}]` : "",
-            formType !== "기본" ? `[${formType}]` : "",
-            r.remark || reference || "",
-          ].filter(Boolean).join(" ") || null,
-          userId: user.id, userName: user.name,
-          orderedAt: orderedAtIso,
-        });
+        if (r.editingId) {
+          // 기존 PO PATCH (수정)
+          await api.patch(`/api/purchase-orders/${r.editingId}`, {
+            action: "수정",
+            qty: r.qty,
+            unitPrice: r.unitPrice || null,
+            vendorName: vendorName || null,
+            siteName: siteName || null,
+            elevatorName: r.elevatorName || null,
+            requesterName: managerName || null,
+            note: buildNote(r.remark),
+            orderedAt: orderedAtIso,
+            batchId: effectiveBatchId,
+          });
+        } else {
+          // 신규 행 → POST
+          await api.post("/api/purchase-orders", {
+            materialId: r.materialId, materialName: r.materialName, qty: r.qty,
+            vendorName: vendorName || null, unitPrice: r.unitPrice || null, requestId: r.reqId,
+            siteName: siteName || null, elevatorName: r.elevatorName || null,
+            requesterName: managerName || null,
+            note: buildNote(r.remark),
+            userId: user.id, userName: user.name,
+            orderedAt: orderedAtIso,
+            batchId: effectiveBatchId,
+          });
+        }
       }
+      // 편집 모드에서 사용자가 X로 제거한 기존 행은 DELETE
+      for (const removedId of removedExistingIds) {
+        await api.delete(`/api/purchase-orders/${removedId}`);
+      }
+      setRemovedExistingIds(new Set());
       window.dispatchEvent(new CustomEvent("ds:purchase_orders_changed"));
-      if (goList) {
+      if (goList || isEdit) {
         router.push("/purchase-orders");
       } else {
         clearAll();
@@ -176,7 +300,8 @@ export default function PurchaseOrderEntry() {
 
       <div className="flex items-center justify-between px-5 py-2.5 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0">
         <h1 className="text-sm font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-          <span className="text-indigo-500">📑</span> 발주서입력
+          <span className="text-indigo-500">📑</span> {isEdit ? "발주서 수정" : "발주서입력"}
+          {isEdit && editLoading && <span className="text-xs text-gray-400 ml-2">불러오는 중...</span>}
         </h1>
       </div>
 
@@ -257,29 +382,46 @@ export default function PurchaseOrderEntry() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => (
-              <tr key={r.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-blue-50/30 dark:hover:bg-blue-900/10">
-                <Td center className="text-gray-800 dark:text-gray-200 font-medium">{i + 1}</Td>
-                <Td>
-                  <MatInlineSearch
-                    value={r.materialId}
-                    matType={matType}
-                    onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
-                    onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })}
-                  />
+            {rows.map((r, i) => {
+              const isExisting = r.editingId != null;
+              return (
+              <tr key={r.id} className={`border-b border-gray-100 dark:border-gray-700 ${isExisting ? "bg-gray-50/40 dark:bg-gray-900/30" : "hover:bg-blue-50/30 dark:hover:bg-blue-900/10"}`}>
+                <Td center className="text-gray-800 dark:text-gray-200 font-medium">
+                  {i + 1}
+                  {isExisting && <span className="ml-1 text-[9px] text-gray-400">#{r.editingId}</span>}
                 </Td>
                 <Td>
-                  <MatInlineSearch value={r.materialName} matType={matType}
-                    onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
-                    onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })} />
+                  {isExisting ? (
+                    <div className="px-1.5 py-1 text-xs font-mono text-gray-600 dark:text-gray-400 truncate">{r.materialId}</div>
+                  ) : (
+                    <MatInlineSearch
+                      value={r.materialId}
+                      matType={matType}
+                      onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
+                      onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })}
+                    />
+                  )}
                 </Td>
                 <Td>
-                  <MatInlineSearch
-                    value={r.spec}
-                    matType={matType}
-                    onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
-                    onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })}
-                  />
+                  {isExisting ? (
+                    <div className="px-1.5 py-1 text-xs text-gray-700 dark:text-gray-300 truncate">{r.materialName}</div>
+                  ) : (
+                    <MatInlineSearch value={r.materialName} matType={matType}
+                      onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
+                      onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })} />
+                  )}
+                </Td>
+                <Td>
+                  {isExisting ? (
+                    <div className="px-1.5 py-1 text-xs text-gray-600 dark:text-gray-400 truncate">{r.spec}</div>
+                  ) : (
+                    <MatInlineSearch
+                      value={r.spec}
+                      matType={matType}
+                      onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
+                      onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })}
+                    />
+                  )}
                 </Td>
                 <Td right>
                   <input type="text" inputMode="numeric" value={r.qty === 0 ? "" : String(r.qty)}
@@ -307,7 +449,8 @@ export default function PurchaseOrderEntry() {
                   <button type="button" onClick={() => removeRow(r.id)} className="text-gray-300 hover:text-red-400 leading-none">×</button>
                 </Td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
           <tfoot className="sticky bottom-0">
             <tr className="bg-[#e9ecef] dark:bg-gray-700 font-semibold border-t-2 border-gray-300 dark:border-gray-600">
@@ -325,14 +468,18 @@ export default function PurchaseOrderEntry() {
       </div>
 
       <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-5 py-3 flex items-center justify-end gap-2">
-        <button type="button" onClick={() => router.push("/purchase-orders")} className="text-xs px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">리스트</button>
-        <button type="button" onClick={clearAll} className="text-xs px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">다시 작성</button>
-        <button type="button" className="text-xs px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">웹자료올리기</button>
-        <button type="button" disabled={saving} onClick={() => save(true)} className="text-xs px-4 py-2 rounded border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-50">
-          저장/전표 <kbd className="text-[10px] text-blue-400">F7</kbd>
-        </button>
-        <button type="button" disabled={saving} onClick={() => save(false)} className="text-xs px-5 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50 shadow-sm">
-          {saving ? "저장 중..." : <>저장 <kbd className="text-[10px] text-blue-200">F8</kbd></>}
+        <button type="button" onClick={() => router.push("/purchase-orders")} className="text-xs px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">{isEdit ? "취소" : "리스트"}</button>
+        {!isEdit && (
+          <>
+            <button type="button" onClick={clearAll} className="text-xs px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">다시 작성</button>
+            <button type="button" className="text-xs px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">웹자료올리기</button>
+            <button type="button" disabled={saving} onClick={() => save(true)} className="text-xs px-4 py-2 rounded border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-50">
+              저장/전표 <kbd className="text-[10px] text-blue-400">F7</kbd>
+            </button>
+          </>
+        )}
+        <button type="button" disabled={saving || editLoading} onClick={() => save(false)} className="text-xs px-5 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50 shadow-sm">
+          {saving ? "저장 중..." : isEdit ? "변경 저장" : <>저장 <kbd className="text-[10px] text-blue-200">F8</kbd></>}
         </button>
       </div>
 

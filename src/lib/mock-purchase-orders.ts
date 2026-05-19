@@ -17,6 +17,7 @@ export interface PurchaseOrderRecord {
   userName: string;
   orderedAt: string;
   receivedAt: string | null;
+  batchId: string | null;
 }
 
 const orders: PurchaseOrderRecord[] = [];
