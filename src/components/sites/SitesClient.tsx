@@ -606,21 +606,23 @@ export default function SitesClient({ initial, elevators }: Props) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
-  // 승강기번호 / 비상통화장치 끝 4자리로 매칭되는 현장명 Set
-  const elevatorMatchSites = useMemo(() => {
-    if (!q) return new Set<string>();
+  // 호기명 / 승강기번호 / 비상통화장치 끝 4자리로 매칭되는 호기들 — 현장명별 그룹
+  const elevatorMatchBySite = useMemo(() => {
+    if (!q) return new Map<string, ElevatorRecord[]>();
     const qDigits = q.replace(/\D/g, "");
-    const matched = new Set<string>();
+    const matched = new Map<string, ElevatorRecord[]>();
     for (const e of allElevators) {
-      if (e.elevatorNo?.toLowerCase().includes(q)) {
-        matched.add(e.siteName);
-        continue;
-      }
-      if (e.emergencyPhone && qDigits) {
+      let hit = false;
+      if (e.unitName?.toLowerCase().includes(q))          hit = true;
+      else if (e.elevatorNo?.toLowerCase().includes(q))   hit = true;
+      else if (e.emergencyPhone && qDigits) {
         const phoneDigits = e.emergencyPhone.replace(/\D/g, "");
-        if (phoneDigits.slice(-4).includes(qDigits)) {
-          matched.add(e.siteName);
-        }
+        if (phoneDigits.slice(-4).includes(qDigits))      hit = true;
+      }
+      if (hit) {
+        const arr = matched.get(e.siteName) ?? [];
+        arr.push(e);
+        matched.set(e.siteName, arr);
       }
     }
     return matched;
@@ -640,12 +642,12 @@ export default function SitesClient({ initial, elevators }: Props) {
         (s.vendor?.toLowerCase().includes(q) ?? false) ||
         (s.emergencyDevice?.toLowerCase().includes(q) ?? false) ||
         (s.emergencyDevices?.some(d => d.number.toLowerCase().includes(q)) ?? false) ||
-        elevatorMatchSites.has(s.name)
+        elevatorMatchBySite.has(s.name)
       );
     }
     // 검색어 없으면 회사 필터만 적용
     return companyFilter !== "전체" ? sites.filter(s => normalizeCompany(s.companyType) === companyFilter) : sites;
-  }, [sites, q, elevatorMatchSites, companyFilter]);
+  }, [sites, q, elevatorMatchBySite, companyFilter]);
 
   const totalPages  = Math.max(1, Math.ceil(filteredSites.length / PAGE_SIZE));
   const safePage    = Math.min(page, totalPages);
@@ -923,6 +925,22 @@ export default function SitesClient({ initial, elevators }: Props) {
                               {site.alias}
                             </p>
                           )}
+                          {(() => {
+                            const matched = elevatorMatchBySite.get(site.name);
+                            if (!matched?.length) return null;
+                            return (
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {matched.map(e => (
+                                  <span key={e.id} className={`text-[11px] px-1.5 py-0.5 rounded font-bold ${
+                                    isDark ? "bg-blue-900/40 text-blue-300 border border-blue-700/60"
+                                           : "bg-blue-50 text-blue-700 border border-blue-200"
+                                  }`}>
+                                    {e.unitName ?? "?"}{e.elevatorNo ? ` · ${e.elevatorNo}` : ""}
+                                  </span>
+                                ))}
+                              </div>
+                            );
+                          })()}
                           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                             {companyBadge(site.companyType, isDark)}
                             {site.contractType && (
