@@ -40,6 +40,19 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
     }
   }, [pathname, user, isLoading, isAuthenticated, router]);
 
+  // Service Worker 메시지 수신: push 알림 클릭 → SPA 라우팅
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    const handler = (e: MessageEvent) => {
+      const data = e.data as { action?: string; link?: string } | undefined;
+      if (data?.action === "navigate" && typeof data.link === "string" && data.link.startsWith("/")) {
+        router.push(data.link);
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", handler);
+    return () => navigator.serviceWorker.removeEventListener("message", handler);
+  }, [router]);
+
   // pathname → 탭 자동 동기화 (URL 직접 진입, 뒤로가기, hydration 후 등)
   // tabs를 deps에 포함해 TabsProvider의 localStorage 복원 이후에도 재실행되도록 함
   const prevTabsRef = useRef<typeof tabs>([]);
