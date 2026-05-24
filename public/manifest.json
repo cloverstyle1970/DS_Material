@@ -1,0 +1,12 @@
+{
+  "name": "DS 자재관리",
+  "short_name": "DS 자재",
+  "description": "승강기 유지보수 스마트 자재관리 시스템",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "any", "type": "image/x-icon" }
+  ]
+}

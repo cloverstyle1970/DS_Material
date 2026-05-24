@@ -64,5 +64,8 @@ next-env.d.ts
 .claude/settings.local.json
 DS_Material/
 
+# Supabase CLI 임시 디렉토리
+/supabase/.temp/
+
 # 외장하드 동기화용 Claude 대화·메모리 백업 (save.ps1 / restore.ps1)
 /.claude-backup/

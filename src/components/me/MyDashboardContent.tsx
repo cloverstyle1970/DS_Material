@@ -5,6 +5,7 @@ import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import Header from "@/components/layout/Header";
+import PushNotificationToggle from "@/components/me/PushNotificationToggle";
 import type { ConstructionRequest, ConstructionSchedule, NotificationItem } from "@/lib/mock-router";
 
 interface TbmRow {
@@ -196,6 +197,7 @@ export default function MyDashboardContent() {
                 />
               </button>
             </div>
+            <PushNotificationToggle />
             {loading ? (
               <div className="text-sm text-gray-400 py-4">불러오는 중...</div>
             ) : notifications.length === 0 ? (
