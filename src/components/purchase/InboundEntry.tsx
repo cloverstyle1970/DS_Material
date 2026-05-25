@@ -8,7 +8,7 @@ import { PurchaseOrderRecord } from "@/lib/mock-purchase-orders";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNum, parseNum } from "@/lib/format";
-import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
+import { isTkMaterial, TK_TEXT_CLASS, isRepairMaterial } from "@/lib/material-style";
 import DraggableModal from "@/components/common/DraggableModal";
 import SerialEntryModal from "./SerialEntryModal";
 
@@ -308,11 +308,16 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
                   />
                 </Td>
                 <Td>
-                  <MatInlineSearch
-                    value={r.materialName} materialId={r.materialId} matType={matType}
-                    onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
-                    onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })}
-                  />
+                  <div className="flex items-center gap-1">
+                    {isRepairMaterial(r.materialId) && <span className="shrink-0 text-[9px] px-1 rounded bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300 font-bold">RE</span>}
+                    <div className="flex-1 min-w-0">
+                      <MatInlineSearch
+                        value={r.materialName} materialId={r.materialId} matType={matType}
+                        onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
+                        onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })}
+                      />
+                    </div>
+                  </div>
                 </Td>
                 <Td>
                   <MatInlineSearch

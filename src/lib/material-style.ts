@@ -11,6 +11,12 @@ export function isTkMaterial(materialId: string | null | undefined): boolean {
   return !!materialId && !materialId.startsWith("D");
 }
 
+/** 수리품 여부 — 자재코드 기반 판별 (DS는 끝 글자 'R', TK는 첫 글자 'A') */
+export function isRepairMaterial(materialId: string | null | undefined): boolean {
+  if (!materialId) return false;
+  return materialId.startsWith("D") ? materialId.endsWith("R") : materialId.startsWith("A");
+}
+
 /** 화면(라이트/다크 공용) TK 텍스트 색 */
 export const TK_TEXT_CLASS = "text-blue-600 dark:text-blue-400";
 

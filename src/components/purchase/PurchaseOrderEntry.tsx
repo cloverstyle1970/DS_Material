@@ -9,7 +9,7 @@ import { ElevatorRecord } from "@/lib/mock-elevators";
 import type { PurchaseOrderRecord } from "@/lib/mock-purchase-orders";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNum, parseNum } from "@/lib/format";
-import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
+import { isTkMaterial, TK_TEXT_CLASS, isRepairMaterial } from "@/lib/material-style";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
@@ -457,13 +457,18 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
                   )}
                 </Td>
                 <Td>
-                  {isExisting ? (
-                    <div className={`px-1.5 py-1 text-xs truncate ${isTkMaterial(r.materialId) ? TK_TEXT_CLASS : "text-gray-700 dark:text-gray-300"}`}>{r.materialName}</div>
-                  ) : (
-                    <MatInlineSearch value={r.materialName} materialId={r.materialId} matType={matType}
-                      onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
-                      onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })} />
-                  )}
+                  <div className="flex items-center gap-1">
+                    {isRepairMaterial(r.materialId) && <span className="shrink-0 text-[9px] px-1 rounded bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300 font-bold">RE</span>}
+                    <div className="flex-1 min-w-0">
+                      {isExisting ? (
+                        <div className={`px-1.5 py-1 text-xs truncate ${isTkMaterial(r.materialId) ? TK_TEXT_CLASS : "text-gray-700 dark:text-gray-300"}`}>{r.materialName}</div>
+                      ) : (
+                        <MatInlineSearch value={r.materialName} materialId={r.materialId} matType={matType}
+                          onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
+                          onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })} />
+                      )}
+                    </div>
+                  </div>
                 </Td>
                 <Td>
                   {isExisting ? (

@@ -188,7 +188,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
       : materials;
     const rows = list.map(m => {
       const base: Record<string, string | number | null> = {
-        구분: m.isRepair ? "수리품" : m.id.startsWith("D") ? "DS" : "TK",
+        구분: m.isRepair ? "RE" : m.id.startsWith("D") ? "DS" : "TK",
         자재코드: m.id,
         부품명: m.name,
         규격: m.modelNo ?? "",
