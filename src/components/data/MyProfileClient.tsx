@@ -24,7 +24,7 @@ declare global {
   }
 }
 
-type TabKey = "basic" | "family" | "career" | "vehicle" | "cert" | "rp";
+type TabKey = "basic" | "family" | "career" | "vehicle" | "cert" | "rp" | "status_history";
 
 interface UserRow {
   id: number;
@@ -102,6 +102,13 @@ interface RP {
   occurred_on: string;
 }
 
+interface StatusHistory {
+  id?: number;
+  status_type: "입사" | "퇴직" | "휴직" | "복직" | "재입사" | "";
+  event_date: string;
+  reason: string;
+}
+
 const EMPTY_FAMILY: FamilyMember = {
   relationship: "", name: "", gender: "", birth_date: "", occupation: "",
   cohabiting: true, is_emergency: false, phone: "",
@@ -119,6 +126,7 @@ const EMPTY_CAREER: Career = {
   company_name: "", joined_date: "", left_date: "", dept: "", rank: "", duty: "",
 };
 const EMPTY_RP: RP = { kind: "", content: "", occurred_on: "" };
+const EMPTY_STATUS_HISTORY: StatusHistory = { status_type: "", event_date: "", reason: "" };
 
 const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: "basic",   label: "기본정보",     icon: "👤" },
@@ -127,6 +135,7 @@ const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: "vehicle", label: "차량등록",     icon: "🚗" },
   { key: "cert",    label: "교육 및 자격", icon: "📜" },
   { key: "rp",      label: "상벌사항",     icon: "🏅" },
+  { key: "status_history", label: "발령/재직상태 이력", icon: "📅" },
 ];
 
 function displaySsn(ssn: string | null | undefined): string {
@@ -196,6 +205,7 @@ export default function MyProfileClient() {
   const [certs, setCerts] = useState<Certification[]>([]);
   const [careers, setCareers] = useState<Career[]>([]);
   const [rps, setRps] = useState<RP[]>([]);
+  const [statusHistory, setStatusHistory] = useState<StatusHistory[]>([]);
 
   // 회사차량
   const [companyVehicles, setCompanyVehicles] = useState<{id: number; plate_number: string; model: string; fuel_type: string; year_made: string | null}[]>([]);
@@ -280,6 +290,21 @@ export default function MyProfileClient() {
         supabase.from("user_career_history").select("*").eq("user_id", editingUserId).order("sort_order"),
         supabase.from("user_rewards_punishments").select("*").eq("user_id", editingUserId).order("sort_order"),
       ]);
+
+      let shData = [];
+      try {
+        const { data, error } = await supabase
+          .from("user_status_history")
+          .select("*")
+          .eq("user_id", editingUserId)
+          .order("event_date", { ascending: true });
+        if (!error && data) {
+          shData = data;
+        }
+      } catch (err) {
+        console.error("user_status_history table query failed:", err);
+      }
+
       // 후속 load가 시작됐다면 이 응답은 무시 (target 사용자가 admin 자신으로 덮어쓰이지 않도록)
       if (reqId !== loadReqRef.current) return;
       const r = u.data as UserRow | null;
@@ -362,6 +387,15 @@ export default function MyProfileClient() {
         content: r.content ?? "",
         occurred_on: r.occurred_on ?? "",
       })));
+
+      type ShRow = Partial<StatusHistory> & { status_type?: string | null; event_date?: string | null; reason?: string | null };
+      setStatusHistory((shData as ShRow[]).map(s => ({
+        id: s.id,
+        status_type: ((s.status_type ?? "") as StatusHistory["status_type"]),
+        event_date: s.event_date ?? "",
+        reason: s.reason ?? "",
+      })));
+
       setLoaded(true);
     })();
   }, [editingUserId]);
@@ -617,6 +651,26 @@ export default function MyProfileClient() {
           }))
         );
         if (rpErr) throw rpErr;
+      }
+
+      // 발령/재직상태 이력
+      try {
+        await supabase.from("user_status_history").delete().eq("user_id", editingUserId);
+        const validSh = statusHistory.filter(s => s.status_type && s.event_date);
+        if (validSh.length > 0) {
+          const { error: shErr } = await supabase.from("user_status_history").insert(
+            validSh.map((s, i) => ({
+              user_id: editingUserId,
+              status_type: s.status_type,
+              event_date: s.event_date || null,
+              reason: s.reason || null,
+              sort_order: (i + 1) * 10,
+            }))
+          );
+          if (shErr) throw shErr;
+        }
+      } catch (shSaveErr) {
+        console.error("user_status_history save failed (possibly table not migrated yet):", shSaveErr);
       }
 
       if (newPhotoUrl !== photoUrl) {
@@ -1344,6 +1398,73 @@ export default function MyProfileClient() {
                         onChange={e => setRps(p => p.map((x, idx) => idx === i ? { ...x, occurred_on: formatYmd(e.target.value) } : x))}
                         placeholder="YYYYMMDD" inputMode="numeric" maxLength={10}
                         className={inputCls + " font-mono"} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ================= 발령/재직상태 이력 ================= */}
+        {tab === "status_history" && (
+          <div className={sectionCls}>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">발령/재직상태 이력 ({statusHistory.length}건)</h2>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">퇴직, 재입사, 휴직, 복직 등 사원의 주요 고용 변동 이력을 관리합니다.</p>
+              </div>
+              {meIsAdmin && (
+                <button type="button" onClick={() => setStatusHistory(p => [...p, { ...EMPTY_STATUS_HISTORY }])}
+                  className="px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800">+ 이력 추가</button>
+              )}
+            </div>
+            {statusHistory.length === 0 && <div className="text-center py-4 text-xs text-gray-400">등록된 발령/재직 상태 변경 이력이 없습니다.</div>}
+            <div className="space-y-3">
+              {statusHistory.map((s, i) => (
+                <div key={i} className={`rounded-lg border p-3 ${
+                  s.status_type === "퇴직" ? "border-red-300 bg-red-50/30 dark:bg-red-900/10"
+                  : s.status_type === "휴직" ? "border-amber-300 bg-amber-50/30 dark:bg-amber-900/10"
+                  : s.status_type === "재입사" || s.status_type === "입사" || s.status_type === "복직" ? "border-green-300 bg-green-50/30 dark:bg-green-900/10"
+                  : "border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/30"
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-[11px] font-bold text-gray-500">이력 #{i + 1}</div>
+                    {meIsAdmin && (
+                      <button type="button" onClick={() => setStatusHistory(p => p.filter((_, idx) => idx !== i))} className="text-[11px] text-red-500">삭제</button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-[140px_160px_1fr] gap-2">
+                    <div>
+                      <label className={labelCls}>발령구분 *</label>
+                      <select value={s.status_type}
+                        onChange={e => setStatusHistory(p => p.map((x, idx) => idx === i ? { ...x, status_type: e.target.value as StatusHistory["status_type"] } : x))}
+                        disabled={!meIsAdmin}
+                        className={inputCls + (!meIsAdmin ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")}>
+                        <option value="">선택</option>
+                        <option value="입사">입사</option>
+                        <option value="퇴직">퇴직</option>
+                        <option value="휴직">휴직</option>
+                        <option value="복직">복직</option>
+                        <option value="재입사">재입사</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelCls}>발령일자 *</label>
+                      <input type="text" value={s.event_date}
+                        onChange={e => setStatusHistory(p => p.map((x, idx) => idx === i ? { ...x, event_date: formatYmd(e.target.value) } : x)) }
+                        placeholder="YYYYMMDD" inputMode="numeric" maxLength={10}
+                        readOnly={!meIsAdmin}
+                        className={inputCls + " font-mono" + (!meIsAdmin ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>내용 / 사유</label>
+                      <input type="text" value={s.reason}
+                        onChange={e => setStatusHistory(p => p.map((x, idx) => idx === i ? { ...x, reason: e.target.value } : x))}
+                        placeholder="예: 일신상의 사유, 산전후 휴가, 부서 이동 복직 등"
+                        lang="ko"
+                        readOnly={!meIsAdmin}
+                        className={inputCls + (!meIsAdmin ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")} />
                     </div>
                   </div>
                 </div>

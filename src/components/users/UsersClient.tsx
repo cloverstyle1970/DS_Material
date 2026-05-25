@@ -15,7 +15,7 @@ export const ADMIN_EDIT_USER_KEY = "ds_admin_edit_user_id";
 
 type SortKey = "id" | "name" | "dept" | "rank" | "cert" | "hireDate" | "phone" | "status";
 type SortDir = "asc" | "desc";
-type StatusFilter = "전체" | "재직" | "퇴직";
+type StatusFilter = "전체" | "재직" | "퇴직" | "휴직";
 
 const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "id",       label: "번호"     },
@@ -31,6 +31,7 @@ const COLUMNS: { key: SortKey; label: string }[] = [
 const STATUS_CLS: Record<string, string> = {
   "재직": "bg-green-50 text-green-700",
   "퇴직": "bg-gray-100 text-gray-500",
+  "휴직": "bg-amber-50 text-amber-700",
 };
 
 const PERMISSION_OPTIONS: { value: Permission; label: string; desc: string; color: string }[] = [
@@ -144,7 +145,7 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
       <div className="flex items-center gap-3 flex-wrap">
         {/* 상태 필터 */}
         <div className="flex gap-1 p-1 bg-gray-100 rounded-xl shrink-0">
-          {(["전체", "재직", "퇴직"] as const).map(s => {
+          {(["전체", "재직", "퇴직", "휴직"] as const).map(s => {
             const count = s === "전체" ? users.length : users.filter(u => u.status === s).length;
             return (
               <button key={s} type="button" onClick={() => { setStatusFilter(s); resetPage(); }}
@@ -190,7 +191,7 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
                   return (
                     <th key={c.key} className={`px-4 py-3 text-center text-xs font-medium whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-500"}`}>
                       <button type="button" onClick={() => toggleSort(c.key)}
-                        className={`flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ${active ? "text-gray-700 dark:text-gray-100 font-semibold" : ""}`}>
+                        className={`flex items-center justify-center mx-auto gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ${active ? "text-gray-700 dark:text-gray-100 font-semibold" : ""}`}>
                         {c.label}
                         <span className={`text-[10px] ${active ? "opacity-100" : "opacity-30"}`}>
                           {active ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}

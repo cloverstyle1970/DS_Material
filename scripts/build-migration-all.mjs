@@ -42,6 +42,8 @@ const ORDER = [
   // ── Phase 4: 권한 그룹 + 사원등록 탭 신규 컬럼·테이블 ────
   "migration-add-permission-groups.sql",
   "migration-add-employee-tabs.sql",              // gender, blood_type, 경력, 상벌
+  "migration-add-user-status-history.sql",        // 퇴직, 재입사, 휴직 등 상태이력
+
 
   // ── Phase 5: 자재 시리얼/회수/스크랩 ────────────────────
   "migration-add-serial-tracking.sql",
