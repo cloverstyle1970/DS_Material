@@ -649,27 +649,25 @@ export default function ManualCenterClient() {
           aside, header, nav, .no-print, button, select, input, textarea {
             display: none !important;
           }
-          /* 전체 레이아웃 계층 플랫화 (Next.js 루트 및 AdminShell 구조) */
+          /* ⚠️ 비활성화(숨김)된 다른 모든 탭 뷰 강제 숨김 (가장 완벽한 SPA 프린팅 격리 방식) */
+          div[style*="display: none"], 
+          div[style*="display:none"] {
+            display: none !important;
+          }
+          /* 전체 레이아웃 계층 플랫화 (Next.js 루트 및 AdminShell 구조 - display 변경 배제) */
           html, body, 
           body > div, 
           body > div > div, 
           body > div > div > div, 
           body > div > div > div > div, 
+          body > div > div > div > div > div,
           main {
-            display: block !important;
             overflow: visible !important;
             height: auto !important;
             min-height: 0 !important;
             position: static !important;
             background: white !important;
             color: black !important;
-          }
-          /* 개별 탭 래퍼: 비활성 탭의 display: none 보존을 위해 display 속성은 강제하지 않음 */
-          body > div > div > div > div > div {
-            overflow: visible !important;
-            height: auto !important;
-            min-height: 0 !important;
-            position: static !important;
           }
           .print-area {
             display: block !important;
