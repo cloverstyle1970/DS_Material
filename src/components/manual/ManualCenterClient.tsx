@@ -639,6 +639,12 @@ export default function ManualCenterClient() {
       {/* 🖨️ PDF 프린트 전용 미디어 스타일 삽입 */}
       <style>{`
         @media print {
+          @page {
+            margin: 0; /* 브라우저 기본 헤더/푸터(URL, 페이지 제목, 날짜 등) 인쇄 차단 */
+          }
+          body {
+            margin: 1.6cm 2cm !important; /* 브라우저 여백 제거로 인한 본문 잘림 방지 (A4 안전 여백) */
+          }
           /* 헤더, 사이드바, 탭 바, 각종 UI 버튼 비표시 */
           aside, header, nav, .no-print, button, select, input, textarea {
             display: none !important;

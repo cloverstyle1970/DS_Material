@@ -9,7 +9,7 @@ export default function TabBar() {
   if (tabs.length === 0) return null;
 
   return (
-    <div className="flex items-center bg-gray-100 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700 px-2 pt-1.5 gap-1 overflow-x-auto shrink-0">
+    <div className="no-print flex items-center bg-gray-100 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700 px-2 pt-1.5 gap-1 overflow-x-auto shrink-0">
       {tabs.map(tab => {
         const active = tab.href === activeHref;
         return (
