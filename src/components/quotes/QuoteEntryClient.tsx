@@ -1176,6 +1176,7 @@ function QuoteEntryInner() {
                 .filter(r => r.material_id || r.material_name.trim())
                 .map((r, i) => ({
                   id: i,
+                  material_id: r.material_id || null,
                   material_name: r.material_name,
                   spec: r.spec || null,
                   unit: r.unit || null,

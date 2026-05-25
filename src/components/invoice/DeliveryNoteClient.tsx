@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useInvoiceData, fmtNum, fmtDate } from "./InvoicePrintShared";
+import { tkPrintTextClass } from "@/lib/material-style";
 
 export default function DeliveryNoteClient() {
   return (
@@ -120,7 +121,7 @@ function Inner() {
                   <td className="border border-black px-1 py-1 text-center">{idx + 1}</td>
                   <td className="border border-black px-2 py-1 text-center">{it.elevator_name ?? "-"}</td>
                   <td className="border border-black px-2 py-1">
-                    <div className="font-medium">{it.material_name}</div>
+                    <div className={`font-medium ${tkPrintTextClass(it.material_id)}`}>{it.material_name}</div>
                     {it.spec && <div className="text-[10px] text-gray-600">{it.spec}</div>}
                   </td>
                   <td className="border border-black px-2 py-1 text-center">{it.unit ?? "EA"}</td>

@@ -26,3 +26,14 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* 인쇄/ PDF 출력 시 텍스트·배경 색상이 그대로 유지되도록 강제
+   (TK 자재 파란색 표시 등이 흑백으로 떨어지지 않게) */
+@media print {
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

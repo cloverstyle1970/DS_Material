@@ -8,6 +8,7 @@ import { MaterialRecord } from "@/lib/mock-materials";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNum } from "@/lib/format";
+import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 import DraggableModal from "@/components/common/DraggableModal";
 import Autocomplete from "@/components/common/Autocomplete";
 import TransactionBulkUploadModal from "./TransactionBulkUploadModal";
@@ -395,8 +396,8 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                   />
                 </td>
                 <td className="pl-2 pr-0 py-3 text-left text-black dark:text-white whitespace-nowrap">{fmtDateOnly(t.createdAt)}</td>
-                <td className="pl-1 pr-2 py-3 text-left font-mono text-black dark:text-white whitespace-nowrap">{t.materialId}</td>
-                <td className="px-2 py-3 text-left font-medium text-black dark:text-white max-w-[200px] truncate">{t.materialName}</td>
+                <td className={`pl-1 pr-2 py-3 text-left font-mono whitespace-nowrap ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>{t.materialId}</td>
+                <td className={`px-2 py-3 text-left font-medium max-w-[200px] truncate ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>{t.materialName}</td>
                 <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{matMap.get(t.materialId) || "-"}</td>
                 <td className="px-2 py-3 text-center tabular-nums text-black dark:text-white">
                   {fmtNum(t.qty)}
@@ -544,7 +545,7 @@ function EditTransactionModal({
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div className="mb-4">
             <p className="text-xs text-gray-500 dark:text-gray-400">자재 정보</p>
-            <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{tx.materialName} <span className="text-xs font-mono text-gray-400">({tx.materialId})</span></p>
+            <p className={`text-sm font-medium ${isTkMaterial(tx.materialId) ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-200"}`}>{tx.materialName} <span className="text-xs font-mono text-gray-400">({tx.materialId})</span></p>
           </div>
 
           <div>
@@ -675,8 +676,8 @@ function BulkOutboundModal({
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {targets.map(t => (
                   <tr key={t.id}>
-                    <td className="px-3 py-3 font-mono text-gray-700 dark:text-gray-300">{t.materialId}</td>
-                    <td className="px-3 py-3 text-gray-800 dark:text-gray-200">{t.materialName}</td>
+                    <td className={`px-3 py-3 font-mono ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-gray-700 dark:text-gray-300"}`}>{t.materialId}</td>
+                    <td className={`px-3 py-3 ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-200"}`}>{t.materialName}</td>
                     <td className="px-3 py-3 text-right tabular-nums text-gray-700 dark:text-gray-300">{fmtNum(t.qty)}</td>
                     <td className="px-3 py-3 text-gray-500 dark:text-gray-400">{t.createdAt.substring(0, 10)}</td>
                   </tr>

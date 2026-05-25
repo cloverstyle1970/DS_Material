@@ -11,6 +11,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNumOr, fmtNum } from "@/lib/format";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
+import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 
 const LOW_STOCK_THRESHOLD = 5;
 
@@ -432,8 +433,8 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
                         </span>
                     }
                   </td>
-                  <td className={`px-4 py-3 text-center font-mono text-xs whitespace-nowrap ${isDark ? "text-gray-300" : "text-slate-600"}`}>{m.id}</td>
-                  <td className={`px-4 py-3 text-center font-medium ${isDark ? "text-white" : "text-gray-800"}`}>{m.name}</td>
+                  <td className={`px-4 py-3 text-center font-mono text-xs whitespace-nowrap ${isTkMaterial(m.id) ? TK_TEXT_CLASS : isDark ? "text-gray-300" : "text-slate-600"}`}>{m.id}</td>
+                  <td className={`px-4 py-3 text-center font-medium ${isTkMaterial(m.id) ? TK_TEXT_CLASS : isDark ? "text-white" : "text-gray-800"}`}>{m.name}</td>
                   <td className={`px-4 py-3 text-center ${isDark ? "text-gray-300" : "text-gray-500"}`}>{m.modelNo ?? "-"}</td>
                   <td className={`px-4 py-3 text-center ${isDark ? "text-gray-300" : "text-gray-500"}`}>{m.unit ?? "-"}</td>
                   {!viewOnly && (

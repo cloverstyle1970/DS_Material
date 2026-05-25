@@ -2,6 +2,7 @@
 
 import { ReactNode } from "react";
 import { fmtNum } from "@/lib/format";
+import { tkPrintTextClass } from "@/lib/material-style";
 
 export interface QuotePrintCompany {
   company_name:    string | null;
@@ -14,6 +15,7 @@ export interface QuotePrintCompany {
 
 export interface QuotePrintItem {
   id?: number | string;
+  material_id?: string | null;
   material_name: string;
   spec?: string | null;
   unit?: string | null;
@@ -153,7 +155,7 @@ export default function QuotePrintPaper({ header, items, company, onOpenOpinion,
               <tr key={it.id ?? idx} className="hover:bg-yellow-50 print:hover:bg-transparent">
                 <td className="border border-black px-1 py-1 text-center">{idx + 1}</td>
                 <td className="border border-black px-2 py-1">
-                  <div className="font-medium">{it.material_name}</div>
+                  <div className={`font-medium ${tkPrintTextClass(it.material_id)}`}>{it.material_name}</div>
                   {it.spec && <div className="text-[10px] text-gray-600">{it.spec}</div>}
                 </td>
                 <td className="border border-black px-2 py-1 text-center">{it.unit ?? "EA"}</td>

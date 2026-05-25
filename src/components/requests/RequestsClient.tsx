@@ -12,6 +12,7 @@ import StockHistoryClient from "@/components/stock/StockHistoryClient";
 import PurchaseOrderBulkUploadModal from "@/components/purchase/PurchaseOrderBulkUploadModal";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNum, fmtNumOr } from "@/lib/format";
+import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 import DraggableModal from "@/components/common/DraggableModal";
 import Autocomplete from "@/components/common/Autocomplete";
 
@@ -726,8 +727,8 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                                     return (
                                       <tr key={idx}>
                                         <td className="px-3 py-2 text-center text-gray-600 dark:text-gray-400 whitespace-nowrap">{item.elevatorName ?? "-"}</td>
-                                        <td className="px-3 py-2 text-center font-medium text-gray-800 dark:text-gray-200">{item.materialName}</td>
-                                        <td className="px-3 py-2 text-center font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">{item.materialId}</td>
+                                        <td className={`px-3 py-2 text-center font-medium ${isTkMaterial(item.materialId) ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-200"}`}>{item.materialName}</td>
+                                        <td className={`px-3 py-2 text-center font-mono whitespace-nowrap ${isTkMaterial(item.materialId) ? TK_TEXT_CLASS : "text-slate-500 dark:text-slate-400"}`}>{item.materialId}</td>
                                         <td className="px-3 py-2 text-center">
                                           <span className={`px-1.5 py-0.5 rounded font-medium ${KIND_CLS[itemKind]}`}>{itemKind}</span>
                                         </td>
@@ -899,8 +900,8 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                     <td className="px-2 py-3 text-left text-blue-600 dark:text-blue-400 font-medium whitespace-nowrap">
                       {o.note?.match(/^\[(.*?)\]/)?.[1] || "-"}
                     </td>
-                    <td className="px-2 py-3 text-left font-mono text-black dark:text-white whitespace-nowrap">{o.materialId}</td>
-                    <td className="px-2 py-3 text-left font-medium text-black dark:text-white max-w-[160px] truncate">{o.materialName}</td>
+                    <td className={`px-2 py-3 text-left font-mono whitespace-nowrap ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>{o.materialId}</td>
+                    <td className={`px-2 py-3 text-left font-medium max-w-[160px] truncate ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>{o.materialName}</td>
                     <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{matModelMap.get(o.materialId) || "-"}</td>
                     <td className="px-2 py-3 text-right tabular-nums text-black dark:text-white">{fmtNum(o.qty)}</td>
                     <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.siteName ?? "-"}</td>
@@ -1020,8 +1021,8 @@ function BulkInboundModal({
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {targets.map(o => (
                   <tr key={o.id}>
-                    <td className="px-3 py-3 font-mono text-gray-700 dark:text-gray-300">{o.materialId}</td>
-                    <td className="px-3 py-3 text-gray-800 dark:text-gray-200">{o.materialName}</td>
+                    <td className={`px-3 py-3 font-mono ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-gray-700 dark:text-gray-300"}`}>{o.materialId}</td>
+                    <td className={`px-3 py-3 ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-200"}`}>{o.materialName}</td>
                     <td className="px-3 py-3 text-right tabular-nums text-gray-700 dark:text-gray-300">{fmtNum(o.qty)}</td>
                     <td className="px-3 py-3 text-gray-600 dark:text-gray-400">{o.vendorName ?? "-"}</td>
                   </tr>

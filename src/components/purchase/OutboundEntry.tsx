@@ -8,6 +8,7 @@ import { ElevatorRecord } from "@/lib/mock-elevators";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNum, parseNum } from "@/lib/format";
+import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 import DraggableModal from "@/components/common/DraggableModal";
 import SerialEntryModal from "./SerialEntryModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
@@ -312,6 +313,7 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
                 <Td>
                   <MatInlineSearch
                     value={r.materialId}
+                    materialId={r.materialId}
                     matType={matType}
                     onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
                     onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })}
@@ -319,7 +321,7 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
                 </Td>
                 <Td>
                   <MatInlineSearch
-                    value={r.materialName} matType={matType}
+                    value={r.materialName} materialId={r.materialId} matType={matType}
                     onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
                     onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })}
                   />
@@ -327,6 +329,7 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
                 <Td>
                   <MatInlineSearch
                     value={r.spec}
+                    materialId={r.materialId}
                     matType={matType}
                     onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
                     onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })}
@@ -517,8 +520,8 @@ function Td({ children, right, center, className = "", colSpan }: { children?: R
 }
 
 // ── 인라인 자동완성 ─────────────────────────────────────────────
-function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
-  value: string; matType: "전체" | "DS" | "TK";
+function MatInlineSearch({ value, materialId, matType, onMultiSelect, onChange }: {
+  value: string; materialId?: string; matType: "전체" | "DS" | "TK";
   onMultiSelect: (materials: MaterialRecord[]) => void; onChange: (v: string) => void;
 }) {
   const [results, setResults] = useState<MaterialRecord[]>([]);
@@ -586,7 +589,7 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
       <input type="text" lang="ko" value={value} onChange={e => { onChange(e.target.value); setChecked(new Set()); }}
         onFocus={() => { setHasFocus(true); if (results.length > 0) setOpen(true); }}
         onBlur={() => setHasFocus(false)}
-        onKeyDown={handleKeyDown} className={cellInput} />
+        onKeyDown={handleKeyDown} className={`${cellInput} ${isTkMaterial(materialId) ? "!text-blue-600 dark:!text-blue-400" : ""}`} />
       {open && results.length > 0 && (
         <div className="absolute z-50 top-full left-0 mt-0.5 w-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl">
           <ul ref={ulRef} className="max-h-52 overflow-y-auto">
@@ -596,9 +599,9 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
                   className={`w-full text-left px-3 py-2 border-b border-gray-50 dark:border-gray-700 last:border-0 flex items-center gap-2 ${checked.has(m.id) ? "bg-orange-50 dark:bg-orange-900/30" : focusedIndex === idx ? "bg-orange-100 dark:bg-orange-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
                   <input type="checkbox" readOnly checked={checked.has(m.id)} className="accent-orange-500 shrink-0" />
                   <div className="min-w-0">
-                    <div className="text-xs font-medium text-gray-800 dark:text-gray-200">{m.name}</div>
+                    <div className={`text-xs font-medium ${isTkMaterial(m.id) ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-200"}`}>{m.name}</div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{m.id}</span>
+                      <span className={`text-[10px] font-mono ${isTkMaterial(m.id) ? TK_TEXT_CLASS : "text-slate-400 dark:text-slate-500"}`}>{m.id}</span>
                       {m.modelNo && <span className="text-[10px] text-gray-500 dark:text-gray-400 border-l border-gray-300 dark:border-gray-600 pl-2">{m.modelNo}</span>}
                       {m.alias && <span className="text-[10px] text-gray-400 dark:text-gray-500">{m.alias}</span>}
                       <span className={`text-[10px] ml-auto font-semibold ${m.stockQty === 0 ? "text-red-400" : "text-gray-400 dark:text-gray-500"}`}>재고 {fmtNum(m.stockQty)}</span>
@@ -715,8 +718,8 @@ function InboundRefPopup({ onSelect, onClose }: { onSelect: (t: TransactionRecor
               {filtered.map(t => (
                 <tr key={t.id} onClick={() => onSelect(t)} className="hover:bg-orange-50 dark:hover:bg-orange-900/10 cursor-pointer border-b border-gray-50 dark:border-gray-700">
                   <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400">{t.createdAt.slice(0, 10)}</td>
-                  <td className="px-2 py-1.5 font-medium dark:text-gray-200">{t.materialName}</td>
-                  <td className="px-2 py-1.5 font-mono text-slate-500 dark:text-slate-400">{t.materialId}</td>
+                  <td className={`px-2 py-1.5 font-medium ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "dark:text-gray-200"}`}>{t.materialName}</td>
+                  <td className={`px-2 py-1.5 font-mono ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-slate-500 dark:text-slate-400"}`}>{t.materialId}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums text-blue-600">{fmtNum(t.qty)}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums font-semibold dark:text-gray-300">{fmtNum(t.afterStock)}</td>
                   <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400">{t.siteName ?? "—"}</td>
@@ -823,8 +826,8 @@ function StockAdjustModal({
     >
         <div className="p-5 space-y-3">
           <div className="bg-gray-50 dark:bg-gray-700/40 rounded-lg p-3 text-xs space-y-1">
-            <div><span className="text-gray-500">자재명: </span><span className="font-semibold text-gray-800 dark:text-gray-100">{row.materialName}</span></div>
-            <div><span className="text-gray-500">자재코드: </span><span className="font-mono text-gray-700 dark:text-gray-300">{row.materialId}</span></div>
+            <div><span className="text-gray-500">자재명: </span><span className={`font-semibold ${isTkMaterial(row.materialId) ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-100"}`}>{row.materialName}</span></div>
+            <div><span className="text-gray-500">자재코드: </span><span className={`font-mono ${isTkMaterial(row.materialId) ? TK_TEXT_CLASS : "text-gray-700 dark:text-gray-300"}`}>{row.materialId}</span></div>
             {row.spec && <div><span className="text-gray-500">규격: </span><span className="text-gray-700 dark:text-gray-300">{row.spec}</span></div>}
             <div className="pt-1 border-t border-gray-200 dark:border-gray-600 flex items-center justify-between">
               <span className="text-gray-500">현재 재고</span>

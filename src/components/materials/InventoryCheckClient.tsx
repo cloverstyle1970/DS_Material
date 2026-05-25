@@ -9,6 +9,7 @@ import { api, getErrorMessage } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
 import { fmtNum } from "@/lib/format";
+import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 
 type MatType = "전체" | "DS" | "TK";
 type CheckMode = "qty" | "sn";
@@ -396,8 +397,8 @@ export default function InventoryCheckClient() {
                           </span>
                       }
                     </td>
-                    <td className="px-4 py-3 text-center font-mono text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{m.id}</td>
-                    <td className="px-4 py-3 text-center font-medium text-gray-900 dark:text-gray-100">{m.name}</td>
+                    <td className={`px-4 py-3 text-center font-mono text-xs whitespace-nowrap ${isTkMaterial(m.id) ? TK_TEXT_CLASS : "text-gray-600 dark:text-gray-400"}`}>{m.id}</td>
+                    <td className={`px-4 py-3 text-center font-medium ${isTkMaterial(m.id) ? TK_TEXT_CLASS : "text-gray-900 dark:text-gray-100"}`}>{m.name}</td>
                     <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400">{m.modelNo ?? "-"}</td>
                     <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400">{m.storageLoc ?? "-"}</td>
                     <td className="px-4 py-3 text-center text-gray-700 dark:text-gray-300 font-medium">{fmtNum(m.stockQty)}</td>
@@ -496,8 +497,8 @@ export default function InventoryCheckClient() {
                         className="w-4 h-4 rounded border-gray-300 accent-emerald-600 cursor-pointer" />
                     </td>
                     <td className="px-4 py-3 text-center font-mono text-xs text-gray-800 dark:text-gray-200 whitespace-nowrap">{u.serialNo}</td>
-                    <td className="px-4 py-3 text-center font-medium text-gray-900 dark:text-gray-100 max-w-[220px] truncate">{u.materialName ?? "-"}</td>
-                    <td className="px-4 py-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{u.materialId}</td>
+                    <td className={`px-4 py-3 text-center font-medium max-w-[220px] truncate ${isTkMaterial(u.materialId) ? TK_TEXT_CLASS : "text-gray-900 dark:text-gray-100"}`}>{u.materialName ?? "-"}</td>
+                    <td className={`px-4 py-3 text-center font-mono text-xs whitespace-nowrap ${isTkMaterial(u.materialId) ? TK_TEXT_CLASS : "text-slate-500 dark:text-slate-400"}`}>{u.materialId}</td>
                     <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400">{u.materialModelNo ?? "-"}</td>
                     <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{u.inboundAt.slice(0, 10)}</td>
                     <td className="px-4 py-3 text-center">

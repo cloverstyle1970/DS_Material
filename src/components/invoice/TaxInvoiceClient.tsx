@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useInvoiceData, fmtNum, fmtDate } from "./InvoicePrintShared";
+import { tkPrintTextClass } from "@/lib/material-style";
 
 export default function TaxInvoiceClient() {
   return (
@@ -121,14 +122,14 @@ function Inner() {
               {items.length === 0 && (
                 <tr><td colSpan={9} className="border border-black px-2 py-3 text-center text-gray-400">자재 라인 없음</td></tr>
               )}
-              {items.map((it, idx) => {
+              {items.map((it) => {
                 const supply = it.amount;
                 const vat = Math.round(supply / 10);
                 const d = new Date(invoice.issued_at);
                 return (
                   <tr key={it.id}>
                     <td className="border border-black px-1 py-1 text-center font-mono">{`${d.getMonth()+1}/${d.getDate()}`}</td>
-                    <td className="border border-black px-2 py-1">{it.material_name}{idx === 0 && items.length > 1 ? "" : ""}</td>
+                    <td className={`border border-black px-2 py-1 ${tkPrintTextClass(it.material_id)}`}>{it.material_name}</td>
                     <td className="border border-black px-2 py-1 text-[10px] text-gray-600">{it.spec ?? ""}</td>
                     <td className="border border-black px-2 py-1 text-center">{it.unit ?? "EA"}</td>
                     <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(it.qty)}</td>

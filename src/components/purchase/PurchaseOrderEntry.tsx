@@ -9,6 +9,7 @@ import { ElevatorRecord } from "@/lib/mock-elevators";
 import type { PurchaseOrderRecord } from "@/lib/mock-purchase-orders";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNum, parseNum } from "@/lib/format";
+import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 import DraggableModal from "@/components/common/DraggableModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 
@@ -391,10 +392,11 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
                 </Td>
                 <Td>
                   {isExisting ? (
-                    <div className="px-1.5 py-1 text-xs font-mono text-gray-600 dark:text-gray-400 truncate">{r.materialId}</div>
+                    <div className={`px-1.5 py-1 text-xs font-mono truncate ${isTkMaterial(r.materialId) ? TK_TEXT_CLASS : "text-gray-600 dark:text-gray-400"}`}>{r.materialId}</div>
                   ) : (
                     <MatInlineSearch
                       value={r.materialId}
+                      materialId={r.materialId}
                       matType={matType}
                       onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
                       onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })}
@@ -403,9 +405,9 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
                 </Td>
                 <Td>
                   {isExisting ? (
-                    <div className="px-1.5 py-1 text-xs text-gray-700 dark:text-gray-300 truncate">{r.materialName}</div>
+                    <div className={`px-1.5 py-1 text-xs truncate ${isTkMaterial(r.materialId) ? TK_TEXT_CLASS : "text-gray-700 dark:text-gray-300"}`}>{r.materialName}</div>
                   ) : (
-                    <MatInlineSearch value={r.materialName} matType={matType}
+                    <MatInlineSearch value={r.materialName} materialId={r.materialId} matType={matType}
                       onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
                       onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })} />
                   )}
@@ -416,6 +418,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
                   ) : (
                     <MatInlineSearch
                       value={r.spec}
+                      materialId={r.materialId}
                       matType={matType}
                       onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
                       onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })}
@@ -671,8 +674,8 @@ function VendorInlineSearch({ value, onChange, vendors }: { value: string; onCha
   );
 }
 
-function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
-  value: string; matType: "전체" | "DS" | "TK";
+function MatInlineSearch({ value, materialId, matType, onMultiSelect, onChange }: {
+  value: string; materialId?: string; matType: "전체" | "DS" | "TK";
   onMultiSelect: (materials: MaterialRecord[]) => void; onChange: (v: string) => void;
 }) {
   const [results, setResults] = useState<MaterialRecord[]>([]);
@@ -739,7 +742,7 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
       <input type="text" lang="ko" value={value} onChange={e => { onChange(e.target.value); setChecked(new Set()); }}
         onFocus={() => { setHasFocus(true); if (results.length > 0) setOpen(true); }}
         onBlur={() => setHasFocus(false)}
-        onKeyDown={handleKeyDown} className={cellInput} />
+        onKeyDown={handleKeyDown} className={`${cellInput} ${isTkMaterial(materialId) ? "!text-blue-600 dark:!text-blue-400" : ""}`} />
       {open && results.length > 0 && (
         <div className="absolute z-50 top-full left-0 mt-0.5 w-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl">
           <ul ref={ulRef} className="max-h-52 overflow-y-auto">
@@ -749,9 +752,9 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
                   className={`w-full text-left px-3 py-2 border-b border-gray-50 dark:border-gray-700 last:border-0 flex items-center gap-2 ${checked.has(m.id) ? "bg-blue-50 dark:bg-blue-900/30" : focusedIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
                   <input type="checkbox" readOnly checked={checked.has(m.id)} className="accent-blue-600 shrink-0" />
                   <div className="min-w-0">
-                    <div className="text-xs font-medium text-gray-800 dark:text-gray-200">{m.name}</div>
+                    <div className={`text-xs font-medium ${isTkMaterial(m.id) ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-200"}`}>{m.name}</div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{m.id}</span>
+                      <span className={`text-[10px] font-mono ${isTkMaterial(m.id) ? TK_TEXT_CLASS : "text-slate-400 dark:text-slate-500"}`}>{m.id}</span>
                       {m.modelNo && <span className="text-[10px] text-gray-500 dark:text-gray-400 border-l border-gray-300 dark:border-gray-600 pl-2">{m.modelNo}</span>}
                       {m.alias && <span className="text-[10px] text-gray-400 dark:text-gray-500">{m.alias}</span>}
                       <span className="text-[10px] text-gray-300 dark:text-gray-500 ml-auto">재고 {fmtNum(m.stockQty)}</span>

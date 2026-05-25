@@ -8,6 +8,7 @@ import { PurchaseOrderRecord } from "@/lib/mock-purchase-orders";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNum, parseNum } from "@/lib/format";
+import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 import DraggableModal from "@/components/common/DraggableModal";
 import SerialEntryModal from "./SerialEntryModal";
 
@@ -300,6 +301,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
                 <Td>
                   <MatInlineSearch
                     value={r.materialId}
+                    materialId={r.materialId}
                     matType={matType}
                     onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
                     onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })}
@@ -307,7 +309,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
                 </Td>
                 <Td>
                   <MatInlineSearch
-                    value={r.materialName} matType={matType}
+                    value={r.materialName} materialId={r.materialId} matType={matType}
                     onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
                     onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })}
                   />
@@ -315,6 +317,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
                 <Td>
                   <MatInlineSearch
                     value={r.spec}
+                    materialId={r.materialId}
                     matType={matType}
                     onMultiSelect={materials => applyMultipleMaterials(r.id, materials)}
                     onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })}
@@ -468,8 +471,8 @@ function Td({ children, right, center, className = "", colSpan }: { children?: R
 }
 
 // ── 인라인 자동완성 ─────────────────────────────────────────────
-function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
-  value: string; matType: "전체" | "DS" | "TK";
+function MatInlineSearch({ value, materialId, matType, onMultiSelect, onChange }: {
+  value: string; materialId?: string; matType: "전체" | "DS" | "TK";
   onMultiSelect: (materials: MaterialRecord[]) => void; onChange: (v: string) => void;
 }) {
   const [results, setResults] = useState<MaterialRecord[]>([]);
@@ -536,7 +539,7 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
       <input type="text" lang="ko" value={value} onChange={e => { onChange(e.target.value); setChecked(new Set()); }}
         onFocus={() => { setHasFocus(true); if (results.length > 0) setOpen(true); }}
         onBlur={() => setHasFocus(false)}
-        onKeyDown={handleKeyDown} className={cellInput} />
+        onKeyDown={handleKeyDown} className={`${cellInput} ${isTkMaterial(materialId) ? "!text-blue-600 dark:!text-blue-400" : ""}`} />
       {open && results.length > 0 && (
         <div className="absolute z-50 top-full left-0 mt-0.5 w-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl">
           <ul ref={ulRef} className="max-h-52 overflow-y-auto">
@@ -546,9 +549,9 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
                   className={`w-full text-left px-3 py-2 border-b border-gray-50 dark:border-gray-700 last:border-0 flex items-center gap-2 ${checked.has(m.id) ? "bg-blue-50 dark:bg-blue-900/30" : focusedIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
                   <input type="checkbox" readOnly checked={checked.has(m.id)} className="accent-blue-600 shrink-0" />
                   <div className="min-w-0">
-                    <div className="text-xs font-medium text-gray-800 dark:text-gray-200">{m.name}</div>
+                    <div className={`text-xs font-medium ${isTkMaterial(m.id) ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-200"}`}>{m.name}</div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{m.id}</span>
+                      <span className={`text-[10px] font-mono ${isTkMaterial(m.id) ? TK_TEXT_CLASS : "text-slate-400 dark:text-slate-500"}`}>{m.id}</span>
                       {m.modelNo && <span className="text-[10px] text-gray-500 dark:text-gray-400 border-l border-gray-300 dark:border-gray-600 pl-2">{m.modelNo}</span>}
                       {m.alias && <span className="text-[10px] text-gray-400 dark:text-gray-500">{m.alias}</span>}
                       <span className="text-[10px] text-gray-300 dark:text-gray-500 ml-auto">단가 {m.buyPrice ? fmtNum(m.buyPrice) : "-"} / 재고 {fmtNum(m.stockQty)}</span>
@@ -783,8 +786,8 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
                   </td>
                   <td className="px-2 py-1.5 text-blue-600 dark:text-blue-400 font-medium whitespace-nowrap">{o.note?.match(/^\[(.*?)\]/)?.[1] || "-"}</td>
                   <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400 whitespace-nowrap">{o.orderedAt.slice(0,10)}</td>
-                  <td className="px-2 py-1.5 font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">{o.materialId}</td>
-                  <td className="px-2 py-1.5 dark:text-gray-200 font-medium whitespace-nowrap">{o.materialName}</td>
+                  <td className={`px-2 py-1.5 font-mono whitespace-nowrap ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-slate-500 dark:text-slate-400"}`}>{o.materialId}</td>
+                  <td className={`px-2 py-1.5 font-medium whitespace-nowrap ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "dark:text-gray-200"}`}>{o.materialName}</td>
                   <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400 whitespace-nowrap">{mats[o.materialId] || "-"}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums dark:text-gray-300 whitespace-nowrap">{fmtNum(o.qty)}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums dark:text-gray-300 whitespace-nowrap">{o.unitPrice ? fmtNum(o.unitPrice) : "-"}</td>
