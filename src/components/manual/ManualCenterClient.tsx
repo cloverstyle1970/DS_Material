@@ -640,10 +640,10 @@ export default function ManualCenterClient() {
       <style>{`
         @media print {
           @page {
-            margin: 0; /* 브라우저 기본 헤더/푸터(URL, 페이지 제목, 날짜 등) 인쇄 차단 */
+            margin: 2cm; /* A4 모든 페이지 사방 여백 강제 적용 (2페이지부터 상단 여백 보장) */
           }
           body {
-            margin: 1.6cm 2cm !important; /* 브라우저 여백 제거로 인한 본문 잘림 방지 (A4 안전 여백) */
+            margin: 0 !important; /* body 마진 초기화, @page 여백이 페이지 단위로 정상 작동하도록 조치 */
           }
           /* 헤더, 사이드바, 탭 바, 각종 UI 버튼 비표시 */
           aside, header, nav, .no-print, button, select, input, textarea {
