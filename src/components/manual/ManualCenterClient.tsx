@@ -381,7 +381,7 @@ function MarkdownRenderer({ text }: { text: string }) {
         const alt = match[1];
         const src = match[2];
         return (
-          <div key={idx} className="my-4 flex flex-col items-center no-print">
+          <div key={idx} className="my-4 flex flex-col items-center break-inside-avoid">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
               src={src} 
@@ -643,20 +643,22 @@ export default function ManualCenterClient() {
           aside, header, nav, .no-print, button, select, input, textarea {
             display: none !important;
           }
-          /* 전체 레이아웃 초기화 */
-          body, .flex, .overflow-hidden {
+          /* 전체 레이아웃 초기화 (숨겨진 overflow 해제 및 height auto 보장) */
+          html, body, #__next, main, [class*="AdminShell"], .flex, .overflow-hidden, .overflow-y-auto {
             display: block !important;
             overflow: visible !important;
+            height: auto !important;
+            min-height: 0 !important;
+            position: static !important;
             background: white !important;
             color: black !important;
           }
           .print-area {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
+            display: block !important;
+            position: static !important;
             width: 100% !important;
             margin: 0 !important;
-            padding: 0 !important;
+            padding: 20pt !important;
             box-shadow: none !important;
             border: none !important;
             background: white !important;
@@ -671,7 +673,8 @@ export default function ManualCenterClient() {
             padding-bottom: 10pt;
           }
           h1, h2, h3 {
-            page-break-after: avoid;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
             color: black !important;
           }
           p, li, blockquote, pre {
@@ -686,11 +689,24 @@ export default function ManualCenterClient() {
             border-left: 4px solid #777 !important;
             background: #f9f9f9 !important;
             padding: 8pt 12pt !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
           pre {
             background: #f4f4f4 !important;
             border: 1px solid #ddd !important;
             padding: 8pt !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            white-space: pre-wrap !important;
+          }
+          img {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            max-width: 100% !important;
+            height: auto !important;
+            display: block !important;
+            margin: 10pt auto !important;
           }
         }
       `}</style>
