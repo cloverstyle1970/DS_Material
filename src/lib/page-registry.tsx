@@ -40,6 +40,7 @@ import QuoteSettingsClient from "@/components/quotes/QuoteSettingsClient";
 import QuotesListClient from "@/components/quotes/QuotesListClient";
 import LaborRatesClient from "@/components/quotes/LaborRatesClient";
 import QuoteDetailClient from "@/components/quotes/QuoteDetailClient";
+import ManualCenterClient from "@/components/manual/ManualCenterClient";
 
 export interface PageEntry {
   label: string;
@@ -118,6 +119,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/data/profile": {
     label: "개인정보수정",
     render: () => <MyProfileClient />,
+  },
+  "/manual": {
+    label: "도움말 센터",
+    render: () => <ManualCenterClient />,
   },
   "/data/company-info": {
     label: "회사 정보 관리",

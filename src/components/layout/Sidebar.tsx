@@ -382,8 +382,20 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
           })}
         </nav>
 
-        {/* 환경설정 */}
-        <div className="px-2 pb-2">
+        {/* 도움말 센터 및 환경설정 */}
+        <div className="px-2 pb-2 space-y-1">
+          <button
+            type="button"
+            onClick={() => handleMenuOpen("/manual", "도움말 센터")}
+            className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors whitespace-nowrap ${
+              pathname === "/manual"
+                ? "bg-white/10 text-white font-medium"
+                : "text-slate-200 hover:bg-white/5 hover:text-white"
+            }`}>
+            <span className="text-base w-5 text-center shrink-0">📖</span>
+            <span className="flex-1">도움말 센터</span>
+            {pathname === "/manual" && <span className="ml-auto w-1 h-4 rounded-full bg-blue-400 shrink-0" />}
+          </button>
           <button
             type="button"
             onClick={() => handleMenuOpen("/settings", "환경설정")}
