@@ -46,6 +46,8 @@ INSERT INTO manuals (category, title, content, sort_order, updated_by) VALUES
 1. 시스템 로그인 후 좌측 사이드바 또는 상단 메뉴에서 **[개인정보수정]** 탭을 클릭하여 접속합니다.
 2. 상단에 본인의 이름과 사원번호가 올바르게 표시되는지 확인합니다.
 
+![개인정보수정 화면 가이드](/images/manual/personal_info.png)
+
 ---
 
 ## 2. 탭별 상세 작성 및 변경 가이드
@@ -153,6 +155,8 @@ INSERT INTO manuals (category, title, content, sort_order, updated_by) VALUES
 ## 2. 단계별 상세 작성 가이드
 
 TBM 등록 양식은 총 **8가지 핵심 영역**으로 구성되어 있습니다. 각 항목의 입력 방법은 아래와 같습니다.
+
+![TBM 등록 화면 가이드](/images/manual/tbm_register.png)
 
 ### 🔌 2.1. 업무 구분 (업무 성격 지정)
 오늘 진행할 작업의 성격에 맞춰 버튼을 터치하여 지정합니다.
@@ -272,6 +276,8 @@ TBM 등록 양식은 총 **8가지 핵심 영역**으로 구성되어 있습니�
 ## 3. 공사 일정 등록 및 조율 가이드 (관리팀 및 관리자용)
 
 공사 요청을 접수하여 실제 공사 캘린더에 일정을 편제하고 배정하는 프로세스입니다.
+
+![공사 일정 캘린더 화면 가이드](/images/manual/construction_calendar.png)
 
 ### 🔗 3.1. 공사 요청을 일정으로 전환하기 (연동)
 1. **[공사 요청]** 메뉴에서 대기 중인 카드를 확인합니다.
