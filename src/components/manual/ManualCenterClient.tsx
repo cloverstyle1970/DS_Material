@@ -643,8 +643,14 @@ export default function ManualCenterClient() {
           aside, header, nav, .no-print, button, select, input, textarea {
             display: none !important;
           }
-          /* 전체 레이아웃 초기화 (숨겨진 overflow 해제 및 height auto 보장) */
-          html, body, #__next, main, [class*="AdminShell"], .flex, .overflow-hidden, .overflow-y-auto {
+          /* 전체 레이아웃 계층 플랫화 (Next.js 루트 및 AdminShell 구조) */
+          html, body, 
+          body > div, 
+          body > div > div, 
+          body > div > div > div, 
+          body > div > div > div > div, 
+          body > div > div > div > div > div, 
+          main {
             display: block !important;
             overflow: visible !important;
             height: auto !important;
