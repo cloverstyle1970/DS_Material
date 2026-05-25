@@ -383,13 +383,9 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
           className="text-xs px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">리스트</button>
         <button type="button" onClick={clearAll}
           className="text-xs px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">다시 작성</button>
-        <button type="button" disabled={saving} onClick={() => save(true)}
-          className="text-xs px-4 py-2 rounded border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-50">
-          저장/전표 <kbd className="text-[10px] text-blue-400">F7</kbd>
-        </button>
         <button type="button" disabled={saving} onClick={() => save(false)}
           className="text-xs px-5 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50 shadow-sm">
-          {saving ? "저장 중..." : <>저장 <kbd className="text-[10px] text-blue-200">F8</kbd></>}
+          {saving ? "저장 중..." : "저장"}
         </button>
       </div>
 

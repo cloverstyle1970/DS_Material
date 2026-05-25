@@ -10,10 +10,12 @@ import type { PurchaseOrderRecord } from "@/lib/mock-purchase-orders";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNum, parseNum } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
+import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
+import PurchaseOrderPrintPaper, { POPrintCompany, POShipInfo, POShipPlace } from "./PurchaseOrderPrintPaper";
 
-interface SiteOption   { id: number; name: string; alias?: string | null }
+interface SiteOption   { id: number; name: string; alias?: string | null; address?: string | null }
 interface VendorOption { id: number; name: string }
 
 interface Row {
@@ -52,6 +54,15 @@ function parseNoteForEdit(note: string | null): { orderRefNo: string; formType: 
   return { orderRefNo, formType, remark: s };
 }
 
+// 발주서 발송지 지정 장소 (고정 목록 — 화물사/택배 안내문)
+const FIXED_SHIP_PLACES: POShipPlace[] = [
+  { label: "대산화물 (고양식사 지점)",         address: "대산화물 : 고양식사 지점으로 발송 부탁드립니다." },
+  { label: "경동화물 (장항 543지점)",          address: "경동화물 : 장항 543지점으로 발송 부탁드립니다." },
+  { label: "경동화물 (파주 아동동 353지점)",    address: "경동화물 : 파주 아동동 353지점으로 발송 부탁드립니다." },
+  { label: "당사 사무실 (택배)",               address: "당사 사무실로 택배 발송 부탁드립니다." },
+  { label: "당사 사무실 지하2층 (입고)",        address: "당사 사무실 지하2층으로 입고 부탁드립니다." },
+];
+
 export default function PurchaseOrderEntry({ editId }: { editId?: number } = {}) {
   const router = useRouter();
   const { user } = useAuth();
@@ -69,6 +80,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
   const [matType,     setMatType]     = useState<"전체" | "DS" | "TK">("전체");
   const [formType,    setFormType]    = useState<"기본" | "긴급" | "수리">("기본");
   const [requesterNames, setRequesterNames] = useState<string[]>([]);
+  const [requesterPhones, setRequesterPhones] = useState<Record<string, string>>({});
   const [batchId, setBatchId] = useState<string | null>(null);
   const [removedExistingIds, setRemovedExistingIds] = useState<Set<number>>(new Set());
   const [editLoading, setEditLoading] = useState(isEdit);
@@ -87,9 +99,21 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
     api.get<MaterialRequestRecord[]>("/api/material-requests")
       .then(data => setPendingRequests(data.filter(r => r.status === "신청" || r.status === "처리중")))
       .catch(() => {});
-    api.get<{ name: string; status: string | null }[]>("/api/users")
-      .then(data => setRequesterNames(data.filter(u => u.status === "재직").map(u => u.name).sort()))
+    api.get<{ name: string; status: string | null; phone: string | null }[]>("/api/users")
+      .then(data => {
+        const active = data.filter(u => u.status === "재직");
+        setRequesterNames(active.map(u => u.name).sort());
+        const pmap: Record<string, string> = {};
+        active.forEach(u => { if (u.phone) pmap[u.name] = u.phone; });
+        setRequesterPhones(pmap);
+      })
       .catch(() => {});
+    (async () => {
+      const { data } = await supabase.from("quote_settings")
+        .select("company_name, company_biz_no, company_address, company_phone, company_email, company_ceo")
+        .eq("id", 1).maybeSingle();
+      if (data) setCompany(data as POPrintCompany);
+    })();
   }, []);
 
   const [orderRefNo,  setOrderRefNo]  = useState("");
@@ -99,6 +123,9 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
     isEdit ? [] : [newRow(), newRow(), newRow(), newRow(), newRow()]
   );
   const [saving,      setSaving]      = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [company,     setCompany]     = useState<POPrintCompany | null>(null);
+  const [shipInfo,    setShipInfo]    = useState<POShipInfo>({ shipTo: "", dueDate: "", receiver: "", contact: "", manager: "", note: "" });
 
   // 편집 모드: 진입한 PO와 동일 batch_id를 가진 모든 PO 로드
   useEffect(() => {
@@ -131,6 +158,14 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
         setFormType(noteHead.formType);
         setOrderDate(head.orderedAt.slice(0, 10));
         setBatchId(target.batchId ?? null);
+        setShipInfo({
+          shipTo:   head.shipTo       ?? "",
+          dueDate:  head.shipDueDate  ?? "",
+          receiver: head.shipReceiver ?? "",
+          contact:  head.shipContact  ?? "",
+          manager:  head.shipManager  ?? "",
+          note:     head.shipNote     ?? "",
+        });
         const loaded = siblings.map(o => {
           const parsed = parseNoteForEdit(o.note);
           const m = matMap.get(o.materialId);
@@ -223,6 +258,12 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
     return { qty, supply };
   }, [rows]);
 
+  // 발송지 선택 후보: 지정 장소(고정 5곳) + 등록 현장 → 선택 시 해당 안내문/주소가 입력됨
+  const shipPlaces = useMemo<POShipPlace[]>(() => [
+    ...FIXED_SHIP_PLACES,
+    ...sites.map(s => ({ label: s.name, address: s.address || s.name })),
+  ], [sites]);
+
   async function save(goList: boolean) {
     if (!user) return;
     const valid = rows.filter(r => r.materialId && r.qty > 0);
@@ -246,6 +287,16 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
         rowRemark || reference || "",
       ].filter(Boolean).join(" ") || null;
 
+      // 발송지 기록란 — 같은 batch 의 모든 행에 동일 값 저장
+      const shipPayload = {
+        shipTo:       shipInfo.shipTo   || null,
+        shipDueDate:  shipInfo.dueDate  || null,
+        shipReceiver: shipInfo.receiver || null,
+        shipContact:  shipInfo.contact  || null,
+        shipManager:  shipInfo.manager  || null,
+        shipNote:     shipInfo.note     || null,
+      };
+
       for (const r of valid) {
         if (r.editingId) {
           // 기존 PO PATCH (수정)
@@ -260,6 +311,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
             note: buildNote(r.remark),
             orderedAt: orderedAtIso,
             batchId: effectiveBatchId,
+            ...shipPayload,
           });
         } else {
           // 신규 행 → POST
@@ -272,6 +324,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
             userId: user.id, userName: user.name,
             orderedAt: orderedAtIso,
             batchId: effectiveBatchId,
+            ...shipPayload,
           });
         }
       }
@@ -292,7 +345,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
 
   function handleKey(e: KeyboardEvent) {
     if (e.key === "F8") { e.preventDefault(); save(false); }
-    else if (e.key === "F7") { e.preventDefault(); save(true); }
+    else if (e.key === "F7") { e.preventDefault(); setPreviewOpen(true); }
   }
 
   return (
@@ -475,18 +528,72 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
           <>
             <button type="button" onClick={clearAll} className="text-xs px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">다시 작성</button>
             <button type="button" className="text-xs px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">웹자료올리기</button>
-            <button type="button" disabled={saving} onClick={() => save(true)} className="text-xs px-4 py-2 rounded border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-50">
-              저장/전표 <kbd className="text-[10px] text-blue-400">F7</kbd>
-            </button>
           </>
         )}
+        <button type="button" onClick={() => setPreviewOpen(true)} className="text-xs px-4 py-2 rounded border border-blue-300 text-blue-700 hover:bg-blue-50">
+          🖨 발주서
+        </button>
         <button type="button" disabled={saving || editLoading} onClick={() => save(false)} className="text-xs px-5 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50 shadow-sm">
-          {saving ? "저장 중..." : isEdit ? "변경 저장" : <>저장 <kbd className="text-[10px] text-blue-200">F8</kbd></>}
+          {saving ? "저장 중..." : isEdit ? "변경 저장" : "저장"}
         </button>
       </div>
 
       {popup === "request" && (
         <RequestPopup requests={pendingRequests} onClose={() => setPopup(null)} onSelect={applyRequest} />
+      )}
+
+      {/* 발주서 미리보기 / 인쇄 오버레이 */}
+      {previewOpen && (
+        <div className="fixed inset-0 z-50 bg-gray-100 dark:bg-gray-900 overflow-auto po-preview-overlay">
+          <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm px-4 py-2 flex items-center gap-2 print:hidden">
+            <span className="text-sm font-bold text-gray-800 dark:text-gray-100">🖨 발주서 미리보기</span>
+            <div className="ml-auto flex gap-2">
+              <button type="button" onClick={() => window.print()}
+                className="px-3 py-1.5 text-xs rounded bg-blue-600 text-white font-semibold hover:bg-blue-700">🖨 인쇄 / PDF로 저장</button>
+              <button type="button" onClick={() => setPreviewOpen(false)}
+                className="px-3 py-1.5 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">✕ 닫기</button>
+            </div>
+          </div>
+          <div className="p-6 print:p-0">
+            <PurchaseOrderPrintPaper
+              orderDate={orderDate}
+              vendorName={vendorName}
+              managerName={managerName}
+              managerPhone={requesterPhones[managerName] ?? ""}
+              siteName={siteName}
+              orderRefNo={orderRefNo}
+              formType={formType}
+              reference={reference}
+              items={rows.map(r => ({
+                materialId:   r.materialId,
+                materialName: r.materialName,
+                spec:         r.spec,
+                qty:          r.qty,
+                unitPrice:    r.unitPrice,
+                elevatorName: r.elevatorName,
+                remark:       r.remark,
+              }))}
+              company={company}
+              shipInfo={shipInfo}
+              onShipInfoChange={patch => setShipInfo(s => ({ ...s, ...patch }))}
+              shipPlaces={shipPlaces}
+            />
+          </div>
+
+          {/* 인쇄 시 미리보기만 출력되도록 격리 */}
+          <style jsx global>{`
+            @media print {
+              body * { visibility: hidden !important; }
+              .po-preview-overlay, .po-preview-overlay * { visibility: visible !important; }
+              .po-preview-overlay {
+                position: absolute !important;
+                left: 0; top: 0; right: 0;
+                background: white !important;
+                overflow: visible !important;
+              }
+            }
+          `}</style>
+        </div>
       )}
     </div>
   );

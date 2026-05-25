@@ -18,6 +18,13 @@ export interface PurchaseOrderRecord {
   orderedAt: string;
   receivedAt: string | null;
   batchId: string | null;
+  // 발송지/납품 기록란 (발주서 인쇄용, batch 단위 — 같은 batch 행에 중복 저장)
+  shipTo:       string | null;
+  shipDueDate:  string | null;
+  shipReceiver: string | null;
+  shipContact:  string | null;
+  shipManager:  string | null;
+  shipNote:     string | null;
 }
 
 const orders: PurchaseOrderRecord[] = [];

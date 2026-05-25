@@ -507,6 +507,12 @@ function dbToOrder(r: any): PurchaseOrderRecord {
     orderedAt:     r.ordered_at,
     receivedAt:    r.received_at    ?? null,
     batchId:       r.batch_id       ?? null,
+    shipTo:        r.ship_to        ?? null,
+    shipDueDate:   r.ship_due_date  ?? null,
+    shipReceiver:  r.ship_receiver  ?? null,
+    shipContact:   r.ship_contact   ?? null,
+    shipManager:   r.ship_manager   ?? null,
+    shipNote:      r.ship_note      ?? null,
   };
 }
 
@@ -529,6 +535,12 @@ function orderToDb(d: any): Record<string, unknown> {
   if (d.orderedAt     !== undefined) obj.ordered_at     = d.orderedAt;
   if (d.receivedAt    !== undefined) obj.received_at    = d.receivedAt;
   if (d.batchId       !== undefined) obj.batch_id       = d.batchId;
+  if (d.shipTo        !== undefined) obj.ship_to        = d.shipTo;
+  if (d.shipDueDate   !== undefined) obj.ship_due_date  = d.shipDueDate;
+  if (d.shipReceiver  !== undefined) obj.ship_receiver  = d.shipReceiver;
+  if (d.shipContact   !== undefined) obj.ship_contact   = d.shipContact;
+  if (d.shipManager   !== undefined) obj.ship_manager   = d.shipManager;
+  if (d.shipNote      !== undefined) obj.ship_note      = d.shipNote;
   return obj;
 }
 
@@ -1350,6 +1362,12 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
       if (body.requesterName !== undefined) patch.requester_name = body.requesterName || null;
       if (body.orderedAt !== undefined) patch.ordered_at = body.orderedAt;
       if (body.batchId !== undefined) patch.batch_id = body.batchId;
+      if (body.shipTo !== undefined) patch.ship_to = body.shipTo || null;
+      if (body.shipDueDate !== undefined) patch.ship_due_date = body.shipDueDate || null;
+      if (body.shipReceiver !== undefined) patch.ship_receiver = body.shipReceiver || null;
+      if (body.shipContact !== undefined) patch.ship_contact = body.shipContact || null;
+      if (body.shipManager !== undefined) patch.ship_manager = body.shipManager || null;
+      if (body.shipNote !== undefined) patch.ship_note = body.shipNote || null;
 
       const { data, error } = await supabase.from("purchase_orders")
         .update(patch).eq("id", numId).select().single();
