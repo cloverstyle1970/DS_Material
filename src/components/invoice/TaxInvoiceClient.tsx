@@ -68,7 +68,13 @@ function Inner() {
                 <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">상호</td>
                 <td className="border border-black px-2 py-1.5 font-bold">{company?.company_name ?? ""}</td>
                 <td className="border border-black bg-gray-100 px-2 py-1.5 w-20 font-semibold text-center">대표자</td>
-                <td className="border border-black px-2 py-1.5">{company?.company_ceo ?? ""}</td>
+                <td className="border border-black px-2 py-1.5">
+                  {company?.company_ceo ?? ""}
+                  {company?.company_stamp_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={company.company_stamp_url} alt="인" className="inline-block h-8 align-middle ml-1" />
+                  ) : null}
+                </td>
                 <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">상호</td>
                 <td className="border border-black px-2 py-1.5 font-bold">{invoice.customer_name ?? quote.customer_name ?? "-"}</td>
               </tr>

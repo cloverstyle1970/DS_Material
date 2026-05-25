@@ -11,6 +11,7 @@ export interface QuotePrintCompany {
   company_phone:   string | null;
   company_email:   string | null;
   company_ceo:     string | null;
+  company_stamp_url?: string | null;
 }
 
 export interface QuotePrintItem {
@@ -95,7 +96,13 @@ export default function QuotePrintPaper({ header, items, company, onOpenOpinion,
               <td className="border border-black bg-gray-100 px-2 py-1.5 w-24 font-semibold text-center">견적년월일</td>
               <td className="border border-black px-2 py-1.5">{fmtDate(header.quote_date)}</td>
               <td className="border border-black bg-gray-100 px-2 py-1.5 w-24 font-semibold text-center">대표이사</td>
-              <td className="border border-black px-2 py-1.5">{company?.company_ceo ?? ""} <span className="text-gray-400 ml-2">[인]</span></td>
+              <td className="border border-black px-2 py-1.5 relative">
+                {company?.company_ceo ?? ""}
+                {company?.company_stamp_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={company.company_stamp_url} alt="인" className="inline-block h-9 align-middle ml-1" />
+                ) : <span className="text-gray-400 ml-2">[인]</span>}
+              </td>
             </tr>
             <tr>
               <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">현장명</td>

@@ -1,11 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { formatPhone } from "@/lib/input-format";
 
 const MENU_HREF = "/data/company-info";
+const ASSET_BUCKET = "company-assets";
+
+async function uploadAsset(file: File): Promise<string> {
+  const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+  const path = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await supabase.storage.from(ASSET_BUCKET).upload(path, file, { cacheControl: "3600", upsert: false });
+  if (error) throw error;
+  return supabase.storage.from(ASSET_BUCKET).getPublicUrl(path).data.publicUrl;
+}
 
 interface CompanyInfo {
   company_name: string;
@@ -14,6 +23,8 @@ interface CompanyInfo {
   company_phone: string;
   company_email: string;
   company_ceo: string;
+  company_stamp_url: string;
+  company_logo_url: string;
 }
 
 const EMPTY: CompanyInfo = {
@@ -23,6 +34,8 @@ const EMPTY: CompanyInfo = {
   company_phone: "",
   company_email: "",
   company_ceo: "",
+  company_stamp_url: "",
+  company_logo_url: "",
 };
 
 export default function CompanyInfoClient() {
@@ -31,12 +44,17 @@ export default function CompanyInfoClient() {
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [stampFile, setStampFile] = useState<File | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+
+  const stampPreview = useMemo(() => stampFile ? URL.createObjectURL(stampFile) : info.company_stamp_url, [stampFile, info.company_stamp_url]);
+  const logoPreview  = useMemo(() => logoFile  ? URL.createObjectURL(logoFile)  : info.company_logo_url,  [logoFile,  info.company_logo_url]);
 
   useEffect(() => {
     (async () => {
       const { data, error } = await supabase
         .from("quote_settings")
-        .select("company_name, company_biz_no, company_address, company_phone, company_email, company_ceo")
+        .select("company_name, company_biz_no, company_address, company_phone, company_email, company_ceo, company_stamp_url, company_logo_url")
         .eq("id", 1).single();
       if (data) {
         setInfo({
@@ -46,6 +64,8 @@ export default function CompanyInfoClient() {
           company_phone:   data.company_phone   ?? "",
           company_email:   data.company_email   ?? "",
           company_ceo:     data.company_ceo     ?? "",
+          company_stamp_url: data.company_stamp_url ?? "",
+          company_logo_url:  data.company_logo_url  ?? "",
         });
       } else if (error) {
         setMessage({ type: "error", text: `로드 실패: ${error.message}` });
@@ -76,6 +96,10 @@ export default function CompanyInfoClient() {
     if (!canUpdate) { setMessage({ type: "error", text: "수정 권한이 없습니다." }); return; }
     setSaving(true);
     try {
+      let stampUrl = info.company_stamp_url;
+      let logoUrl  = info.company_logo_url;
+      if (stampFile) stampUrl = await uploadAsset(stampFile);
+      if (logoFile)  logoUrl  = await uploadAsset(logoFile);
       const { error } = await supabase.from("quote_settings").update({
         company_name:    info.company_name    || null,
         company_biz_no:  info.company_biz_no  || null,
@@ -83,9 +107,14 @@ export default function CompanyInfoClient() {
         company_phone:   info.company_phone   || null,
         company_email:   info.company_email   || null,
         company_ceo:     info.company_ceo     || null,
+        company_stamp_url: stampUrl || null,
+        company_logo_url:  logoUrl  || null,
         updated_at: new Date().toISOString(),
       }).eq("id", 1);
       if (error) throw error;
+      setInfo(prev => ({ ...prev, company_stamp_url: stampUrl, company_logo_url: logoUrl }));
+      setStampFile(null);
+      setLogoFile(null);
       setMessage({ type: "success", text: "회사 정보가 저장되었습니다." });
     } catch (e) {
       setMessage({ type: "error", text: e instanceof Error ? e.message : String(e) });
@@ -147,6 +176,56 @@ export default function CompanyInfoClient() {
                     onChange={e => patch({ company_ceo: e.target.value })} className={inputCls} />
                 </div>
               </div>
+            </div>
+
+            {/* 인감도장 · 로고 */}
+            <div className={sectionCls}>
+              <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3">🖋 인감도장 · 회사 로고</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>인감도장</label>
+                  <div className="flex items-center gap-3">
+                    <div className="w-24 h-24 shrink-0 border border-gray-300 dark:border-gray-600 rounded flex items-center justify-center bg-white overflow-hidden">
+                      {stampPreview ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={stampPreview} alt="인감도장" className="max-w-full max-h-full object-contain" />
+                      ) : <span className="text-[10px] text-gray-400">없음</span>}
+                    </div>
+                    <div className="space-y-1.5">
+                      <input type="file" accept="image/png,image/jpeg,image/webp"
+                        onChange={e => setStampFile(e.target.files?.[0] ?? null)}
+                        className="block text-xs text-gray-600 dark:text-gray-300" />
+                      {stampPreview && (
+                        <button type="button" onClick={() => { setStampFile(null); patch({ company_stamp_url: "" }); }}
+                          className="text-[11px] text-red-500 hover:underline">제거</button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-1.5">견적서·발주서·거래명세서 날인란에 표시 (배경 투명 PNG 권장)</p>
+                </div>
+                <div>
+                  <label className={labelCls}>회사 로고</label>
+                  <div className="flex items-center gap-3">
+                    <div className="w-24 h-24 shrink-0 border border-gray-300 dark:border-gray-600 rounded flex items-center justify-center bg-white overflow-hidden">
+                      {logoPreview ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={logoPreview} alt="회사 로고" className="max-w-full max-h-full object-contain" />
+                      ) : <span className="text-[10px] text-gray-400">없음</span>}
+                    </div>
+                    <div className="space-y-1.5">
+                      <input type="file" accept="image/png,image/jpeg,image/webp"
+                        onChange={e => setLogoFile(e.target.files?.[0] ?? null)}
+                        className="block text-xs text-gray-600 dark:text-gray-300" />
+                      {logoPreview && (
+                        <button type="button" onClick={() => { setLogoFile(null); patch({ company_logo_url: "" }); }}
+                          className="text-[11px] text-red-500 hover:underline">제거</button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-1.5">로고 이미지 (추후 문서 활용 예정)</p>
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-3">※ 이미지를 선택한 뒤 아래 [저장] 버튼을 눌러야 업로드·반영됩니다.</p>
             </div>
 
             <div className={sectionCls}>

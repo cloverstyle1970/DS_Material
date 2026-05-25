@@ -11,6 +11,7 @@ export interface POPrintCompany {
   company_phone:   string | null;
   company_email:   string | null;
   company_ceo:     string | null;
+  company_stamp_url?: string | null;
 }
 
 export interface POPrintItem {
@@ -87,8 +88,9 @@ function ShipPlacePicker({ value, places, onChange }: {
 interface Props {
   orderDate:    string;            // YYYY-MM-DD
   vendorName:   string;
-  managerName:  string;            // 발주자 (= 자재 신청자)
+  managerName:  string;            // 자재 신청자 (= 담당자)
   managerPhone: string;            // 신청자(담당자) 연락처
+  ordererName:  string;            // 발주자 (발주서 작성자)
   siteName:     string;
   orderRefNo:   string;
   formType:     "기본" | "긴급" | "수리";
@@ -107,7 +109,7 @@ function fmtDate(iso: string): string {
 }
 
 export default function PurchaseOrderPrintPaper({
-  orderDate, vendorName, managerName, managerPhone, siteName, orderRefNo, formType, reference, items, company, shipInfo, onShipInfoChange, shipPlaces,
+  orderDate, vendorName, managerName, managerPhone, ordererName, siteName, orderRefNo, formType, reference, items, company, shipInfo, onShipInfoChange, shipPlaces,
 }: Props) {
   const validItems = items.filter(it => it.materialId || it.materialName.trim());
   const totalQty = validItems.reduce((s, it) => s + it.qty, 0);
@@ -139,7 +141,13 @@ export default function PurchaseOrderPrintPaper({
               <td className="border border-black bg-gray-100 px-2 py-1.5 w-24 font-semibold text-center">발주일자</td>
               <td className="border border-black px-2 py-1.5">{fmtDate(orderDate)}</td>
               <td className="border border-black bg-gray-100 px-2 py-1.5 w-24 font-semibold text-center">대표이사</td>
-              <td className="border border-black px-2 py-1.5">{company?.company_ceo ?? ""} <span className="text-gray-400 ml-2">[인]</span></td>
+              <td className="border border-black px-2 py-1.5">
+                {company?.company_ceo ?? ""}
+                {company?.company_stamp_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={company.company_stamp_url} alt="인" className="inline-block h-9 align-middle ml-1" />
+                ) : <span className="text-gray-400 ml-2">[인]</span>}
+              </td>
             </tr>
             <tr>
               <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">거래처</td>
@@ -161,7 +169,7 @@ export default function PurchaseOrderPrintPaper({
             </tr>
             <tr>
               <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">발주자</td>
-              <td className="border border-black px-2 py-1.5">{managerName || "-"}</td>
+              <td className="border border-black px-2 py-1.5">{ordererName || "-"}</td>
               <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">합계금액</td>
               <td className="border border-black px-2 py-1.5">&nbsp;</td>
             </tr>

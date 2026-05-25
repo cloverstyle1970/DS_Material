@@ -52,6 +52,7 @@ export interface CompanyInfo {
   company_phone: string | null;
   company_email: string | null;
   company_ceo: string | null;
+  company_stamp_url?: string | null;
 }
 
 export function useInvoiceData(invoiceId: number) {
@@ -76,7 +77,7 @@ export function useInvoiceData(invoiceId: number) {
           .eq("id", i.quote_id).maybeSingle(),
         supabase.from("quote_items").select("*").eq("quote_id", i.quote_id).order("sort_order"),
         supabase.from("quote_settings")
-          .select("company_name, company_biz_no, company_address, company_phone, company_email, company_ceo")
+          .select("company_name, company_biz_no, company_address, company_phone, company_email, company_ceo, company_stamp_url")
           .eq("id", 1).maybeSingle(),
       ]);
       setQuote((q.data ?? null) as QuoteForInvoice | null);

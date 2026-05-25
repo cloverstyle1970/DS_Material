@@ -239,6 +239,7 @@ function QuoteEntryInner() {
           company_phone:   data.company_phone   ?? null,
           company_email:   data.company_email   ?? null,
           company_ceo:     data.company_ceo     ?? null,
+          company_stamp_url: data.company_stamp_url ?? null,
         });
       }
     })();

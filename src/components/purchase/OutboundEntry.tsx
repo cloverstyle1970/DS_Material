@@ -7,12 +7,14 @@ import { MaterialRecord } from "@/lib/mock-materials";
 import { ElevatorRecord } from "@/lib/mock-elevators";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { supabase } from "@/lib/supabase";
 import { fmtNum, parseNum } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 import DraggableModal from "@/components/common/DraggableModal";
 import SerialEntryModal from "./SerialEntryModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 import { formatDate as sharedFormatYmd } from "@/lib/input-format";
+import OutboundDeliveryNotePaper, { DNReceiver, DNVendor } from "./OutboundDeliveryNotePaper";
 
 interface SiteOption { id: number; name: string }
 
@@ -55,6 +57,10 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
   const [saving, setSaving] = useState(false);
   const [serialEditRowId, setSerialEditRowId] = useState<string | null>(null);
   const [editBatchId, setEditBatchId] = useState<string | null>(null);
+  const [previewDN, setPreviewDN] = useState(false);
+  const [dnReceiver, setDnReceiver] = useState<DNReceiver>({ name: "", bizNo: "", address: "", phone: "" });
+  const [dnVendors, setDnVendors] = useState<DNVendor[]>([]);
+  const [dnStampUrl, setDnStampUrl] = useState("");
 
   useEffect(() => {
     if (!isEdit || !editId) return;
@@ -116,6 +122,13 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
 
   useEffect(() => {
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
+    api.get<{ name: string; bizNo: string | null; address: string | null; phone: string | null }[]>("/api/vendors")
+      .then(data => setDnVendors(data.map(v => ({ name: v.name, bizNo: v.bizNo ?? "", address: v.address ?? "", phone: v.phone ?? "" }))))
+      .catch(() => {});
+    (async () => {
+      const { data } = await supabase.from("quote_settings").select("company_stamp_url").eq("id", 1).maybeSingle();
+      if (data?.company_stamp_url) setDnStampUrl(data.company_stamp_url);
+    })();
   }, []);
 
   const [rows,  setRows]  = useState<Row[]>([newRow(), newRow(), newRow(), newRow(), newRow()]);
@@ -246,9 +259,23 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
     } finally { setSaving(false); }
   }
 
+  // TODO(추후 검토): 거래명세서 공급받는자 등록번호/주소가 거래처 선택 시에도 표시 안 되는 사례 보고됨(2026-05-25).
+  // 거래처관리(vendors) biz_no/address 데이터 점검 + 현장↔거래처 매핑 방식 재검토 필요.
+  function openDeliveryNote() {
+    // 현장명과 이름이 일치하는 거래처가 있으면 등록번호·주소·전화까지 자동 채움
+    setDnReceiver(r => {
+      if (r.bizNo || r.address) return r; // 이미 거래처를 선택해 채워진 경우 보존
+      const key = (r.name || siteName).trim();
+      const matched = key ? dnVendors.find(v => v.name === key) : undefined;
+      if (matched) return { name: matched.name, bizNo: matched.bizNo, address: matched.address, phone: matched.phone };
+      return { ...r, name: r.name || siteName };
+    });
+    setPreviewDN(true);
+  }
+
   function handleKey(e: KeyboardEvent) {
     if (e.key === "F8") { e.preventDefault(); save(false); }
-    else if (e.key === "F7") { e.preventDefault(); save(true); }
+    else if (e.key === "F7") { e.preventDefault(); openDeliveryNote(); }
   }
 
   return (
@@ -416,9 +443,9 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
           className="text-xs px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">리스트</button>
         <button type="button" onClick={clearAll}
           className="text-xs px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">다시 작성</button>
-        <button type="button" disabled={saving} onClick={() => save(true)}
-          className="text-xs px-4 py-2 rounded border border-orange-300 text-orange-600 hover:bg-orange-50 disabled:opacity-50">
-          거래명세서
+        <button type="button" onClick={openDeliveryNote}
+          className="text-xs px-4 py-2 rounded border border-orange-300 text-orange-600 hover:bg-orange-50">
+          🖨 거래명세서
         </button>
         <button type="button" disabled={saving} onClick={() => save(false)}
           className="text-xs px-5 py-2 rounded bg-orange-500 text-white font-semibold hover:bg-orange-600 disabled:opacity-50 shadow-sm">
@@ -460,6 +487,51 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
           />
         );
       })()}
+
+      {/* 거래명세서 미리보기 / 인쇄 오버레이 */}
+      {previewDN && (
+        <div className="fixed inset-0 z-50 bg-gray-100 dark:bg-gray-900 overflow-auto dn-preview-overlay">
+          <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm px-4 py-2 flex items-center gap-2 print:hidden">
+            <span className="text-sm font-bold text-gray-800 dark:text-gray-100">🖨 거래명세서 미리보기</span>
+            <div className="ml-auto flex gap-2">
+              <button type="button" onClick={() => window.print()}
+                className="px-3 py-1.5 text-xs rounded bg-blue-600 text-white font-semibold hover:bg-blue-700">🖨 인쇄 / PDF로 저장</button>
+              <button type="button" onClick={() => setPreviewDN(false)}
+                className="px-3 py-1.5 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">✕ 닫기</button>
+            </div>
+          </div>
+          <div className="p-6 print:p-0">
+            <OutboundDeliveryNotePaper
+              outboundDate={outboundDate}
+              items={rows.map(r => ({
+                materialId:   r.materialId,
+                materialName: r.materialName,
+                spec:         r.spec,
+                qty:          r.qty,
+                unitPrice:    r.unitPrice,
+              }))}
+              receiver={dnReceiver}
+              onReceiverChange={patch => setDnReceiver(s => ({ ...s, ...patch }))}
+              vendors={dnVendors}
+              stampUrl={dnStampUrl}
+            />
+          </div>
+
+          {/* 인쇄 시 미리보기만 출력되도록 격리 */}
+          <style jsx global>{`
+            @media print {
+              body * { visibility: hidden !important; }
+              .dn-preview-overlay, .dn-preview-overlay * { visibility: visible !important; }
+              .dn-preview-overlay {
+                position: absolute !important;
+                left: 0; top: 0; right: 0;
+                background: white !important;
+                overflow: visible !important;
+              }
+            }
+          `}</style>
+        </div>
+      )}
     </div>
   );
 }

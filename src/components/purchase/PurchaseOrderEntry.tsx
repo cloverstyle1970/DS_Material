@@ -110,7 +110,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
       .catch(() => {});
     (async () => {
       const { data } = await supabase.from("quote_settings")
-        .select("company_name, company_biz_no, company_address, company_phone, company_email, company_ceo")
+        .select("company_name, company_biz_no, company_address, company_phone, company_email, company_ceo, company_stamp_url")
         .eq("id", 1).maybeSingle();
       if (data) setCompany(data as POPrintCompany);
     })();
@@ -560,6 +560,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
               vendorName={vendorName}
               managerName={managerName}
               managerPhone={requesterPhones[managerName] ?? ""}
+              ordererName={user?.name ?? ""}
               siteName={siteName}
               orderRefNo={orderRefNo}
               formType={formType}

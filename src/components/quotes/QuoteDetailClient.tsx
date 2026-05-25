@@ -103,6 +103,7 @@ interface CompanyInfo {
   company_phone: string | null;
   company_email: string | null;
   company_ceo: string | null;
+  company_stamp_url?: string | null;
 }
 
 function fmtDate(iso: string): string {
@@ -158,7 +159,7 @@ function QuoteDetailInner() {
       const [h, it, c] = await Promise.all([
         supabase.from("quotes").select("*").eq("id", id).single(),
         supabase.from("quote_items").select("*").eq("quote_id", id).order("sort_order"),
-        supabase.from("quote_settings").select("company_name, company_biz_no, company_address, company_phone, company_email, company_ceo").eq("id", 1).single(),
+        supabase.from("quote_settings").select("company_name, company_biz_no, company_address, company_phone, company_email, company_ceo, company_stamp_url").eq("id", 1).single(),
       ]);
       if (h.error) { setError(`견적서 로드 실패: ${h.error.message}`); setLoading(false); return; }
       setHeader(h.data as QuoteHeader);
