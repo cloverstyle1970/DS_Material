@@ -368,6 +368,26 @@ function MarkdownRenderer({ text }: { text: string }) {
       );
     }
 
+    // 5.5. 이미지 렌더링 (![설명](url))
+    if (line.trim().startsWith("![") && line.trim().endsWith(")")) {
+      const match = line.trim().match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+      if (match) {
+        const alt = match[1];
+        const src = match[2];
+        return (
+          <div key={idx} className="my-4 flex flex-col items-center no-print">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src={src} 
+              alt={alt} 
+              className="max-w-full h-auto rounded-xl border border-gray-200 dark:border-gray-700 shadow-md max-h-[400px] object-contain bg-gray-50 dark:bg-gray-800 p-1" 
+            />
+            {alt && <span className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">▲ {alt}</span>}
+          </div>
+        );
+      }
+    }
+
     // 6. 일반 문단
     if (line.trim() === "") {
       return <div key={idx} className="h-2" />;
