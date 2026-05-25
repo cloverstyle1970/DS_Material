@@ -4,11 +4,14 @@ import { useState, useEffect, FormEvent } from "react";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 
+const MANUAL_DOCS_BUCKET = "manual-docs";
+
 interface ManualRecord {
   id: number;
   category: string;
   title: string;
   content: string;
+  pdf_url: string | null;
   sort_order: number;
   updated_at: string;
   updated_by: string | null;
@@ -111,6 +114,7 @@ const STATIC_FALLBACK_MANUALS: ManualRecord[] = [
 1. 정보를 입력하거나 정정한 후에는 화면 맨 아래에 위치한 **[저장]** 버튼을 반드시 클릭해야 데이터베이스에 반영됩니다.
 2. 저장 실패 시 화면 하단에 **빨간색 경고 메세지**로 누락된 필드가 표시됩니다. (예: "가족정보 긴급연락처 지정 시 연락처는 필수입니다.") 안내 문구에 따라 해당 탭으로 이동하여 보완 후 다시 저장하십시오.
 3. 저장이 정상 완료되면 **"개인정보가 저장되었습니다."**라는 **초록색 알림 문구**가 출력됩니다.`,
+    pdf_url: null,
     sort_order: 10,
     updated_at: new Date().toISOString(),
     updated_by: "시스템",
@@ -209,6 +213,7 @@ TBM 등록 양식은 총 **8가지 핵심 영역**으로 구성되어 있습니�
 > 
 > **2. 현장 동료의 참여 서명**:
 > 2인 이상 작업 시 동료 참가자를 빠뜨리지 말고 입력하여 팀원 전체가 안전수칙을 공유했음을 누락 없이 증명하십시오.`,
+    pdf_url: null,
     sort_order: 20,
     updated_at: new Date().toISOString(),
     updated_by: "시스템",
@@ -299,6 +304,7 @@ TBM 등록 양식은 총 **8가지 핵심 영역**으로 구성되어 있습니�
 > **공사 일정 등록과 TBM 작성의 필수 고리**:
 > 1. 본 메뉴를 통해 **공사 일정이 등록되면**, 해당 날짜의 작업자는 현장 모바일 기기에서 **[TBM 등록]** 시 **"공사일정에서 가져오기"**를 통해 해당 일정을 터치 한 번으로 즉시 연동할 수 있습니다.
 > 2. 캘린더 상에서 **TBM이 미작성된 공사는 블랙 테두리**, **TBM 작성이 완료된 공사는 블루/화이트 테두리**로 실시간 연동 표출되므로 관리팀은 당일 현장 안전수칙 이행 현황을 달력에서 실시간 모니터링할 수 있습니다.`,
+    pdf_url: null,
     sort_order: 30,
     updated_at: new Date().toISOString(),
     updated_by: "시스템",
@@ -501,6 +507,10 @@ export default function ManualCenterClient() {
   const [editContent, setEditContent] = useState("");
   const [editSortOrder, setEditSortOrder] = useState(10);
   const [saving, setSaving] = useState(false);
+  // PDF / 마크다운 작성 유형
+  const [editType, setEditType] = useState<"markdown" | "pdf">("markdown");
+  const [editPdfFile, setEditPdfFile] = useState<File | null>(null);
+  const [editPdfUrl, setEditPdfUrl] = useState<string>("");
 
   // 카테고리 목록
   const CATEGORIES = ["인적자원/사원", "자재/입출고", "현장/호기", "견적/발주", "안전/TBM", "기타 도움말"];
@@ -547,6 +557,9 @@ export default function ManualCenterClient() {
     setEditCategory("인적자원/사원");
     setEditContent("");
     setEditSortOrder((manuals.length ? Math.max(...manuals.map(m => m.sort_order)) : 0) + 10);
+    setEditType("markdown");
+    setEditPdfFile(null);
+    setEditPdfUrl("");
     setEditMode("create");
   }
 
@@ -556,27 +569,56 @@ export default function ManualCenterClient() {
     setEditCategory(activeManual.category);
     setEditContent(activeManual.content);
     setEditSortOrder(activeManual.sort_order);
+    setEditType(activeManual.pdf_url ? "pdf" : "markdown");
+    setEditPdfFile(null);
+    setEditPdfUrl(activeManual.pdf_url || "");
     setEditMode("edit");
+  }
+
+  async function uploadPdf(file: File): Promise<string> {
+    const path = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.pdf`;
+    const { error: upErr } = await supabase.storage
+      .from(MANUAL_DOCS_BUCKET)
+      .upload(path, file, { cacheControl: "3600", upsert: false, contentType: "application/pdf" });
+    if (upErr) throw upErr;
+    const { data } = supabase.storage.from(MANUAL_DOCS_BUCKET).getPublicUrl(path);
+    return data.publicUrl;
   }
 
   async function handleSave(e: FormEvent) {
     e.preventDefault();
-    if (!editTitle.trim() || !editContent.trim()) {
-      alert("제목과 내용을 모두 작성해주시기 바랍니다.");
+    if (!editTitle.trim()) {
+      alert("제목을 작성해주시기 바랍니다.");
+      return;
+    }
+    if (editType === "markdown" && !editContent.trim()) {
+      alert("본문 내용을 작성해주시기 바랍니다.");
+      return;
+    }
+    if (editType === "pdf" && !editPdfFile && !editPdfUrl) {
+      alert("등록할 PDF 파일을 선택해주시기 바랍니다.");
       return;
     }
     setSaving(true);
     try {
+      // PDF 유형이면 신규 파일 업로드 → 최종 pdf_url 결정
+      let pdfUrl: string | null = null;
+      if (editType === "pdf") {
+        pdfUrl = editPdfFile ? await uploadPdf(editPdfFile) : editPdfUrl;
+      }
+      const payload = {
+        title: editTitle.trim(),
+        category: editCategory,
+        content: editType === "pdf" ? "" : editContent,
+        pdf_url: pdfUrl,
+        sort_order: Number(editSortOrder),
+        updated_by: user?.name || "관리자",
+      };
+
       if (editMode === "create") {
         const { data, error } = await supabase
           .from("manuals")
-          .insert({
-            title: editTitle.trim(),
-            category: editCategory,
-            content: editContent,
-            sort_order: Number(editSortOrder),
-            updated_by: user?.name || "관리자",
-          })
+          .insert(payload)
           .select()
           .single();
 
@@ -588,14 +630,7 @@ export default function ManualCenterClient() {
       } else if (editMode === "edit" && activeManual) {
         const { error } = await supabase
           .from("manuals")
-          .update({
-            title: editTitle.trim(),
-            category: editCategory,
-            content: editContent,
-            sort_order: Number(editSortOrder),
-            updated_by: user?.name || "관리자",
-            updated_at: new Date().toISOString(),
-          })
+          .update({ ...payload, updated_at: new Date().toISOString() })
           .eq("id", activeManual.id);
 
         if (error) throw error;
@@ -799,7 +834,7 @@ export default function ManualCenterClient() {
                               : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                           }`}
                         >
-                          📄 {m.title}
+                          {m.pdf_url ? "📕" : "📄"} {m.title}
                         </button>
                       );
                     })}
@@ -855,20 +890,64 @@ export default function ManualCenterClient() {
                 />
               </div>
 
+              {/* 작성 유형 토글: 마크다운 직접 작성 vs PDF 파일 업로드 */}
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-semibold text-gray-500">본문 내용 (마크다운 포맷 기재) *</label>
-                  <span className="text-[10px] text-gray-400"># 대제목, ## 중제목, * 리스트, **굵게** 지원</span>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">매뉴얼 유형 *</label>
+                <div className="inline-flex rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setEditType("markdown")}
+                    className={`px-4 py-2 transition-colors ${editType === "markdown" ? "bg-blue-600 text-white" : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300"}`}
+                  >
+                    📝 문서 직접 작성
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditType("pdf")}
+                    className={`px-4 py-2 transition-colors ${editType === "pdf" ? "bg-blue-600 text-white" : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300"}`}
+                  >
+                    📕 PDF 파일 등록
+                  </button>
                 </div>
-                <textarea
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  placeholder="# 사원용 매뉴얼...&#10;&#10;기본 정보는 사원관리를 참고하십시오."
-                  required
-                  rows={16}
-                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 text-sm font-mono text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
               </div>
+
+              {editType === "markdown" ? (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-gray-500">본문 내용 (마크다운 포맷 기재) *</label>
+                    <span className="text-[10px] text-gray-400"># 대제목, ## 중제목, * 리스트, **굵게** 지원</span>
+                  </div>
+                  <textarea
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    placeholder="# 사원용 매뉴얼...&#10;&#10;기본 정보는 사원관리를 참고하십시오."
+                    rows={16}
+                    className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 text-sm font-mono text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">PDF 파일 *</label>
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    onChange={(e) => setEditPdfFile(e.target.files?.[0] || null)}
+                    className="w-full text-xs text-gray-600 dark:text-gray-300 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-blue-50 dark:file:bg-blue-900/30 file:text-blue-600 dark:file:text-blue-300 file:text-xs file:font-bold file:cursor-pointer"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1.5">
+                    {editPdfFile
+                      ? `선택된 파일: ${editPdfFile.name}`
+                      : editPdfUrl
+                        ? "기존 PDF가 등록되어 있습니다. 새 파일을 선택하면 교체됩니다."
+                        : "최대 50MB, PDF 형식만 업로드할 수 있습니다."}
+                  </p>
+                  {editPdfUrl && !editPdfFile && (
+                    <a href={editPdfUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                      현재 등록된 PDF 열기 →
+                    </a>
+                  )}
+                </div>
+              )}
 
               <div className="flex gap-2 justify-end">
                 <button
@@ -911,13 +990,24 @@ export default function ManualCenterClient() {
                     </button>
                   </>
                 )}
-                <button
-                  type="button"
-                  onClick={handlePrint}
-                  className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1 shrink-0"
-                >
-                  🖨️ PDF 출력 / 저장
-                </button>
+                {activeManual.pdf_url ? (
+                  <a
+                    href={activeManual.pdf_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1 shrink-0"
+                  >
+                    📥 PDF 열기 / 다운로드
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handlePrint}
+                    className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1 shrink-0"
+                  >
+                    🖨️ PDF 출력 / 저장
+                  </button>
+                )}
               </div>
 
               {/* 매뉴얼 본문 */}
@@ -930,9 +1020,30 @@ export default function ManualCenterClient() {
                 </div>
               </div>
 
-              <div className="prose dark:prose-invert max-w-none">
-                <MarkdownRenderer text={activeManual.content} />
-              </div>
+              {activeManual.pdf_url ? (
+                /* PDF 매뉴얼: 내장 뷰어 + 새 탭 열기 */
+                <div className="no-print">
+                  <iframe
+                    src={activeManual.pdf_url}
+                    title={activeManual.title}
+                    className="w-full h-[75vh] rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
+                  />
+                  <div className="mt-3 text-center">
+                    <a
+                      href={activeManual.pdf_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      📕 PDF가 보이지 않으면 여기를 눌러 새 탭에서 열기 →
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <div className="prose dark:prose-invert max-w-none">
+                  <MarkdownRenderer text={activeManual.content} />
+                </div>
+              )}
             </article>
           ) : (
             <div className="text-center py-16 text-sm text-gray-400">등록된 가이드가 없습니다.</div>

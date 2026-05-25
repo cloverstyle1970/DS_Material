@@ -44,6 +44,7 @@ const ORDER = [
   "migration-add-employee-tabs.sql",              // gender, blood_type, 경력, 상벌
   "migration-add-user-status-history.sql",        // 퇴직, 재입사, 휴직 등 상태이력
   "migration-add-manuals.sql",                    // 도움말/매뉴얼 센터 테이블 및 데이터
+  "migration-add-manual-pdf.sql",                 // 매뉴얼 PDF 업로드(pdf_url + manual-docs 버킷)
 
 
 
