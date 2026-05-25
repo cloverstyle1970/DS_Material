@@ -649,7 +649,6 @@ export default function ManualCenterClient() {
           body > div > div, 
           body > div > div > div, 
           body > div > div > div > div, 
-          body > div > div > div > div > div, 
           main {
             display: block !important;
             overflow: visible !important;
@@ -658,6 +657,13 @@ export default function ManualCenterClient() {
             position: static !important;
             background: white !important;
             color: black !important;
+          }
+          /* 개별 탭 래퍼: 비활성 탭의 display: none 보존을 위해 display 속성은 강제하지 않음 */
+          body > div > div > div > div > div {
+            overflow: visible !important;
+            height: auto !important;
+            min-height: 0 !important;
+            position: static !important;
           }
           .print-area {
             display: block !important;
