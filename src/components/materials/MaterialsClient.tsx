@@ -423,7 +423,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
                   </td>
                   <td className="px-4 py-3 text-center">
                     {m.isRepair
-                      ? <span className={`text-xs px-2 py-0.5 rounded-full ${isDark ? "bg-green-900/60 text-green-300" : "bg-green-100 text-green-700"}`}>수리품</span>
+                      ? <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${isDark ? "bg-green-900/60 text-green-300" : "bg-green-100 text-green-700"}`}>RE</span>
                       : <span className={`text-xs px-2 py-0.5 rounded-full ${
                           isDark
                             ? m.id.startsWith("D") ? "bg-red-900/60 text-red-300" : "bg-blue-900/60 text-blue-300"

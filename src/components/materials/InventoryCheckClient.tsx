@@ -387,7 +387,7 @@ export default function InventoryCheckClient() {
                     </td>
                     <td className="px-4 py-3 text-center">
                       {m.isRepair
-                        ? <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300">수리품</span>
+                        ? <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300">RE</span>
                         : <span className={`text-xs px-2 py-0.5 rounded-full ${
                             isDark
                               ? m.id.startsWith("D") ? "bg-red-900/60 text-red-300" : "bg-blue-900/60 text-blue-300"
