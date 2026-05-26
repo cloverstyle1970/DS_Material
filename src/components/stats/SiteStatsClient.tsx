@@ -149,8 +149,8 @@ export default function SiteStatsClient() {
       "차변(입고금액)": m.inAmt,
       "대변(출고수량)": m.outQty,
       "대변(출고금액)": m.outAmt,
-      "현장잔고(수량)": m.inQty - m.outQty,
-      "현장잔고(금액)": m.inAmt - m.outAmt,
+      "수익금(수량)": m.inQty - m.outQty,
+      "수익금(금액)": m.inAmt - m.outAmt,
       최종처리일: fmtDate(m.lastDate),
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -260,7 +260,7 @@ export default function SiteStatsClient() {
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">현장명</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>차변 (입고)</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>대변 (출고)</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>현장 잔고</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>수익금</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">자재종수</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">최종처리일</th>
                 </tr>
@@ -324,7 +324,7 @@ export default function SiteStatsClient() {
                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">코드</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>차변 (입고)</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>대변 (출고)</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>현장 잔고</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>수익금</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">최종처리일</th>
                   </tr>
                   <tr className="bg-gray-100/30 dark:bg-gray-800/20 text-[10px] text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-700">
