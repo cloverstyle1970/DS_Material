@@ -24,6 +24,7 @@ const ORDER = [
   "migration-add-tbm-participant-attestation.sql",
   "migration-add-quotes.sql",                     // quotes
   "migration-add-quote-opinion-bucket.sql",
+  "migration-material-reference-images.sql",      // materials.reference_image_url1/2 + material-references 버킷
   "migration-add-uniform-safety-requests.sql",
 
   // ── Phase 2: users 컬럼 확장 ─────────────────────────────
@@ -45,6 +46,7 @@ const ORDER = [
   "migration-add-user-status-history.sql",        // 퇴직, 재입사, 휴직 등 상태이력
   "migration-add-manuals.sql",                    // 도움말/매뉴얼 센터 테이블 및 데이터
   "migration-add-manual-pdf.sql",                 // 매뉴얼 PDF 업로드(pdf_url + manual-docs 버킷)
+  "migration-add-manual-claim.sql",               // 견적 및 자재청구 등록 사용자 매뉴얼
 
 
 
@@ -56,6 +58,7 @@ const ORDER = [
   "migration-add-unused-return.sql",
   "migration-scrap-unit-rpc.sql",
   "migration-fix-company-type.sql",
+  "migration-add-po-ship-info.sql",               // purchase_orders 발송지/납품 기록란
 
   // ── Phase 6: material_units RLS ─────────────────────────
   "migration-disable-rls-material-units.sql",
@@ -92,7 +95,8 @@ function makePoliciesIdempotent(sql) {
   return { sql: result, injected };
 }
 
-let out = `-- ============================================================
+let out = `SET client_encoding = 'UTF8';
+-- ============================================================
 -- 통합 마이그레이션 — 모든 migration-*.sql 을 한 번에 실행
 -- ------------------------------------------------------------
 -- 자동 생성: scripts/build-migration-all.mjs
