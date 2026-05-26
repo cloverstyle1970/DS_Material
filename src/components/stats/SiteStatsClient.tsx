@@ -140,6 +140,12 @@ export default function SiteStatsClient() {
   const totalInAmt  = filtered.filter(t => t.type === "입고").reduce((s, t) => s + t.qty * (t.unitPrice ?? 0), 0);
   const totalOutAmt = filtered.filter(t => t.type === "출고").reduce((s, t) => s + t.qty * (t.unitPrice ?? 0), 0);
 
+  const ledgerTransactions = useMemo(() => {
+    const arr = [...filtered];
+    arr.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    return arr;
+  }, [filtered]);
+
   function downloadExcel() {
     if (materialStats.length === 0) return;
     const rows = materialStats.map(m => ({
@@ -394,7 +400,7 @@ export default function SiteStatsClient() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-                {filtered.slice(0, 100).map(t => {
+                {ledgerTransactions.slice(0, 100).map(t => {
                   const price = t.unitPrice ?? 0;
                   const amt = t.qty * price;
                   const isIn = t.type === "입고";
