@@ -284,13 +284,13 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
               <Th w="32">No</Th>
               <Th w="120">품목코드</Th>
               <Th w="200">품목명</Th>
-              <Th w="110">규격</Th>
+              <Th w="220">규격</Th>
               <Th w="60">수량</Th>
               <Th w="120">S/N</Th>
               <Th w="100">단가</Th>
               <Th w="110">공급가액</Th>
               <Th w="140">현장</Th>
-              <Th>적요</Th>
+              <Th w="140">적요</Th>
               <Th w="36"></Th>
             </tr>
           </thead>
