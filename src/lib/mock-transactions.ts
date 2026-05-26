@@ -1,4 +1,4 @@
-import { adjustStock } from "./mock-materials";
+import { adjustStock, getMaterials } from "./mock-materials";
 
 export interface TransactionRecord {
   id: number;
@@ -23,6 +23,7 @@ export interface TransactionRecord {
   userName: string;
   createdAt: string;
   batchId?: string | null;
+  unitPrice: number;
 }
 
 const transactions: TransactionRecord[] = [];
@@ -61,6 +62,9 @@ export function addTransaction(data: AddTransactionInput): { record?: Transactio
   if (result.error === "NOT_FOUND")    return { error: "자재를 찾을 수 없습니다." };
   if (result.error === "INSUFFICIENT") return { error: `재고 부족 (현재 재고: ${result.prevStock})` };
 
+  const mat = getMaterials().find(m => m.id === data.materialId);
+  const unitPrice = mat ? (data.type === "입고" ? mat.buyPrice : mat.sellPrice) ?? 0 : 0;
+
   const record: TransactionRecord = {
     id: nextId++,
     type:               data.type,
@@ -84,6 +88,7 @@ export function addTransaction(data: AddTransactionInput): { record?: Transactio
     afterStock:         result.afterStock,
     createdAt:          new Date().toISOString(),
     batchId:            data.batchId ?? null,
+    unitPrice,
   };
   transactions.push(record);
   return { record };

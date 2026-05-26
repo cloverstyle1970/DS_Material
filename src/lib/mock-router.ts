@@ -434,6 +434,7 @@ function dbToTransaction(r: any): TransactionRecord {
     userName:           r.user_name,
     createdAt:          r.created_at,
     batchId:            r.batch_id               ?? null,
+    unitPrice:          r.unit_price             ?? 0,
   };
 }
 

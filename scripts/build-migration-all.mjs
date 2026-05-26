@@ -59,6 +59,8 @@ const ORDER = [
   "migration-scrap-unit-rpc.sql",
   "migration-fix-company-type.sql",
   "migration-add-po-ship-info.sql",               // purchase_orders 발송지/납품 기록란
+  "migration-add-transaction-batch.sql",          // transactions.batch_id 컬럼 및 RPC 묶음기능
+  "migration-add-transaction-price.sql",          // transactions.unit_price 컬럼 및 단가 기록 RPC
 
   // ── Phase 6: material_units RLS ─────────────────────────
   "migration-disable-rls-material-units.sql",

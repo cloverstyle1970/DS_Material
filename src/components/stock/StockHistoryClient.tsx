@@ -22,24 +22,10 @@ interface Props {
 
 interface Search { dateFrom: string; dateTo: string; siteName: string; userName: string; matQuery: string }
 
-type SortKey = "createdAt" | "materialName" | "materialId" | "qty" | "siteName" | "userName";
+type SortKey = "createdAt" | "materialName" | "materialId" | "qty" | "siteName" | "userName" | "unitPrice";
 type SortDir = "asc" | "desc";
 
 type ColDef = { key: SortKey | null; label: string; sortable: boolean; outboundOnly?: boolean };
-
-const COLUMNS: ColDef[] = [
-  { key: "createdAt",    label: "일자",     sortable: true  },
-  { key: "materialId",   label: "자재코드", sortable: true  },
-  { key: "materialName", label: "자재명",   sortable: true  },
-  { key: null,           label: "규격",     sortable: false },
-  { key: "qty",          label: "수량",     sortable: true  },
-  { key: null,           label: "재고변동", sortable: false },
-  { key: "siteName",     label: "현장",     sortable: true  },
-  { key: null,           label: "S/N",      sortable: false, outboundOnly: true },
-  { key: null,           label: "회수",     sortable: false, outboundOnly: true },
-  { key: "userName",     label: "처리자",   sortable: true  },
-  { key: null,           label: "비고",     sortable: false },
-];
 
 function today() { return new Date().toISOString().substring(0, 10); }
 function defaultSearch(): Search { return { dateFrom: today(), dateTo: today(), siteName: "", userName: "", matQuery: "" }; }
@@ -111,6 +97,22 @@ export default function StockHistoryClient({ mode, initial }: Props) {
 
   const isInbound = mode === "입고";
   const signColor = isInbound ? "text-blue-600"                   : "text-orange-500";
+
+  const columns: ColDef[] = useMemo(() => [
+    { key: "createdAt",    label: "일자",     sortable: true  },
+    { key: "materialId",   label: "자재코드", sortable: true  },
+    { key: "materialName", label: "자재명",   sortable: true  },
+    { key: null,           label: "규격",     sortable: false },
+    { key: "qty",          label: "수량",     sortable: true  },
+    { key: "unitPrice",    label: isInbound ? "입고단가" : "출고단가", sortable: true },
+    { key: null,           label: isInbound ? "입고금액" : "출고금액", sortable: false },
+    { key: null,           label: "재고변동", sortable: false },
+    { key: "siteName",     label: "현장",     sortable: true  },
+    { key: null,           label: "S/N",      sortable: false, outboundOnly: true },
+    { key: null,           label: "회수",     sortable: false, outboundOnly: true },
+    { key: "userName",     label: "처리자",   sortable: true  },
+    { key: null,           label: "비고",     sortable: false },
+  ], [isInbound]);
 
   const filtered = transactions.filter(t => {
     if (!inRange(t.createdAt, search.dateFrom, search.dateTo)) return false;
@@ -241,6 +243,8 @@ export default function StockHistoryClient({ mode, initial }: Props) {
         자재명: t.materialName,
         규격: matMap.get(t.materialId) ?? "",
         수량: t.qty,
+        [isInbound ? "입고단가" : "출고단가"]: t.unitPrice ?? 0,
+        [isInbound ? "입고금액" : "출고금액"]: (t.unitPrice ?? 0) * t.qty,
         이전재고: t.prevStock,
         이후재고: t.afterStock,
         현장: t.siteName ?? "",
@@ -353,7 +357,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                   className="h-3.5 w-3.5 rounded cursor-pointer"
                 />
               </th>
-              {COLUMNS.filter(c => !c.outboundOnly || !isInbound).map(c => {
+              {columns.filter(c => !c.outboundOnly || !isInbound).map(c => {
                 const active = c.sortable && c.key === sortKey;
                 const padCls = c.label === "일자" ? "pl-2 pr-0" : c.label === "자재코드" ? "pl-1 pr-2" : "px-2";
                 return (
@@ -376,7 +380,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
           <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={(isInbound ? 9 : 11) + (admin ? 1 : 0) + 1} className="text-center py-16 text-gray-400 dark:text-gray-500">
+                <td colSpan={(isInbound ? 11 : 13) + (admin ? 1 : 0) + 1} className="text-center py-16 text-gray-400 dark:text-gray-500">
                   {transactions.length === 0
                     ? `${mode} 내역이 없습니다.`
                     : "조건에 맞는 내역이 없습니다."}
@@ -401,6 +405,12 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                 <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{matMap.get(t.materialId) || "-"}</td>
                 <td className="px-2 py-3 text-center tabular-nums text-black dark:text-white">
                   {fmtNum(t.qty)}
+                </td>
+                <td className="px-2 py-3 text-right tabular-nums text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                  ₩{fmtNum(t.unitPrice ?? 0)}
+                </td>
+                <td className={`px-2 py-3 text-right tabular-nums font-semibold whitespace-nowrap ${isInbound ? "text-blue-600 dark:text-blue-400" : "text-orange-500 dark:text-orange-400"}`}>
+                  ₩{fmtNum((t.unitPrice ?? 0) * t.qty)}
                 </td>
                 <td className="px-2 py-3 text-center tabular-nums text-black dark:text-white whitespace-nowrap">
                   {fmtNum(t.prevStock)} → <span className="font-medium">{fmtNum(t.afterStock)}</span>
@@ -460,6 +470,22 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                 )}
               </tr>
             ))}
+            {/* 합계 요약 행 */}
+            {sorted.length > 0 && (
+              <tr className="bg-gray-50 dark:bg-gray-700/50 font-semibold border-t border-gray-200 dark:border-gray-700">
+                <td className="px-3 py-3"></td>
+                <td className="pl-2 pr-0 py-3 text-left text-black dark:text-white font-bold">합계</td>
+                <td colSpan={3}></td>
+                <td className="px-2 py-3 text-center tabular-nums text-black dark:text-white font-bold">
+                  {fmtNum(sorted.reduce((acc, curr) => acc + curr.qty, 0))}
+                </td>
+                <td className="px-2 py-3"></td>
+                <td className={`px-2 py-3 text-right tabular-nums font-bold ${isInbound ? "text-blue-600 dark:text-blue-400" : "text-orange-500 dark:text-orange-400"}`}>
+                  ₩{fmtNum(sorted.reduce((acc, curr) => acc + (curr.qty * (curr.unitPrice ?? 0)), 0))}
+                </td>
+                <td colSpan={(isInbound ? 4 : 6) + (admin ? 1 : 0)} className="px-2 py-3"></td>
+              </tr>
+            )}
           </tbody>
         </table>
         </div>

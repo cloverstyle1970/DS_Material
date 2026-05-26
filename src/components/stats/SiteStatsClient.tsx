@@ -69,11 +69,12 @@ export default function SiteStatsClient() {
   }
 
   const filtered = useMemo(() => {
+    const siteQuery = selectedSite.trim().toLowerCase();
     return transactions.filter(t => {
       const d = t.createdAt.substring(0, 10);
       if (dateFrom && d < dateFrom) return false;
       if (dateTo   && d > dateTo)   return false;
-      if (selectedSite && t.siteName !== selectedSite) return false;
+      if (siteQuery && !(t.siteName ?? "").toLowerCase().includes(siteQuery)) return false;
       return true;
     });
   }, [transactions, dateFrom, dateTo, selectedSite]);
@@ -152,12 +153,21 @@ export default function SiteStatsClient() {
             <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
               className="px-2.5 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-xs text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400" />
           </div>
-          {/* 현장 필터 */}
-          <select value={selectedSite} onChange={e => setSelectedSite(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400">
-            <option value="">전체 현장</option>
-            {sites.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-          </select>
+          {/* 현장 필터 (입력 + 자동완성) */}
+          <div className="relative flex items-center">
+            <input type="text" lang="ko" list="site-stats-options"
+              value={selectedSite} onChange={e => setSelectedSite(e.target.value)}
+              placeholder="전체 현장 (입력하여 검색)"
+              className="w-56 px-3 py-2 pr-7 rounded-lg border border-gray-200 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            {selectedSite && (
+              <button type="button" onClick={() => setSelectedSite("")}
+                aria-label="현장 필터 초기화"
+                className="absolute right-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none">×</button>
+            )}
+            <datalist id="site-stats-options">
+              {sites.map(s => <option key={s.id} value={s.name} />)}
+            </datalist>
+          </div>
           <div className="flex items-center gap-2 ml-auto">
             {canDownload && (
               <button onClick={downloadExcel} disabled={materialStats.length === 0}
