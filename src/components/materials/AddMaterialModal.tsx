@@ -9,7 +9,6 @@ import { MaterialRecord } from "@/lib/mock-materials";
 import CategoryManagerModal from "./CategoryManagerModal";
 import DraggableModal from "@/components/common/DraggableModal";
 
-const OPINION_BUCKET = "material-opinions";
 const REFERENCE_BUCKET = "material-references";
 
 interface Props {
@@ -39,10 +38,7 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
   const [stockQty, setStockQty] = useState(0);
   const [saving, setSaving] = useState(false);
 
-  // 소견서 / 참조 사진
-  const [opinionText, setOpinionText] = useState(source?.opinionText ?? "");
-  const [opinionFile, setOpinionFile] = useState<File | null>(null);
-  const [opinionUploading, setOpinionUploading] = useState(false);
+  // 참조 사진
   const [refFile1, setRefFile1] = useState<File | null>(null);
   const [refFile2, setRefFile2] = useState<File | null>(null);
   const [refUploading, setRefUploading] = useState(false);
@@ -110,12 +106,12 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
     ? (isDs ? trimmedManualId.endsWith("R") : trimmedManualId.startsWith("A"))
     : isRepair;
 
-  async function uploadImage(file: File, bucket: string, prefix: string): Promise<string> {
+  async function uploadReferenceImage(file: File, slot: 1 | 2): Promise<string> {
     const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
-    const path = `new/${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const { error: upErr } = await supabase.storage.from(bucket).upload(path, file, { cacheControl: "3600", upsert: false });
+    const path = `new/ref${slot}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error: upErr } = await supabase.storage.from(REFERENCE_BUCKET).upload(path, file, { cacheControl: "3600", upsert: false });
     if (upErr) throw upErr;
-    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+    const { data } = supabase.storage.from(REFERENCE_BUCKET).getPublicUrl(path);
     return data.publicUrl;
   }
 
@@ -134,26 +130,18 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
 
     setSaving(true);
     try {
-      // 사진 업로드 (신규는 material.id가 없어서 path는 new/ prefix)
-      let opinionImageUrl = "";
-      if (opinionFile) {
-        setOpinionUploading(true);
-        try { opinionImageUrl = await uploadImage(opinionFile, OPINION_BUCKET, "opinion"); }
-        finally { setOpinionUploading(false); }
-      }
+      // 참조 사진 업로드 (신규는 material.id가 없어서 path는 new/ prefix)
       let referenceImageUrl1 = "";
       let referenceImageUrl2 = "";
       if (refFile1 || refFile2) {
         setRefUploading(true);
         try {
-          if (refFile1) referenceImageUrl1 = await uploadImage(refFile1, REFERENCE_BUCKET, "ref1");
-          if (refFile2) referenceImageUrl2 = await uploadImage(refFile2, REFERENCE_BUCKET, "ref2");
+          if (refFile1) referenceImageUrl1 = await uploadReferenceImage(refFile1, 1);
+          if (refFile2) referenceImageUrl2 = await uploadReferenceImage(refFile2, 2);
         } finally { setRefUploading(false); }
       }
 
       const extra = {
-        opinionText: opinionText.trim(),
-        opinionImageUrl,
         referenceImageUrl1,
         referenceImageUrl2,
       };
@@ -367,33 +355,6 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
               </div>
             </div>
 
-            {/* 소견서 (견적서 작성 시 자동 첨부) */}
-            <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
-                📝 소견서 <span className="text-[10px] text-gray-400">(견적서 작성 시 자동 첨부)</span>
-              </label>
-              <textarea value={opinionText} onChange={e => setOpinionText(e.target.value)} rows={3} lang="ko"
-                placeholder="이 자재에 대한 소견 (역할, 점검 권장 시점, 교체 사유 등)"
-                className="w-full rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-slate-400 resize-none" />
-              <div className="mt-2">
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">소견서 이미지 (선택)</label>
-                <div className="flex items-center gap-2">
-                  <input id="add-opinion-img" type="file" accept="image/*"
-                    onChange={e => setOpinionFile(e.target.files?.[0] ?? null)} className="hidden" />
-                  <label htmlFor="add-opinion-img" className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold cursor-pointer hover:bg-blue-700 whitespace-nowrap">
-                    📁 파일 선택
-                  </label>
-                  <span className="text-xs text-gray-600 dark:text-gray-300 truncate flex-1">
-                    {opinionFile ? opinionFile.name : "선택된 파일 없음"}
-                  </span>
-                  {opinionFile && (
-                    <button type="button" onClick={() => setOpinionFile(null)} className="text-xs text-red-500">지우기</button>
-                  )}
-                </div>
-                {opinionUploading && <div className="text-[11px] text-gray-500 mt-1">이미지 업로드 중...</div>}
-              </div>
-            </div>
-
             {/* 참조 사진 (자재 자체 식별/유지보수용, 최대 2장) */}
             <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
@@ -447,7 +408,7 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
                 className="flex-1 rounded-lg border border-gray-200 dark:border-gray-600 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                 취소
               </button>
-              <button type="submit" disabled={saving || opinionUploading || refUploading || !name.trim() || !major || !mid || !sub || (isManual && !isRepairMode && !trimmedManualId)}
+              <button type="submit" disabled={saving || refUploading || !name.trim() || !major || !mid || !sub || (isManual && !isRepairMode && !trimmedManualId)}
                 className="flex-1 rounded-lg bg-slate-700 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 transition-colors">
                 {saving ? "저장 중..." : "등록"}
               </button>

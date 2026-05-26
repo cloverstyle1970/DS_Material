@@ -36,8 +36,8 @@ export default function TabBar() {
               className={[
                 "shrink-0 w-5 h-5 rounded flex items-center justify-center text-base leading-none transition-colors ml-1",
                 active
-                  ? "text-gray-300 dark:text-gray-500 hover:bg-slate-700 dark:hover:bg-gray-200 hover:text-white dark:hover:text-gray-700"
-                  : "text-gray-400 dark:text-gray-500 hover:bg-gray-300 dark:hover:bg-slate-700 hover:text-gray-700 dark:hover:text-white",
+                  ? "text-gray-300 dark:text-gray-600 hover:bg-slate-700 dark:hover:bg-gray-200 hover:text-white dark:hover:text-gray-700"
+                  : "text-gray-500 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-slate-700 hover:text-gray-700 dark:hover:text-white",
               ].join(" ")}
               aria-label="탭 닫기"
             >

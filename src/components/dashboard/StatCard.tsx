@@ -15,10 +15,10 @@ const COLOR_MAP = {
 };
 
 const NUM_COLOR_MAP = {
-  blue:   "text-blue-600",
-  orange: "text-orange-600",
-  red:    "text-red-600",
-  green:  "text-green-600",
+  blue:   "text-blue-600 dark:text-blue-300",
+  orange: "text-orange-600 dark:text-orange-300",
+  red:    "text-red-600 dark:text-red-300",
+  green:  "text-green-600 dark:text-green-300",
 };
 
 export default function StatCard({ label, value, unit = "건", color }: StatCardProps) {

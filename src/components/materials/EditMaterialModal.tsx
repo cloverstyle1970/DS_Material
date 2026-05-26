@@ -7,7 +7,6 @@ import { supabase } from "@/lib/supabase";
 import RegisterRepairModal from "./RegisterRepairModal";
 import DraggableModal from "@/components/common/DraggableModal";
 
-const OPINION_BUCKET = "material-opinions";
 const REFERENCE_BUCKET = "material-references";
 
 interface Props {
@@ -26,10 +25,6 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
   const [storageLoc, setStorageLoc] = useState(material.storageLoc ?? "");
   const [stockQty,   setStockQty]   = useState(material.stockQty);
   const [isRepair,   setIsRepair]   = useState(material.isRepair);
-  const [opinionText,     setOpinionText]     = useState(material.opinionText ?? "");
-  const [opinionImageUrl, setOpinionImageUrl] = useState(material.opinionImageUrl ?? "");
-  const [opinionFile,     setOpinionFile]     = useState<File | null>(null);
-  const [opinionUploading, setOpinionUploading] = useState(false);
   const [refUrl1, setRefUrl1] = useState(material.referenceImageUrl1 ?? "");
   const [refUrl2, setRefUrl2] = useState(material.referenceImageUrl2 ?? "");
   const [refFile1, setRefFile1] = useState<File | null>(null);
@@ -41,20 +36,6 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
 
   const isDs = material.id.startsWith("D");
   const canRegisterRepair = isDs && !material.isRepair;
-
-  async function uploadOpinionImage(file: File): Promise<string> {
-    setOpinionUploading(true);
-    try {
-      const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
-      const path = `${material.id}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const { error: upErr } = await supabase.storage.from(OPINION_BUCKET).upload(path, file, { cacheControl: "3600", upsert: false });
-      if (upErr) throw upErr;
-      const { data } = supabase.storage.from(OPINION_BUCKET).getPublicUrl(path);
-      return data.publicUrl;
-    } finally {
-      setOpinionUploading(false);
-    }
-  }
 
   async function uploadReferenceImage(file: File, slot: 1 | 2): Promise<string> {
     setRefUploading(true);
@@ -75,19 +56,12 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
     if (!name.trim()) { setError("부품명을 입력해 주세요."); return; }
     setSaving(true);
     try {
-      // 새 이미지 파일이 있으면 먼저 업로드
-      let finalImageUrl = opinionImageUrl;
-      if (opinionFile) {
-        finalImageUrl = await uploadOpinionImage(opinionFile);
-      }
       let finalRef1 = refUrl1;
       if (refFile1) finalRef1 = await uploadReferenceImage(refFile1, 1);
       let finalRef2 = refUrl2;
       if (refFile2) finalRef2 = await uploadReferenceImage(refFile2, 2);
       await api.patch(`/api/materials/${encodeURIComponent(material.id)}`, {
         name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty, isRepair,
-        opinionText: opinionText.trim(),
-        opinionImageUrl: finalImageUrl || "",
         referenceImageUrl1: finalRef1 || "",
         referenceImageUrl2: finalRef2 || "",
       });
@@ -196,39 +170,6 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
             </div>
           </div>
 
-          {/* 소견서 (견적서 작성 시 자동 첨부) */}
-          <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
-            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
-              📝 소견서 <span className="text-[10px] text-gray-400">(견적서 작성 시 자동 첨부)</span>
-            </label>
-            <textarea value={opinionText} onChange={e => setOpinionText(e.target.value)} rows={3} lang="ko"
-              placeholder="이 자재에 대한 소견 (역할, 점검 권장 시점, 교체 사유 등)"
-              className={field + " resize-none"} />
-            <div className="mt-2">
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">소견서 이미지 (선택)</label>
-              <div className="flex items-center gap-2">
-                <input id="opinion-img" type="file" accept="image/*"
-                  onChange={e => setOpinionFile(e.target.files?.[0] ?? null)} className="hidden" />
-                <label htmlFor="opinion-img" className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold cursor-pointer hover:bg-blue-700 whitespace-nowrap">
-                  📁 파일 선택
-                </label>
-                {opinionImageUrl && !opinionFile && (
-                  <a href={opinionImageUrl} target="_blank" rel="noopener noreferrer"
-                    className="text-xs text-blue-600 hover:underline whitespace-nowrap">현재 이미지 보기</a>
-                )}
-                <span className="text-xs text-gray-600 dark:text-gray-300 truncate flex-1">
-                  {opinionFile ? opinionFile.name : (opinionImageUrl ? "기존 이미지 등록됨" : "선택된 파일 없음")}
-                </span>
-                {(opinionFile || opinionImageUrl) && (
-                  <button type="button"
-                    onClick={() => { setOpinionFile(null); setOpinionImageUrl(""); }}
-                    className="text-xs text-red-500">지우기</button>
-                )}
-              </div>
-              {opinionUploading && <div className="text-[11px] text-gray-500 mt-1">이미지 업로드 중...</div>}
-            </div>
-          </div>
-
           {/* 참조 사진 (자재 자체 식별/유지보수용, 최대 2장) */}
           <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
@@ -287,7 +228,7 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
               className="flex-1 rounded-lg border border-gray-200 dark:border-gray-600 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
               취소
             </button>
-            <button type="submit" disabled={saving || opinionUploading || refUploading || !name.trim()}
+            <button type="submit" disabled={saving || refUploading || !name.trim()}
               className="flex-1 rounded-lg bg-slate-700 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 transition-colors">
               {saving ? "저장 중..." : "수정 저장"}
             </button>
