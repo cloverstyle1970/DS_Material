@@ -81,38 +81,76 @@ export default function SiteStatsClient() {
 
   // 현장별 집계
   const siteStats = useMemo(() => {
-    const map: Record<string, { site: string; inQty: number; outQty: number; materials: Set<string>; lastDate: string }> = {};
+    const map: Record<string, {
+      site: string;
+      inQty: number;
+      inAmt: number;
+      outQty: number;
+      outAmt: number;
+      materials: Set<string>;
+      lastDate: string;
+    }> = {};
     filtered.forEach(t => {
       const site = t.siteName ?? "미지정";
-      if (!map[site]) map[site] = { site, inQty: 0, outQty: 0, materials: new Set(), lastDate: "" };
-      if (t.type === "입고") map[site].inQty  += t.qty;
-      else                   map[site].outQty += t.qty;
+      if (!map[site]) map[site] = { site, inQty: 0, inAmt: 0, outQty: 0, outAmt: 0, materials: new Set(), lastDate: "" };
+      const price = t.unitPrice ?? 0;
+      const amt = t.qty * price;
+      if (t.type === "입고") {
+        map[site].inQty += t.qty;
+        map[site].inAmt += amt;
+      } else {
+        map[site].outQty += t.qty;
+        map[site].outAmt += amt;
+      }
       map[site].materials.add(t.materialId);
       if (t.createdAt > map[site].lastDate) map[site].lastDate = t.createdAt;
     });
-    return Object.values(map).sort((a, b) => b.outQty - a.outQty);
+    return Object.values(map).sort((a, b) => b.outAmt - a.outAmt);
   }, [filtered]);
 
   // 자재별 집계 (선택 현장 또는 전체)
   const materialStats = useMemo(() => {
-    const map: Record<string, { id: string; name: string; inQty: number; outQty: number; lastDate: string }> = {};
+    const map: Record<string, {
+      id: string;
+      name: string;
+      inQty: number;
+      inAmt: number;
+      outQty: number;
+      outAmt: number;
+      lastDate: string;
+    }> = {};
     filtered.forEach(t => {
-      if (!map[t.materialId]) map[t.materialId] = { id: t.materialId, name: t.materialName, inQty: 0, outQty: 0, lastDate: "" };
-      if (t.type === "입고") map[t.materialId].inQty  += t.qty;
-      else                   map[t.materialId].outQty += t.qty;
+      if (!map[t.materialId]) map[t.materialId] = { id: t.materialId, name: t.materialName, inQty: 0, inAmt: 0, outQty: 0, outAmt: 0, lastDate: "" };
+      const price = t.unitPrice ?? 0;
+      const amt = t.qty * price;
+      if (t.type === "입고") {
+        map[t.materialId].inQty += t.qty;
+        map[t.materialId].inAmt += amt;
+      } else {
+        map[t.materialId].outQty += t.qty;
+        map[t.materialId].outAmt += amt;
+      }
       if (t.createdAt > map[t.materialId].lastDate) map[t.materialId].lastDate = t.createdAt;
     });
-    return Object.values(map).sort((a, b) => b.outQty - a.outQty);
+    return Object.values(map).sort((a, b) => b.outAmt - a.outAmt); // Note: sorting by outbound amount
   }, [filtered]);
 
   const totalIn  = filtered.filter(t => t.type === "입고").reduce((s, t) => s + t.qty, 0);
   const totalOut = filtered.filter(t => t.type === "출고").reduce((s, t) => s + t.qty, 0);
+  const totalInAmt  = filtered.filter(t => t.type === "입고").reduce((s, t) => s + t.qty * (t.unitPrice ?? 0), 0);
+  const totalOutAmt = filtered.filter(t => t.type === "출고").reduce((s, t) => s + t.qty * (t.unitPrice ?? 0), 0);
 
   function downloadExcel() {
     if (materialStats.length === 0) return;
     const rows = materialStats.map(m => ({
-      자재코드: m.id, 자재명: m.name,
-      입고수량: m.inQty, 출고수량: m.outQty,
+      자재코드: m.id,
+      자재명: m.name,
+      "차변(입고수량)": m.inQty,
+      "차변(입고금액)": m.inAmt,
+      "대변(출고수량)": m.outQty,
+      "대변(출고금액)": m.outAmt,
+      "현장잔고(수량)": m.inQty - m.outQty,
+      "현장잔고(금액)": m.inAmt - m.outAmt,
       최종처리일: fmtDate(m.lastDate),
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -182,20 +220,22 @@ export default function SiteStatsClient() {
       {/* 요약 카드 */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">조회 입고 수량</p>
-          <p className="text-2xl font-bold text-blue-600">{fmtNum(totalIn)}<span className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1">건</span></p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">조회 입고 금액 (차변)</p>
+          <p className="text-xl font-bold text-blue-600">₩{fmtNum(totalInAmt)}</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">수량: {fmtNum(totalIn)} EA</p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">조회 출고 수량</p>
-          <p className="text-2xl font-bold text-orange-500">{fmtNum(totalOut)}<span className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1">건</span></p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">조회 출고 금액 (대변)</p>
+          <p className="text-xl font-bold text-orange-500">₩{fmtNum(totalOutAmt)}</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">수량: {fmtNum(totalOut)} EA</p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">관련 현장 수</p>
-          <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{fmtNum(siteStats.length)}<span className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1">곳</span></p>
+          <p className="text-xl font-bold text-slate-700 dark:text-slate-300">{fmtNum(siteStats.length)}<span className="text-xs font-normal text-gray-400 dark:text-gray-500 ml-1">곳</span></p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">투입 자재 종수</p>
-          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{fmtNum(materialStats.length)}<span className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1">종</span></p>
+          <p className="text-xl font-bold text-purple-600 dark:text-purple-400">{fmtNum(materialStats.length)}<span className="text-xs font-normal text-gray-400 dark:text-gray-500 ml-1">종</span></p>
         </div>
       </div>
 
@@ -214,24 +254,46 @@ export default function SiteStatsClient() {
             </div>
           ) : (
             <div className="overflow-auto max-h-[calc(100vh-250px)]">
-            <table className="w-full min-w-[500px] text-sm">
+            <table className="w-full min-w-[700px] text-sm">
               <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
                 <tr>
-                  {["현장명", "입고", "출고", "자재종수", "최종처리일"].map(h => (
-                    <th key={h} className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{h}</th>
-                  ))}
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">현장명</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>차변 (입고)</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>대변 (출고)</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>현장 잔고</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">자재종수</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">최종처리일</th>
+                </tr>
+                <tr className="bg-gray-100/30 dark:bg-gray-800/20 text-[10px] text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-700">
+                  <th></th>
+                  <th className="px-2 py-1 font-normal border-r border-gray-200/20 dark:border-gray-700/20">수량</th>
+                  <th className="px-2 py-1 font-normal pr-4">금액</th>
+                  <th className="px-2 py-1 font-normal border-r border-gray-200/20 dark:border-gray-700/20">수량</th>
+                  <th className="px-2 py-1 font-normal pr-4">금액</th>
+                  <th className="px-2 py-1 font-normal border-r border-gray-200/20 dark:border-gray-700/20">수량</th>
+                  <th className="px-2 py-1 font-normal pr-4">금액</th>
+                  <th></th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-                {siteStats.map(s => (
-                  <tr key={s.site} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                    <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[160px] truncate">{s.site}</td>
-                    <td className="px-4 py-3 text-center text-blue-600 font-medium tabular-nums">{fmtNum(s.inQty)}</td>
-                    <td className="px-4 py-3 text-center text-orange-500 font-medium tabular-nums">{fmtNum(s.outQty)}</td>
-                    <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 tabular-nums">{fmtNum(s.materials.size)}</td>
-                    <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(s.lastDate)}</td>
-                  </tr>
-                ))}
+                {siteStats.map(s => {
+                  const balQty = s.inQty - s.outQty;
+                  const balAmt = s.inAmt - s.outAmt;
+                  return (
+                    <tr key={s.site} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                      <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[160px] truncate">{s.site}</td>
+                      <td className="px-2 py-3 text-center text-blue-600 font-medium tabular-nums border-r border-gray-200/20 dark:border-gray-700/20">{fmtNum(s.inQty)}</td>
+                      <td className="px-2 py-3 text-right text-blue-600 font-medium tabular-nums pr-4">₩{fmtNum(s.inAmt)}</td>
+                      <td className="px-2 py-3 text-center text-orange-500 font-medium tabular-nums border-r border-gray-200/20 dark:border-gray-700/20">{fmtNum(s.outQty)}</td>
+                      <td className="px-2 py-3 text-right text-orange-500 font-medium tabular-nums pr-4">₩{fmtNum(s.outAmt)}</td>
+                      <td className={`px-2 py-3 text-center font-bold tabular-nums border-r border-gray-200/20 dark:border-gray-700/20 ${balQty >= 0 ? "text-slate-700 dark:text-slate-300" : "text-red-500"}`}>{fmtNum(balQty)}</td>
+                      <td className={`px-2 py-3 text-right font-bold tabular-nums pr-4 ${balAmt >= 0 ? "text-slate-700 dark:text-slate-300" : "text-red-500"}`}>₩{fmtNum(balAmt)}</td>
+                      <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 tabular-nums">{fmtNum(s.materials.size)}</td>
+                      <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(s.lastDate)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             </div>
@@ -258,21 +320,43 @@ export default function SiteStatsClient() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700 sticky top-0">
                   <tr>
-                    {["자재명", "코드", "입고", "출고", "최종처리일"].map(h => (
-                      <th key={h} className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{h}</th>
-                    ))}
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">자재명</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">코드</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>차변 (입고)</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>대변 (출고)</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>현장 잔고</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">최종처리일</th>
+                  </tr>
+                  <tr className="bg-gray-100/30 dark:bg-gray-800/20 text-[10px] text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-700">
+                    <th></th>
+                    <th></th>
+                    <th className="px-2 py-1 font-normal border-r border-gray-200/20 dark:border-gray-700/20">수량</th>
+                    <th className="px-2 py-1 font-normal pr-4">금액</th>
+                    <th className="px-2 py-1 font-normal border-r border-gray-200/20 dark:border-gray-700/20">수량</th>
+                    <th className="px-2 py-1 font-normal pr-4">금액</th>
+                    <th className="px-2 py-1 font-normal border-r border-gray-200/20 dark:border-gray-700/20">수량</th>
+                    <th className="px-2 py-1 font-normal pr-4">금액</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-                  {materialStats.map(m => (
-                    <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                      <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[150px] truncate">{m.name}</td>
-                      <td className="px-4 py-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{m.id}</td>
-                      <td className="px-4 py-3 text-center text-blue-600 tabular-nums">{m.inQty > 0 ? fmtNum(m.inQty) : "—"}</td>
-                      <td className="px-4 py-3 text-center text-orange-500 tabular-nums">{m.outQty > 0 ? fmtNum(m.outQty) : "—"}</td>
-                      <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(m.lastDate)}</td>
-                    </tr>
-                  ))}
+                  {materialStats.map(m => {
+                    const balQty = m.inQty - m.outQty;
+                    const balAmt = m.inAmt - m.outAmt;
+                    return (
+                      <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                        <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[150px] truncate">{m.name}</td>
+                        <td className="px-4 py-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{m.id}</td>
+                        <td className="px-2 py-3 text-center text-blue-600 font-medium tabular-nums border-r border-gray-200/20 dark:border-gray-700/20">{m.inQty > 0 ? fmtNum(m.inQty) : "—"}</td>
+                        <td className="px-2 py-3 text-right text-blue-600 font-medium tabular-nums pr-4">{m.inAmt > 0 ? `₩${fmtNum(m.inAmt)}` : "—"}</td>
+                        <td className="px-2 py-3 text-center text-orange-500 font-medium tabular-nums border-r border-gray-200/20 dark:border-gray-700/20">{m.outQty > 0 ? fmtNum(m.outQty) : "—"}</td>
+                        <td className="px-2 py-3 text-right text-orange-500 font-medium tabular-nums pr-4">{m.outAmt > 0 ? `₩${fmtNum(m.outAmt)}` : "—"}</td>
+                        <td className={`px-2 py-3 text-center font-bold tabular-nums border-r border-gray-200/20 dark:border-gray-700/20 ${balQty >= 0 ? "text-slate-700 dark:text-slate-300" : "text-red-500"}`}>{fmtNum(balQty)}</td>
+                        <td className={`px-2 py-3 text-right font-bold tabular-nums pr-4 ${balAmt >= 0 ? "text-slate-700 dark:text-slate-300" : "text-red-500"}`}>₩{fmtNum(balAmt)}</td>
+                        <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(m.lastDate)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -284,37 +368,62 @@ export default function SiteStatsClient() {
       {filtered.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div className="px-5 py-3.5 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">입출고 이력</h3>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">입출고 이력 원장</h3>
             <span className="text-xs text-gray-400 dark:text-gray-500">{filtered.length}건</span>
           </div>
           <div className="overflow-x-auto max-h-64 overflow-y-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700 sticky top-0">
                 <tr>
-                  {["일시", "구분", "자재명", "수량", "현장", "처리자"].map(h => (
-                    <th key={h} className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{h}</th>
-                  ))}
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">일시</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">자재명</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>차변 (입고)</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>대변 (출고)</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">현장</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">처리자</th>
+                </tr>
+                <tr className="bg-gray-100/30 dark:bg-gray-800/20 text-[10px] text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-700">
+                  <th></th>
+                  <th></th>
+                  <th className="px-2 py-1 font-normal border-r border-gray-200/20 dark:border-gray-700/20">수량</th>
+                  <th className="px-2 py-1 font-normal pr-4">금액</th>
+                  <th className="px-2 py-1 font-normal border-r border-gray-200/20 dark:border-gray-700/20">수량</th>
+                  <th className="px-2 py-1 font-normal pr-4">금액</th>
+                  <th></th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-                {filtered.slice(0, 100).map(t => (
-                  <tr key={`${t.type}-${t.id}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                    <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(t.createdAt)}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        t.type === "입고" ? "bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400" : "bg-orange-50 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400"
-                      }`}>{t.type}</span>
-                    </td>
-                    <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[180px] truncate">{t.materialName}</td>
-                    <td className="px-4 py-3 text-center tabular-nums">
-                      <span className={t.type === "입고" ? "text-blue-600" : "text-orange-500"}>
-                        {fmtNum(t.qty)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{t.siteName ?? "—"}</td>
-                    <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{t.userName}</td>
-                  </tr>
-                ))}
+                {filtered.slice(0, 100).map(t => {
+                  const price = t.unitPrice ?? 0;
+                  const amt = t.qty * price;
+                  const isIn = t.type === "입고";
+                  return (
+                    <tr key={`${t.type}-${t.id}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                      <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(t.createdAt)}</td>
+                      <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[180px] truncate">{t.materialName}</td>
+                      
+                      {/* 차변 (입고) */}
+                      <td className="px-2 py-3 text-center text-blue-600 font-medium tabular-nums border-r border-gray-200/20 dark:border-gray-700/20">
+                        {isIn ? fmtNum(t.qty) : "—"}
+                      </td>
+                      <td className="px-2 py-3 text-right text-blue-600 font-medium tabular-nums pr-4">
+                        {isIn ? `₩${fmtNum(amt)}` : "—"}
+                      </td>
+                      
+                      {/* 대변 (출고) */}
+                      <td className="px-2 py-3 text-center text-orange-500 font-medium tabular-nums border-r border-gray-200/20 dark:border-gray-700/20">
+                        {!isIn ? fmtNum(t.qty) : "—"}
+                      </td>
+                      <td className="px-2 py-3 text-right text-orange-500 font-medium tabular-nums pr-4">
+                        {!isIn ? `₩${fmtNum(amt)}` : "—"}
+                      </td>
+                      
+                      <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{t.siteName ?? "—"}</td>
+                      <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{t.userName}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
