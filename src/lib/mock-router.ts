@@ -888,7 +888,7 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
 
 async function routePOST(path: string, body: AnyBody): Promise<unknown> {
   if (path === "/api/materials") {
-    const { sourceId, directId, isDs, major, mid, sub, isRepair, trackSerial, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty } = body;
+    const { sourceId, directId, isDs, major, mid, sub, isRepair, trackSerial, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty, opinionText, opinionImageUrl, referenceImageUrl1, referenceImageUrl2 } = body;
     if (!major || !mid || !sub) throw new MockApiError("분류 코드(major/mid/sub)가 누락됐습니다", 400);
 
     let id: string;
@@ -942,6 +942,10 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
       stock_qty:    trackSerialFlag ? 0 : (Number(stockQty) || 0),
       is_repair:    isRepair,
       track_serial: trackSerialFlag,
+      opinion_text:          opinionText        || null,
+      opinion_image_url:     opinionImageUrl    || null,
+      reference_image_url1:  referenceImageUrl1 || null,
+      reference_image_url2:  referenceImageUrl2 || null,
     };
     const { data, error } = await supabase.from("materials").insert(row).select().single();
     if (error) throw new MockApiError(error.message, 500);

@@ -139,6 +139,7 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
     try {
       const m = await api.get<MaterialRecord>(`/api/materials/${encodeURIComponent(materialId)}`);
       patchRow(rowId, {
+        spec: m.modelNo ?? "",
         stockQty: m.stockQty ?? 0,
         storageLoc: m.storageLoc ?? "",
         buyPrice: m.buyPrice ?? 0,
@@ -211,6 +212,7 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
       return [...prev, row];
     });
     setPopup(null);
+    if (t.materialId) refreshRowStock(row.id, t.materialId);
   }
 
   const totals = useMemo(() => {

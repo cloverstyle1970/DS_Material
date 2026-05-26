@@ -7,13 +7,10 @@
 -- 추가
 --   · materials.reference_image_url1 : 참조 사진 1
 --   · materials.reference_image_url2 : 참조 사진 2
+--   · Storage 버킷 "material-references" + RLS 정책
+--     (기존 "material-opinions" 와 동일한 운영 정책)
 --
--- Storage 버킷
---   "material-references" 버킷이 Supabase Storage 에 있어야 함.
---   (Supabase Dashboard → Storage → New bucket → public 권한)
---   * 기존 "material-opinions" 버킷과 동일한 운영 정책 권장.
---
--- idempotent: ALTER ... IF NOT EXISTS
+-- idempotent: ALTER ... IF NOT EXISTS / INSERT ... ON CONFLICT / DROP POLICY IF EXISTS
 -- ============================================================
 
 ALTER TABLE materials
@@ -21,6 +18,35 @@ ALTER TABLE materials
   ADD COLUMN IF NOT EXISTS reference_image_url2 TEXT;
 
 NOTIFY pgrst, 'reload schema';
+
+-- ------------------------------------------------------------
+-- Storage 버킷 + RLS 정책
+-- ------------------------------------------------------------
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'material-references',
+  'material-references',
+  TRUE,
+  10485760,   -- 10MB
+  ARRAY['image/jpeg','image/png','image/webp','image/gif']
+)
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "material_references_authenticated_upload" ON storage.objects;
+DROP POLICY IF EXISTS "material_references_public_read"          ON storage.objects;
+DROP POLICY IF EXISTS "material_references_authenticated_delete" ON storage.objects;
+
+CREATE POLICY "material_references_authenticated_upload"
+  ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'material-references');
+
+CREATE POLICY "material_references_public_read"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'material-references');
+
+CREATE POLICY "material_references_authenticated_delete"
+  ON storage.objects FOR DELETE
+  USING (bucket_id = 'material-references');
 
 -- ============================================================
 -- 검증
@@ -32,4 +58,7 @@ SELECT
 UNION ALL SELECT
   'materials.reference_image_url2',
   (SELECT COUNT(*) FROM information_schema.columns
-    WHERE table_name='materials' AND column_name='reference_image_url2');
+    WHERE table_name='materials' AND column_name='reference_image_url2')
+UNION ALL SELECT
+  'bucket material-references',
+  (SELECT COUNT(*) FROM storage.buckets WHERE id='material-references');
