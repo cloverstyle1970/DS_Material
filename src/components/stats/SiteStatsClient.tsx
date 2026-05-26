@@ -149,8 +149,8 @@ export default function SiteStatsClient() {
       "차변(입고금액)": m.inAmt,
       "대변(출고수량)": m.outQty,
       "대변(출고금액)": m.outAmt,
-      "수익금(수량)": m.inQty - m.outQty,
-      "수익금(금액)": m.inAmt - m.outAmt,
+      "수익금(수량)": m.outQty - m.inQty,
+      "수익금(금액)": m.outAmt - m.inAmt,
       최종처리일: fmtDate(m.lastDate),
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -278,8 +278,8 @@ export default function SiteStatsClient() {
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                 {siteStats.map(s => {
-                  const balQty = s.inQty - s.outQty;
-                  const balAmt = s.inAmt - s.outAmt;
+                  const balQty = s.outQty - s.inQty;
+                  const balAmt = s.outAmt - s.inAmt;
                   return (
                     <tr key={s.site} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                       <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[160px] truncate">{s.site}</td>
@@ -341,8 +341,8 @@ export default function SiteStatsClient() {
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                   {materialStats.map(m => {
-                    const balQty = m.inQty - m.outQty;
-                    const balAmt = m.inAmt - m.outAmt;
+                    const balQty = m.outQty - m.inQty;
+                    const balAmt = m.outAmt - m.inAmt;
                     return (
                       <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                         <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[150px] truncate">{m.name}</td>
