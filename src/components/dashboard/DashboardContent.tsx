@@ -57,7 +57,7 @@ export default function DashboardContent() {
                  <span className="font-bold text-slate-800 dark:text-slate-100">{fmtNum(stats.dsSites)}곳</span>
                </div>
             </div>
-            <StatCard label="총 유지보수 호기" value={stats.totalElevators} unit="대" color="green" />
+            <StatCard label="유지보수 대수" value={stats.totalElevators} unit="대" color="green" />
             <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 flex flex-col justify-center shadow-sm xl:col-span-3">
                <div className="grid grid-cols-3 gap-4 text-center divide-x divide-slate-100 dark:divide-slate-700">
                  <div>
