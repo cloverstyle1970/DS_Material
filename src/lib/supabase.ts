@@ -1,7 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 
+// anon 키는 공개(publishable) 키 — 클라이언트 번들에 노출되는 게 정상이며 RLS로 보호된다.
+// 배포(GitHub Pages) 빌드에서 Secret이 비어도 동작하도록 신DB 기본값을 둔다.
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://bbnmxwpacdfqvicybhau.supabase.co";
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJibm14d3BhY2RmcXZpY3liaGF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NDA3NDYsImV4cCI6MjA5MTAxNjc0Nn0.cGqnmu5BeaXosxoE-IEmjX-dF4zDYipzpYb5hhc8S6I";
 
 const rawClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY || "placeholder");
 
