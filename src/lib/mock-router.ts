@@ -596,23 +596,24 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
       supabase.from("material_requests").select("*").order("requested_at", { ascending: false }).limit(10),
       supabase.from("managed_sites").select("*", { count: "exact", head: true }).eq("company_type", "TK"),
       supabase.from("managed_sites").select("*", { count: "exact", head: true }).eq("company_type", "DS"),
-      fetchAll("elevators", "site_name"),
-      fetchAll("sites", "name, company_type"),
+      fetchAll("site_elevators", "site_id"),
+      fetchAll("managed_sites", "id, company_type"),
     ]);
     const tkeSites = tkeSitesResult.count ?? 0;
     const dsSites = dsSitesResult.count ?? 0;
 
     const totalElevators = allElevators.length;
 
-    const siteTypeMap = new Map<string, string>();
-    allSites.forEach((s: any) => siteTypeMap.set(s.name, s.company_type));
+    // 신DB: 호기=site_elevators(site_id), 현장 회사구분=managed_sites(id→company_type)
+    const siteTypeMap = new Map<number, string>();
+    allSites.forEach((s: any) => siteTypeMap.set(s.id, s.company_type));
 
     let tkeElevators = 0;
     let dsElevators = 0;
     let otherElevators = 0;
 
     allElevators.forEach((e: any) => {
-      const type = siteTypeMap.get(e.site_name);
+      const type = siteTypeMap.get(e.site_id);
       if (type === "TK") tkeElevators++;
       else if (type === "DS") dsElevators++;
       else otherElevators++;
