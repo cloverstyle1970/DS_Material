@@ -37,7 +37,14 @@ export default function LoginPage() {
       .eq("password", password)
       .maybeSingle();
 
-    if (qErr || !account) {
+    if (qErr) {
+      // 조회 자체 실패(예: Invalid API key=옛 번들 캐시, 네트워크) — 비번 문제와 구분해 노출
+      console.error("[login] accounts 조회 실패:", qErr);
+      setError(`로그인 처리 오류: ${qErr.message || qErr.code || "네트워크 오류"} — 캐시 새로고침(Ctrl+Shift+R) 후 재시도하세요.`);
+      setSubmitting(false);
+      return;
+    }
+    if (!account) {
       setError("아이디 또는 비밀번호가 올바르지 않습니다.");
       setSubmitting(false);
       return;
