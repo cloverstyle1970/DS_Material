@@ -44,6 +44,21 @@ interface Row extends Vehicle {
 
 type StatusFilter = "active" | "scrapped" | "all";
 
+// 정렬 가능 컬럼 (이력·액션 제외)
+const SORT_COLS: { key: keyof Row; label: string }[] = [
+  { key: "vehicle_type",        label: "구분" },
+  { key: "user_name",           label: "사용자" },
+  { key: "user_dept",           label: "부서" },
+  { key: "plate_number",        label: "차량번호" },
+  { key: "model",               label: "차종" },
+  { key: "fuel_type",           label: "유종" },
+  { key: "insurance_company",   label: "보험사" },
+  { key: "insurance_end_date",  label: "보험만기" },
+];
+function compareCell(a: unknown, b: unknown): number {
+  return String(a ?? "").localeCompare(String(b ?? ""), "ko", { numeric: true });
+}
+
 export default function CompanyVehiclesClient() {
   const { user } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
@@ -54,6 +69,10 @@ export default function CompanyVehiclesClient() {
   const [editing, setEditing] = useState<Row | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [historyOf, setHistoryOf] = useState<Row | null>(null);
+  const [sort, setSort] = useState<{ key: keyof Row | null; dir: "asc" | "desc" }>({ key: null, dir: "asc" });
+  function toggleSort(key: keyof Row) {
+    setSort(prev => prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" });
+  }
 
   async function load() {
     setLoading(true);
@@ -101,6 +120,13 @@ export default function CompanyVehiclesClient() {
         || r.user_dept.toLowerCase().includes(s);
     });
 
+  const sorted = sort.key
+    ? [...filtered].sort((a, b) => {
+        const r = compareCell(a[sort.key!], b[sort.key!]);
+        return sort.dir === "asc" ? r : -r;
+      })
+    : filtered;
+
   return (
     <div className="min-h-full bg-gray-50 dark:bg-gray-900">
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
@@ -134,24 +160,27 @@ export default function CompanyVehiclesClient() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
                 <tr className="text-center text-[11px] font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
-                  <th className="px-3 py-2.5">구분</th>
-                  <th className="px-3 py-2.5">사용자</th>
-                  <th className="px-3 py-2.5">부서</th>
-                  <th className="px-3 py-2.5">차량번호</th>
-                  <th className="px-3 py-2.5">차종</th>
-                  <th className="px-3 py-2.5">유종</th>
-                  <th className="px-3 py-2.5">보험사</th>
-                  <th className="px-3 py-2.5">보험만기</th>
+                  {SORT_COLS.map(c => (
+                    <th key={c.key} onClick={() => toggleSort(c.key)}
+                      className="px-3 py-2.5 cursor-pointer select-none hover:text-gray-900 dark:hover:text-white">
+                      <span className="inline-flex items-center gap-0.5">
+                        {c.label}
+                        <span className="text-[9px] text-gray-400">
+                          {sort.key === c.key ? (sort.dir === "asc" ? "▲" : "▼") : "↕"}
+                        </span>
+                      </span>
+                    </th>
+                  ))}
                   <th className="px-3 py-2.5">이력</th>
                   <th className="px-3 py-2.5">액션</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {loading && <tr><td colSpan={10} className="px-3 py-8 text-center text-xs text-gray-500">로딩 중...</td></tr>}
-                {!loading && filtered.length === 0 && (
+                {!loading && sorted.length === 0 && (
                   <tr><td colSpan={10} className="px-3 py-12 text-center text-xs text-gray-500">조건에 해당하는 회사차량이 없습니다.</td></tr>
                 )}
-                {!loading && filtered.map(r => (
+                {!loading && sorted.map(r => (
                   <tr key={r.id} className={`hover:bg-gray-50 dark:hover:bg-gray-700/30 text-center ${r.status === "scrapped" ? "opacity-60" : ""}`}>
                     <td className="px-3 py-2.5">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${vehicleTypeBadgeCls(r.vehicle_type)}`}>
