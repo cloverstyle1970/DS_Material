@@ -75,24 +75,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
           const parsed = JSON.parse(stored);
-          // Supabase에서 최신 권한·부서·테마 갱신 (권한·테마 변경 시 재로그인 없이 반영)
-          const { data } = await supabase
-            .from("users")
-            .select("permissions, dept, theme")
+          // 신DB accounts 에서 최신 권한·부서·테마 갱신 (재로그인 없이 반영)
+          const { data: account } = await supabase
+            .from("accounts")
+            .select("username, name, role, permissions, dept, theme")
             .eq("id", parsed.id)
-            .eq("status", "재직")
-            .single();
-          const dbTheme = (data as { theme?: string } | null)?.theme;
-          const theme = dbTheme === "dark" ? "dark" : dbTheme === "light" ? "light" : parsed.theme;
-          const freshUser: AuthUser = {
-            ...parsed,
-            permissions: (data?.permissions ?? parsed.permissions ?? []) as Permission[],
-            dept: data?.dept ?? parsed.dept ?? "",
-            theme,
-          };
+            .maybeSingle();
+
+          let freshUser: AuthUser = parsed;
+          if (account) {
+            const isMaster = account.role === "마스터";
+            const permissions = (isMaster
+              ? ["admin"]
+              : (Array.isArray(account.permissions) ? account.permissions : [])
+            ) as Permission[];
+            const theme = account.theme === "dark" ? "dark" : account.theme === "light" ? "light" : parsed.theme;
+
+            freshUser = {
+              ...parsed,
+              name: account.username ?? parsed.name,
+              dept: account.dept ?? "",
+              permissions,
+              theme,
+            };
+            applyTheme(theme);
+          } else {
+            applyTheme(parsed.theme);
+          }
+
           setUser(freshUser);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
-          applyTheme(theme);
         }
       } catch {}
       setIsLoading(false);

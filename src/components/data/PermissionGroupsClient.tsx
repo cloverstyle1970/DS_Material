@@ -180,10 +180,11 @@ export default function PermissionGroupsClient() {
   async function reload() {
     const [g, u] = await Promise.all([
       supabase.from("permission_groups").select("*").order("sort_order"),
-      supabase.from("users")
-        .select("id, name, dept, rank, status, permission_group_id, permissions")
+      // 신DB 정본은 accounts. username 이 실제 식별자 → name 으로 별칭.
+      supabase.from("accounts")
+        .select("id, name:username, dept, rank, status, permission_group_id, permissions")
         .eq("status", "재직")
-        .order("name"),
+        .order("username"),
     ]);
     setGroups((g.data ?? []) as Group[]);
     setUsers((u.data ?? []) as UserRow[]);
@@ -307,7 +308,7 @@ export default function PermissionGroupsClient() {
       }
       const ids = members.map(m => m.id);
       const { error } = await supabase
-        .from("users")
+        .from("accounts")
         .update({ permissions: editing.permissions })
         .in("id", ids);
       if (error) throw error;
@@ -351,7 +352,7 @@ export default function PermissionGroupsClient() {
       const g = groups.find(x => x.id === gid);
       update.permissions = g ? g.permissions : [];
     }
-    const { error } = await supabase.from("users").update(update).eq("id", uId);
+    const { error } = await supabase.from("accounts").update(update).eq("id", uId);
     if (error) { alert("어사인 실패: " + error.message); return; }
     await reload();
   }
@@ -364,7 +365,7 @@ export default function PermissionGroupsClient() {
   async function saveDetail() {
     if (!detailUser) return;
     const { error } = await supabase
-      .from("users")
+      .from("accounts")
       .update({ permissions: detailPerms })
       .eq("id", detailUser.id);
     if (error) { alert("저장 실패: " + error.message); return; }

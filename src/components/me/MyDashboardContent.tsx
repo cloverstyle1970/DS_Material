@@ -48,43 +48,63 @@ export default function MyDashboardContent() {
   const refresh = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    try {
-      // 알림
-      const notifs = await api.get<NotificationItem[]>(`/api/notifications?userId=${user.id}&limit=30`);
 
-      // 내 공사요청
-      const allReqs = await api.get<ConstructionRequest[]>("/api/construction-requests");
-      const mine = allReqs.filter(r => r.requesterUserId === user.id || (!r.requesterUserId && r.requesterName === user.name));
+    // 신DB 스키마 전환 중 — 구 스키마 테이블(notifications/construction_*/tbm_records 등)이
+    // 신DB에 없을 수 있다. 각 소스를 독립적으로 조회하고, 실패(테이블 없음 등) 시
+    // 빈 값으로 degrade해 화면이 죽지 않게 한다.
+    async function safe<T>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> {
+      try {
+        return await fn();
+      } catch (e) {
+        console.warn(`[대시보드] ${label} 조회 생략:`, getErrorMessage(e));
+        return fallback;
+      }
+    }
 
-      // 다가오는 일정 (담당자 또는 작업자에 내 이름 포함, 오늘~+7일)
-      const allScheds = await api.get<ConstructionSchedule[]>("/api/construction-schedules");
-      const name = user.name;
-      const upcoming = allScheds
-        .filter(s => s.endDate >= today && s.startDate <= sevenDaysLater)
-        .filter(s => s.manager.includes(name) || s.workers.includes(name))
-        .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.startTime.localeCompare(b.startTime));
+    const name = user.name;
 
-      // 최근 TBM 5건 (내가 작성)
-      const { data: tbmData } = await supabase.from("tbm_records")
+    // 알림
+    const notifs = await safe("알림", () =>
+      api.get<NotificationItem[]>(`/api/notifications?userId=${user.id}&limit=30`), []);
+
+    // 내 공사요청
+    const allReqs = await safe("공사요청", () =>
+      api.get<ConstructionRequest[]>("/api/construction-requests"), []);
+    const mine = allReqs.filter(r => r.requesterUserId === user.id || (!r.requesterUserId && r.requesterName === name));
+
+    // 다가오는 일정 (담당자 또는 작업자에 내 이름 포함, 오늘~+7일)
+    const allScheds = await safe("공사일정", () =>
+      api.get<ConstructionSchedule[]>("/api/construction-schedules"), []);
+    const upcoming = allScheds
+      .filter(s => s.endDate >= today && s.startDate <= sevenDaysLater)
+      .filter(s => s.manager.includes(name) || s.workers.includes(name))
+      .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.startTime.localeCompare(b.startTime));
+
+    // 최근 TBM 5건 (내가 작성)
+    const tbmData = await safe<TbmRow[]>("TBM", async () => {
+      const { data, error } = await supabase.from("tbm_records")
         .select("id, mode, sub_type, site_name, elevator_name, work_content, created_at")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(5);
+      if (error) throw error;
+      return (data ?? []) as TbmRow[];
+    }, []);
 
-      // 알림 수신 설정
-      const { data: prefData } = await supabase.from("users")
+    // 알림 수신 설정
+    const prefEnabled = await safe("알림설정", async () => {
+      const { data, error } = await supabase.from("users")
         .select("notifications_enabled").eq("id", user.id).single();
+      if (error) throw error;
+      return data?.notifications_enabled !== false;
+    }, true);
 
-      setNotifications(notifs);
-      setMyRequests(mine);
-      setUpcomingSchedules(upcoming);
-      setMyTbm((tbmData ?? []) as TbmRow[]);
-      setNotifEnabled(prefData?.notifications_enabled !== false);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+    setNotifications(notifs);
+    setMyRequests(mine);
+    setUpcomingSchedules(upcoming);
+    setMyTbm(tbmData);
+    setNotifEnabled(prefEnabled);
+    setLoading(false);
   }, [user, today, sevenDaysLater]);
 
   useEffect(() => {

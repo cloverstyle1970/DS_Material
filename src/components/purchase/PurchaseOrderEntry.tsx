@@ -117,6 +117,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
   }, []);
 
   const [orderRefNo,  setOrderRefNo]  = useState("");
+  const [freeOfCharge, setFreeOfCharge] = useState(false);  // 무상: 체크 시 구매단가 0원
   const [files,       setFiles]       = useState<File[]>([]);
   const [popup,       setPopup]       = useState<null | "request">(null);
   const [rows,        setRows]        = useState<Row[]>(() =>
@@ -229,7 +230,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
       const startIdx = next.findIndex(r => r.id === startRowId);
       materials.forEach((m, i) => {
         const idx = startIdx + i;
-        const unitPrice = m.buyPrice ?? 0;
+        const unitPrice = freeOfCharge ? 0 : (m.buyPrice ?? 0);
         const patch = { materialId: m.id, materialName: m.name, spec: m.modelNo ?? "", qty: 1, unitPrice };
         if (idx < next.length) next[idx] = { ...next[idx], ...patch };
         else next.push(newRow(patch));
@@ -245,7 +246,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
     for (const item of req.items) {
       const list = await api.get<MaterialRecord[]>(`/api/materials?q=${encodeURIComponent(item.materialId)}`).catch(() => [] as MaterialRecord[]);
       const m = list.find(x => x.id === item.materialId);
-      const unitPrice = m?.buyPrice ?? 0;
+      const unitPrice = freeOfCharge ? 0 : (m?.buyPrice ?? 0);
       newRows.push(newRow({ materialId: item.materialId, materialName: item.materialName, spec: m?.modelNo ?? "", qty: item.qty, unitPrice, elevatorName: item.elevatorName ?? "", remark: `신청#${req.id}`, reqId: req.id }));
     }
     setRows([...newRows, newRow()]);
@@ -389,6 +390,19 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
               {requesterNames.map(n => <option key={n} value={n} />)}
             </datalist>
           </FormField>
+          <FormField label="무상" className="w-20">
+            <input
+              type="checkbox"
+              checked={freeOfCharge}
+              onChange={e => {
+                const on = e.target.checked;
+                setFreeOfCharge(on);
+                // 무상 체크 시 모든 행의 구매단가를 0원으로
+                if (on) setRows(prev => prev.map(r => ({ ...r, unitPrice: 0 })));
+              }}
+              className="h-4 w-4 rounded cursor-pointer accent-blue-600"
+            />
+          </FormField>
           <FormField label="현장" className="w-80 flex-1 min-w-[280px]">
             <SiteInlineSearch value={siteName} onChange={setSiteName} sites={sites} />
           </FormField>
@@ -489,9 +503,10 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
                     className={cellInput + " text-right"} />
                 </Td>
                 <Td right>
-                  <input type="text" inputMode="numeric" value={r.unitPrice === 0 ? "" : fmtNum(r.unitPrice)}
+                  <input type="text" inputMode="numeric" readOnly={freeOfCharge}
+                    value={freeOfCharge ? "0" : (r.unitPrice === 0 ? "" : fmtNum(r.unitPrice))}
                     onChange={e => patchRow(r.id, { unitPrice: parseNum(e.target.value) })}
-                    className={cellInput + " text-right"} />
+                    className={cellInput + " text-right" + (freeOfCharge ? " text-gray-400 cursor-not-allowed" : "")} />
                 </Td>
                 <Td right className="text-gray-700 dark:text-gray-300 tabular-nums">{fmtNum(r.qty * r.unitPrice)}</Td>
                 <Td>

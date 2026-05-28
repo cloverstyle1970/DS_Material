@@ -1,14 +1,14 @@
 /**
- * 2026-05-13 통합 엑셀 import 스크립트.
+ * 2026-05-13 ?�합 ?��? import ?�크립트.
  *
- * 실행:
- *   npx tsx scripts/site-import/import.ts --dry-run   # 변경사항만 출력, 실제 쓰기 없음
- *   npx tsx scripts/site-import/import.ts             # 실제 적용 (--apply 와 동일)
+ * ?�행:
+ *   npx tsx scripts/site-import/import.ts --dry-run   # 변경사??�� 출력, ?�제 ?�기 ?�음
+ *   npx tsx scripts/site-import/import.ts             # ?�제 ?�용 (--apply ?� ?�일)
  *
- * 사전 조건:
- *   1) supabase/sites_elevators_extend.sql 을 Supabase Dashboard 에서 실행하여 컬럼 확장
- *   2) scripts/site-import/convert.py 를 실행하여 import-payload.json 생성
- *   3) .env.local 에 NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY (또는 SUPABASE_SERVICE_ROLE_KEY)
+ * ?�전 조건:
+ *   1) supabase/sites_elevators_extend.sql ??Supabase Dashboard ?�서 ?�행?�여 컬럼 ?�장
+ *   2) scripts/site-import/convert.py �??�행?�여 import-payload.json ?�성
+ *   3) .env.local ??NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY (?�는 SUPABASE_SERVICE_ROLE_KEY)
  */
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
@@ -29,7 +29,7 @@ const SUPABASE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error("[ERR] NEXT_PUBLIC_SUPABASE_URL / KEY 가 .env.local 에 없습니다.");
+  console.error("[ERR] NEXT_PUBLIC_SUPABASE_URL / KEY 가 .env.local ???�습?�다.");
   process.exit(1);
 }
 
@@ -120,7 +120,7 @@ async function main() {
   const payload: Payload = JSON.parse(readFileSync(PAYLOAD_PATH, "utf-8"));
   const mode = DRY ? "[DRY-RUN]" : "[APPLY]";
 
-  console.log(`${mode} Import 시작`);
+  console.log(`${mode} Import ?�작`);
   console.log(`  sites          : ${payload.sites.length} (new=${payload.sites.filter(s=>!s.id).length})`);
   console.log(`  elevators      : ${payload.elevators.length} (new=${payload.elevators.filter(e=>!e.id).length})`);
   console.log(`  rename         : ${Object.keys(payload.renameMap).length}`);
@@ -128,32 +128,32 @@ async function main() {
   console.log(`  elevs delete   : ${payload.elevatorsToDelete.length + payload.placeholderElevatorIds.length}`);
 
   if (DRY) {
-    console.log("\n[DRY-RUN] Supabase 변경 없이 종료. 실제 적용은 인자 없이 실행하세요.");
+    console.log("\n[DRY-RUN] Supabase 변�??�이 종료. ?�제 ?�용?� ?�자 ?�이 ?�행?�세??");
     return;
   }
 
-  // 1) placeholder + orphan elevators 삭제 (FK 충돌 방지)
+  // 1) placeholder + orphan elevators ??�� (FK 충돌 방�?)
   const elevIdsToDelete = [
     ...payload.elevatorsToDelete,
     ...payload.placeholderElevatorIds,
   ];
   if (elevIdsToDelete.length > 0) {
-    console.log(`\n→ elevators 삭제 (${elevIdsToDelete.length}개)`);
+    console.log(`\n??elevators ??�� (${elevIdsToDelete.length}�?`);
     const { error } = await supabase.from("elevators").delete().in("id", elevIdsToDelete);
     if (error) throw new Error(`elevators delete: ${error.message}`);
   }
 
-  // 2) orphan sites 삭제
+  // 2) orphan sites ??��
   if (payload.sitesToDelete.length > 0) {
-    console.log(`→ sites 삭제 (${payload.sitesToDelete.length}개)`);
+    console.log(`??sites ??�� (${payload.sitesToDelete.length}�?`);
     const { error } = await supabase.from("sites").delete().in("name", payload.sitesToDelete);
     if (error) throw new Error(`sites delete: ${error.message}`);
   }
 
-  // 3) sites: id 있는 행은 update, id 없는 행은 insert
+  // 3) sites: id ?�는 ?��? update, id ?�는 ?��? insert
   const sitesUpdate = payload.sites.filter(s => s.id !== undefined).map(siteToDb);
   const sitesInsert = payload.sites.filter(s => s.id === undefined).map(siteToDb);
-  console.log(`→ sites update (${sitesUpdate.length}개)`);
+  console.log(`??sites update (${sitesUpdate.length}�?`);
   for (let i = 0; i < sitesUpdate.length; i += 100) {
     const chunk = sitesUpdate.slice(i, i + 100);
     const { error } = await supabase.from("sites").upsert(chunk, { onConflict: "id" });
@@ -162,15 +162,15 @@ async function main() {
   }
   console.log("");
   if (sitesInsert.length > 0) {
-    console.log(`→ sites insert new (${sitesInsert.length}개)`);
+    console.log(`??sites insert new (${sitesInsert.length}�?`);
     const { error } = await supabase.from("sites").insert(sitesInsert);
     if (error) throw new Error(`sites insert: ${error.message}`);
   }
 
-  // 4) elevators: id 있는 행은 update, id 없는 행은 insert
+  // 4) elevators: id ?�는 ?��? update, id ?�는 ?��? insert
   const elevsUpdate = payload.elevators.filter(e => e.id !== undefined).map(elevatorToDb);
   const elevsInsert = payload.elevators.filter(e => e.id === undefined).map(elevatorToDb);
-  console.log(`→ elevators update (${elevsUpdate.length}개)`);
+  console.log(`??elevators update (${elevsUpdate.length}�?`);
   for (let i = 0; i < elevsUpdate.length; i += 200) {
     const chunk = elevsUpdate.slice(i, i + 200);
     const { error } = await supabase.from("elevators").upsert(chunk, { onConflict: "id" });
@@ -179,13 +179,13 @@ async function main() {
   }
   console.log("");
   if (elevsInsert.length > 0) {
-    console.log(`→ elevators insert new (${elevsInsert.length}개)`);
+    console.log(`??elevators insert new (${elevsInsert.length}�?`);
     const { error } = await supabase.from("elevators").insert(elevsInsert);
     if (error) throw new Error(`elevators insert: ${error.message}`);
   }
 
-  // 5) src/data/*.json 동기화 (시드 파일)
-  console.log("→ 시드 JSON 재조회·동기화");
+  // 5) src/data/*.json ?�기??(?�드 ?�일)
+  console.log("???�드 JSON ?�조?�·동기화");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async function fetchAll(table: string): Promise<any[]> {
     const PAGE = 1000;
@@ -248,10 +248,10 @@ async function main() {
 
   writeFileSync(SITES_JSON, JSON.stringify(seedSites, null, 2), "utf-8");
   writeFileSync(ELEVS_JSON, JSON.stringify(seedElevs, null, 2), "utf-8");
-  console.log(`  sites.json     : ${seedSites.length}개`);
-  console.log(`  elevators.json : ${seedElevs.length}개`);
+  console.log(`  sites.json     : ${seedSites.length}�?);
+  console.log(`  elevators.json : ${seedElevs.length}�?);
 
-  console.log("\n✓ Import 완료");
+  console.log("\n??Import ?�료");
 }
 
 main().catch((err) => {

@@ -4,7 +4,7 @@ import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { hashPassword } from "@/lib/password";
+import type { Permission } from "@/lib/mock-users";
 
 export default function LoginPage() {
   const { isAuthenticated, isLoading, login } = useAuth();
@@ -26,44 +26,36 @@ export default function LoginPage() {
     setError("");
     setSubmitting(true);
 
-    const trimmed = name.trim();
-    const { data: user, error: dbError } = await supabase
-      .from("users")
-      .select("id, name, dept, permissions, status, theme")
-      .eq("name", trimmed)
-      .eq("status", "재직")
-      .single();
+    const username = name.trim();
 
-    if (dbError || !user) {
-      setError("이름을 확인해 주세요.");
+    // 신DB accounts 기반 인증: username + password(평문) 매칭.
+    // password 컬럼은 클라이언트로 내려받지 않고 필터 조건으로만 사용한다.
+    const { data: account, error: qErr } = await supabase
+      .from("accounts")
+      .select("id, username, name, role, permissions, dept, theme, status")
+      .eq("username", username)
+      .eq("password", password)
+      .maybeSingle();
+
+    if (qErr || !account) {
+      setError("아이디 또는 비밀번호가 올바르지 않습니다.");
       setSubmitting(false);
       return;
     }
 
-    // password_hash 컬럼은 마이그레이션 후 활성화 — 컬럼 없으면 에러 무시
-    const { data: pwRow } = await supabase
-      .from("users")
-      .select("password_hash")
-      .eq("id", user.id)
-      .single();
+    // 권한: 마스터는 전체 권한, 그 외는 accounts.permissions 를 그대로 사용
+    const isMaster = account.role === "마스터";
+    const permissions = (isMaster
+      ? ["admin"]
+      : (Array.isArray(account.permissions) ? account.permissions : [])
+    ) as Permission[];
 
-    const storedHash = (pwRow as { password_hash?: string | null } | null)?.password_hash ?? null;
-    if (storedHash) {
-      const inputHash = await hashPassword(password);
-      if (inputHash !== storedHash) {
-        setError("비밀번호가 올바르지 않습니다.");
-        setSubmitting(false);
-        return;
-      }
-    }
-
-    const userTheme = (user as { theme?: string }).theme;
     login({
-      id: user.id,
-      name: user.name,
-      dept: user.dept ?? "",
-      permissions: (user.permissions ?? []) as import("@/lib/mock-users").Permission[],
-      theme: userTheme === "dark" ? "dark" : userTheme === "light" ? "light" : undefined,
+      id: Number(account.id),
+      name: account.username,                 // username = 실제 사용자 식별자(데이터 병합 기준)
+      dept: account.dept ?? "",
+      permissions,
+      theme: account.theme === "dark" ? "dark" : account.theme === "light" ? "light" : undefined,
     });
     router.replace("/dashboard");
   }
@@ -83,13 +75,13 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-xl p-8 space-y-5">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-gray-700">이름</label>
+            <label className="text-sm font-medium text-gray-700">아이디</label>
             <input
               type="text"
               lang="ko"
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="홍길동"
+              placeholder="아이디 입력"
               autoComplete="username"
               autoFocus
               required
@@ -122,7 +114,6 @@ export default function LoginPage() {
             {submitting ? "확인 중..." : "로그인"}
           </button>
 
-          <p className="text-center text-xs text-gray-400">초기 비밀번호: <span className="font-mono font-medium text-gray-500">1234</span></p>
         </form>
       </div>
     </div>

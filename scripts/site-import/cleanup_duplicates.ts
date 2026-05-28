@@ -1,8 +1,8 @@
 /**
- * import 재실행 누적으로 발생한 sites/elevators 중복 정리.
- * 각 중복 그룹에서 min(id) 만 남기고 나머지 삭제.
+ * import ?�실???�적?�로 발생??sites/elevators 중복 ?�리.
+ * �?중복 그룹?�서 min(id) �??�기�??�머지 ??��.
  *
- * 실행:
+ * ?�행:
  *   npx tsx scripts/site-import/cleanup_duplicates.ts --dry-run
  *   npx tsx scripts/site-import/cleanup_duplicates.ts
  */
@@ -40,9 +40,9 @@ async function fetchAll(table: string): Promise<any[]> {
 
 async function main() {
   const mode = DRY ? "[DRY-RUN]" : "[APPLY]";
-  console.log(`${mode} 중복 정리 시작`);
+  console.log(`${mode} 중복 ?�리 ?�작`);
 
-  // sites: name 기준 그룹
+  // sites: name 기�? 그룹
   const sites = await fetchAll("sites");
   const sitesByName: Record<string, number[]> = {};
   for (const s of sites) {
@@ -59,7 +59,7 @@ async function main() {
     }
   }
 
-  // elevators: (siteName, unitName) 기준 그룹
+  // elevators: (siteName, unitName) 기�? 그룹
   const elevs = await fetchAll("elevators");
   const elevByKey: Record<string, number[]> = {};
   for (const e of elevs) {
@@ -77,26 +77,26 @@ async function main() {
     }
   }
 
-  console.log(`\n총 삭제 대상: sites=${siteIdsToDelete.length}, elevators=${elevIdsToDelete.length}`);
+  console.log(`\n�???�� ?�?? sites=${siteIdsToDelete.length}, elevators=${elevIdsToDelete.length}`);
 
   if (DRY) {
-    console.log("\n[DRY-RUN] 변경 없이 종료.");
+    console.log("\n[DRY-RUN] 변�??�이 종료.");
     return;
   }
 
   if (elevIdsToDelete.length > 0) {
     const { error } = await supabase.from("elevators").delete().in("id", elevIdsToDelete);
     if (error) throw error;
-    console.log(`elevators ${elevIdsToDelete.length}개 삭제 완료`);
+    console.log(`elevators ${elevIdsToDelete.length}�???�� ?�료`);
   }
   if (siteIdsToDelete.length > 0) {
     const { error } = await supabase.from("sites").delete().in("id", siteIdsToDelete);
     if (error) throw error;
-    console.log(`sites ${siteIdsToDelete.length}개 삭제 완료`);
+    console.log(`sites ${siteIdsToDelete.length}�???�� ?�료`);
   }
 
-  // 시드 JSON 재동기화
-  console.log("\n→ 시드 JSON 재조회·동기화");
+  // ?�드 JSON ?�동기화
+  console.log("\n???�드 JSON ?�조?�·동기화");
   const dbSites = await fetchAll("sites");
   const dbElevs = await fetchAll("elevators");
   const seedSites = dbSites.map(r => ({
@@ -125,9 +125,9 @@ async function main() {
   }));
   writeFileSync(resolve(process.cwd(), "src/data/sites.json"),     JSON.stringify(seedSites, null, 2), "utf-8");
   writeFileSync(resolve(process.cwd(), "src/data/elevators.json"), JSON.stringify(seedElevs, null, 2), "utf-8");
-  console.log(`  sites.json     : ${seedSites.length}개`);
-  console.log(`  elevators.json : ${seedElevs.length}개`);
-  console.log("\n✓ 정리 완료");
+  console.log(`  sites.json     : ${seedSites.length}�?);
+  console.log(`  elevators.json : ${seedElevs.length}�?);
+  console.log("\n???�리 ?�료");
 }
 
 main().catch(e => { console.error("[FATAL]", e); process.exit(1); });

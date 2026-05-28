@@ -60,7 +60,7 @@ export default function CompanyVehiclesClient() {
     const [v, u] = await Promise.all([
       // 모든 구분 포함: 자차·렌트·회사차량·기타 (개인정보수정·사원등록에서 입력된 것 포함)
       supabase.from("user_vehicles").select("*").order("plate_number"),
-      supabase.from("users").select("id, name, dept").eq("status", "재직").order("name"),
+      supabase.from("accounts").select("id, name:username, dept").eq("status", "재직").order("username"),
     ]);
     const userMap = new Map<number, UserMini>();
     ((u.data ?? []) as UserMini[]).forEach(x => userMap.set(x.id, x));

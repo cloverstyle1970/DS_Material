@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, FormEvent } from "react";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { hashPassword } from "@/lib/password";
 import { formatDate as formatYmd, formatPhone, formatSsn } from "@/lib/input-format";
 
 // 사원관리(UsersClient)에서 관리자가 사원 이름을 클릭할 때 세팅됨
@@ -283,7 +282,7 @@ export default function MyProfileClient() {
     setLoaded(false);
     (async () => {
       const [u, fam, veh, cert, car, rp] = await Promise.all([
-        supabase.from("users").select("*").eq("id", editingUserId).single(),
+        supabase.from("accounts").select("*").eq("id", editingUserId).single(),
         supabase.from("user_family_members").select("*").eq("user_id", editingUserId).order("sort_order"),
         supabase.from("user_vehicles").select("*").eq("user_id", editingUserId).order("sort_order"),
         supabase.from("user_certifications").select("*").eq("user_id", editingUserId).order("sort_order"),
@@ -307,7 +306,9 @@ export default function MyProfileClient() {
 
       // 후속 load가 시작됐다면 이 응답은 무시 (target 사용자가 admin 자신으로 덮어쓰이지 않도록)
       if (reqId !== loadReqRef.current) return;
-      const r = u.data as UserRow | null;
+      // accounts: 실제 식별자는 username → name 으로 정규화해 다운스트림과 일관 유지
+      const raw = u.data as (UserRow & { username?: string }) | null;
+      const r = raw ? { ...raw, name: raw.username ?? raw.name } as UserRow : null;
       if (r) {
         setRow(r);
         setEditName(r.name ?? "");
@@ -444,22 +445,21 @@ export default function MyProfileClient() {
 
     setPwSubmitting(true);
     try {
+      // 신DB 로그인은 accounts.password(평문) 기반 → 비밀번호도 평문으로 검증/저장
       const { data: r, error: fErr } = await supabase
-        .from("users")
-        .select("password_hash")
+        .from("accounts")
+        .select("password")
         .eq("id", user.id)
         .single();
       if (fErr || !r) { setPwStatus({ type: "error", text: "사용자 정보를 불러오지 못했습니다." }); return; }
-      const stored = r.password_hash as string | null;
-      const curHash = await hashPassword(currentPw);
-      if (stored && curHash !== stored) {
+      const stored = r.password as string | null;
+      if (stored != null && currentPw !== stored) {
         setPwStatus({ type: "error", text: "현재 비밀번호가 올바르지 않습니다." });
         return;
       }
-      const newHash = await hashPassword(newPw);
       const { error: uErr } = await supabase
-        .from("users")
-        .update({ password_hash: newHash })
+        .from("accounts")
+        .update({ password: newPw })
         .eq("id", user.id);
       if (uErr) { setPwStatus({ type: "error", text: `비밀번호 변경 실패: ${uErr.message}` }); return; }
       setPwStatus({ type: "success", text: "비밀번호가 변경되었습니다." });
@@ -544,13 +544,14 @@ export default function MyProfileClient() {
       };
       if (isAdminEditing) {
         usersPatch.name      = editName.trim();
+        usersPatch.username  = editName.trim();   // accounts: username 이 실제 식별자 → 함께 갱신
         usersPatch.ssn       = editSsn || null;
         usersPatch.hire_date = editHireDate || null;
         usersPatch.dept      = editDept || null;
         usersPatch.rank      = editRank || null;
         usersPatch.status    = editStatus || null;
       }
-      const { error: uErr } = await supabase.from("users").update(usersPatch).eq("id", editingUserId);
+      const { error: uErr } = await supabase.from("accounts").update(usersPatch).eq("id", editingUserId);
       if (uErr) throw uErr;
 
       // 가족 — 전체 삭제 후 재삽입

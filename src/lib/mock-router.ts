@@ -102,7 +102,7 @@ async function insertNotification(params: {
   refId?: number | null;
 }): Promise<void> {
   // 수신자가 인앱 알림을 꺼두었으면 인앱 저장 스킵 (전역 on/off)
-  const { data: u } = await supabase.from("users")
+  const { data: u } = await supabase.from("accounts")
     .select("notifications_enabled").eq("id", params.userId).single();
   if (!u || u.notifications_enabled !== false) {
     await supabase.from("notifications").insert({
@@ -200,7 +200,7 @@ function dbToAnnualEvent(r: any): AnnualEvent {
 function dbToSite(r: any): SiteRecord {
   return {
     id:                r.id,
-    name:              r.name,
+    name:              r.site_name,   // managed_sites.site_name
     alias:             r.alias              ?? null,
     ledgerNo:          r.ledger_no          ?? null,
     siteKind:          r.site_kind          ?? null,
@@ -235,7 +235,7 @@ function dbToSite(r: any): SiteRecord {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function siteToDb(d: any): Record<string, unknown> {
   const obj: Record<string, unknown> = {};
-  if (d.name              !== undefined) obj.name               = d.name;
+  if (d.name              !== undefined) obj.site_name          = d.name;   // managed_sites.site_name
   if (d.alias             !== undefined) obj.alias              = d.alias;
   if (d.ledgerNo          !== undefined) obj.ledger_no          = d.ledgerNo;
   if (d.siteKind          !== undefined) obj.site_kind          = d.siteKind;
@@ -268,25 +268,25 @@ function siteToDb(d: any): Record<string, unknown> {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function dbToElevator(r: any): ElevatorRecord {
+function dbToElevator(r: any, siteName?: string): ElevatorRecord {
+  // site_elevators 스키마: site_id(FK), unit_name, elevator_number, elevator_model
   return {
     id:             r.id,
-    siteName:       r.site_name       ?? "",
-    unitName:       r.unit_name       ?? null,
-    elevatorNo:     r.elevator_no     ?? null,
-    emergencyPhone: r.emergency_phone ?? null,
-    modelName:      r.model_name      ?? null,
+    siteName:       siteName ?? r.site_name ?? "",
+    unitName:       r.unit_name        ?? null,
+    elevatorNo:     r.elevator_number  ?? null,
+    emergencyPhone: r.emergency_phone  ?? null, // site_elevators엔 컬럼 없음 → null
+    modelName:      r.elevator_model   ?? null,
   };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function elevatorToDb(d: any): Record<string, unknown> {
   const obj: Record<string, unknown> = {};
-  if (d.siteName       !== undefined) obj.site_name       = d.siteName;
-  if (d.unitName       !== undefined) obj.unit_name       = d.unitName;
-  if (d.elevatorNo     !== undefined) obj.elevator_no     = d.elevatorNo;
-  if (d.emergencyPhone !== undefined) obj.emergency_phone = d.emergencyPhone;
-  if (d.modelName      !== undefined) obj.model_name      = d.modelName;
+  if (d.unitName   !== undefined) obj.unit_name       = d.unitName;
+  if (d.elevatorNo !== undefined) obj.elevator_number = d.elevatorNo;
+  if (d.modelName  !== undefined) obj.elevator_model  = d.modelName;
+  // 현장(site_id)·emergencyPhone 은 라우트에서 별도 처리 (site_elevators 스키마)
   return obj;
 }
 
@@ -331,9 +331,10 @@ function vendorToDb(d: any): Record<string, unknown> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function dbToUser(r: any): UserRecord {
+  // 신DB 정본은 accounts. username 이 실제 식별자(병합 기준).
   return {
     id:          r.id,
-    name:        r.name,
+    name:        r.username ?? r.name,
     dept:        r.dept        ?? null,
     rank:        r.rank        ?? null,
     ssn:         r.ssn         ?? null,
@@ -349,9 +350,9 @@ function dbToUser(r: any): UserRecord {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function userToDb(d: any): Record<string, unknown> {
+  // accounts 테이블로 직접 매핑. name 입력은 username/name 양쪽에 거울 저장.
   const obj: Record<string, unknown> = {};
-  if (d.id          !== undefined) obj.id          = d.id;
-  if (d.name        !== undefined) obj.name        = d.name;
+  if (d.name        !== undefined) { obj.username = d.name; obj.name = d.name; }
   if (d.dept        !== undefined) obj.dept        = d.dept;
   if (d.rank        !== undefined) obj.rank        = d.rank;
   if (d.ssn         !== undefined) obj.ssn         = d.ssn;
@@ -593,8 +594,8 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
       supabase.from("materials").select("*", { count: "exact", head: true }).lte("stock_qty", 0),
       supabase.from("materials").select("*", { count: "exact", head: true }),
       supabase.from("material_requests").select("*").order("requested_at", { ascending: false }).limit(10),
-      supabase.from("sites").select("*", { count: "exact", head: true }).eq("company_type", "TK"),
-      supabase.from("sites").select("*", { count: "exact", head: true }).eq("company_type", "DS"),
+      supabase.from("managed_sites").select("*", { count: "exact", head: true }).eq("company_type", "TK"),
+      supabase.from("managed_sites").select("*", { count: "exact", head: true }).eq("company_type", "DS"),
       fetchAll("elevators", "site_name"),
       fetchAll("sites", "name, company_type"),
     ]);
@@ -707,7 +708,7 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
     return store;
   }
   if (path === "/api/sites") {
-    const { data, error } = await supabase.from("sites").select("*").order("name");
+    const { data, error } = await supabase.from("managed_sites").select("*").order("site_name");
     if (error) throw new MockApiError(error.message, 500);
     return (data ?? []).map(dbToSite);
   }
@@ -731,19 +732,27 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
   }
   if (path === "/api/elevators") {
     const site = params.get("site");
+    // site_elevators 는 site_id(FK→managed_sites.id) 로 연결 → 현장명 맵 구성
+    const { data: msRows } = await supabase.from("managed_sites").select("id, site_name");
+    const idToName = new Map<number, string>((msRows ?? []).map((s: any) => [s.id, s.site_name]));
+    const nameToId = new Map<string, number>((msRows ?? []).map((s: any) => [s.site_name, s.id]));
+    const siteId = site ? nameToId.get(site) : undefined;
+    if (site && siteId === undefined) return []; // 해당 현장 없음
+
     const PAGE = 1000;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const all: any[] = [];
+    const all: ElevatorRecord[] = [];
     for (let offset = 0; ; offset += PAGE) {
-      let query = supabase.from("elevators").select("*").order("unit_name").range(offset, offset + PAGE - 1);
-      if (site) query = query.eq("site_name", site);
+      let query = supabase.from("site_elevators").select("*").order("unit_name").range(offset, offset + PAGE - 1);
+      if (siteId !== undefined) query = query.eq("site_id", siteId);
       const { data, error } = await query;
       if (error) throw new MockApiError(error.message, 500);
-      const rows = data ?? [];
-      all.push(...rows);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rows = (data ?? []) as any[];
+      all.push(...rows.map(r => dbToElevator(r, idToName.get(r.site_id))));
       if (rows.length < PAGE) break;
     }
-    return all.map(dbToElevator);
+    return all;
   }
   if (path === "/api/material-units") {
     const materialId = params.get("materialId");
@@ -842,7 +851,7 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
   }
   if (path === "/api/users") {
     const q = params.get("q")?.toLowerCase();
-    const { data, error } = await supabase.from("users").select("*").order("name");
+    const { data, error } = await supabase.from("accounts").select("*").order("username");
     if (error) throw new MockApiError(error.message, 500);
     let list = (data ?? []).map(dbToUser);
     if (q) list = list.filter(u =>
@@ -1006,7 +1015,7 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
     throw new MockApiError("invalid level", 400);
   }
   if (path === "/api/sites") {
-    const { data, error } = await supabase.from("sites").insert(siteToDb(body)).select().single();
+    const { data, error } = await supabase.from("managed_sites").insert(siteToDb(body)).select().single();
     if (error) throw new MockApiError(error.message, 500);
     return dbToSite(data);
   }
@@ -1016,13 +1025,16 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
     return dbToVendor(data);
   }
   if (path === "/api/elevators") {
-    const { siteName, unitName, elevatorNo, emergencyPhone } = body;
+    const { siteName, unitName, elevatorNo } = body;
     if (!siteName) throw new MockApiError("siteName 필수", 400);
-    const { data, error } = await supabase.from("elevators")
-      .insert({ site_name: siteName, unit_name: unitName || null, elevator_no: elevatorNo || null, emergency_phone: emergencyPhone || null })
+    // 현장명 → site_id 해석 (site_elevators 는 FK 연결)
+    const { data: site } = await supabase.from("managed_sites").select("id").eq("site_name", siteName).maybeSingle();
+    if (!site) throw new MockApiError("현장을 찾을 수 없습니다", 404);
+    const { data, error } = await supabase.from("site_elevators")
+      .insert({ site_id: (site as any).id, unit_name: unitName || null, elevator_number: elevatorNo || null })
       .select().single();
     if (error) throw new MockApiError(error.message, 500);
-    return dbToElevator(data);
+    return dbToElevator(data, siteName);
   }
   if (path === "/api/transactions") {
     const { records, error } = await supabaseAddTransaction(body);
@@ -1061,7 +1073,14 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
     return dbToOrder(data);
   }
   if (path === "/api/users") {
-    const { data, error } = await supabase.from("users").insert(userToDb(body)).select().single();
+    const payload = userToDb(body);
+    // accounts NOT NULL 컬럼 기본값 보강 (password / role)
+    if (payload.password === undefined) payload.password = "000000";
+    if (payload.role === undefined) {
+      const perms = Array.isArray(body.permissions) ? body.permissions : [];
+      payload.role = perms.includes("admin") ? "관리자" : "직원";
+    }
+    const { data, error } = await supabase.from("accounts").insert(payload).select().single();
     if (error) throw new MockApiError(error.message, 500);
     return dbToUser(data);
   }
@@ -1189,7 +1208,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
 
   const siteId = extractId(path, "/api/sites");
   if (siteId) {
-    const { data, error } = await supabase.from("sites")
+    const { data, error } = await supabase.from("managed_sites")
       .update(siteToDb(body)).eq("id", Number(siteId)).select().single();
     if (error) throw new MockApiError(error.message, 500);
     if (!data) throw new MockApiError("not found", 404);
@@ -1207,11 +1226,23 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
 
   const elevatorId = extractId(path, "/api/elevators");
   if (elevatorId) {
-    const { data, error } = await supabase.from("elevators")
-      .update(elevatorToDb(body)).eq("id", Number(elevatorId)).select().single();
+    const patch = elevatorToDb(body);
+    // 현장 변경 시 site_id 재해석
+    if (body.siteName !== undefined) {
+      const { data: site } = await supabase.from("managed_sites").select("id").eq("site_name", body.siteName).maybeSingle();
+      if (site) patch.site_id = (site as any).id;
+    }
+    const { data, error } = await supabase.from("site_elevators")
+      .update(patch).eq("id", Number(elevatorId)).select().single();
     if (error) throw new MockApiError(error.message, 500);
     if (!data) throw new MockApiError("Not found", 404);
-    return dbToElevator(data);
+    // 반환용 현장명 해석
+    let siteName: string | undefined = body.siteName;
+    if (!siteName) {
+      const { data: s } = await supabase.from("managed_sites").select("site_name").eq("id", (data as any).site_id).maybeSingle();
+      siteName = (s as any)?.site_name;
+    }
+    return dbToElevator(data, siteName);
   }
 
   const reqId = extractId(path, "/api/material-requests");
@@ -1384,7 +1415,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
 
   const userId = extractId(path, "/api/users");
   if (userId) {
-    const { data, error } = await supabase.from("users")
+    const { data, error } = await supabase.from("accounts")
       .update(userToDb(body)).eq("id", Number(userId)).select().single();
     if (error) throw new MockApiError(error.message, 500);
     if (!data) throw new MockApiError("not found", 404);
@@ -1649,21 +1680,21 @@ async function routeDELETE(path: string, body: AnyBody): Promise<unknown> {
 
   const siteId = extractId(path, "/api/sites");
   if (siteId) {
-    const { error } = await supabase.from("sites").delete().eq("id", Number(siteId));
+    const { error } = await supabase.from("managed_sites").delete().eq("id", Number(siteId));
     if (error) throw new MockApiError(error.message, 500);
     return { ok: true };
   }
 
   const elevatorId = extractId(path, "/api/elevators");
   if (elevatorId) {
-    const { error } = await supabase.from("elevators").delete().eq("id", Number(elevatorId));
+    const { error } = await supabase.from("site_elevators").delete().eq("id", Number(elevatorId));
     if (error) throw new MockApiError(error.message, 500);
     return { ok: true };
   }
 
   const userId = extractId(path, "/api/users");
   if (userId) {
-    const { error } = await supabase.from("users").delete().eq("id", Number(userId));
+    const { error } = await supabase.from("accounts").delete().eq("id", Number(userId));
     if (error) throw new MockApiError(error.message, 500);
     return { ok: true };
   }

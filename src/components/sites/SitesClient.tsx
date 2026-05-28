@@ -591,10 +591,10 @@ export default function SitesClient({ initial, elevators }: Props) {
 
     const channel = supabase
       .channel("sites-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "sites" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "managed_sites" }, () => {
         api.get<SiteRecord[]>("/api/sites").then(setSites).catch(() => {});
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "elevators" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_elevators" }, () => {
         api.get<ElevatorRecord[]>("/api/elevators").then(setAllElevators).catch(() => {});
       })
       .subscribe();

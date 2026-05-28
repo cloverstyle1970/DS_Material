@@ -11,7 +11,7 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error("❌ Missing SUPABASE credentials in .env.local");
+  console.error("??Missing SUPABASE credentials in .env.local");
   process.exit(1);
 }
 
@@ -25,28 +25,27 @@ function excelDate(v) {
   return null;
 }
 
-// SSN 포맷 표준화: 하이픈 제거 후 13자리 숫자 형식으로 저장
-function cleanSsn(v) {
+// SSN ?�맷 ?��??? ?�이???�거 ??13?�리 ?�자 ?�식?�로 ?�??function cleanSsn(v) {
   if (!v) return null;
   return String(v).replace(/\D/g, "").slice(0, 13);
 }
 
 async function main() {
-  console.log("🚀 사원명 기준 정보 업데이트 시작...");
+  console.log("?? ?�원�?기�? ?�보 ?�데?�트 ?�작...");
 
-  // 1. 데이터베이스에서 현재 사원 목록 조회
+  // 1. ?�이?�베?�스?�서 ?�재 ?�원 목록 조회
   const { data: dbUsers, error } = await supabase
     .from("users")
     .select("*");
     
   if (error) {
-    console.error("❌ DB 사원 조회 실패:", error.message);
+    console.error("??DB ?�원 조회 ?�패:", error.message);
     process.exit(1);
   }
   
-  console.log(`ℹ️ 현재 DB에 등록된 사원: ${dbUsers.length}명`);
+  console.log(`?�️ ?�재 DB???�록???�원: ${dbUsers.length}�?);
 
-  // DB 사원명을 키로 매핑 (동명이인 예방을 위해 배열로 관리)
+  // DB ?�원명을 ?�로 매핑 (?�명?�인 ?�방???�해 배열�?관�?
   const dbUsersByName = new Map();
   for (const user of dbUsers) {
     if (!dbUsersByName.has(user.name)) {
@@ -55,7 +54,7 @@ async function main() {
     dbUsersByName.get(user.name).push(user);
   }
 
-  // 2. 엑셀 파일 로드 및 파싱
+  // 2. ?��? ?�일 로드 �??�싱
   const filePath = path.join(__dirname, "..", "ds-page", "user.xlsx");
   const wb = XLSX.readFile(filePath);
   const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -81,9 +80,9 @@ async function main() {
     });
   }
 
-  console.log(`ℹ️ 엑셀 파일 내 사원: ${excelUsers.length}명`);
+  console.log(`?�️ ?��? ?�일 ???�원: ${excelUsers.length}�?);
 
-  // 3. 업데이트 대상 매치 및 실행
+  // 3. ?�데?�트 ?�??매치 �??�행
   let updateCount = 0;
   let skippedCount = 0;
 
@@ -91,19 +90,19 @@ async function main() {
     const matchedDbUsers = dbUsersByName.get(exUser.name);
     
     if (!matchedDbUsers) {
-      console.log(`⚠️ 엑셀 사원 '${exUser.name}'은(는) DB에 등록되어 있지 않아 건너뜁니다.`);
+      console.log(`?�️ ?��? ?�원 '${exUser.name}'?�(?? DB???�록?�어 ?��? ?�아 건너?�니??`);
       skippedCount++;
       continue;
     }
 
     if (matchedDbUsers.length > 1) {
-      console.log(`⚠️ DB에 동일한 이름 '${exUser.name}'을 가진 사원이 여러 명 존재합니다. 엑셀의 사원번호(${exUser.id})와 일치하는 계정을 찾습니다.`);
+      console.log(`?�️ DB???�일???�름 '${exUser.name}'??가�??�원???�러 �?존재?�니?? ?��????�원번호(${exUser.id})?� ?�치?�는 계정??찾습?�다.`);
     }
 
-    // 이름이 같고 사원번호(id)까지 일치하거나, 단일 이름 매칭일 때 대상을 찾음
+    // ?�름??같고 ?�원번호(id)까�? ?�치?�거?? ?�일 ?�름 매칭?????�?�을 찾음
     const targetUser = matchedDbUsers.find(u => u.id === exUser.id) || matchedDbUsers[0];
 
-    // 변경 사항 감지
+    // 변�??�항 감�?
     const patch = {};
     const fieldsToCompare = {
       dept: 'dept',
@@ -127,9 +126,9 @@ async function main() {
     }
 
     if (Object.keys(patch).length > 0) {
-      console.log(`✏️ 사원 '${targetUser.name}' (ID: ${targetUser.id}) 정보 업데이트 중:`);
+      console.log(`?�️ ?�원 '${targetUser.name}' (ID: ${targetUser.id}) ?�보 ?�데?�트 �?`);
       for (const [key, val] of Object.entries(patch)) {
-        console.log(`   - ${key}: "${targetUser[key]}" ➔ "${val}"`);
+        console.log(`   - ${key}: "${targetUser[key]}" ??"${val}"`);
       }
 
       const { error: updateErr } = await supabase
@@ -138,18 +137,18 @@ async function main() {
         .eq("id", targetUser.id);
 
       if (updateErr) {
-        console.error(`❌ '${targetUser.name}' 업데이트 실패:`, updateErr.message);
+        console.error(`??'${targetUser.name}' ?�데?�트 ?�패:`, updateErr.message);
       } else {
         updateCount++;
       }
     } else {
-      // 변경 사항 없음
+      // 변�??�항 ?�음
     }
   }
 
-  console.log(`\n🎉 업데이트 작업 완료!`);
-  console.log(`   - 정보가 업데이트된 사원: ${updateCount}명`);
-  console.log(`   - 정보 변경이 없거나 건너뛴 사원: ${excelUsers.length - updateCount}명`);
+  console.log(`\n?�� ?�데?�트 ?�업 ?�료!`);
+  console.log(`   - ?�보가 ?�데?�트???�원: ${updateCount}�?);
+  console.log(`   - ?�보 변경이 ?�거??건너???�원: ${excelUsers.length - updateCount}�?);
 }
 
 main();

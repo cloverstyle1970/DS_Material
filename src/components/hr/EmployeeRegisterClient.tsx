@@ -343,7 +343,7 @@ export default function EmployeeRegisterClient() {
 
     // 주민번호 중복
     if (form.ssn) {
-      const { data: dup } = await supabase.from("users").select("id").eq("ssn", form.ssn).maybeSingle();
+      const { data: dup } = await supabase.from("accounts").select("id").eq("ssn", form.ssn).maybeSingle();
       if (dup) { setMessage({ type: "error", text: "이미 등록된 주민등록번호입니다." }); setTab("basic"); return; }
     }
 
@@ -353,8 +353,15 @@ export default function EmployeeRegisterClient() {
       const fullAddress = [form.address_basic, form.address_detail].filter(Boolean).join(" ").trim();
       const initialPwHash = await hashPassword(form.initial_password);
 
+      const newPermissions = form.permission_group_id
+        ? (permGroups.find(g => g.id === form.permission_group_id)?.permissions ?? [])
+        : [];
+      // 신DB 정본은 accounts: username(로그인 식별자)·password(평문)·role 추가
       const payload = {
+        username: form.name.trim(),
         name: form.name.trim(),
+        password: form.initial_password,
+        role: newPermissions.includes("admin") ? "마스터" : "직원",
         ssn: form.ssn || null,
         gender: form.gender || null,
         blood_type: form.blood_type || null,
@@ -374,12 +381,10 @@ export default function EmployeeRegisterClient() {
         uniform_bottom_size: form.uniform_bottom_size || null,
         safety_shoes_size: form.safety_shoes_size || null,
         permission_group_id: form.permission_group_id,
-        permissions: form.permission_group_id
-          ? (permGroups.find(g => g.id === form.permission_group_id)?.permissions ?? [])
-          : [],
+        permissions: newPermissions,
         password_hash: initialPwHash,
       };
-      const { data: inserted, error: insErr } = await supabase.from("users")
+      const { data: inserted, error: insErr } = await supabase.from("accounts")
         .insert(payload).select("id").single();
       if (insErr) {
         console.error("[employee-register] insert error:", insErr, "payload:", payload);

@@ -24,7 +24,7 @@ export default function TeamCrewClient() {
     const [d, c, u] = await Promise.all([
       supabase.from("departments").select("id, name, sort_order, is_active").eq("is_active", true).order("sort_order"),
       supabase.from("crews").select("id, department_id, name, sort_order, is_active").order("sort_order"),
-      supabase.from("users").select("id, name, dept, rank, crew_id").order("name"),
+      supabase.from("accounts").select("id, name:username, dept, rank, crew_id").order("username"),
     ]);
     setDepts((d.data ?? []) as Department[]);
     setCrews((c.data ?? []) as Crew[]);
@@ -65,7 +65,7 @@ export default function TeamCrewClient() {
   }, [crews]);
 
   async function moveMemberToCrew(userId: number, crewId: number | null) {
-    const { error } = await supabase.from("users").update({ crew_id: crewId }).eq("id", userId);
+    const { error } = await supabase.from("accounts").update({ crew_id: crewId }).eq("id", userId);
     if (error) { alert(`이동 실패: ${error.message}`); return; }
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, crew_id: crewId } : u));
   }

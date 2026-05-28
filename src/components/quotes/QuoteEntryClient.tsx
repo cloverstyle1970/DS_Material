@@ -399,15 +399,16 @@ function QuoteEntryInner() {
       return;
     }
     (async () => {
-      const [elev, site] = await Promise.all([
-        supabase.from("elevators")
-          .select("unit_name").eq("site_name", siteName).order("unit_name"),
-        supabase.from("sites")
-          .select("contract_type, contract_start, contract_end, warranty_start, warranty_end, company_type")
-          .eq("name", siteName).maybeSingle(),
-      ]);
+      // 신DB: 현장은 managed_sites(site_name), 호기는 site_elevators(site_id FK)
+      const { data: ms } = await supabase.from("managed_sites")
+        .select("id, contract_type, contract_start, contract_end, warranty_start, warranty_end, company_type")
+        .eq("site_name", siteName).maybeSingle();
+      const elev = (ms as { id?: number } | null)?.id != null
+        ? await supabase.from("site_elevators")
+            .select("unit_name").eq("site_id", (ms as { id: number }).id).order("unit_name")
+        : { data: [] as { unit_name: string }[] };
       setElevatorOptions((elev.data ?? []).map(e => (e as { unit_name: string }).unit_name).filter(Boolean));
-      const info = (site.data ?? null) as SiteContractInfo | null;
+      const info = (ms ?? null) as SiteContractInfo | null;
       setSiteInfo(info);
       // FM 계약구분이면 charge_type 자동 '무상' 권유 (수정 모드에서는 사용자가 저장한 값을 보존)
       if (!isEditMode && info?.contract_type && FM_CONTRACT_TYPES.has(info.contract_type)) {

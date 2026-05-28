@@ -1,14 +1,14 @@
 /**
- * PWB-PL ìì¬ ì¼ê´„ ì¹˜í™˜:
- *   name='PWB-PL' í–‰ì— ëŒ€í•´ â†’ alias=name ë°±ì—… â†’ name=model_no(ê·œê²©) â†’ model_no=NULL
- * ì‹¤í–‰: node scripts/rename-pwb-pl.mjs
+ * PWB-PL ?ì¬ ?¼ê´„ ì¹˜í™˜:
+ *   name='PWB-PL' ?‰ì— ?€????alias=name ë°±ì—… ??name=model_no(ê·œê²©) ??model_no=NULL
+ * ?¤í–‰: node scripts/rename-pwb-pl.mjs
  *
  * ë¡¤ë°±:
  *   UPDATE materials SET name='PWB-PL', model_no=alias, alias=NULL WHERE alias='PWB-PL';
  */
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL      = "https://gwgzzsoknjulwwsmubju.supabase.co";
+const SUPABASE_URL      = "https://bbnmxwpacdfqvicybhau.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_ONRnSvrXjF9V7HKbFhkpqg_8sOqdvLJ";
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -17,7 +17,7 @@ const R = s => `\x1b[31m${s}\x1b[0m`;
 const Y = s => `\x1b[33m${s}\x1b[0m`;
 const C = s => `\x1b[36m${s}\x1b[0m`;
 
-// â”€â”€â”€ 1. Pre-check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€?€ 1. Pre-check ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 const { data: before, error: e0 } = await sb
   .from("materials")
   .select("id, name, model_no, alias")
@@ -27,20 +27,20 @@ if (e0) { console.error(R("PRE-FETCH ERROR:"), e0); process.exit(1); }
 const total = before.length;
 const noModel = before.filter(r => !r.model_no || !String(r.model_no).trim());
 const hasAlias = before.filter(r => r.alias && String(r.alias).trim());
-console.log(C(`[Pre-check] name='PWB-PL' í–‰: ${total}ê±´`));
-console.log(`  - ê·œê²©(model_no) ë¹„ì–´ìˆìŒ (ì¹˜í™˜ ì œì™¸): ${noModel.length}ê±´`);
-console.log(`  - alias ë¹„ì–´ìˆì§€ ì•ŠìŒ (ë°±ì—… ìœ„í—˜): ${hasAlias.length}ê±´`);
+console.log(C(`[Pre-check] name='PWB-PL' ?? ${total}ê±?));
+console.log(`  - ê·œê²©(model_no) ë¹„ì–´?ˆìŒ (ì¹˜í™˜ ?œì™¸): ${noModel.length}ê±?);
+console.log(`  - alias ë¹„ì–´?ˆì? ?ŠìŒ (ë°±ì—… ?„í—˜): ${hasAlias.length}ê±?);
 
 if (hasAlias.length > 0) {
-  console.error(R(`[ì¤‘ë‹¨] aliasê°€ ì´ë¯¸ ì‚¬ìš© ì¤‘ì¸ í–‰ì´ ${hasAlias.length}ê±´ ìˆì–´ ë°±ì—… ì¶©ëŒ ìœ„í—˜.`));
+  console.error(R(`[ì¤‘ë‹¨] aliasê°€ ?´ë? ?¬ìš© ì¤‘ì¸ ?‰ì´ ${hasAlias.length}ê±??ˆì–´ ë°±ì—… ì¶©ëŒ ?„í—˜.`));
   for (const r of hasAlias.slice(0, 10)) console.error(`  ! ${r.id} alias="${r.alias}"`);
   process.exit(1);
 }
 
 const targets = before.filter(r => r.model_no && String(r.model_no).trim());
-console.log(`  â†’ ì¹˜í™˜ ëŒ€ìƒ: ${G(targets.length + "ê±´")}`);
+console.log(`  ??ì¹˜í™˜ ?€?? ${G(targets.length + "ê±?)}`);
 
-// â”€â”€â”€ 2. Apply per-row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€?€ 2. Apply per-row ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 console.log("");
 console.log(C("[Apply] alias=PWB-PL ë°±ì—… + name=model_no + model_no=NULL ê°±ì‹ ..."));
 let ok = 0, fail = 0;
@@ -59,17 +59,17 @@ for (let i = 0; i < targets.length; i++) {
     ok++;
   }
   if ((i + 1) % 25 === 0 || i === targets.length - 1) {
-    process.stdout.write(`\r  ì§„í–‰: ${i + 1}/${targets.length}  (ì„±ê³µ ${ok} / ì‹¤íŒ¨ ${fail})`);
+    process.stdout.write(`\r  ì§„í–‰: ${i + 1}/${targets.length}  (?±ê³µ ${ok} / ?¤íŒ¨ ${fail})`);
   }
 }
 console.log("");
 
 if (fail > 0) {
-  console.error(R(`\n[ì‹¤íŒ¨ ${fail}ê±´]`));
+  console.error(R(`\n[?¤íŒ¨ ${fail}ê±?`));
   for (const f of failures.slice(0, 20)) console.error(`  ! ${f.id}: ${f.err}`);
 }
 
-// â”€â”€â”€ 3. Post-check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€?€ 3. Post-check ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 const { data: stillPwb } = await sb
   .from("materials")
   .select("id, name, model_no")
@@ -81,14 +81,14 @@ const { data: renamed } = await sb
 
 console.log("");
 console.log(C("[Post-check]"));
-console.log(`  ì”ì—¬ name='PWB-PL' í–‰: ${stillPwb.length}ê±´  ${stillPwb.length === noModel.length ? G("(ì˜ˆìƒì¹˜ ì¼ì¹˜ â€” ê·œê²© ë¹„ì—ˆë˜ í–‰ë§Œ ë‚¨ìŒ)") : R("(ë¶ˆì¼ì¹˜!)")}`);
-console.log(`  alias='PWB-PL' ë°±ì—… í–‰: ${renamed.length}ê±´  ${renamed.length === ok ? G("(ì„±ê³µ ìˆ˜ì™€ ì¼ì¹˜)") : R("(ë¶ˆì¼ì¹˜!)")}`);
+console.log(`  ?”ì—¬ name='PWB-PL' ?? ${stillPwb.length}ê±? ${stillPwb.length === noModel.length ? G("(?ˆìƒì¹??¼ì¹˜ ??ê·œê²© ë¹„ì—ˆ???‰ë§Œ ?¨ìŒ)") : R("(ë¶ˆì¼ì¹?)")}`);
+console.log(`  alias='PWB-PL' ë°±ì—… ?? ${renamed.length}ê±? ${renamed.length === ok ? G("(?±ê³µ ?˜ì? ?¼ì¹˜)") : R("(ë¶ˆì¼ì¹?)")}`);
 
 console.log("");
-console.log(C("[ìƒ˜í”Œ 5ê±´]"));
+console.log(C("[?˜í”Œ 5ê±?"));
 for (const r of renamed.slice(0, 5)) {
   console.log(`  ${r.id}  name="${r.name}"  model_no=${JSON.stringify(r.model_no)}  alias="${r.alias}"`);
 }
 
 console.log("");
-console.log(G(`ì™„ë£Œ. ì„±ê³µ ${ok}ê±´ / ì‹¤íŒ¨ ${fail}ê±´`));
+console.log(G(`?„ë£Œ. ?±ê³µ ${ok}ê±?/ ?¤íŒ¨ ${fail}ê±?));

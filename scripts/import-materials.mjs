@@ -5,7 +5,7 @@ import { dirname, join } from "path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const SUPABASE_URL     = "https://gwgzzsoknjulwwsmubju.supabase.co";
+const SUPABASE_URL     = "https://bbnmxwpacdfqvicybhau.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_ONRnSvrXjF9V7HKbFhkpqg_8sOqdvLJ";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -35,7 +35,7 @@ function toDb(d) {
 const rows = partList.map(toDb);
 const BATCH = 500;
 
-console.log(`총 ${rows.length}건 import 시작...`);
+console.log(`�?${rows.length}�?import ?�작...`);
 
 let errors = 0;
 for (let i = 0; i < rows.length; i += BATCH) {
@@ -44,12 +44,12 @@ for (let i = 0; i < rows.length; i += BATCH) {
   const batchNo = Math.floor(i / BATCH) + 1;
   const total   = Math.ceil(rows.length / BATCH);
   if (error) {
-    console.error(`  배치 ${batchNo}/${total} 오류: ${error.message}`);
+    console.error(`  배치 ${batchNo}/${total} ?�류: ${error.message}`);
     errors++;
   } else {
-    console.log(`  배치 ${batchNo}/${total} 완료 (${Math.min(i + BATCH, rows.length)}/${rows.length}건)`);
+    console.log(`  배치 ${batchNo}/${total} ?�료 (${Math.min(i + BATCH, rows.length)}/${rows.length}�?`);
   }
 }
 
-if (errors === 0) console.log("\n✓ 모든 자재 import 완료!");
-else console.log(`\n완료 (오류 ${errors}배치)`);
+if (errors === 0) console.log("\n??모든 ?�재 import ?�료!");
+else console.log(`\n?�료 (?�류 ${errors}배치)`);

@@ -169,12 +169,15 @@ export default function ClaimEntryClient() {
   useEffect(() => {
     if (!siteName.trim()) { setElevatorOptions([]); return; }
     (async () => {
-      const [elev, site] = await Promise.all([
-        supabase.from("elevators").select("unit_name").eq("site_name", siteName).order("unit_name"),
-        supabase.from("sites").select("contract_type").eq("name", siteName).maybeSingle(),
-      ]);
+      // 신DB: 현장은 managed_sites(site_name), 호기는 site_elevators(site_id FK)
+      const { data: ms } = await supabase.from("managed_sites")
+        .select("id, contract_type").eq("site_name", siteName).maybeSingle();
+      const elev = (ms as { id?: number } | null)?.id != null
+        ? await supabase.from("site_elevators")
+            .select("unit_name").eq("site_id", (ms as { id: number }).id).order("unit_name")
+        : { data: [] as { unit_name: string }[] };
       setElevatorOptions((elev.data ?? []).map(e => (e as { unit_name: string }).unit_name).filter(Boolean));
-      const ct = (site.data as { contract_type: string | null } | null)?.contract_type;
+      const ct = (ms as { contract_type: string | null } | null)?.contract_type;
       if (ct && (ct === "TK-FM" || ct === "대솔FM" || ct === "DS-FM")) {
         setMode("무상신청");
       }

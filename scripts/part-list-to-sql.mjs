@@ -42,9 +42,9 @@ function row(d) {
 
 const CHUNK = 500;
 const lines = [];
-lines.push("-- materials 테이블 초기화 후 재삽입");
-lines.push("-- 생성: " + new Date().toISOString());
-lines.push("-- 총 " + partList.length + "건");
+lines.push("-- materials ?�이�?초기?????�삽??);
+lines.push("-- ?�성: " + new Date().toISOString());
+lines.push("-- �?" + partList.length + "�?);
 lines.push("");
 lines.push("BEGIN;");
 lines.push("TRUNCATE TABLE materials RESTART IDENTITY CASCADE;");
@@ -63,4 +63,4 @@ const out = path.join(ROOT, "scripts", "import-materials.sql");
 fs.writeFileSync(out, lines.join("\n"), "utf-8");
 
 const sizeKB = (fs.statSync(out).size / 1024).toFixed(1);
-console.log(`작성 완료: ${out} (${partList.length}건, ${sizeKB} KB)`);
+console.log(`?�성 ?�료: ${out} (${partList.length}�? ${sizeKB} KB)`);

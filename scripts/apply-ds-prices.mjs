@@ -6,12 +6,12 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
 
-// Excel 읽기
+// Excel ?�기
 const wb = XLSX.readFile(path.join(ROOT, "DS PARR PRICE LIST.xlsx"));
 const ws = wb.Sheets[wb.SheetNames[0]];
 const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
-// Part No → { buyPrice, sellPrice } 맵 생성
+// Part No ??{ buyPrice, sellPrice } �??�성
 function parsePrice(v) {
   if (typeof v === "number") return v;
   if (typeof v === "string") return Number(v.replace(/,/g, "")) || null;
@@ -26,9 +26,9 @@ for (const row of rows.slice(1)) {
   const sell = parsePrice(row[5]);
   if (buy || sell) priceMap.set(id, { buyPrice: buy, sellPrice: sell });
 }
-console.log(`가격 데이터: ${priceMap.size}건`);
+console.log(`가�??�이?? ${priceMap.size}�?);
 
-// part-list.json 업데이트
+// part-list.json ?�데?�트
 const partListPath = path.join(ROOT, "src", "data", "part-list.json");
 const materials = JSON.parse(fs.readFileSync(partListPath, "utf-8"));
 
@@ -43,4 +43,4 @@ for (const m of materials) {
 }
 
 fs.writeFileSync(partListPath, JSON.stringify(materials, null, 2), "utf-8");
-console.log(`업데이트 완료: ${updated}/${materials.length}개 자재에 가격 적용`);
+console.log(`?�데?�트 ?�료: ${updated}/${materials.length}�??�재??가�??�용`);

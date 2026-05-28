@@ -5,7 +5,7 @@ import { dirname, join } from "path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const SUPABASE_URL     = "https://gwgzzsoknjulwwsmubju.supabase.co";
+const SUPABASE_URL     = "https://bbnmxwpacdfqvicybhau.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_ONRnSvrXjF9V7HKbFhkpqg_8sOqdvLJ";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -34,24 +34,24 @@ function toDb(d) {
 
 const rows = partList.map(toDb);
 
-console.log("기존 materials 행 수 확인...");
+console.log("기존 materials ?????�인...");
 const { count: beforeCount, error: countErr } = await supabase
   .from("materials").select("*", { count: "exact", head: true });
 if (countErr) {
-  console.error("조회 실패:", countErr.message);
+  console.error("조회 ?�패:", countErr.message);
   process.exit(1);
 }
-console.log(`현재 ${beforeCount}건 존재. 전체 삭제 진행...`);
+console.log(`?�재 ${beforeCount}�?존재. ?�체 ??�� 진행...`);
 
 const { error: delErr } = await supabase
   .from("materials").delete().neq("id", "__never_match__");
 if (delErr) {
-  console.error("삭제 실패:", delErr.message);
+  console.error("??�� ?�패:", delErr.message);
   process.exit(1);
 }
-console.log("삭제 완료.");
+console.log("??�� ?�료.");
 
-console.log(`${rows.length}건 insert 시작...`);
+console.log(`${rows.length}�?insert ?�작...`);
 const BATCH = 500;
 let errors = 0;
 for (let i = 0; i < rows.length; i += BATCH) {
@@ -60,15 +60,15 @@ for (let i = 0; i < rows.length; i += BATCH) {
   const batchNo = Math.floor(i / BATCH) + 1;
   const total   = Math.ceil(rows.length / BATCH);
   if (error) {
-    console.error(`  배치 ${batchNo}/${total} 오류: ${error.message}`);
+    console.error(`  배치 ${batchNo}/${total} ?�류: ${error.message}`);
     errors++;
   } else {
-    console.log(`  배치 ${batchNo}/${total} 완료 (${Math.min(i + BATCH, rows.length)}/${rows.length}건)`);
+    console.log(`  배치 ${batchNo}/${total} ?�료 (${Math.min(i + BATCH, rows.length)}/${rows.length}�?`);
   }
 }
 
 const { count: afterCount } = await supabase
   .from("materials").select("*", { count: "exact", head: true });
-console.log(`\n최종 materials 행 수: ${afterCount}건`);
-if (errors === 0) console.log("✓ 초기화+재삽입 완료");
-else console.log(`완료 (오류 ${errors}배치)`);
+console.log(`\n최종 materials ???? ${afterCount}�?);
+if (errors === 0) console.log("??초기???�삽???�료");
+else console.log(`?�료 (?�류 ${errors}배치)`);

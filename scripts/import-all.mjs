@@ -1,6 +1,6 @@
 /**
- * vendors, users, sites, elevators Îç∞Ïù¥ÌÑ∞Î•º ExcelÏóêÏÑú SupabaseÎ°ú import.
- * Ïã§Ìñâ: node scripts/import-all.mjs
+ * vendors, users, sites, elevators ?∞Ïù¥?∞Î? Excel?êÏÑú SupabaseÎ°?import.
+ * ?§Ìñâ: node scripts/import-all.mjs
  */
 import { createClient } from "@supabase/supabase-js";
 import XLSX from "xlsx";
@@ -10,7 +10,7 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
 
-const SUPABASE_URL      = "https://gwgzzsoknjulwwsmubju.supabase.co";
+const SUPABASE_URL      = "https://bbnmxwpacdfqvicybhau.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_ONRnSvrXjF9V7HKbFhkpqg_8sOqdvLJ";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -29,16 +29,16 @@ async function upsert(table, rows, key = "id") {
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH);
     const { error } = await supabase.from(table).upsert(batch, { onConflict: key });
-    if (error) { console.error(`  ${table} Î∞∞Ïπò Ïò§Î•ò:`, error.message); }
-    else { total += batch.length; process.stdout.write(`\r  ${table}: ${total}/${rows.length}Í±¥`); }
+    if (error) { console.error(`  ${table} Î∞∞Ïπò ?§Î•ò:`, error.message); }
+    else { total += batch.length; process.stdout.write(`\r  ${table}: ${total}/${rows.length}Í±?); }
   }
-  console.log(`\r  ${table}: ${total}Í±¥ ÏôÑÎ£å          `);
+  console.log(`\r  ${table}: ${total}Í±??ÑÎ£å          `);
 }
 
-// ‚îÄ‚îÄ 1. vendors ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
-console.log("\n[1/4] Í±∞ÎûòÏ≤ò import...");
+// ?Ä?Ä 1. vendors ?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä
+console.log("\n[1/4] Í±∞ÎûòÏ≤?import...");
 {
-  const wb = XLSX.readFile(path.join(ROOT, "Í±∞ÎûòÏ≤òÎ¶¨Ïä§Ìä∏.xlsx"));
+  const wb = XLSX.readFile(path.join(ROOT, "Í±∞ÎûòÏ≤òÎ¶¨?§Ìä∏.xlsx"));
   const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "" });
   const vendors = [];
   let id = 1;
@@ -67,8 +67,8 @@ console.log("\n[1/4] Í±∞ÎûòÏ≤ò import...");
   await upsert("vendors", vendors);
 }
 
-// ‚îÄ‚îÄ 2. users ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
-console.log("\n[2/4] ÏÇ¨Ïö©Ïûê import...");
+// ?Ä?Ä 2. users ?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä
+console.log("\n[2/4] ?¨Ïö©??import...");
 {
   const wb = XLSX.readFile(path.join(ROOT, "user.xlsx"));
   const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "" });
@@ -97,10 +97,10 @@ console.log("\n[2/4] ÏÇ¨Ïö©Ïûê import...");
   await upsert("users", users);
 }
 
-// ‚îÄ‚îÄ 3. sites ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
-console.log("\n[3/4] ÌòÑÏû• import...");
+// ?Ä?Ä 3. sites ?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä
+console.log("\n[3/4] ?ÑÏû• import...");
 {
-  const wb = XLSX.readFile(path.join(ROOT, "ÌòÑÏû•Î¶¨Ïä§Ìä∏.xlsx"));
+  const wb = XLSX.readFile(path.join(ROOT, "?ÑÏû•Î¶¨Ïä§??xlsx"));
   const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "" });
   const seen = new Set();
   const sites = [];
@@ -112,7 +112,7 @@ console.log("\n[3/4] ÌòÑÏû• import...");
     sites.push({
       id: id++,
       name,
-      company_type:      str(row[1]) === "ÏûêÏÇ¨" ? "DS" : str(row[1]),
+      company_type:      str(row[1]) === "?êÏÇ¨" ? "DS" : str(row[1]),
       contract_type:     str(row[2]),
       contract_date:     excelDate(row[3]),
       contract_start:    excelDate(row[4]),
@@ -138,10 +138,10 @@ console.log("\n[3/4] ÌòÑÏû• import...");
   await upsert("sites", sites);
 }
 
-// ‚îÄ‚îÄ 4. elevators ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
-console.log("\n[4/4] Ìò∏Í∏∞ import...");
+// ?Ä?Ä 4. elevators ?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä
+console.log("\n[4/4] ?∏Í∏∞ import...");
 {
-  const wb = XLSX.readFile(path.join(ROOT, "ÌòÑÏû•Ìò∏Í∏∞Ï†ïÎ≥¥.xlsx"));
+  const wb = XLSX.readFile(path.join(ROOT, "?ÑÏû•?∏Í∏∞?ïÎ≥¥.xlsx"));
   const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "" });
   const elevators = [];
   let id = 1;
@@ -158,4 +158,4 @@ console.log("\n[4/4] Ìò∏Í∏∞ import...");
   await upsert("elevators", elevators);
 }
 
-console.log("\n‚úì Ï†ÑÏ≤¥ import ÏôÑÎ£å!");
+console.log("\n???ÑÏ≤¥ import ?ÑÎ£å!");

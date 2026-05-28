@@ -26,9 +26,9 @@ function str(v) {
 
 function readSheet(name) {
   const ws = wb.Sheets[name];
-  if (!ws) throw new Error(`시트 누락: ${name}`);
+  if (!ws) throw new Error(`?�트 ?�락: ${name}`);
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-  // header: part_no, 품명, 규격, 구매단가, 판매단가, 도번, 단위
+  // header: part_no, ?�명, 규격, 구매?��?, ?�매?��?, ?�번, ?�위
   return rows.slice(1)
     .filter(r => String(r[0] ?? "").trim())
     .map(r => ({
@@ -60,8 +60,8 @@ function toRecord(row) {
   };
 }
 
-const tkRows = readSheet("TK자재");
-const dsRows = readSheet("DS자재");
+const tkRows = readSheet("TK?�재");
+const dsRows = readSheet("DS?�재");
 
 const all = [...tkRows, ...dsRows].map(toRecord);
 
@@ -76,4 +76,4 @@ for (const rec of all) {
 const dedup = [...seen.values()];
 
 fs.writeFileSync(OUT, JSON.stringify(dedup, null, 2), "utf-8");
-console.log(`TK ${tkRows.length}건 + DS ${dsRows.length}건 → ${dedup.length}건 작성: ${OUT}`);
+console.log(`TK ${tkRows.length}�?+ DS ${dsRows.length}�???${dedup.length}�??�성: ${OUT}`);

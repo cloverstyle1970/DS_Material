@@ -72,16 +72,22 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
         supabase.from("tbm_repair_types").select("*").eq("is_active", true).order("sort_order"),
         supabase.from("tbm_fault_types").select("*").eq("is_active", true).order("sort_order"),
         supabase.from("tbm_checklist_items").select("*").eq("is_active", true).order("sort_order"),
-        supabase.from("sites").select("id, name").order("name"),
-        supabase.from("elevators").select("id, site_name, unit_name").order("unit_name"),
-        supabase.from("users").select("id, name, dept").eq("status", "재직").order("name"),
+        // 신DB: 현장=managed_sites(site_name→name 별칭), 호기=site_elevators(site_id), 사원=accounts(username→name)
+        supabase.from("managed_sites").select("id, name:site_name").order("site_name"),
+        supabase.from("site_elevators").select("id, site_id, unit_name").order("unit_name"),
+        supabase.from("accounts").select("id, name:username, dept").eq("status", "재직").order("username"),
       ]);
       if (sr.data) setSafetyRules(sr.data as SafetyRule[]);
       if (rt.data) setRepairTypes(rt.data as RepairType[]);
       if (ft.data) setFaultTypes(ft.data as FaultType[]);
       if (ci.data) setChecklistItems(ci.data as ChecklistItem[]);
       if (st.data) setSites(st.data as Site[]);
-      if (ev.data) setElevators(ev.data as Elevator[]);
+      if (ev.data) {
+        // site_elevators 는 site_id FK → 현장명으로 평탄화
+        const siteName = new Map((st.data ?? []).map(s => [(s as { id: number }).id, (s as { name: string }).name]));
+        setElevators((ev.data as { id: number; site_id: number; unit_name: string }[])
+          .map(e => ({ id: e.id, site_name: siteName.get(e.site_id) ?? "", unit_name: e.unit_name })) as Elevator[]);
+      }
       if (us.data) setUsers(us.data as UserMini[]);
     })();
   }, []);
