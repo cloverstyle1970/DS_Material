@@ -1,13 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 
-// anon 키는 공개(publishable) 키 — 클라이언트 번들에 노출되는 게 정상이며 RLS로 보호된다.
-// 배포(GitHub Pages) 빌드에서 Secret이 비어도 동작하도록 신DB 기본값을 둔다.
-// Secret 붙여넣기 시 끼어든 공백·개행을 제거(sanitize) — 그대로 두면 HTTP 헤더 값 오류 발생.
-const RAW_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://bbnmxwpacdfqvicybhau.supabase.co";
-const RAW_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJibm14d3BhY2RmcXZpY3liaGF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NDA3NDYsImV4cCI6MjA5MTAxNjc0Nn0.cGqnmu5BeaXosxoE-IEmjX-dF4zDYipzpYb5hhc8S6I";
-// JWT/URL 모두 공백을 포함하지 않으므로 전체 화이트스페이스 제거가 안전.
-const SUPABASE_URL = RAW_URL.replace(/\s/g, "");
-const SUPABASE_ANON_KEY = RAW_ANON_KEY.replace(/\s/g, "");
+// 신DB 고정 접속값. anon 키는 공개(publishable) 키로, 클라이언트 번들 노출이 정상이며 RLS로 보호된다.
+// 배포 Secret 값 손상(붙여넣기 시 개행 끼임 등)으로 401이 반복돼, env를 읽지 않고 코드에 직접 고정한다.
+// (키 교체가 필요하면 이 값을 수정. .replace 로 혹시 모를 공백도 한 번 더 정리)
+const SUPABASE_URL = "https://bbnmxwpacdfqvicybhau.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJibm14d3BhY2RmcXZpY3liaGF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NDA3NDYsImV4cCI6MjA5MTAxNjc0Nn0.cGqnmu5BeaXosxoE-IEmjX-dF4zDYipzpYb5hhc8S6I".replace(/\s/g, "");
 
 const rawClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY || "placeholder");
 
