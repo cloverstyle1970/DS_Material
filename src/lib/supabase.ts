@@ -2,8 +2,12 @@ import { createClient } from "@supabase/supabase-js";
 
 // anon 키는 공개(publishable) 키 — 클라이언트 번들에 노출되는 게 정상이며 RLS로 보호된다.
 // 배포(GitHub Pages) 빌드에서 Secret이 비어도 동작하도록 신DB 기본값을 둔다.
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://bbnmxwpacdfqvicybhau.supabase.co";
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJibm14d3BhY2RmcXZpY3liaGF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NDA3NDYsImV4cCI6MjA5MTAxNjc0Nn0.cGqnmu5BeaXosxoE-IEmjX-dF4zDYipzpYb5hhc8S6I";
+// Secret 붙여넣기 시 끼어든 공백·개행을 제거(sanitize) — 그대로 두면 HTTP 헤더 값 오류 발생.
+const RAW_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://bbnmxwpacdfqvicybhau.supabase.co";
+const RAW_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJibm14d3BhY2RmcXZpY3liaGF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NDA3NDYsImV4cCI6MjA5MTAxNjc0Nn0.cGqnmu5BeaXosxoE-IEmjX-dF4zDYipzpYb5hhc8S6I";
+// JWT/URL 모두 공백을 포함하지 않으므로 전체 화이트스페이스 제거가 안전.
+const SUPABASE_URL = RAW_URL.replace(/\s/g, "");
+const SUPABASE_ANON_KEY = RAW_ANON_KEY.replace(/\s/g, "");
 
 const rawClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY || "placeholder");
 
