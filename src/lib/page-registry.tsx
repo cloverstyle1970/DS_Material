@@ -30,6 +30,8 @@ import PerformanceStatsClient from "@/components/stats/PerformanceStatsClient";
 import DeptRankClient from "@/components/hr/DeptRankClient";
 import TeamCrewClient from "@/components/hr/TeamCrewClient";
 import CompanyVehiclesClient from "@/components/hr/CompanyVehiclesClient";
+import TransferClient from "@/components/hr/TransferClient";
+import EmploymentStatusClient from "@/components/hr/EmploymentStatusClient";
 import MyProfileClient from "@/components/data/MyProfileClient";
 import CompanyInfoClient from "@/components/data/CompanyInfoClient";
 import PermissionGroupsClient from "@/components/data/PermissionGroupsClient";
@@ -83,6 +85,14 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/hr/company-vehicles": {
     label: "회사차량관리",
     render: () => <CompanyVehiclesClient />,
+  },
+  "/hr/transfer": {
+    label: "인사 이동",
+    render: () => <TransferClient />,
+  },
+  "/hr/employment-status": {
+    label: "재직상태 관리",
+    render: () => <EmploymentStatusClient />,
   },
   "/uniform-safety": {
     label: "근무복·안전장구 신청",

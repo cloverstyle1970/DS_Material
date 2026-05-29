@@ -103,9 +103,13 @@ interface RP {
 
 interface StatusHistory {
   id?: number;
-  status_type: "입사" | "퇴직" | "휴직" | "복직" | "재입사" | "";
+  status_type: "입사" | "퇴직" | "휴직" | "복직" | "재입사" | "부서이동" | "진급" | "강등" | "전보" | "직책변경" | "겸직" | "";
   event_date: string;
   reason: string;
+  from_dept?: string;
+  to_dept?: string;
+  from_rank?: string;
+  to_rank?: string;
 }
 
 const EMPTY_FAMILY: FamilyMember = {
@@ -125,7 +129,7 @@ const EMPTY_CAREER: Career = {
   company_name: "", joined_date: "", left_date: "", dept: "", rank: "", duty: "",
 };
 const EMPTY_RP: RP = { kind: "", content: "", occurred_on: "" };
-const EMPTY_STATUS_HISTORY: StatusHistory = { status_type: "", event_date: "", reason: "" };
+const EMPTY_STATUS_HISTORY: StatusHistory = { status_type: "", event_date: "", reason: "", from_dept: "", to_dept: "", from_rank: "", to_rank: "" };
 
 const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: "basic",   label: "기본정보",     icon: "👤" },
@@ -389,12 +393,16 @@ export default function MyProfileClient() {
         occurred_on: r.occurred_on ?? "",
       })));
 
-      type ShRow = Partial<StatusHistory> & { status_type?: string | null; event_date?: string | null; reason?: string | null };
+      type ShRow = Partial<StatusHistory> & { status_type?: string | null; event_date?: string | null; reason?: string | null; from_dept?: string | null; to_dept?: string | null; from_rank?: string | null; to_rank?: string | null };
       setStatusHistory((shData as ShRow[]).map(s => ({
         id: s.id,
         status_type: ((s.status_type ?? "") as StatusHistory["status_type"]),
         event_date: s.event_date ?? "",
         reason: s.reason ?? "",
+        from_dept: s.from_dept ?? "",
+        to_dept: s.to_dept ?? "",
+        from_rank: s.from_rank ?? "",
+        to_rank: s.to_rank ?? "",
       })));
 
       setLoaded(true);
@@ -665,6 +673,10 @@ export default function MyProfileClient() {
               status_type: s.status_type,
               event_date: s.event_date || null,
               reason: s.reason || null,
+              from_dept: s.from_dept || null,
+              to_dept: s.to_dept || null,
+              from_rank: s.from_rank || null,
+              to_rank: s.to_rank || null,
               sort_order: (i + 1) * 10,
             }))
           );
@@ -1427,6 +1439,7 @@ export default function MyProfileClient() {
                   s.status_type === "퇴직" ? "border-red-300 bg-red-50/30 dark:bg-red-900/10"
                   : s.status_type === "휴직" ? "border-amber-300 bg-amber-50/30 dark:bg-amber-900/10"
                   : s.status_type === "재입사" || s.status_type === "입사" || s.status_type === "복직" ? "border-green-300 bg-green-50/30 dark:bg-green-900/10"
+                  : ["부서이동", "진급", "강등", "전보", "직책변경", "겸직"].includes(s.status_type) ? "border-purple-300 bg-purple-50/30 dark:bg-purple-900/10"
                   : "border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/30"
                 }`}>
                   <div className="flex items-center justify-between mb-2">
@@ -1443,11 +1456,21 @@ export default function MyProfileClient() {
                         disabled={!meIsAdmin}
                         className={inputCls + (!meIsAdmin ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")}>
                         <option value="">선택</option>
-                        <option value="입사">입사</option>
-                        <option value="퇴직">퇴직</option>
-                        <option value="휴직">휴직</option>
-                        <option value="복직">복직</option>
-                        <option value="재입사">재입사</option>
+                        <optgroup label="고용상태">
+                          <option value="입사">입사</option>
+                          <option value="퇴직">퇴직</option>
+                          <option value="휴직">휴직</option>
+                          <option value="복직">복직</option>
+                          <option value="재입사">재입사</option>
+                        </optgroup>
+                        <optgroup label="발령">
+                          <option value="부서이동">부서이동</option>
+                          <option value="진급">진급</option>
+                          <option value="강등">강등</option>
+                          <option value="전보">전보</option>
+                          <option value="직책변경">직책변경</option>
+                          <option value="겸직">겸직</option>
+                        </optgroup>
                       </select>
                     </div>
                     <div>
@@ -1468,6 +1491,12 @@ export default function MyProfileClient() {
                         className={inputCls + (!meIsAdmin ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")} />
                     </div>
                   </div>
+                  {(s.to_dept || s.to_rank) && (
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-500 dark:text-gray-400">
+                      {s.to_dept && <span>부서: {s.from_dept || "-"} → <span className="font-semibold text-gray-700 dark:text-gray-200">{s.to_dept}</span></span>}
+                      {s.to_rank && <span>직급: {s.from_rank || "-"} → <span className="font-semibold text-gray-700 dark:text-gray-200">{s.to_rank}</span></span>}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
