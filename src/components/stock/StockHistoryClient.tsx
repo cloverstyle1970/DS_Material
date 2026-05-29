@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import Link from "next/link";
 import * as XLSX from "xlsx";
 import { TransactionRecord } from "@/lib/mock-transactions";
@@ -60,6 +61,13 @@ export default function StockHistoryClient({ mode, initial }: Props) {
     api.get<TransactionRecord[]>(`/api/transactions?type=${encodeURIComponent(mode)}`)
       .then(setTransactions).catch(() => {});
   }, [mode]);
+
+  // 숨어 있던 탭이 다시 보일 때 거래내역을 다시 받아 stale 방지
+  const reloadData = useCallback(() => {
+    api.get<TransactionRecord[]>(`/api/transactions?type=${encodeURIComponent(mode)}`)
+      .then(setTransactions).catch(() => {});
+  }, [mode]);
+  useReloadOnActivate(reloadData);
   useEffect(() => {
     function refresh(e: Event) {
       const detail = (e as CustomEvent<{ mode?: string }>).detail;

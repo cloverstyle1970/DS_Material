@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { UserRecord, Permission } from "@/lib/mock-users";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -78,9 +79,16 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
   const isDark = theme === "dark";
   const { tabs, openTab } = useTabs();
 
-  useEffect(() => {
+  // 숨어 있던 탭이 다시 보일 때 사원 목록을 다시 받아 stale 방지
+  // (인사이동 탭에서 발령 등록 → accounts 변경분을 새로고침 없이 반영)
+  const reloadUsers = useCallback(() => {
     api.get<UserRecord[]>("/api/users").then(setUsers).catch(() => {});
   }, []);
+  useReloadOnActivate(reloadUsers);
+
+  useEffect(() => {
+    reloadUsers();
+  }, [reloadUsers]);
 
   // 관리자: 사원 이름 클릭 → 개인정보수정 탭에 대상 사용자로 진입
   function openProfileEdit(u: UserRecord) {

@@ -6,6 +6,7 @@ import { useAuth, hasMenuPermission, isAdmin } from "@/context/AuthContext";
 import { matchMenuHref } from "@/lib/permissions";
 import { PAGE_REGISTRY } from "@/lib/page-registry";
 import { TabsProvider, useTabs, MAX_TABS } from "@/context/TabsContext";
+import { TabActivationProvider } from "@/context/TabActivationContext";
 import Sidebar from "./Sidebar";
 import TabBar from "./TabBar";
 import SidebarContext from "@/context/SidebarContext";
@@ -141,7 +142,9 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
                       className="absolute inset-0 flex flex-col overflow-auto"
                       style={{ display: isVisible ? "flex" : "none" }}
                     >
-                      {entry.render()}
+                      <TabActivationProvider isActive={isVisible}>
+                        {entry.render()}
+                      </TabActivationProvider>
                     </div>
                   );
                 })}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, Fragment, useRef, useEffect } from "react";
+import { useState, useMemo, Fragment, useRef, useEffect, useCallback } from "react";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
@@ -211,6 +212,13 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
   const [orders,   setOrders]   = useState(initialOrders);
   const [showOrderBulkUpload, setShowOrderBulkUpload] = useState(false);
   const [matModelMap, setMatModelMap] = useState<Map<string, string>>(new Map()); // materialId → modelNo(규격)
+
+  // 숨어 있던 탭이 다시 보일 때 신청/발주 목록을 다시 받아 stale 방지
+  const reloadData = useCallback(() => {
+    api.get<MaterialRequestRecord[]>("/api/material-requests").then(setRequests).catch(() => {});
+    api.get<PurchaseOrderRecord[]>("/api/purchase-orders").then(setOrders).catch(() => {});
+  }, []);
+  useReloadOnActivate(reloadData);
 
   useEffect(() => {
     function refreshOrders() {
