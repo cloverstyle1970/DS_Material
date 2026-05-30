@@ -86,6 +86,44 @@ function newRow(seed: Partial<ItemRow> = {}): ItemRow {
   };
 }
 
+// ── 공수 표준(분류 마스터 연계) + 작업 라인 ─────────────────
+interface LaborCat {
+  id: number;
+  level: "major" | "mid";
+  label: string;
+  parent_id: number | null;
+  sort_order: number;
+  is_active: boolean;
+}
+interface WorkloadStandard {
+  id: number;
+  major_id: number | null;
+  mid_id: number | null;
+  detail: string | null;     // 소분류/상세 (보조구분·층수)
+  man_days: number | null;   // NULL = 별도 견적(미기재)
+  note: string | null;
+}
+
+interface LaborLine {
+  key: string;
+  standard_id: number | null;  // 선택된 공수 항목 (NULL = 자유 입력)
+  major_id: number | null;     // 연쇄 선택 UI 상태 (대분류)
+  mid_id: number | null;       // 연쇄 선택 UI 상태 (중분류)
+  work_name: string;           // 작업명 스냅샷 (대·중·상세 조합)
+  man_days: number;            // 공수
+  remark: string;
+  elevator_name: string;
+}
+function newLaborLine(seed: Partial<LaborLine> = {}): LaborLine {
+  return {
+    key: crypto.randomUUID(),
+    standard_id: null, major_id: null, mid_id: null,
+    work_name: "", man_days: 0,
+    remark: "", elevator_name: "",
+    ...seed,
+  };
+}
+
 function daysBetween(fromIso: string | null, toIso: string | null): number | null {
   if (!fromIso || !toIso) return null;
   const a = new Date(fromIso).getTime();
@@ -199,6 +237,19 @@ function QuoteEntryInner() {
   const [laborManhours, setLaborManhours]   = useState<number>(1);     // 공모드=공수, 식모드=통합 공수합
   const [laborUnitPrice, setLaborUnitPrice] = useState<number>(0);     // 1공당 단가
 
+  // 교체공사 작업 라인 (표준 공수 연동). 1건 이상이면 공수 = Σ(라인 man_days) 자동.
+  const [standards, setStandards]   = useState<WorkloadStandard[]>([]);
+  const [laborCats, setLaborCats]   = useState<LaborCat[]>([]);
+  const [laborLines, setLaborLines] = useState<LaborLine[]>([]);
+
+  // 부가세 표시 모드 (false=별도 기본, true=포함)
+  const [vatIncluded, setVatIncluded] = useState<boolean>(false);
+  // 견적서 규격(spec) 표기 여부 (기본 표시)
+  const [showSpec, setShowSpec] = useState<boolean>(true);
+  // 견적신청자 사원 검색 후보 + 수정모드 작성자명
+  const [employees, setEmployees] = useState<{ id: string; name: string; dept: string | null; team: string | null }[]>([]);
+  const [editCreatedBy, setEditCreatedBy] = useState<string>("");
+
   // 인건비/요율 적용 여부 (체크 해제 시 인건비·일반관리비·이윤 모두 0)
   const [laborEnabled, setLaborEnabled] = useState<boolean>(true);
 
@@ -244,6 +295,8 @@ function QuoteEntryInner() {
       }
     })();
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
+    supabase.from("accounts").select("id, name, dept, team").order("name")
+      .then(({ data }) => { if (data) setEmployees(data as typeof employees); });
   }, []);
 
   // fromRequest 프리필
@@ -302,6 +355,41 @@ function QuoteEntryInner() {
     })();
   }, [fromRequestId]);
 
+  // 공수 표준 + 분류 마스터 로드 (마운트 1회)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [std, cat] = await Promise.all([
+        supabase.from("labor_workload_standards")
+          .select("id, major_id, mid_id, detail, man_days, note")
+          .eq("is_active", true).order("sort_order"),
+        supabase.from("labor_categories")
+          .select("id, level, label, parent_id, sort_order, is_active")
+          .eq("is_active", true).order("sort_order"),
+      ]);
+      if (cancelled) return;
+      if (std.data) setStandards(std.data as WorkloadStandard[]);
+      if (cat.data) setLaborCats(cat.data as LaborCat[]);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // 수정모드 복원: standard_id 만 있는 라인에 대분류/중분류 채움 (표준 로드 후 1회 보정)
+  useEffect(() => {
+    if (standards.length === 0) return;
+    setLaborLines(prev => {
+      let changed = false;
+      const next = prev.map(l => {
+        if (l.standard_id != null && l.major_id == null) {
+          const s = standards.find(x => x.id === l.standard_id);
+          if (s) { changed = true; return { ...l, major_id: s.major_id, mid_id: s.mid_id }; }
+        }
+        return l;
+      });
+      return changed ? next : prev;
+    });
+  }, [standards]);
+
   // ============================================================
   // 수정 모드 — 기존 quote 로드
   // ============================================================
@@ -312,9 +400,10 @@ function QuoteEntryInner() {
       setEditLoading(true);
       setEditLoadError(null);
       setEditLockedReason(null);
-      const [hdr, items] = await Promise.all([
+      const [hdr, items, lines] = await Promise.all([
         supabase.from("quotes").select("*").eq("id", editId).maybeSingle(),
         supabase.from("quote_items").select("*").eq("quote_id", editId).order("sort_order"),
+        supabase.from("quote_labor_lines").select("*").eq("quote_id", editId).order("sort_order"),
       ]);
       if (cancelled) return;
       if (hdr.error || !hdr.data) {
@@ -325,9 +414,10 @@ function QuoteEntryInner() {
       const h = hdr.data as {
         id: number; quote_no: string; quote_date: string;
         site_name: string | null; work_title: string | null;
-        customer_name: string | null;
+        customer_name: string | null; created_by_name: string | null;
         note: string | null; status: string; charge_type: "유상" | "무상" | null;
         labor_mode: "공" | "식" | null; labor_manhours: number | null; labor_unit_price: number | null;
+        vat_included: boolean | null; show_spec: boolean | null;
         indirect_labor_rate: number | null; overhead_rate: number | null; profit_rate: number | null;
         truncate_amount: number | null;
         direct_labor: number | null; indirect_labor: number | null;
@@ -342,12 +432,15 @@ function QuoteEntryInner() {
       setSiteName(h.site_name ?? "");
       setWorkTitle(h.work_title ?? "");
       setCustomerName(h.customer_name ?? "");
+      setEditCreatedBy(h.created_by_name ?? "");
       setNote(h.note ?? "");
       setChargeType(h.charge_type ?? "유상");
       setChargeAutoApplied(false);
       setLaborMode(h.labor_mode ?? "공");
       setLaborManhours(Number(h.labor_manhours ?? 0));
       setLaborUnitPrice(Number(h.labor_unit_price ?? 0));
+      setVatIncluded(!!h.vat_included);
+      setShowSpec(h.show_spec !== false);
       setIndirectRate(Number(h.indirect_labor_rate ?? 8));
       setOverheadRate(Number(h.overhead_rate ?? 10));
       setProfitRate(Number(h.profit_rate ?? 8));
@@ -385,6 +478,18 @@ function QuoteEntryInner() {
         // 아이템이 없는 견적은 기본 1행
         setRows([newRow()]);
       }
+      // 작업 라인 프리필
+      const lns = (lines.data ?? []) as Array<{
+        standard_id: number | null; work_name: string;
+        man_days: number; remark: string | null; elevator_name: string | null;
+      }>;
+      setLaborLines(lns.map(l => newLaborLine({
+        standard_id:   l.standard_id,
+        work_name:     l.work_name,
+        man_days:      Number(l.man_days),
+        remark:        l.remark ?? "",
+        elevator_name: l.elevator_name ?? "",
+      })));
       setEditLoading(false);
     })();
     return () => { cancelled = true; };
@@ -428,11 +533,23 @@ function QuoteEntryInner() {
   // 자동 계산
   // ============================================================
 
+  // 공수 표준/분류 파생 (연쇄 드롭다운용)
+  const catById   = new Map(laborCats.map(c => [c.id, c]));
+  const majorCats = laborCats.filter(c => c.level === "major");
+  const midsOfMajor = (majorId: number | null) => laborCats.filter(c => c.level === "mid" && c.parent_id === majorId);
+  const stdsOfMid   = (majorId: number | null, midId: number | null) => standards.filter(s => s.major_id === majorId && s.mid_id === midId);
+  const stdLabel = (s: WorkloadStandard) =>
+    [catById.get(s.major_id ?? -1)?.label, catById.get(s.mid_id ?? -1)?.label, s.detail].filter(Boolean).join(" · ");
+
   const materialSubtotal = rows.reduce((s, r) => s + (r.material_id ? r.qty * r.unit_price : 0), 0);
+  // 작업 라인이 1건 이상이면 공수는 라인 man_days 합으로 자동 산출 (수동 입력란 대체)
+  const hasLaborLines    = laborLines.length > 0;
+  const laborLinesManhours = laborLines.reduce((s, l) => s + (l.man_days || 0), 0);
+  const effectiveManhours  = hasLaborLines ? laborLinesManhours : laborManhours;
   // 공모드: direct = unit_price * manhours
   // 식모드: 식수=1 이지만 입력된 공수합 × 단가 로 동일하게 계산
   // laborEnabled=false 면 인건비·요율 모두 미적용 (자재비만 합계에 반영)
-  const directLabor      = laborEnabled ? Math.round(laborUnitPrice * laborManhours) : 0;
+  const directLabor      = laborEnabled ? Math.round(laborUnitPrice * effectiveManhours) : 0;
   const indirectLabor    = laborEnabled ? Math.round(directLabor * indirectRate / 100) : 0;
   const laborSubtotal    = directLabor + indirectLabor;
   const overhead         = laborEnabled ? Math.round((materialSubtotal + laborSubtotal) * overheadRate / 100) : 0;
@@ -446,6 +563,8 @@ function QuoteEntryInner() {
   }, [subBeforeTrunc, isMaterialOnly, truncateManual]);
 
   const totalAmount = subBeforeTrunc - truncateAmount;
+  const vatAmount   = Math.round(totalAmount * 0.1);  // 공급가액의 10%
+  const grandTotal  = totalAmount + vatAmount;
 
   // ============================================================
   // 자재 검색 + 행 갱신
@@ -460,6 +579,37 @@ function QuoteEntryInner() {
   }
   function removeRow(key: string) {
     setRows(prev => prev.length === 1 ? prev : prev.filter(r => r.key !== key));
+  }
+
+  // ── 작업 라인 (공수 표준 연동) ──────────────────────────────
+  function patchLine(key: string, patch: Partial<LaborLine>) {
+    setLaborLines(prev => prev.map(l => l.key === key ? { ...l, ...patch } : l));
+  }
+  function addLaborLine() {
+    setLaborLines(prev => [...prev, newLaborLine()]);
+  }
+  function removeLaborLine(key: string) {
+    setLaborLines(prev => prev.filter(l => l.key !== key));
+  }
+  // 연쇄 선택 핸들러
+  function selectLineMajor(key: string, majorId: number | null) {
+    patchLine(key, { major_id: majorId, mid_id: null, standard_id: null, work_name: "", man_days: 0 });
+  }
+  function selectLineMid(key: string, midId: number | null) {
+    // 해당 중분류에 표준 항목이 1개뿐이면 자동 선택
+    const line = laborLines.find(l => l.key === key);
+    const only = midId != null ? standards.filter(s => s.mid_id === midId && s.major_id === line?.major_id) : [];
+    if (only.length === 1) {
+      const s = only[0];
+      patchLine(key, { mid_id: midId, standard_id: s.id, work_name: stdLabel(s), man_days: s.man_days ?? 0 });
+    } else {
+      patchLine(key, { mid_id: midId, standard_id: null, work_name: "", man_days: 0 });
+    }
+  }
+  function selectLineStandard(key: string, stdId: number | null) {
+    const s = stdId != null ? standards.find(x => x.id === stdId) : null;
+    if (s) patchLine(key, { standard_id: s.id, work_name: stdLabel(s), man_days: s.man_days ?? 0 });
+    else patchLine(key, { standard_id: null, work_name: "", man_days: 0 });
   }
 
   async function searchMaterial(key: string, query: string) {
@@ -590,11 +740,26 @@ function QuoteEntryInner() {
         overhead_rate: overheadRate,
         profit_rate: profitRate,
         labor_mode:       laborMode,
-        labor_manhours:   laborManhours,
+        labor_manhours:   effectiveManhours,
         labor_unit_price: laborUnitPrice,
+        vat_included:     vatIncluded,
+        show_spec:        showSpec,
         charge_type:      chargeType,
         note: note || null,
       };
+      // 작업 라인 payload (work_name 비어있지 않은 라인만)
+      const validLines = laborLines.filter(l => l.work_name.trim() !== "");
+      const laborLinesPayload = (quoteId: number) => validLines.map((l, i) => ({
+        quote_id: quoteId,
+        standard_id: l.standard_id,
+        work_name: l.work_name.trim(),
+        man_days: l.man_days || 0,
+        unit_price: laborUnitPrice,
+        amount: Math.round((l.man_days || 0) * laborUnitPrice),
+        remark: l.remark || null,
+        elevator_name: l.elevator_name || null,
+        sort_order: (i + 1) * 10,
+      }));
       const itemsPayload = (quoteId: number) => validItems.map((r, i) => ({
         quote_id: quoteId,
         material_id: r.material_id || null,
@@ -634,6 +799,14 @@ function QuoteEntryInner() {
         const { error: e3 } = await supabase.from("quote_items").insert(itemsPayload(editId));
         if (e3) throw e3;
 
+        // 작업 라인도 동일하게 전체 DELETE 후 INSERT
+        const { error: e2b } = await supabase.from("quote_labor_lines").delete().eq("quote_id", editId);
+        if (e2b) throw e2b;
+        if (validLines.length > 0) {
+          const { error: e3b } = await supabase.from("quote_labor_lines").insert(laborLinesPayload(editId));
+          if (e3b) throw e3b;
+        }
+
         setMessage({
           type: "success",
           text: `견적서가 수정되었습니다. (${editQuoteNo ?? `#${editId}`})`,
@@ -657,6 +830,11 @@ function QuoteEntryInner() {
       const { error: e2 } = await supabase.from("quote_items").insert(itemsPayload(header.id));
       if (e2) throw e2;
 
+      if (validLines.length > 0) {
+        const { error: e2b } = await supabase.from("quote_labor_lines").insert(laborLinesPayload(header.id));
+        if (e2b) throw e2b;
+      }
+
       // 견적요청으로부터 진입한 경우 → quote_request.quote_id 연결 + 상태 갱신
       if (sourceRequestId && header.id) {
         await supabase.from("quote_requests")
@@ -678,6 +856,9 @@ function QuoteEntryInner() {
       setChargeAutoApplied(false);
       setLaborMode("공");
       setLaborManhours(1);
+      setLaborLines([]);
+      setVatIncluded(false);
+      setShowSpec(true);
       setLaborUnitPrice(settings?.default_direct_labor ?? 0);
       setLaborEnabled(true);
       setTruncateManual(false);
@@ -757,34 +938,23 @@ function QuoteEntryInner() {
                 </div>
               )}
             </div>
-            <div className="lg:col-span-3">
-              <label className={labelCls}>구분</label>
-              <div className="flex items-center gap-2">
-                <div className="flex gap-0.5 bg-gray-100 dark:bg-gray-700 p-0.5 rounded">
-                  {(["유상", "무상"] as const).map(c => (
-                    <button key={c} type="button"
-                      onClick={() => { setChargeType(c); setChargeAutoApplied(false); }}
-                      className={`px-4 py-1 text-[11px] font-bold rounded transition-colors ${
-                        chargeType === c
-                          ? (c === "무상" ? "bg-amber-500 text-white" : "bg-blue-600 text-white")
-                          : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-                      }`}>{c}</button>
-                  ))}
-                </div>
-                {chargeAutoApplied && (
-                  <span className="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 px-2 py-1 rounded border border-amber-200 dark:border-amber-700">
-                    🛡️ FM 현장({siteInfo?.contract_type}) — [무상] 자동 적용. 견적서 대신 [자재신청]을 사용해 주세요.
-                  </span>
-                )}
-              </div>
-            </div>
             <div className="lg:col-span-2">
               <label className={labelCls}>작업명</label>
               <input type="text" value={workTitle} onChange={e => setWorkTitle(e.target.value)} lang="ko" className={inputCls} />
             </div>
             <div>
-              <label className={labelCls}>{sourceRequestId ? "견적요청자" : "고객명"}</label>
-              <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)} lang="ko" className={inputCls} />
+              <label className={labelCls}>견적신청자 <span className="text-[10px] text-gray-400">(사원 검색/직접입력{sourceRequestId ? " · 요청목록 자동" : ""})</span></label>
+              <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)} lang="ko" list="quote-requester-opts" className={inputCls} />
+              <datalist id="quote-requester-opts">
+                {employees.map(emp => (
+                  <option key={emp.id} value={emp.name}>{[emp.dept, emp.team].filter(Boolean).join(" / ")}</option>
+                ))}
+              </datalist>
+            </div>
+            <div>
+              <label className={labelCls}>견적작성자</label>
+              <input type="text" readOnly value={isEditMode ? editCreatedBy : (user?.name ?? "")}
+                className={inputCls + " bg-gray-100 dark:bg-gray-600 cursor-not-allowed"} />
             </div>
           </div>
         </div>
@@ -795,7 +965,13 @@ function QuoteEntryInner() {
         {/* 자재비 라인 */}
         <div className={sectionCls}>
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">📦 자재비</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">📦 자재비</h2>
+              <label className="flex items-center gap-1.5 cursor-pointer select-none text-xs font-semibold text-gray-700 dark:text-gray-300">
+                <input type="checkbox" checked={showSpec} onChange={e => setShowSpec(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+                규격 표시
+              </label>
+            </div>
             <div className="flex items-center gap-2 ml-auto">
               <div className="flex gap-0.5 bg-gray-100 dark:bg-gray-700 p-0.5 rounded">
                 {(["DS", "TK", "ALL"] as const).map(t => (
@@ -982,16 +1158,20 @@ function QuoteEntryInner() {
             <div>
               <label className={labelCls}>
                 {laborMode === "공" ? "공수" : "통합 공수합"}
-                {laborMode === "식" && <span className="text-[10px] text-gray-400 ml-1">(여러 작업 합)</span>}
+                {hasLaborLines
+                  ? <span className="text-[10px] text-blue-500 ml-1">(작업 라인 합 자동)</span>
+                  : laborMode === "식" && <span className="text-[10px] text-gray-400 ml-1">(여러 작업 합)</span>}
               </label>
-              <input type="text" inputMode="decimal" value={laborManhours === 0 ? "" : String(laborManhours)}
+              <input type="text" inputMode="decimal"
+                value={hasLaborLines ? String(effectiveManhours) : (laborManhours === 0 ? "" : String(laborManhours))}
                 onChange={e => setLaborManhours(parseDecimal(e.target.value))}
+                readOnly={hasLaborLines}
                 placeholder="예: 2.5"
-                className={inputCls + " text-right tabular-nums font-semibold"} />
+                className={inputCls + " text-right tabular-nums font-semibold" + (hasLaborLines ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")} />
               <div className="text-[11px] text-gray-500 mt-1">
                 {laborMode === "공"
-                  ? `${laborManhours}공 × ${fmtNum(laborUnitPrice)}원 = ${fmtNum(directLabor)}원`
-                  : `1식 (${laborManhours}공 통합) × ${fmtNum(laborUnitPrice)}원 = ${fmtNum(directLabor)}원`}
+                  ? `${effectiveManhours}공 × ${fmtNum(laborUnitPrice)}원 = ${fmtNum(directLabor)}원`
+                  : `1식 (${effectiveManhours}공 통합) × ${fmtNum(laborUnitPrice)}원 = ${fmtNum(directLabor)}원`}
               </div>
             </div>
             <div>
@@ -1025,11 +1205,120 @@ function QuoteEntryInner() {
               <div className="text-[11px] text-gray-500 mt-1">= {fmtNum(profit)}원</div>
             </div>
           </div>
+
+          {/* 교체공사 작업 라인 (표준 공수 연동) */}
+          <div className={`mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 ${!laborEnabled ? "opacity-50 pointer-events-none" : ""}`}>
+            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+              <h3 className="text-xs font-bold text-gray-700 dark:text-gray-200">
+                🔧 교체공사 작업 라인 <span className="text-[10px] font-normal text-gray-400">(표준 선택 시 공수 자동 · 합계가 위 공수에 반영)</span>
+              </h3>
+              <button type="button" onClick={addLaborLine}
+                className="text-[11px] font-semibold px-2.5 py-1 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50">
+                + 작업 추가
+              </button>
+            </div>
+            {laborLines.length === 0 ? (
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 py-2">
+                작업 라인을 추가하면 <b>대분류 → 중분류 → 항목</b> 순으로 표준 공수를 선택할 수 있습니다. (미사용 시 위 공수 직접 입력)
+              </p>
+            ) : (
+              <div className="overflow-visible">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+                      <th className="px-1 py-1 text-left font-semibold" style={{ width: 150 }}>대분류</th>
+                      <th className="px-1 py-1 text-left font-semibold" style={{ width: 130 }}>중분류</th>
+                      <th className="px-1 py-1 text-left font-semibold" style={{ minWidth: 160 }}>항목 (상세 · 공수)</th>
+                      <th className="px-1 py-1 text-right font-semibold" style={{ width: 60 }}>공수</th>
+                      <th className="px-1 py-1 text-right font-semibold" style={{ width: 100 }}>금액</th>
+                      <th className="px-1 py-1 text-left font-semibold" style={{ width: 80 }}>호기</th>
+                      <th className="px-1 py-1 text-left font-semibold">비고</th>
+                      <th className="px-1 py-1" style={{ width: 28 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {laborLines.map(l => {
+                      const mids = midsOfMajor(l.major_id);
+                      const items = stdsOfMid(l.major_id, l.mid_id);
+                      const lineAmount = Math.round((l.man_days || 0) * laborUnitPrice);
+                      const selCls = "w-full px-1 py-1 text-xs text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-300 disabled:opacity-50";
+                      return (
+                        <tr key={l.key} className="border-b border-gray-100 dark:border-gray-700/50">
+                          <td className="px-1 py-0.5">
+                            <select value={l.major_id ?? ""} onChange={e => selectLineMajor(l.key, e.target.value ? Number(e.target.value) : null)} className={selCls}>
+                              <option value="">대분류</option>
+                              {majorCats.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                            </select>
+                          </td>
+                          <td className="px-1 py-0.5">
+                            <select value={l.mid_id ?? ""} onChange={e => selectLineMid(l.key, e.target.value ? Number(e.target.value) : null)} disabled={l.major_id == null} className={selCls}>
+                              <option value="">{l.major_id == null ? "—" : "중분류"}</option>
+                              {mids.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                            </select>
+                          </td>
+                          <td className="px-1 py-0.5">
+                            <select value={l.standard_id ?? ""} onChange={e => selectLineStandard(l.key, e.target.value ? Number(e.target.value) : null)} disabled={l.mid_id == null} className={selCls}>
+                              <option value="">{l.mid_id == null ? "—" : "항목 선택"}</option>
+                              {items.map(s => (
+                                <option key={s.id} value={s.id}>
+                                  {(s.detail || "기본")} · {s.man_days == null ? "별도견적" : `${s.man_days}공`}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-1 py-0.5">
+                            <input type="text" inputMode="decimal"
+                              value={l.man_days === 0 ? "" : String(l.man_days)}
+                              onChange={e => patchLine(l.key, { man_days: parseDecimal(e.target.value) })}
+                              placeholder="0"
+                              className={cellInput + " text-right tabular-nums"} />
+                          </td>
+                          <td className="px-1 py-0.5 text-right tabular-nums text-gray-700 dark:text-gray-200">{fmtNum(lineAmount)}</td>
+                          <td className="px-1 py-0.5">
+                            <input type="text" value={l.elevator_name}
+                              onChange={e => patchLine(l.key, { elevator_name: e.target.value })}
+                              className={cellInput} />
+                          </td>
+                          <td className="px-1 py-0.5">
+                            <input type="text" value={l.remark}
+                              onChange={e => patchLine(l.key, { remark: e.target.value })}
+                              className={cellInput} />
+                          </td>
+                          <td className="px-1 py-0.5 text-center">
+                            <button type="button" onClick={() => removeLaborLine(l.key)} className="text-red-400 hover:text-red-600">×</button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    <tr className="font-bold bg-gray-50 dark:bg-gray-700/40">
+                      <td className="px-1 py-1 text-right text-gray-600 dark:text-gray-300" colSpan={3}>합계</td>
+                      <td className="px-1 py-1 text-right tabular-nums text-gray-700 dark:text-gray-200">{effectiveManhours}공</td>
+                      <td className="px-1 py-1 text-right tabular-nums text-blue-600 dark:text-blue-400">{fmtNum(Math.round(effectiveManhours * laborUnitPrice))}</td>
+                      <td colSpan={3}></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 합계 + 절사 + 특기사항 */}
         <div className={sectionCls}>
-          <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3">💰 합계</h2>
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">💰 합계</h2>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-gray-500 dark:text-gray-400">견적 대표 금액:</span>
+              <div className="flex gap-0.5 bg-gray-100 dark:bg-gray-700 p-0.5 rounded">
+                {([[false, "부가세 별도"], [true, "부가세 포함"]] as [boolean, string][]).map(([v, l]) => (
+                  <button key={l} type="button" onClick={() => setVatIncluded(v)}
+                    className={`px-3 py-1 text-[11px] font-bold rounded transition-colors ${
+                      vatIncluded === v ? "bg-blue-600 text-white" : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                    }`}>{l}</button>
+                ))}
+              </div>
+            </div>
+          </div>
           <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-4">
             <table className="w-full text-sm">
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -1042,8 +1331,8 @@ function QuoteEntryInner() {
                     2. 인건비 <span className="text-xs text-gray-400">
                       {laborEnabled
                         ? `(${laborMode === "공"
-                            ? `${laborManhours}공 + 간접 ${indirectRate}%`
-                            : `1식(${laborManhours}공 통합) + 간접 ${indirectRate}%`})`
+                            ? `${effectiveManhours}공 + 간접 ${indirectRate}%`
+                            : `1식(${effectiveManhours}공 통합) + 간접 ${indirectRate}%`})`
                         : "(미적용)"}
                     </span>
                   </td>
@@ -1081,11 +1370,16 @@ function QuoteEntryInner() {
                   <td className="py-1.5 text-right tabular-nums text-red-600 dark:text-red-400">- {fmtNum(truncateAmount)} 원</td>
                 </tr>
                 <tr className="border-t-2 border-gray-400 dark:border-gray-500">
-                  <td className="py-2.5 font-bold text-base text-gray-900 dark:text-white">공급가액</td>
-                  <td className="py-2.5 text-right tabular-nums font-bold text-lg text-blue-600 dark:text-blue-400">{fmtNum(totalAmount)} 원</td>
+                  <td className={`py-2 ${!vatIncluded ? "font-bold text-base text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-300"}`}>공급가액</td>
+                  <td className={`py-2 text-right tabular-nums ${!vatIncluded ? "font-bold text-lg text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-200"}`}>{fmtNum(totalAmount)} 원</td>
                 </tr>
                 <tr>
-                  <td colSpan={2} className="text-[11px] text-gray-400 dark:text-gray-500 pt-1">※ 위 금액은 부가세 별도 금액임</td>
+                  <td className="py-1 text-gray-600 dark:text-gray-300">부가가치세 (10%)</td>
+                  <td className="py-1 text-right tabular-nums text-gray-700 dark:text-gray-200">{fmtNum(vatAmount)} 원</td>
+                </tr>
+                <tr>
+                  <td className={`py-2 ${vatIncluded ? "font-bold text-base text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-300"}`}>합계 (부가세 포함)</td>
+                  <td className={`py-2 text-right tabular-nums ${vatIncluded ? "font-bold text-lg text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-200"}`}>{fmtNum(grandTotal)} 원</td>
                 </tr>
               </tbody>
             </table>
@@ -1173,7 +1467,20 @@ function QuoteEntryInner() {
                 truncate_amount:     truncateAmount,
                 total_amount:        totalAmount,
                 note:                note || null,
+                labor_mode:          laborMode,
+                labor_manhours:      effectiveManhours,
+                labor_unit_price:    laborUnitPrice,
+                vat_included:        vatIncluded,
+                show_spec:           showSpec,
               }}
+              laborLines={laborEnabled
+                ? laborLines.filter(l => l.work_name.trim()).map(l => ({
+                    work_name: l.work_name.trim(),
+                    man_days: l.man_days || 0,
+                    unit_price: laborUnitPrice,
+                    amount: Math.round((l.man_days || 0) * laborUnitPrice),
+                  }))
+                : []}
               items={rows
                 .filter(r => r.material_id || r.material_name.trim())
                 .map((r, i) => ({

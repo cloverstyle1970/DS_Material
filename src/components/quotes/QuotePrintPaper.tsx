@@ -47,12 +47,29 @@ export interface QuotePrintHeader {
   truncate_amount: number;
   total_amount: number;
   note: string | null;
+  // 인건비 표시 모드 (작업 라인 연동)
+  labor_mode?: "공" | "식" | null;
+  labor_manhours?: number | null;
+  labor_unit_price?: number | null;
+  // 부가세 포함 여부 (false=별도 기본)
+  vat_included?: boolean | null;
+  // 규격 표시 여부 (기본 true)
+  show_spec?: boolean | null;
+}
+
+export interface QuotePrintLaborLine {
+  work_name: string;
+  man_days: number;
+  unit_price: number;
+  amount: number;
 }
 
 interface Props {
   header: QuotePrintHeader;
   items: QuotePrintItem[];
   company: QuotePrintCompany | null;
+  /** 교체공사 작업 라인 (있으면 인건비 섹션에 공정별/식 표시) */
+  laborLines?: QuotePrintLaborLine[];
   /** 소견 버튼(상세 페이지 전용). 미지정 시 버튼 숨김 */
   onOpenOpinion?: (id: number | string) => void;
   /** 미리보기 모드 — 우상단에 워터마크 뱃지 표시 */
@@ -67,7 +84,28 @@ function fmtDate(iso: string): string {
   return `${m[1]}년 ${m[2]}월 ${m[3]}일`;
 }
 
-export default function QuotePrintPaper({ header, items, company, onOpenOpinion, preview, footerExtra }: Props) {
+export default function QuotePrintPaper({ header, items, company, laborLines, onOpenOpinion, preview, footerExtra }: Props) {
+  const hasLaborLines = !!laborLines && laborLines.length > 0;
+  const laborAsSik = hasLaborLines && header.labor_mode === "식";
+  // 부가세 — 공급가액 기준 10%
+  const vatIncluded = !!header.vat_included;
+  const showSpec = header.show_spec !== false;  // 기본 표시
+  const supplyAmount = header.total_amount;
+  const vatAmount = Math.round(supplyAmount * 0.1);
+  const grandTotal = supplyAmount + vatAmount;
+
+  // 항목표·총액표 컬럼 정렬 공유 (절사금액↔공급가액 사이 여백 분리용)
+  const colGroup = (
+    <colgroup>
+      <col style={{ width: "2.5rem" }} />{/* NO */}
+      <col />{/* 품목 */}
+      <col style={{ width: "3.5rem" }} />{/* 단위 */}
+      <col style={{ width: "4rem" }} />{/* 수량 */}
+      <col style={{ width: "6rem" }} />{/* 단가 */}
+      <col style={{ width: "7rem" }} />{/* 금액 */}
+      <col style={{ width: "8rem" }} />{/* 비고 */}
+    </colgroup>
+  );
   return (
     <>
       <div className="quote-paper bg-white text-black mx-auto shadow-lg print:shadow-none relative">
@@ -136,8 +174,9 @@ export default function QuotePrintPaper({ header, items, company, onOpenOpinion,
           <span className="block text-[11px] text-gray-600 mt-1">아래와 같이 見積 합니다.</span>
         </div>
 
-        {/* 메인 테이블 */}
-        <table className="w-full text-xs border-collapse">
+        {/* 메인 테이블 (항목부: 자재비~절사금액) */}
+        <table className="w-full text-xs border-collapse table-fixed">
+          {colGroup}
           <thead>
             <tr className="bg-gray-100 text-center font-bold">
               <th className="border border-black px-1 py-1.5 w-10">NO</th>
@@ -163,7 +202,7 @@ export default function QuotePrintPaper({ header, items, company, onOpenOpinion,
                 <td className="border border-black px-1 py-1 text-center">{idx + 1}</td>
                 <td className="border border-black px-2 py-1">
                   <div className={`font-medium ${tkPrintTextClass(it.material_id)}`}>{it.material_name}</div>
-                  {it.spec && <div className="text-[10px] text-gray-600">{it.spec}</div>}
+                  {showSpec && it.spec && <div className="text-[10px] text-gray-600">{it.spec}</div>}
                 </td>
                 <td className="border border-black px-2 py-1 text-center">{it.unit ?? "EA"}</td>
                 <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(it.qty)}</td>
@@ -191,15 +230,42 @@ export default function QuotePrintPaper({ header, items, company, onOpenOpinion,
               <td className="border border-black bg-gray-50 px-2 py-1 font-bold text-center">2</td>
               <td colSpan={6} className="border border-black bg-gray-50 px-2 py-1 font-bold">인 건 비</td>
             </tr>
-            <tr>
-              <td className="border border-black"></td>
-              <td className="border border-black px-2 py-1">직접인건비</td>
-              <td className="border border-black px-2 py-1 text-center">공</td>
-              <td className="border border-black px-2 py-1 text-right tabular-nums">1</td>
-              <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(header.direct_labor)}</td>
-              <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(header.direct_labor)}</td>
-              <td className="border border-black"></td>
-            </tr>
+            {!hasLaborLines && (
+              /* 작업 라인 없음 — 기존 단일 직접인건비 행 */
+              <tr>
+                <td className="border border-black"></td>
+                <td className="border border-black px-2 py-1">직접인건비</td>
+                <td className="border border-black px-2 py-1 text-center">공</td>
+                <td className="border border-black px-2 py-1 text-right tabular-nums">1</td>
+                <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(header.direct_labor)}</td>
+                <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(header.direct_labor)}</td>
+                <td className="border border-black"></td>
+              </tr>
+            )}
+            {hasLaborLines && laborAsSik && (
+              /* "식" 모드 — 전체 공정을 일식 1줄로 묶음 */
+              <tr>
+                <td className="border border-black"></td>
+                <td className="border border-black px-2 py-1">직접인건비</td>
+                <td className="border border-black px-2 py-1 text-center">식</td>
+                <td className="border border-black px-2 py-1 text-right tabular-nums">1</td>
+                <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(header.direct_labor)}</td>
+                <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(header.direct_labor)}</td>
+                <td className="border border-black"></td>
+              </tr>
+            )}
+            {hasLaborLines && !laborAsSik && laborLines!.map((l, i) => (
+              /* "공" 모드 — 공정별 개별 행 (직접인건비 내역) */
+              <tr key={i}>
+                <td className="border border-black"></td>
+                <td className="border border-black px-2 py-1">직접인건비({l.work_name.split(" · ")[0]} 작업 및 조정비용)</td>
+                <td className="border border-black px-2 py-1 text-center">공</td>
+                <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(l.man_days)}</td>
+                <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(l.unit_price)}</td>
+                <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(l.amount)}</td>
+                <td className="border border-black"></td>
+              </tr>
+            ))}
             <tr>
               <td className="border border-black"></td>
               <td className="border border-black px-2 py-1">간접인건비 (직접인건비의 {header.indirect_labor_rate}%)</td>
@@ -247,11 +313,34 @@ export default function QuotePrintPaper({ header, items, company, onOpenOpinion,
               <td className="border border-black px-2 py-1 text-right tabular-nums text-red-600">- {fmtNum(header.truncate_amount)}</td>
               <td className="border border-black"></td>
             </tr>
+          </tbody>
+        </table>
 
-            {/* 공급가액 */}
-            <tr className="bg-yellow-50 print:bg-gray-100 font-bold text-base">
-              <td colSpan={5} className="border border-black px-2 py-2 text-right">공 급 가 액</td>
-              <td className="border border-black px-2 py-2 text-right tabular-nums">￦ {fmtNum(header.total_amount)}</td>
+        {/* 절사금액 ↔ 공급가액 사이 신축 여백 (A4 한 장 채움) */}
+        <div className="flex-grow min-h-[8mm]" />
+
+        {/* 총액부 (공급가액/부가세/합계) — 페이지 하단 */}
+        <table className="w-full text-xs border-collapse table-fixed">
+          {colGroup}
+          <tbody>
+            {/* 공급가액 (별도 모드면 대표 강조) */}
+            <tr className={`font-bold ${!vatIncluded ? "bg-yellow-50 print:bg-gray-100 text-base" : ""}`}>
+              <td colSpan={5} className="border border-black px-2 py-2 text-right">
+                공 급 가 액{!vatIncluded && <span className="text-[10px] font-normal text-gray-500 ml-1">(부가세 별도)</span>}
+              </td>
+              <td className="border border-black px-2 py-2 text-right tabular-nums">￦ {fmtNum(supplyAmount)}</td>
+              <td className="border border-black"></td>
+            </tr>
+            {/* 부가가치세 */}
+            <tr className="font-bold">
+              <td colSpan={5} className="border border-black px-2 py-1.5 text-right">부 가 가 치 세 (10%)</td>
+              <td className="border border-black px-2 py-1.5 text-right tabular-nums">￦ {fmtNum(vatAmount)}</td>
+              <td className="border border-black"></td>
+            </tr>
+            {/* 합계 (포함 모드면 대표 강조) */}
+            <tr className={`font-bold ${vatIncluded ? "bg-yellow-50 print:bg-gray-100 text-base" : ""}`}>
+              <td colSpan={5} className="border border-black px-2 py-2 text-right">합 계 (부가세 포함)</td>
+              <td className="border border-black px-2 py-2 text-right tabular-nums">￦ {fmtNum(grandTotal)}</td>
               <td className="border border-black"></td>
             </tr>
           </tbody>
@@ -292,13 +381,16 @@ export default function QuotePrintPaper({ header, items, company, onOpenOpinion,
       <style jsx global>{`
         .quote-paper {
           width: 210mm;
+          min-height: 297mm;          /* A4 한 장 최소 높이 — 내용 짧아도 하단 승인란 고정 */
           padding: 12mm 10mm;
           box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
         }
         @media print {
           @page { size: A4; margin: 8mm; }
           body, html { background: white !important; }
-          .quote-paper { width: 100% !important; padding: 0 !important; box-shadow: none !important; }
+          .quote-paper { width: 100% !important; min-height: 277mm; padding: 0 !important; box-shadow: none !important; }
         }
       `}</style>
     </>
