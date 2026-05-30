@@ -119,7 +119,7 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
     render: () => <QuoteDetailClient />,
   },
   "/quotes/labor-rates": {
-    label: "공임 단가표",
+    label: "공정별 공수표",
     render: () => <LaborRatesClient />,
   },
   "/quotes/settings": {
