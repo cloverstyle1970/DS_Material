@@ -13,7 +13,7 @@ export async function visibleUserIds(user: AuthUser): Promise<number[] | null> {
   if (isAdmin(user)) return null;
   const dept = (user.dept ?? "").trim();
   if (!dept) return [user.id];
-  const { data } = await supabase.from("users").select("id").eq("dept", dept);
+  const { data } = await supabase.from("accounts").select("id").eq("dept", dept);
   const ids = (data ?? []).map(r => r.id as number);
   return ids.length ? ids : [user.id];
 }

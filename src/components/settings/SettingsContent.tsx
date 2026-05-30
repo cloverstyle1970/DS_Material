@@ -13,7 +13,7 @@ export default function SettingsContent() {
     setTheme(t);
     if (!user) return;
     // DB 저장 실패해도 UI 적용은 유지 (재로그인 시 DB 값으로 복원)
-    await supabase.from("users").update({ theme: t }).eq("id", user.id);
+    await supabase.from("accounts").update({ theme: t }).eq("id", user.id);
   }
 
   return (

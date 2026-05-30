@@ -6,6 +6,8 @@ import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
 import RegisterRepairModal from "./RegisterRepairModal";
 import DraggableModal from "@/components/common/DraggableModal";
+import { parseNum } from "@/lib/format";
+import { formatMoney } from "@/lib/input-format";
 
 const REFERENCE_BUCKET = "material-references";
 
@@ -20,8 +22,8 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
   const [alias,      setAlias]      = useState(material.alias ?? "");
   const [modelNo,    setModelNo]    = useState(material.modelNo ?? "");
   const [unit,       setUnit]       = useState(material.unit ?? "EA");
-  const [buyPrice,   setBuyPrice]   = useState(material.buyPrice != null ? String(material.buyPrice) : "");
-  const [sellPrice,  setSellPrice]  = useState(material.sellPrice != null ? String(material.sellPrice) : "");
+  const [buyPrice,   setBuyPrice]   = useState(material.buyPrice != null ? formatMoney(material.buyPrice) : "");
+  const [sellPrice,  setSellPrice]  = useState(material.sellPrice != null ? formatMoney(material.sellPrice) : "");
   const [storageLoc, setStorageLoc] = useState(material.storageLoc ?? "");
   const [stockQty,   setStockQty]   = useState(material.stockQty);
   const [isRepair,   setIsRepair]   = useState(material.isRepair);
@@ -61,7 +63,7 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
       let finalRef2 = refUrl2;
       if (refFile2) finalRef2 = await uploadReferenceImage(refFile2, 2);
       await api.patch(`/api/materials/${encodeURIComponent(material.id)}`, {
-        name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty, isRepair,
+        name, alias, modelNo, unit, buyPrice: parseNum(buyPrice), sellPrice: parseNum(sellPrice), storageLoc, stockQty, isRepair,
         referenceImageUrl1: finalRef1 || "",
         referenceImageUrl2: finalRef2 || "",
       });
@@ -149,11 +151,13 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">구매단가 (원)</label>
-              <input type="number" min={0} value={buyPrice} onChange={e => setBuyPrice(e.target.value)} placeholder="0" className={field} />
+              <input type="text" inputMode="numeric" value={buyPrice}
+                onChange={e => setBuyPrice(formatMoney(e.target.value))} placeholder="0" className={field + " text-right"} />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">판매단가 (원)</label>
-              <input type="number" min={0} value={sellPrice} onChange={e => setSellPrice(e.target.value)} placeholder="0" className={field} />
+              <input type="text" inputMode="numeric" value={sellPrice}
+                onChange={e => setSellPrice(formatMoney(e.target.value))} placeholder="0" className={field + " text-right"} />
             </div>
           </div>
 

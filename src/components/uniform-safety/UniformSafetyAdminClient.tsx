@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { fmtNum } from "@/lib/format";
+import UniformSafetyDirectIssueTab, { type MaterialOption } from "./UniformSafetyDirectIssueTab";
 
 const MENU_HREF = "/uniform-safety/admin";
 
@@ -40,7 +41,7 @@ interface ReqRow {
 
 interface UserMini { id: number; name: string; dept: string | null; }
 
-type Tab = "manage" | "history";
+type Tab = "manage" | "history" | "issue";
 type StatusFilter = Status | "all";
 
 // ============================================================
@@ -51,6 +52,10 @@ export default function UniformSafetyAdminClient() {
 
   const [rows, setRows] = useState<ReqRow[]>([]);
   const [users, setUsers] = useState<UserMini[]>([]);
+  const [materials, setMaterials] = useState<MaterialOption[]>([]); // 직접 불출용 자재 풀 (D9902 + D9903)
+  const [subLabels, setSubLabels] = useState<{ uniform: Map<string, string>; safety: Map<string, string> }>(
+    { uniform: new Map(), safety: new Map() }
+  );
   const [loading, setLoading] = useState(true);
 
   // 처리 탭 필터
@@ -73,20 +78,32 @@ export default function UniformSafetyAdminClient() {
   // 처리 진행 중
   const [processingId, setProcessingId] = useState<number | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
-    const [r, u] = await Promise.all([
+    const [r, u, mUni, mSaf, cUni, cSaf] = await Promise.all([
       supabase.from("uniform_safety_requests")
         .select("*, items:uniform_safety_request_items(*)")
         .order("requested_at", { ascending: false })
         .limit(500),
-      supabase.from("users").select("id, name, dept").order("name"),
+      supabase.from("accounts").select("id, name, dept").eq("status", "재직").order("name"),
+      supabase.from("materials").select("id, name, unit, model_no, stock_qty").like("id", "D9902%").order("id"),
+      supabase.from("materials").select("id, name, unit, model_no, stock_qty").like("id", "D9903%").order("id"),
+      supabase.from("categories").select("code, label").eq("level", "sub").eq("major_code", "99").eq("mid_code", "02"),
+      supabase.from("categories").select("code, label").eq("level", "sub").eq("major_code", "99").eq("mid_code", "03"),
     ]);
     setRows(((r.data ?? []) as ReqRow[]).map(x => ({ ...x, items: x.items ?? [] })));
     setUsers((u.data ?? []) as UserMini[]);
+    const matUni = ((mUni.data ?? []) as MaterialOption[]).map(m => ({ ...m, request_type: "근무복" as const }));
+    const matSaf = ((mSaf.data ?? []) as MaterialOption[]).map(m => ({ ...m, request_type: "안전장구" as const }));
+    setMaterials([...matUni, ...matSaf]);
+    const uMap = new Map<string, string>();
+    ((cUni.data ?? []) as {code: string; label: string}[]).forEach(r => uMap.set(r.code, r.label));
+    const sMap = new Map<string, string>();
+    ((cSaf.data ?? []) as {code: string; label: string}[]).forEach(r => sMap.set(r.code, r.label));
+    setSubLabels({ uniform: uMap, safety: sMap });
     setLoading(false);
-  }
-  useEffect(() => { load(); }, []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
 
   if (!user) return <div className="p-8 text-center text-sm text-gray-500">로그인이 필요합니다.</div>;
   const admin = isAdmin(user);
@@ -109,6 +126,61 @@ export default function UniformSafetyAdminClient() {
     if (!canUpdate || !user) return;
     setProcessingId(row.id);
     try {
+      // 신청 → 처리중 / 수령완료 로 첫 전환되는 시점에만 출고 트랜잭션 발생 (중복 방지)
+      const needsIssue = row.status === "신청" && (next === "처리중" || next === "수령완료");
+
+      if (needsIssue && row.items.length > 0) {
+        // 사전 재고 검증: 같은 자재가 여러 라인에 있으면 합산
+        const needMap = new Map<string, number>();
+        for (const it of row.items) needMap.set(it.material_id, (needMap.get(it.material_id) ?? 0) + it.qty);
+        const ids = Array.from(needMap.keys());
+        const { data: stockRows, error: stockErr } = await supabase
+          .from("materials")
+          .select("id, name, stock_qty")
+          .in("id", ids);
+        if (stockErr) throw stockErr;
+        const stockMap = new Map((stockRows ?? []).map(m => [m.id as string, { name: m.name as string, qty: (m.stock_qty as number) ?? 0 }]));
+        const insufficient: string[] = [];
+        for (const [mid, need] of needMap.entries()) {
+          const info = stockMap.get(mid);
+          if (!info || info.qty < need) {
+            insufficient.push(`${info?.name ?? mid} (필요 ${need} / 재고 ${info?.qty ?? 0})`);
+          }
+        }
+        if (insufficient.length > 0) {
+          throw new Error(`재고 부족으로 출고 불가:\n- ${insufficient.join("\n- ")}`);
+        }
+
+        // 출고 트랜잭션 (라인 단위, 같은 신청은 동일 batch_id로 묶음)
+        const batchId = crypto.randomUUID();
+        const issueSiteName = `[지급] ${row.user_name}`;
+        for (const it of row.items) {
+          const noteParts = [
+            `${row.request_type} 신청 #${row.id}`,
+            row.user_dept ? `부서 ${row.user_dept}` : null,
+            it.category_label ? `구분 ${it.category_label}` : null,
+            it.size ? `사이즈 ${it.size}` : null,
+          ].filter(Boolean) as string[];
+          const { data, error } = await supabase.rpc("add_transaction", {
+            p_type:            "출고",
+            p_material_id:     it.material_id,
+            p_material_name:   it.material_name,
+            p_qty:             it.qty,
+            p_site_name:       issueSiteName,
+            p_note:            noteParts.join(" / "),
+            p_user_id:         user.id,
+            p_user_name:       user.name,
+            p_elevator_name:   null,
+            p_serial_nos:      null,
+            p_requires_return: false,
+            p_batch_id:        batchId,
+          });
+          if (error) throw error;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if ((data as any)?.error) throw new Error((data as any).error);
+        }
+      }
+
       const patch: Partial<ReqRow> & { processor_id?: number; processor_name?: string; cancel_reason?: string | null } = { status: next };
       if (next === "처리중") {
         patch.processed_at = new Date().toISOString();
@@ -139,7 +211,7 @@ export default function UniformSafetyAdminClient() {
           if (it.category_label === "하의") update.uniform_bottom_size = it.size;
         }
         if (Object.keys(update).length > 0) {
-          const { error: e2 } = await supabase.from("users").update(update).eq("id", row.user_id);
+          const { error: e2 } = await supabase.from("accounts").update(update).eq("id", row.user_id);
           if (e2) throw e2;
         }
       }
@@ -225,7 +297,11 @@ export default function UniformSafetyAdminClient() {
       </div>
 
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 flex gap-1">
-        {([["manage", `📋 신청 처리 (${counts.신청 + counts.처리중})`], ["history", `📊 불출이력`]] as [Tab, string][]).map(([t, label]) => (
+        {([
+          ["manage",  `📋 신청 처리 (${counts.신청 + counts.처리중})`],
+          ["history", `📊 불출이력`],
+          ["issue",   `➕ 직접 불출`],
+        ] as [Tab, string][]).map(([t, label]) => (
           <button key={t} type="button" onClick={() => setTab(t)}
             className={`py-2.5 px-4 text-sm font-semibold border-b-2 transition-colors ${
               tab === t ? "text-blue-600 dark:text-blue-400 border-blue-500"
@@ -425,6 +501,17 @@ export default function UniformSafetyAdminClient() {
           </div>
         </>
       )}
+
+      {/* 직접 불출 탭 */}
+      {tab === "issue" && (
+        <UniformSafetyDirectIssueTab
+          users={users}
+          materials={materials}
+          subLabels={subLabels}
+          canUpdate={canUpdate}
+          onCompleted={load}
+        />
+      )}
     </div>
   );
 }
@@ -495,12 +582,12 @@ function RequestCard({
           {row.status === "신청" && (
             <button type="button" disabled={busy} onClick={() => onChange(row, "처리중")}
               className="px-3 py-1.5 rounded text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 hover:bg-amber-200 disabled:opacity-50">
-              처리중으로
+              📦 출고등록 (처리중)
             </button>
           )}
           <button type="button" disabled={busy} onClick={() => onChange(row, "수령완료")}
             className="px-3 py-1.5 rounded text-xs font-semibold bg-green-600 text-white hover:bg-green-700 disabled:opacity-50">
-            ✓ 수령완료{row.request_type === "근무복" ? " (사이즈 동기화)" : ""}
+            ✓ {row.status === "신청" ? "출고+수령완료" : "수령완료"}{row.request_type === "근무복" ? " (사이즈 동기화)" : ""}
           </button>
           <button type="button" disabled={busy} onClick={cancel}
             className="px-3 py-1.5 rounded text-xs font-semibold bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-300 hover:bg-red-100 disabled:opacity-50">

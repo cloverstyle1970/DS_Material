@@ -5,6 +5,7 @@ import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
 import { fmtNum, parseNum } from "@/lib/format";
+import * as XLSX from "xlsx";
 
 const MENU_HREF = "/quotes/labor-rates";
 
@@ -77,6 +78,27 @@ export default function LaborRatesClient() {
     await load();
   }
 
+  function downloadXlsx() {
+    // 현재 필터(active/inactive/all + 검색)가 적용된 결과를 그대로 export
+    const header = ["코드", "공정명", "분류", "단위", "단가", "설명", "활성", "정렬"];
+    const body = filtered.map(r => [
+      r.process_code,
+      r.process_name,
+      r.category ?? "",
+      r.unit ?? "",
+      r.unit_price ?? 0,
+      r.description ?? "",
+      r.is_active ? "활성" : "비활성",
+      r.sort_order,
+    ]);
+    const ws = XLSX.utils.aoa_to_sheet([header, ...body]);
+    ws["!cols"] = [{ wch: 14 }, { wch: 28 }, { wch: 12 }, { wch: 8 }, { wch: 12 }, { wch: 40 }, { wch: 8 }, { wch: 6 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "공임단가");
+    const ts = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    XLSX.writeFile(wb, `공임단가_${ts}.xlsx`);
+  }
+
   return (
     <div className="min-h-full bg-gray-50 dark:bg-gray-900">
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
@@ -98,9 +120,13 @@ export default function LaborRatesClient() {
         <input type="text" lang="ko" value={search} onChange={e => setSearch(e.target.value)}
           placeholder="코드·공정명·분류 검색"
           className="flex-1 max-w-md px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
+        <button type="button" onClick={downloadXlsx} disabled={filtered.length === 0}
+          className="ml-auto px-3 py-1.5 rounded bg-green-600 text-white text-xs font-semibold hover:bg-green-700 disabled:opacity-50">
+          📥 엑셀 다운로드 ({filtered.length})
+        </button>
         {canCreate && (
           <button type="button" onClick={() => setShowNew(true)}
-            className="ml-auto px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700">+ 공정 추가</button>
+            className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700">+ 공정 추가</button>
         )}
       </div>
 

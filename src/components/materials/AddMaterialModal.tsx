@@ -6,6 +6,8 @@ import { generateMaterialCode } from "@/lib/category-codes";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
 import { MaterialRecord } from "@/lib/mock-materials";
+import { parseNum } from "@/lib/format";
+import { formatMoney } from "@/lib/input-format";
 import CategoryManagerModal from "./CategoryManagerModal";
 import DraggableModal from "@/components/common/DraggableModal";
 
@@ -32,8 +34,8 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
   const [alias, setAlias] = useState(source?.alias ?? "");
   const [modelNo, setModelNo] = useState(source?.modelNo ?? "");
   const [unit, setUnit] = useState(source?.unit ?? "EA");
-  const [buyPrice, setBuyPrice] = useState(source?.buyPrice != null ? String(source.buyPrice) : "");
-  const [sellPrice, setSellPrice] = useState(source?.sellPrice != null ? String(source.sellPrice) : "");
+  const [buyPrice, setBuyPrice] = useState(source?.buyPrice != null ? formatMoney(source.buyPrice) : "");
+  const [sellPrice, setSellPrice] = useState(source?.sellPrice != null ? formatMoney(source.sellPrice) : "");
   const [storageLoc, setStorageLoc] = useState(source?.storageLoc ?? "");
   const [stockQty, setStockQty] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -145,9 +147,11 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
         referenceImageUrl1,
         referenceImageUrl2,
       };
+      const buyPriceNum  = parseNum(buyPrice);
+      const sellPriceNum = parseNum(sellPrice);
       const payload = isManual && !isRepairMode
-        ? { directId: trimmedManualId, major, mid, sub, isRepair: computedIsRepair, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty, ...extra }
-        : { sourceId: source?.id, isDs, major, mid, sub, isRepair, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty, ...extra };
+        ? { directId: trimmedManualId, major, mid, sub, isRepair: computedIsRepair, name, alias, modelNo, unit, buyPrice: buyPriceNum, sellPrice: sellPriceNum, storageLoc, stockQty, ...extra }
+        : { sourceId: source?.id, isDs, major, mid, sub, isRepair, name, alias, modelNo, unit, buyPrice: buyPriceNum, sellPrice: sellPriceNum, storageLoc, stockQty, ...extra };
       await api.post("/api/materials", payload);
       onSaved();
     } catch (e) {
@@ -332,13 +336,15 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">구매단가 (원)</label>
-                <input type="number" min={0} value={buyPrice} onChange={e => setBuyPrice(e.target.value)} placeholder="0"
-                  className="w-full rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+                <input type="text" inputMode="numeric" value={buyPrice}
+                  onChange={e => setBuyPrice(formatMoney(e.target.value))} placeholder="0"
+                  className="w-full rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-right text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-400" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">판매단가 (원)</label>
-                <input type="number" min={0} value={sellPrice} onChange={e => setSellPrice(e.target.value)} placeholder="0"
-                  className="w-full rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+                <input type="text" inputMode="numeric" value={sellPrice}
+                  onChange={e => setSellPrice(formatMoney(e.target.value))} placeholder="0"
+                  className="w-full rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-right text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-400" />
               </div>
             </div>
 

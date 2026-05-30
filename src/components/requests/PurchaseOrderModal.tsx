@@ -9,6 +9,8 @@ import SiteSearchInput from "@/components/ui/SiteSearchInput";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { api, getErrorMessage } from "@/lib/api-client";
 import DraggableModal from "@/components/common/DraggableModal";
+import { parseNum } from "@/lib/format";
+import { formatMoney } from "@/lib/input-format";
 
 interface VendorOption { id: number; name: string }
 interface SiteOption  { id: number; name: string }
@@ -129,7 +131,7 @@ export default function PurchaseOrderModal({ vendors, sites, pendingRequests, us
         return [...prev, {
           material: mat,
           qty: item.qty,
-          unitPrice: mat.buyPrice ? String(mat.buyPrice) : "",
+          unitPrice: mat.buyPrice ? formatMoney(mat.buyPrice) : "",
         }];
       });
       setMatQuery(mat.name);
@@ -152,7 +154,7 @@ export default function PurchaseOrderModal({ vendors, sites, pendingRequests, us
       setSelectedItems(prev => [...prev, {
         material: m,
         qty: 1,
-        unitPrice: m.buyPrice ? String(m.buyPrice) : "",
+        unitPrice: m.buyPrice ? formatMoney(m.buyPrice) : "",
       }]);
     }
     setError("");
@@ -189,7 +191,7 @@ export default function PurchaseOrderModal({ vendors, sites, pendingRequests, us
           materialName: item.material.name,
           qty: item.qty,
           vendorName: vendorName || null,
-          unitPrice: item.unitPrice ? Number(item.unitPrice) : null,
+          unitPrice: item.unitPrice ? parseNum(item.unitPrice) : null,
           requestId: linkedRequestId,
           siteName: siteName || null,
           elevatorName,
@@ -389,10 +391,10 @@ export default function PurchaseOrderModal({ vendors, sites, pendingRequests, us
                       {/* 단가 */}
                       <div className="flex items-center gap-1 flex-1">
                         <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">단가</span>
-                        <input type="number" min={0} value={item.unitPrice}
-                          onChange={e => updateItem(item.material.id, { unitPrice: e.target.value })}
+                        <input type="text" inputMode="numeric" value={item.unitPrice}
+                          onChange={e => updateItem(item.material.id, { unitPrice: formatMoney(e.target.value) })}
                           placeholder="0"
-                          className="flex-1 min-w-0 px-2 py-0.5 text-sm text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-1 focus:ring-slate-400" />
+                          className="flex-1 min-w-0 px-2 py-0.5 text-sm text-right tabular-nums text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-1 focus:ring-slate-400" />
                       </div>
                     </div>
                   </li>

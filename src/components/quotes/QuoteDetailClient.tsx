@@ -8,7 +8,8 @@ import { useTabs, MAX_TABS } from "@/context/TabsContext";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
 import QuotePrintPaper from "@/components/quotes/QuotePrintPaper";
-import { fmtNum } from "@/lib/format";
+import { fmtNum, parseNum } from "@/lib/format";
+import { formatMoney } from "@/lib/input-format";
 
 // ============================================================
 // 타입
@@ -327,7 +328,7 @@ function QuoteDetailInner() {
 
   async function savePayment() {
     if (!header || !user) return;
-    const amt = Number(payForm.amount.replace(/[^0-9-]/g, ""));
+    const amt = parseNum(payForm.amount);
     if (!Number.isFinite(amt) || amt <= 0) { alert("금액을 입력하세요."); return; }
     if (!payForm.paid_at) { alert("입금일을 입력하세요."); return; }
     setPaySaving(true);
@@ -661,10 +662,7 @@ function QuoteDetailInner() {
           <div>
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">금액 <span className="text-red-500">*</span></label>
             <input type="text" inputMode="numeric" value={payForm.amount}
-              onChange={e => {
-                const v = e.target.value.replace(/[^0-9]/g, "");
-                setPayForm(f => ({ ...f, amount: v ? fmtNum(Number(v)) : "" }));
-              }}
+              onChange={e => setPayForm(f => ({ ...f, amount: formatMoney(e.target.value) }))}
               placeholder={`최대 ${fmtNum(header.total_amount)}원`}
               className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-right tabular-nums font-bold" />
           </div>

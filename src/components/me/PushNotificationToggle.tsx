@@ -75,7 +75,7 @@ export default function PushNotificationToggle() {
 
     // push_enabled 조회
     const { data } = await supabase
-      .from("users")
+      .from("accounts")
       .select("push_enabled")
       .eq("id", user.id)
       .single();
@@ -149,7 +149,7 @@ export default function PushNotificationToggle() {
     setPushEnabled(next);
     setBusy(true);
     try {
-      const { error } = await supabase.from("users").update({ push_enabled: next }).eq("id", user.id);
+      const { error } = await supabase.from("accounts").update({ push_enabled: next }).eq("id", user.id);
       if (error) throw error;
     } catch (e) {
       setPushEnabled(!next);

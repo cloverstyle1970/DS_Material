@@ -58,6 +58,20 @@ export function formatPhone(value: string): string {
 }
 
 // ============================================================
+// 금액/수량 — 입력 중 천 단위 콤마 자동 삽입
+// ------------------------------------------------------------
+// 정수만 지원 (소수점 없는 통화 입력 기준). 음수는 허용하지 않음.
+// 빈 값은 빈 문자열 반환 (placeholder 유지).
+// 저장 시 숫자 변환은 `parseNum` (format.ts) 사용.
+// ============================================================
+export function formatMoney(value: string | number | null | undefined): string {
+  if (value == null) return "";
+  const d = String(value).replace(/[^0-9]/g, "");
+  if (d === "") return "";
+  return Number(d).toLocaleString();
+}
+
+// ============================================================
 // 주민등록번호 — 13자리 → XXXXXX-XXXXXXX
 // ============================================================
 export function formatSsn(value: string): string {

@@ -4,7 +4,8 @@ import { useState, FormEvent } from "react";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { api, ApiError, getErrorMessage } from "@/lib/api-client";
 import DraggableModal from "@/components/common/DraggableModal";
-import { fmtNum } from "@/lib/format";
+import { fmtNum, parseNum } from "@/lib/format";
+import { formatMoney } from "@/lib/input-format";
 
 interface Props {
   parent: MaterialRecord;
@@ -19,8 +20,8 @@ export default function RegisterRepairModal({ parent, onClose, onSaved }: Props)
   const [alias,      setAlias]      = useState(parent.alias ?? "");
   const [modelNo,    setModelNo]    = useState(parent.modelNo ?? "");
   const [unit,       setUnit]       = useState(parent.unit ?? "EA");
-  const [buyPrice,   setBuyPrice]   = useState(parent.buyPrice  != null ? String(Math.round(parent.buyPrice  * 0.5)) : "");
-  const [sellPrice,  setSellPrice]  = useState(parent.sellPrice != null ? String(Math.round(parent.sellPrice * 0.5)) : "");
+  const [buyPrice,   setBuyPrice]   = useState(parent.buyPrice  != null ? formatMoney(Math.round(parent.buyPrice  * 0.5)) : "");
+  const [sellPrice,  setSellPrice]  = useState(parent.sellPrice != null ? formatMoney(Math.round(parent.sellPrice * 0.5)) : "");
   const [storageLoc, setStorageLoc] = useState(parent.storageLoc ?? "");
   const [stockQty,   setStockQty]   = useState(0);
   const [saving,     setSaving]     = useState(false);
@@ -36,7 +37,7 @@ export default function RegisterRepairModal({ parent, onClose, onSaved }: Props)
         categoryCode: parent.categoryCode,
         isRepair: true,
         name, alias, modelNo, unit,
-        buyPrice, sellPrice, storageLoc, stockQty,
+        buyPrice: parseNum(buyPrice), sellPrice: parseNum(sellPrice), storageLoc, stockQty,
       });
       onSaved();
     } catch (e) {
@@ -128,11 +129,13 @@ export default function RegisterRepairModal({ parent, onClose, onSaved }: Props)
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">구매단가 (원)</label>
-              <input type="number" min={0} value={buyPrice} onChange={e => setBuyPrice(e.target.value)} placeholder="0" className={field} />
+              <input type="text" inputMode="numeric" value={buyPrice}
+                onChange={e => setBuyPrice(formatMoney(e.target.value))} placeholder="0" className={field + " text-right"} />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">판매단가 (원)</label>
-              <input type="number" min={0} value={sellPrice} onChange={e => setSellPrice(e.target.value)} placeholder="0" className={field} />
+              <input type="text" inputMode="numeric" value={sellPrice}
+                onChange={e => setSellPrice(formatMoney(e.target.value))} placeholder="0" className={field + " text-right"} />
             </div>
           </div>
 

@@ -93,7 +93,7 @@ export default function MyDashboardContent() {
 
     // 알림 수신 설정
     const prefEnabled = await safe("알림설정", async () => {
-      const { data, error } = await supabase.from("users")
+      const { data, error } = await supabase.from("accounts")
         .select("notifications_enabled").eq("id", user.id).single();
       if (error) throw error;
       return data?.notifications_enabled !== false;
@@ -141,7 +141,7 @@ export default function MyDashboardContent() {
     setNotifEnabled(next);
     setNotifPrefSaving(true);
     try {
-      const { error } = await supabase.from("users")
+      const { error } = await supabase.from("accounts")
         .update({ notifications_enabled: next }).eq("id", user.id);
       if (error) throw error;
     } catch (e) {

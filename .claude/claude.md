@@ -61,12 +61,12 @@ supabase/                   # 보조 시드/리셋 SQL
 ### 2. 인증 / 권한 모델
 
 - 인증: `AuthContext` + localStorage(`ds_auth_user`). 서버 세션 없음. 새로고침 시 Supabase에서 `permissions/dept/theme` 재조회로 권한 변경 즉시 반영.
-- `users.permissions: text[]` 가 단일 진리원. 값은 다음 중 하나:
+- `accounts.permissions: text[]` 가 단일 진리원. 값은 다음 중 하나:
   - `"admin"` — 전체 권한 (모든 메뉴/기능 통과)
   - `"site_manage"`, `"view_only"` — 레거시 플래그
   - `"menu:/path:read|create|update"` — 메뉴별 권한
 - 권한 체크: `hasMenuPermission(user, href, "read"|"create"|"update")` 또는 `isAdmin(user)`. `AdminShell`이 라우트 가드도 수행 (`matchMenuHref`로 longest-prefix 매칭 → 권한 없으면 `/dashboard`로 리다이렉트).
-- **권한 그룹**(`permission_groups` 테이블, `/data/permission-groups` 페이지): 그룹은 권한 템플릿이며 "↻ 멤버에 적용" 버튼이 `users.permissions`를 **덮어쓰기**(동기화) 방식. 그룹 자체가 런타임에 조회되지는 않음 — `users.permissions`만 인증에 사용. 그룹 변경 후 멤버 동기화를 잊으면 권한이 안 반영된다.
+- **권한 그룹**(`permission_groups` 테이블, `/data/permission-groups` 페이지): 그룹은 권한 템플릿이며 "↻ 멤버에 적용" 버튼이 `accounts.permissions`를 **덮어쓰기**(동기화) 방식. 그룹 자체가 런타임에 조회되지는 않음 — `accounts.permissions`만 인증에 사용. 그룹 변경 후 멤버 동기화를 잊으면 권한이 안 반영된다.
 
 ### 3. Supabase 직접 호출
 
@@ -87,11 +87,11 @@ supabase/                   # 보조 시드/리셋 SQL
 
 ### 5. 사원/개인정보 모델
 
-`users` + 부속 1:N 테이블이 사원등록·개인정보수정 양쪽에서 공유:
+`accounts` + 부속 1:N 테이블이 사원등록·개인정보수정 양쪽에서 공유:
 
 | 테이블 | 용도 | 편집 위치 |
 |--------|------|----------|
-| `users` | 본체 (성명·주민번호·gender·blood_type·permissions·permission_group_id 등) | 사원등록(admin) / 개인정보수정(본인) |
+| `accounts` | 사원 본체 (성명·주민번호·gender·blood_type·dept·team·position·permissions·permission_group_id·uniform_*_size·theme·push_enabled·notifications_enabled 등) | 사원등록(admin) / 개인정보수정(본인) |
 | `user_family_members` | 가족 + 긴급연락처 1명(`is_emergency` 부분 UNIQUE, `phone`) | 양쪽 |
 | `user_vehicles` | 차량 (회사차량은 별도 페이지에서 관리) | 양쪽 (회사차량은 readOnly) |
 | `user_certifications` | 자격증 (`self_check`, `acquired_date`, `expiry_date`, `issuer`, `cert_doc_url`) | 양쪽 |
@@ -101,6 +101,8 @@ supabase/                   # 보조 시드/리셋 SQL
 
 저장 패턴: 1:N 테이블은 **전체 DELETE 후 INSERT 재삽입** (단순한 정합성 보장). 단, `user_vehicles`는 `vehicle_type='회사차량'` 행은 보존.
 
+부속 1:N 테이블의 `user_id` 컬럼은 모두 `accounts.id` 를 가리킨다 (테이블 이름이 `user_*` 인 것은 레거시 명명). **PostgREST 에 노출된 `users` 테이블은 Supabase Auth 시스템 테이블(`auth.users`) 이므로 비즈니스 코드에서 호출 금지** — `supabase.from("accounts")` 만 사용.
+
 ### 6. UI 컨벤션
 
 - 다크모드: Tailwind `class` 전략. 깜빡임 방지를 위해 `app/layout.tsx` head에 인라인 스크립트로 SSR 전에 `<html class="dark">` 적용. 모든 컴포넌트는 `dark:` variant를 함께 작성.
@@ -109,7 +111,7 @@ supabase/                   # 보조 시드/리셋 SQL
   - YYYYMMDD → YYYY-MM-DD (생년월일·취득일·만료일 등)
   - 주민번호 7번째 자리(1·3·5·7→남, 2·4·6·8→여)로 성별 자동 추정
 - 폼: 일반적으로 `Enter` 키로 다음 입력란 포커스 이동 (한글 IME 조합 중 무시).
-- 초기 비밀번호: `1234` (사원등록 시 `hashPassword("1234")`로 `users.password_hash` 세팅. 변경은 `/data/profile` 기본정보 탭).
+- 초기 비밀번호: `1234` (사원등록 시 `hashPassword("1234")`로 `accounts.password_hash` 세팅. 변경은 `/data/profile` 기본정보 탭).
 
 ---
 
