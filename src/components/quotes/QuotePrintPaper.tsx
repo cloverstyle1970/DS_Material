@@ -55,6 +55,10 @@ export interface QuotePrintHeader {
   vat_included?: boolean | null;
   // 규격 표시 여부 (기본 true)
   show_spec?: boolean | null;
+  // 견적 수정 내역 출력 여부 (기본 false)
+  show_revisions?: boolean | null;
+  // Nego 확정가 (VAT 별도, 0=미사용)
+  nego_amount?: number | null;
 }
 
 export interface QuotePrintLaborLine {
@@ -64,12 +68,19 @@ export interface QuotePrintLaborLine {
   amount: number;
 }
 
+export interface QuotePrintRevisionNote {
+  revised_date: string;
+  content: string;
+}
+
 interface Props {
   header: QuotePrintHeader;
   items: QuotePrintItem[];
   company: QuotePrintCompany | null;
   /** 교체공사 작업 라인 (있으면 인건비 섹션에 공정별/식 표시) */
   laborLines?: QuotePrintLaborLine[];
+  /** 견적 수정 내역 (show_revisions=true 이고 내역 있으면 특기사항 아래 표시) */
+  revisionNotes?: QuotePrintRevisionNote[];
   /** 소견 버튼(상세 페이지 전용). 미지정 시 버튼 숨김 */
   onOpenOpinion?: (id: number | string) => void;
   /** 미리보기 모드 — 우상단에 워터마크 뱃지 표시 */
@@ -84,15 +95,19 @@ function fmtDate(iso: string): string {
   return `${m[1]}년 ${m[2]}월 ${m[3]}일`;
 }
 
-export default function QuotePrintPaper({ header, items, company, laborLines, onOpenOpinion, preview, footerExtra }: Props) {
+export default function QuotePrintPaper({ header, items, company, laborLines, revisionNotes, onOpenOpinion, preview, footerExtra }: Props) {
+  const showRevisions = !!header.show_revisions && !!revisionNotes && revisionNotes.length > 0;
   const hasLaborLines = !!laborLines && laborLines.length > 0;
   const laborAsSik = hasLaborLines && header.labor_mode === "식";
-  // 부가세 — 공급가액 기준 10%
   const vatIncluded = !!header.vat_included;
   const showSpec = header.show_spec !== false;  // 기본 표시
-  const supplyAmount = header.total_amount;
-  const vatAmount = Math.round(supplyAmount * 0.1);
-  const grandTotal = supplyAmount + vatAmount;
+  // Nego 확정가가 있으면 부가세·합계는 그 금액 기준
+  const negoAmount = header.nego_amount ?? 0;
+  const negoActive = negoAmount > 0;
+  const supplyAmount = header.total_amount;                    // 원 견적 공급가액
+  const effectiveSupply = negoActive ? negoAmount : supplyAmount;
+  const vatAmount = Math.round(effectiveSupply * 0.1);         // 실효 공급가액 기준 10%
+  const grandTotal = effectiveSupply + vatAmount;
 
   // 항목표·총액표 컬럼 정렬 공유 (절사금액↔공급가액 사이 여백 분리용)
   const colGroup = (
@@ -323,6 +338,14 @@ export default function QuotePrintPaper({ header, items, company, laborLines, on
         <table className="w-full text-xs border-collapse table-fixed">
           {colGroup}
           <tbody>
+            {/* Nego 확정가 (입력 시) — 공급가액 바로 위, 빨간색 강조 */}
+            {negoActive && (
+              <tr className="font-bold text-base">
+                <td colSpan={5} className="border border-black px-2 py-2 text-right text-red-600">Nego확정가 (VAT별도)</td>
+                <td className="border border-black px-2 py-2 text-right tabular-nums text-red-600">￦ {fmtNum(negoAmount)}</td>
+                <td className="border border-black"></td>
+              </tr>
+            )}
             {/* 공급가액 (별도 모드면 대표 강조) */}
             <tr className={`font-bold ${!vatIncluded ? "bg-yellow-50 print:bg-gray-100 text-base" : ""}`}>
               <td colSpan={5} className="border border-black px-2 py-2 text-right">
@@ -371,6 +394,23 @@ export default function QuotePrintPaper({ header, items, company, laborLines, on
             </tr>
           </tbody>
         </table>
+
+        {/* 견적 수정 내역 (토글 ON + 내역 있을 때만) */}
+        {showRevisions && (
+          <table className="w-full text-xs border-collapse mt-2">
+            <tbody>
+              <tr>
+                <td colSpan={2} className="border border-black bg-gray-100 px-2 py-1 font-semibold">※ 견적 수정 내역</td>
+              </tr>
+              {revisionNotes!.map((r, i) => (
+                <tr key={i}>
+                  <td className="border border-black px-2 py-1 w-32 text-center whitespace-nowrap">{r.revised_date}</td>
+                  <td className="border border-black px-2 py-1">{r.content}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
 
         {/* 푸터 */}
         <div className="text-center text-[10px] text-gray-500 mt-3">2025년 승강기안전 국무총리상 수상기업 (주)대솔이엘</div>

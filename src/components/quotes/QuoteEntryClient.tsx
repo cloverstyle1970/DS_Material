@@ -124,6 +124,15 @@ function newLaborLine(seed: Partial<LaborLine> = {}): LaborLine {
   };
 }
 
+interface RevisionNote {
+  key: string;
+  revised_date: string;  // YYYY-MM-DD
+  content: string;
+}
+function newRevisionNote(seed: Partial<RevisionNote> = {}): RevisionNote {
+  return { key: crypto.randomUUID(), revised_date: todayISO(), content: "", ...seed };
+}
+
 function daysBetween(fromIso: string | null, toIso: string | null): number | null {
   if (!fromIso || !toIso) return null;
   const a = new Date(fromIso).getTime();
@@ -249,6 +258,11 @@ function QuoteEntryInner() {
   // 견적신청자 사원 검색 후보 + 수정모드 작성자명
   const [employees, setEmployees] = useState<{ id: string; name: string; dept: string | null; team: string | null }[]>([]);
   const [editCreatedBy, setEditCreatedBy] = useState<string>("");
+  // 견적 수정 내역 + 출력 표시 토글(기본 미출력)
+  const [revisionNotes, setRevisionNotes] = useState<RevisionNote[]>([]);
+  const [showRevisions, setShowRevisions] = useState<boolean>(false);
+  // Nego 확정가 (VAT 별도, 0=미사용 → 입력 시 부가세·합계 이 금액 기준)
+  const [negoAmount, setNegoAmount] = useState<number>(0);
 
   // 인건비/요율 적용 여부 (체크 해제 시 인건비·일반관리비·이윤 모두 0)
   const [laborEnabled, setLaborEnabled] = useState<boolean>(true);
@@ -400,10 +414,11 @@ function QuoteEntryInner() {
       setEditLoading(true);
       setEditLoadError(null);
       setEditLockedReason(null);
-      const [hdr, items, lines] = await Promise.all([
+      const [hdr, items, lines, revs] = await Promise.all([
         supabase.from("quotes").select("*").eq("id", editId).maybeSingle(),
         supabase.from("quote_items").select("*").eq("quote_id", editId).order("sort_order"),
         supabase.from("quote_labor_lines").select("*").eq("quote_id", editId).order("sort_order"),
+        supabase.from("quote_revision_notes").select("*").eq("quote_id", editId).order("sort_order"),
       ]);
       if (cancelled) return;
       if (hdr.error || !hdr.data) {
@@ -417,7 +432,7 @@ function QuoteEntryInner() {
         customer_name: string | null; created_by_name: string | null;
         note: string | null; status: string; charge_type: "유상" | "무상" | null;
         labor_mode: "공" | "식" | null; labor_manhours: number | null; labor_unit_price: number | null;
-        vat_included: boolean | null; show_spec: boolean | null;
+        vat_included: boolean | null; show_spec: boolean | null; show_revisions: boolean | null; nego_amount: number | null;
         indirect_labor_rate: number | null; overhead_rate: number | null; profit_rate: number | null;
         truncate_amount: number | null;
         direct_labor: number | null; indirect_labor: number | null;
@@ -441,6 +456,10 @@ function QuoteEntryInner() {
       setLaborUnitPrice(Number(h.labor_unit_price ?? 0));
       setVatIncluded(!!h.vat_included);
       setShowSpec(h.show_spec !== false);
+      setShowRevisions(!!h.show_revisions);
+      setNegoAmount(Number(h.nego_amount ?? 0));
+      const revRows = (revs.data ?? []) as Array<{ revised_date: string; content: string }>;
+      setRevisionNotes(revRows.map(r => newRevisionNote({ revised_date: r.revised_date, content: r.content })));
       setIndirectRate(Number(h.indirect_labor_rate ?? 8));
       setOverheadRate(Number(h.overhead_rate ?? 10));
       setProfitRate(Number(h.profit_rate ?? 8));
@@ -563,8 +582,11 @@ function QuoteEntryInner() {
   }, [subBeforeTrunc, isMaterialOnly, truncateManual]);
 
   const totalAmount = subBeforeTrunc - truncateAmount;
-  const vatAmount   = Math.round(totalAmount * 0.1);  // 공급가액의 10%
-  const grandTotal  = totalAmount + vatAmount;
+  // Nego 확정가가 있으면 부가세·합계는 그 금액 기준
+  const negoActive      = negoAmount > 0;
+  const effectiveSupply = negoActive ? negoAmount : totalAmount;
+  const vatAmount   = Math.round(effectiveSupply * 0.1);
+  const grandTotal  = effectiveSupply + vatAmount;
 
   // ============================================================
   // 자재 검색 + 행 갱신
@@ -610,6 +632,17 @@ function QuoteEntryInner() {
     const s = stdId != null ? standards.find(x => x.id === stdId) : null;
     if (s) patchLine(key, { standard_id: s.id, work_name: stdLabel(s), man_days: s.man_days ?? 0 });
     else patchLine(key, { standard_id: null, work_name: "", man_days: 0 });
+  }
+
+  // ── 견적 수정 내역 ──────────────────────────────────────────
+  function patchNote(key: string, patch: Partial<RevisionNote>) {
+    setRevisionNotes(prev => prev.map(n => n.key === key ? { ...n, ...patch } : n));
+  }
+  function addRevisionNote() {
+    setRevisionNotes(prev => [...prev, newRevisionNote()]);
+  }
+  function removeRevisionNote(key: string) {
+    setRevisionNotes(prev => prev.filter(n => n.key !== key));
   }
 
   async function searchMaterial(key: string, query: string) {
@@ -744,6 +777,8 @@ function QuoteEntryInner() {
         labor_unit_price: laborUnitPrice,
         vat_included:     vatIncluded,
         show_spec:        showSpec,
+        show_revisions:   showRevisions,
+        nego_amount:      negoAmount,
         charge_type:      chargeType,
         note: note || null,
       };
@@ -758,6 +793,14 @@ function QuoteEntryInner() {
         amount: Math.round((l.man_days || 0) * laborUnitPrice),
         remark: l.remark || null,
         elevator_name: l.elevator_name || null,
+        sort_order: (i + 1) * 10,
+      }));
+      // 견적 수정 내역 payload (내용 있는 행만)
+      const validNotes = revisionNotes.filter(n => n.content.trim() !== "");
+      const revisionNotesPayload = (quoteId: number) => validNotes.map((n, i) => ({
+        quote_id: quoteId,
+        revised_date: n.revised_date,
+        content: n.content.trim(),
         sort_order: (i + 1) * 10,
       }));
       const itemsPayload = (quoteId: number) => validItems.map((r, i) => ({
@@ -807,6 +850,14 @@ function QuoteEntryInner() {
           if (e3b) throw e3b;
         }
 
+        // 수정 내역도 전체 DELETE 후 INSERT
+        const { error: e2c } = await supabase.from("quote_revision_notes").delete().eq("quote_id", editId);
+        if (e2c) throw e2c;
+        if (validNotes.length > 0) {
+          const { error: e3c } = await supabase.from("quote_revision_notes").insert(revisionNotesPayload(editId));
+          if (e3c) throw e3c;
+        }
+
         setMessage({
           type: "success",
           text: `견적서가 수정되었습니다. (${editQuoteNo ?? `#${editId}`})`,
@@ -834,6 +885,10 @@ function QuoteEntryInner() {
         const { error: e2b } = await supabase.from("quote_labor_lines").insert(laborLinesPayload(header.id));
         if (e2b) throw e2b;
       }
+      if (validNotes.length > 0) {
+        const { error: e2c } = await supabase.from("quote_revision_notes").insert(revisionNotesPayload(header.id));
+        if (e2c) throw e2c;
+      }
 
       // 견적요청으로부터 진입한 경우 → quote_request.quote_id 연결 + 상태 갱신
       if (sourceRequestId && header.id) {
@@ -859,6 +914,9 @@ function QuoteEntryInner() {
       setLaborLines([]);
       setVatIncluded(false);
       setShowSpec(true);
+      setRevisionNotes([]);
+      setShowRevisions(false);
+      setNegoAmount(0);
       setLaborUnitPrice(settings?.default_direct_labor ?? 0);
       setLaborEnabled(true);
       setTruncateManual(false);
@@ -1369,7 +1427,13 @@ function QuoteEntryInner() {
                   </td>
                   <td className="py-1.5 text-right tabular-nums text-red-600 dark:text-red-400">- {fmtNum(truncateAmount)} 원</td>
                 </tr>
-                <tr className="border-t-2 border-gray-400 dark:border-gray-500">
+                {negoActive && (
+                  <tr className="border-t-2 border-gray-400 dark:border-gray-500">
+                    <td className="py-2 font-bold text-base text-red-600 dark:text-red-400">Nego확정가 (VAT별도)</td>
+                    <td className="py-2 text-right tabular-nums font-bold text-lg text-red-600 dark:text-red-400">{fmtNum(negoAmount)} 원</td>
+                  </tr>
+                )}
+                <tr className={negoActive ? "" : "border-t-2 border-gray-400 dark:border-gray-500"}>
                   <td className={`py-2 ${!vatIncluded ? "font-bold text-base text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-300"}`}>공급가액</td>
                   <td className={`py-2 text-right tabular-nums ${!vatIncluded ? "font-bold text-lg text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-200"}`}>{fmtNum(totalAmount)} 원</td>
                 </tr>
@@ -1389,6 +1453,58 @@ function QuoteEntryInner() {
             <label className={labelCls}>특기사항</label>
             <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} lang="ko"
               className={inputCls + " resize-none"} />
+          </div>
+
+          {/* Nego 확정가 (VAT 별도) */}
+          <div className="mt-4">
+            <label className={labelCls}>
+              <span className="text-red-600 dark:text-red-400">Nego확정가 (VAT별도)</span>
+              <span className="text-[10px] text-gray-400 ml-1">(협상 확정 시 입력 — 부가세·합계가 이 금액 기준으로 계산됨. 미입력 시 공급가액 사용)</span>
+            </label>
+            <div className="flex items-center gap-4 flex-wrap">
+              <input type="text" inputMode="numeric" value={negoAmount === 0 ? "" : fmtNum(negoAmount)}
+                onChange={e => setNegoAmount(parseNum(e.target.value))}
+                placeholder="미입력"
+                className={inputCls + " text-right tabular-nums font-bold text-red-600 dark:text-red-400 max-w-xs"} />
+              <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+                네고전 금액 {fmtNum(totalAmount)}원
+              </span>
+              {negoActive && (
+                <span className="text-xs font-semibold text-red-600 dark:text-red-400">
+                  네고된 금액 {fmtNum(totalAmount - negoAmount)}원
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* 견적 수정 내역 */}
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+              <label className={labelCls + " mb-0"}>✏️ 견적 수정 내역</label>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1.5 cursor-pointer select-none text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  <input type="checkbox" checked={showRevisions} onChange={e => setShowRevisions(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+                  출력물에 표시
+                </label>
+                <button type="button" onClick={addRevisionNote}
+                  className="text-[11px] font-semibold px-2.5 py-1 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50">+ 수정내역 추가</button>
+              </div>
+            </div>
+            {revisionNotes.length === 0 ? (
+              <p className="text-[11px] text-gray-400 dark:text-gray-500">수정 내역이 없습니다. [+ 수정내역 추가]로 일자·내용을 기록할 수 있습니다.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {revisionNotes.map(n => (
+                  <div key={n.key} className="flex items-center gap-2">
+                    <input type="date" value={n.revised_date} onChange={e => patchNote(n.key, { revised_date: e.target.value })}
+                      className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 tabular-nums shrink-0" />
+                    <input type="text" value={n.content} onChange={e => patchNote(n.key, { content: e.target.value })} lang="ko"
+                      placeholder="수정 내용" className="flex-1 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700" />
+                    <button type="button" onClick={() => removeRevisionNote(n.key)} className="text-red-400 hover:text-red-600 px-1 shrink-0">×</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {message && (
@@ -1472,7 +1588,10 @@ function QuoteEntryInner() {
                 labor_unit_price:    laborUnitPrice,
                 vat_included:        vatIncluded,
                 show_spec:           showSpec,
+                show_revisions:      showRevisions,
+                nego_amount:         negoAmount,
               }}
+              revisionNotes={revisionNotes.filter(n => n.content.trim()).map(n => ({ revised_date: n.revised_date, content: n.content.trim() }))}
               laborLines={laborEnabled
                 ? laborLines.filter(l => l.work_name.trim()).map(l => ({
                     work_name: l.work_name.trim(),

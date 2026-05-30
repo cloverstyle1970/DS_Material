@@ -7,7 +7,7 @@ import { useAuth, isAdmin } from "@/context/AuthContext";
 import { useTabs, MAX_TABS } from "@/context/TabsContext";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
-import QuotePrintPaper, { QuotePrintLaborLine } from "@/components/quotes/QuotePrintPaper";
+import QuotePrintPaper, { QuotePrintLaborLine, QuotePrintRevisionNote } from "@/components/quotes/QuotePrintPaper";
 import { fmtNum, parseNum } from "@/lib/format";
 import { formatMoney } from "@/lib/input-format";
 
@@ -45,6 +45,8 @@ interface QuoteHeader {
   labor_unit_price: number | null;
   vat_included: boolean | null;
   show_spec: boolean | null;
+  show_revisions: boolean | null;
+  nego_amount: number | null;
   note: string | null;
   status: Status;
   progress_state: ProgressState;
@@ -137,6 +139,7 @@ function QuoteDetailInner() {
   const [header, setHeader] = useState<QuoteHeader | null>(null);
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [laborLines, setLaborLines] = useState<QuotePrintLaborLine[]>([]);
+  const [revisionNotes, setRevisionNotes] = useState<QuotePrintRevisionNote[]>([]);
   const [company, setCompany] = useState<CompanyInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -163,17 +166,19 @@ function QuoteDetailInner() {
     if (!Number.isFinite(id)) { setError("잘못된 견적서 ID입니다."); setLoading(false); return; }
     (async () => {
       setLoading(true);
-      const [h, it, c, ll] = await Promise.all([
+      const [h, it, c, ll, rn] = await Promise.all([
         supabase.from("quotes").select("*").eq("id", id).single(),
         supabase.from("quote_items").select("*").eq("quote_id", id).order("sort_order"),
         supabase.from("quote_settings").select("company_name, company_biz_no, company_address, company_phone, company_email, company_ceo, company_stamp_url").eq("id", 1).single(),
         supabase.from("quote_labor_lines").select("work_name, man_days, unit_price, amount").eq("quote_id", id).order("sort_order"),
+        supabase.from("quote_revision_notes").select("revised_date, content").eq("quote_id", id).order("sort_order"),
       ]);
       if (h.error) { setError(`견적서 로드 실패: ${h.error.message}`); setLoading(false); return; }
       setHeader(h.data as QuoteHeader);
       setItems((it.data ?? []) as QuoteItem[]);
       setCompany(c.data as CompanyInfo | null);
       setLaborLines((ll.data ?? []) as QuotePrintLaborLine[]);
+      setRevisionNotes((rn.data ?? []) as QuotePrintRevisionNote[]);
       setLoading(false);
     })();
   }, [id]);
@@ -648,6 +653,7 @@ function QuoteDetailInner() {
           items={items}
           company={company}
           laborLines={laborLines}
+          revisionNotes={revisionNotes}
           onOpenOpinion={(id) => setOpenOpinionId(Number(id))}
         />
       </div>
