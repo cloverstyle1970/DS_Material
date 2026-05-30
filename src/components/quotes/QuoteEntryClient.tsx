@@ -987,18 +987,14 @@ function QuoteEntryInner() {
               <label className={labelCls}>견적일자</label>
               <input type="date" value={quoteDate} onChange={e => setQuoteDate(e.target.value)} className={inputCls} />
             </div>
-            <div className="lg:col-span-2">
-              <label className={labelCls}>현장명 <span className="text-[10px] text-gray-400">(검색 또는 직접입력)</span></label>
+            <div>
+              <label className={labelCls}>현장명 <span className="text-[10px] text-gray-400">(검색/직접입력)</span></label>
               <SiteInlineSearch value={siteName} onChange={setSiteName} sites={sites} inputCls={inputCls} />
               {elevatorOptions.length > 0 && (
                 <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
                   ※ 이 현장의 호기 {elevatorOptions.length}개 — 자재 행의 [호기] 입력란 클릭 시 자동완성됨
                 </div>
               )}
-            </div>
-            <div className="lg:col-span-2">
-              <label className={labelCls}>작업명</label>
-              <input type="text" value={workTitle} onChange={e => setWorkTitle(e.target.value)} lang="ko" className={inputCls} />
             </div>
             <div>
               <label className={labelCls}>견적신청자 <span className="text-[10px] text-gray-400">(사원 검색/직접입력{sourceRequestId ? " · 요청목록 자동" : ""})</span></label>
@@ -1008,6 +1004,10 @@ function QuoteEntryInner() {
                   <option key={emp.id} value={emp.name}>{[emp.dept, emp.team].filter(Boolean).join(" / ")}</option>
                 ))}
               </datalist>
+            </div>
+            <div className="lg:col-span-2">
+              <label className={labelCls}>작업명</label>
+              <input type="text" value={workTitle} onChange={e => setWorkTitle(e.target.value)} lang="ko" className={inputCls} />
             </div>
             <div>
               <label className={labelCls}>견적작성자</label>
