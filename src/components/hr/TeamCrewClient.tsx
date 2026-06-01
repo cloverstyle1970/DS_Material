@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
@@ -34,12 +34,16 @@ export default function TeamCrewClient() {
 
   useEffect(() => { void load(); }, [load]);
 
-  // 부서 열림 상태: 첫 로드 후 모든 부서 펼치기
+  // 부서 열림 상태: 첫 로드 후 모든 부서 펼치기 (1회만)
+  // ref 가드 없이 openDeptIds.size===0 만 보면, 사용자가 마지막 부서를 접어 set이
+  // 빌 때마다 다시 모두 펼치는 버그가 발생함.
+  const initialExpandedRef = useRef(false);
   useEffect(() => {
-    if (depts.length > 0 && openDeptIds.size === 0) {
+    if (depts.length > 0 && !initialExpandedRef.current) {
       setOpenDeptIds(new Set(depts.map(d => d.id)));
+      initialExpandedRef.current = true;
     }
-  }, [depts, openDeptIds.size]);
+  }, [depts]);
 
   // 부서별 사원·조 인덱스
   const usersByDept = useMemo(() => {
