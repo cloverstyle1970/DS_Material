@@ -32,7 +32,7 @@ export default function LoginPage() {
     // password 컬럼은 클라이언트로 내려받지 않고 필터 조건으로만 사용한다.
     const { data: account, error: qErr } = await supabase
       .from("accounts")
-      .select("id, username, name, role, permissions, dept, theme, status")
+      .select("id, username, name, permissions, dept, theme, status")
       .eq("username", username)
       .eq("password", password)
       .maybeSingle();
@@ -50,12 +50,8 @@ export default function LoginPage() {
       return;
     }
 
-    // 권한: 마스터는 전체 권한, 그 외는 accounts.permissions 를 그대로 사용
-    const isMaster = account.role === "마스터";
-    const permissions = (isMaster
-      ? ["admin"]
-      : (Array.isArray(account.permissions) ? account.permissions : [])
-    ) as Permission[];
+    // accounts.permissions 가 단일 진리원. role 컬럼은 표시용일 뿐 권한에 영향 없음.
+    const permissions = (Array.isArray(account.permissions) ? account.permissions : []) as Permission[];
 
     login({
       id: Number(account.id),

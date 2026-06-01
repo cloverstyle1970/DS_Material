@@ -23,6 +23,7 @@ export interface ConstructionSchedule {
   manager: string;
   managerPhone: string;
   companyType: "TK" | "DS" | "" | null;
+  progressConfirmed: boolean; // 기성확인
 }
 
 interface AnnualEvent {
@@ -72,6 +73,7 @@ function CalendarContent() {
   const [manager, setManager] = useState("");
   const [managerPhone, setManagerPhone] = useState("");
   const [companyType, setCompanyType] = useState<"TK" | "DS" | "">("");
+  const [progressConfirmed, setProgressConfirmed] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // 현장명 검색 (인라인)
@@ -174,6 +176,7 @@ function CalendarContent() {
     setManager("");
     setManagerPhone("");
     setCompanyType("");
+    setProgressConfirmed(false);
     setShowModal(true);
   }
 
@@ -191,6 +194,7 @@ function CalendarContent() {
     setManager(schedule.manager);
     setManagerPhone(schedule.managerPhone || "");
     setCompanyType(schedule.companyType === "TK" || schedule.companyType === "DS" ? schedule.companyType : "");
+    setProgressConfirmed(!!schedule.progressConfirmed);
     setShowModal(true);
   }
 
@@ -201,7 +205,7 @@ function CalendarContent() {
 
     setSaving(true);
     try {
-      const payload = { requestId, startDate, endDate, startTime, siteName, elevatorName, details, workers, manager, managerPhone, companyType };
+      const payload = { requestId, startDate, endDate, startTime, siteName, elevatorName, details, workers, manager, managerPhone, companyType, progressConfirmed };
       if (editingId) {
         await api.patch(`/api/construction-schedules/${editingId}`, payload);
       } else {
@@ -448,31 +452,44 @@ function CalendarContent() {
                     // 공사휴무는 기존 색감 유지 (휴무는 TBM 대상 아님)
                     const isHoliday = sch.siteName === "공사휴무";
                     const isTk = sch.companyType === "TK";
-                    const borderCls = isHoliday
-                      ? "border-green-300 dark:border-green-400"
-                      : isTk
-                        ? "border-blue-500 dark:border-blue-400"     // TK 현장: 파란색
-                        : hasTbm
-                          ? "border-blue-500 dark:border-white"      // TBM 작성됨
-                          : "border-black dark:border-white";        // TBM 미작성
+                    const isPaid = !!sch.progressConfirmed;
+                    // 기성확인이 우선: 테두리·텍스트 모두 빨간색으로 강조
+                    const borderCls = isPaid
+                      ? "border-red-500 dark:border-red-400"
+                      : isHoliday
+                        ? "border-green-300 dark:border-green-400"
+                        : isTk
+                          ? "border-blue-500 dark:border-blue-400"     // TK 현장: 파란색
+                          : hasTbm
+                            ? "border-blue-500 dark:border-white"      // TBM 작성됨
+                            : "border-black dark:border-white";        // TBM 미작성
+                    const baseTextCls = isPaid
+                      ? "text-red-600 dark:text-red-400"
+                      : "text-gray-900 dark:text-gray-100";
+                    const titleTextCls = isPaid
+                      ? "text-red-600 dark:text-red-400"
+                      : isTk ? "text-blue-600 dark:text-blue-400" : "";
+                    const subTextCls = isPaid
+                      ? "text-red-600 dark:text-red-400"
+                      : "text-gray-700 dark:text-white";
                     return (
                       <div
                         key={`sch-${sch.id}`}
                         onClick={(e) => { e.stopPropagation(); openEditModal(sch); }}
-                        className={`text-xs px-2 py-1.5 rounded cursor-pointer leading-tight flex flex-col gap-0.5 bg-transparent border-2 text-gray-900 dark:text-gray-100 ${borderCls}`}
-                        title={`${sch.siteName} ${sch.elevatorName ? `(${sch.elevatorName})` : ""}${sch.startTime ? ` ${sch.startTime}` : ""} / ${sch.details} / ${sch.workers}${sch.manager ? ` / 담당: ${sch.manager}${sch.managerPhone ? ` ${sch.managerPhone}` : ""}` : ""}${!isHoliday ? (hasTbm ? " · TBM 작성됨" : " · TBM 미작성") : ""}`}
+                        className={`text-xs px-2 py-1.5 rounded cursor-pointer leading-tight flex flex-col gap-0.5 bg-transparent border-2 ${baseTextCls} ${borderCls}`}
+                        title={`${sch.siteName} ${sch.elevatorName ? `(${sch.elevatorName})` : ""}${sch.startTime ? ` ${sch.startTime}` : ""} / ${sch.details} / ${sch.workers}${sch.manager ? ` / 담당: ${sch.manager}${sch.managerPhone ? ` ${sch.managerPhone}` : ""}` : ""}${!isHoliday ? (hasTbm ? " · TBM 작성됨" : " · TBM 미작성") : ""}${isPaid ? " · 기성확인" : ""}`}
                       >
-                        <div className={`font-bold truncate text-[12px] ${isTk ? "text-blue-600 dark:text-blue-400" : ""}`}>
+                        <div className={`font-bold truncate text-[12px] ${titleTextCls}`}>
                           {sch.siteName}{sch.elevatorName ? ` · ${sch.elevatorName}` : ""}
                         </div>
                         {sch.startTime && (
                           <div className="truncate text-[11px] font-medium">{sch.startTime}</div>
                         )}
                         {sch.details && (
-                          <div className="truncate text-[11px] text-gray-700 dark:text-white">{sch.details}</div>
+                          <div className={`truncate text-[11px] ${subTextCls}`}>{sch.details}</div>
                         )}
                         {sch.workers && (
-                          <div className="truncate text-[11px] text-gray-700 dark:text-white">👷 {sch.workers}</div>
+                          <div className={`truncate text-[11px] ${subTextCls}`}>👷 {sch.workers}</div>
                         )}
                       </div>
                     );
@@ -608,6 +625,16 @@ function CalendarContent() {
                   <button type="button" onClick={() => setSiteName("공사휴무")} className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded hover:bg-green-700 transition-colors">
                     공사휴무
                   </button>
+                  <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded border-2 cursor-pointer transition-colors ${
+                    progressConfirmed
+                      ? "border-red-500 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
+                      : "border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  }`}>
+                    <input type="checkbox" checked={progressConfirmed}
+                      onChange={e => setProgressConfirmed(e.target.checked)}
+                      className="rounded accent-red-500" />
+                    <span className="text-sm font-semibold">기성확인</span>
+                  </label>
                   {editingId && (
                     <button type="button" onClick={handleDelete} disabled={saving} className="text-red-500 hover:text-red-700 text-sm font-medium px-2 py-1">삭제</button>
                   )}

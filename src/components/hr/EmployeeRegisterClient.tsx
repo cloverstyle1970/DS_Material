@@ -356,12 +356,13 @@ export default function EmployeeRegisterClient() {
       const newPermissions = form.permission_group_id
         ? (permGroups.find(g => g.id === form.permission_group_id)?.permissions ?? [])
         : [];
-      // 신DB 정본은 accounts: username(로그인 식별자)·password(평문)·role 추가
+      // 신DB 정본은 accounts. 권한은 permissions / permission_group_id 가 단일 진리원이므로
+      // role 컬럼은 표시용 기본값("직원")만 채운다.
       const payload = {
         username: form.name.trim(),
         name: form.name.trim(),
         password: form.initial_password,
-        role: newPermissions.includes("admin") ? "마스터" : "직원",
+        role: "직원",
         ssn: form.ssn || null,
         gender: form.gender || null,
         blood_type: form.blood_type || null,

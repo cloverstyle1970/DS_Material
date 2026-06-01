@@ -164,14 +164,14 @@ export default function TeamCrewClient() {
                             <span className="text-gray-500 dark:text-gray-400">· {members.length}명</span>
                             {!c.is_active && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">비활성</span>}
                           </div>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1.5">
                             <button type="button" onClick={() => setEditingCrew(c)}
-                              className="px-2 py-0.5 text-[10px] rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200">
-                              수정
+                              className="px-2.5 py-1 text-[11px] font-semibold rounded bg-blue-600 text-white hover:bg-blue-700">
+                              ✏️ 조 수정
                             </button>
                             <button type="button" onClick={() => void removeCrew(c)}
-                              className="px-2 py-0.5 text-[10px] rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200">
-                              삭제
+                              className="px-2.5 py-1 text-[11px] font-semibold rounded bg-red-500 text-white hover:bg-red-600">
+                              🗑 삭제
                             </button>
                           </div>
                         </div>
@@ -233,23 +233,35 @@ export default function TeamCrewClient() {
         })}
       </div>
 
-      {(addingForDept || editingCrew) && (
-        <CrewEditModal
-          dept={addingForDept ?? depts.find(d => d.id === editingCrew!.department_id)!}
-          initial={editingCrew}
-          onClose={() => { setAddingForDept(null); setEditingCrew(null); }}
-          onSaved={() => { setAddingForDept(null); setEditingCrew(null); void load(); }}
-        />
-      )}
+      {(addingForDept || editingCrew) && (() => {
+        const targetDept = addingForDept ?? depts.find(d => d.id === editingCrew!.department_id)!;
+        const deptUsers = usersByDept.get(targetDept.name) ?? [];
+        const deptCrewIds = new Set((crewsByDept.get(targetDept.id) ?? []).map(c => c.id));
+        return (
+          <CrewEditModal
+            dept={targetDept}
+            initial={editingCrew}
+            deptUsers={deptUsers}
+            deptCrewIds={deptCrewIds}
+            onClose={() => { setAddingForDept(null); setEditingCrew(null); }}
+            onSaved={() => { setAddingForDept(null); setEditingCrew(null); void load(); }}
+          />
+        );
+      })()}
     </div>
   );
 }
 
+const CREW_MIN = 2;
+const CREW_MAX = 4;
+
 function CrewEditModal({
-  dept, initial, onClose, onSaved,
+  dept, initial, deptUsers, deptCrewIds, onClose, onSaved,
 }: {
   dept: Department;
   initial: Crew | null;
+  deptUsers: UserRow[];      // 이 부서에 속한 사원 전체
+  deptCrewIds: Set<number>;  // 이 부서의 활성 조 id 집합 (다른 조 배정 여부 판단용)
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -258,26 +270,86 @@ function CrewEditModal({
   const [isActive, setIsActive] = useState(initial?.is_active ?? true);
   const [saving, setSaving] = useState(false);
 
+  // 멤버 선택: 수정 모드면 현재 이 조에 속한 사원으로 초기화, 신규는 비어 있음
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(
+    () => new Set(initial ? deptUsers.filter(u => u.crew_id === initial.id).map(u => u.id) : [])
+  );
+
+  // 같은 부서 사원 중 선택 가능한 후보:
+  //  - 이미 이 조에 속한 사원 (수정 시)
+  //  - 어떤 조에도 안 속하거나, 같은 부서의 다른 조에 속한 사원 (이동 가능)
+  const candidates = useMemo(() => {
+    return deptUsers.slice().sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  }, [deptUsers]);
+
+  function toggleMember(id: number) {
+    setSelectedIds(prev => {
+      if (prev.has(id)) {
+        const next = new Set(prev); next.delete(id); return next;
+      }
+      if (prev.size >= CREW_MAX) {
+        alert(`한 조는 최대 ${CREW_MAX}명까지 가능합니다.`);
+        return prev;
+      }
+      const next = new Set(prev); next.add(id); return next;
+    });
+  }
+
   async function save() {
     if (!name.trim()) { alert("조 이름은 필수입니다."); return; }
-    setSaving(true);
-    const payload = { department_id: dept.id, name: name.trim(), sort_order: Number(sortOrder) || 0, is_active: isActive };
-    const res = initial
-      ? await supabase.from("crews").update(payload).eq("id", initial.id)
-      : await supabase.from("crews").insert(payload);
-    setSaving(false);
-    if (res.error) {
-      alert(res.error.code === "23505" ? `${dept.name} 안에 같은 이름의 조가 이미 있습니다.` : res.error.message);
+    if (selectedIds.size > CREW_MAX) {
+      alert(`한 조는 최대 ${CREW_MAX}명까지 가능합니다. (현재 ${selectedIds.size}명)`);
       return;
     }
-    onSaved();
+    if (selectedIds.size > 0 && selectedIds.size < CREW_MIN) {
+      if (!confirm(`권장 인원은 ${CREW_MIN}~${CREW_MAX}명입니다. ${selectedIds.size}명으로 저장하시겠습니까?`)) return;
+    }
+
+    setSaving(true);
+    try {
+      const payload = { department_id: dept.id, name: name.trim(), sort_order: Number(sortOrder) || 0, is_active: isActive };
+
+      let crewId: number;
+      if (initial) {
+        const { error } = await supabase.from("crews").update(payload).eq("id", initial.id);
+        if (error) throw error;
+        crewId = initial.id;
+      } else {
+        const { data, error } = await supabase.from("crews").insert(payload).select("id").single();
+        if (error) throw error;
+        crewId = Number(data!.id);
+      }
+
+      // 멤버 배정 동기화
+      const previousMemberIds = initial
+        ? deptUsers.filter(u => u.crew_id === initial.id).map(u => u.id)
+        : [];
+      const toAssign = Array.from(selectedIds).filter(id => !previousMemberIds.includes(id));
+      const toRemove = previousMemberIds.filter(id => !selectedIds.has(id));
+
+      if (toAssign.length > 0) {
+        const { error: aErr } = await supabase.from("accounts").update({ crew_id: crewId }).in("id", toAssign);
+        if (aErr) throw aErr;
+      }
+      if (toRemove.length > 0) {
+        const { error: rErr } = await supabase.from("accounts").update({ crew_id: null }).in("id", toRemove);
+        if (rErr) throw rErr;
+      }
+
+      onSaved();
+    } catch (e) {
+      const err = e as { code?: string; message?: string };
+      alert(err.code === "23505" ? `${dept.name} 안에 같은 이름의 조가 이미 있습니다.` : (err.message ?? "저장 실패"));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <DraggableModal
       open={true}
       onClose={onClose}
-      panelClassName="w-full max-w-sm"
+      panelClassName="w-full max-w-md"
       z={60}
       header={
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
@@ -307,6 +379,54 @@ function CrewEditModal({
               className="w-4 h-4" />
             <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">활성</span>
           </label>
+        </div>
+
+        {/* 멤버 선택 */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+              조원 선택 <span className="text-gray-400 font-normal">({dept.name} 사원 중)</span>
+            </label>
+            <span className={`text-[11px] font-bold ${
+              selectedIds.size > CREW_MAX
+                ? "text-red-600 dark:text-red-400"
+                : selectedIds.size >= CREW_MIN && selectedIds.size <= CREW_MAX
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-amber-600 dark:text-amber-400"
+            }`}>
+              {selectedIds.size} / {CREW_MAX}명
+              <span className="ml-1 text-gray-400 font-normal">권장 {CREW_MIN}~{CREW_MAX}</span>
+            </span>
+          </div>
+          {candidates.length === 0 ? (
+            <div className="text-[11px] text-gray-400 dark:text-gray-500 italic py-3 text-center border border-dashed border-gray-200 dark:border-gray-700 rounded">
+              {dept.name}에 등록된 사원이 없습니다.
+            </div>
+          ) : (
+            <div className="max-h-56 overflow-y-auto rounded border border-gray-200 dark:border-gray-700">
+              {candidates.map(u => {
+                const checked = selectedIds.has(u.id);
+                const inAnotherCrew = !checked && u.crew_id != null && deptCrewIds.has(u.crew_id) && (!initial || u.crew_id !== initial.id);
+                const atLimit = !checked && selectedIds.size >= CREW_MAX;
+                return (
+                  <label key={u.id}
+                    className={`flex items-center gap-2 px-3 py-1.5 text-xs border-b border-gray-100 dark:border-gray-700/50 last:border-0 cursor-pointer transition-colors ${
+                      checked ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-gray-50 dark:hover:bg-gray-700/30"
+                    } ${atLimit ? "opacity-50" : ""}`}>
+                    <input type="checkbox" checked={checked} disabled={atLimit}
+                      onChange={() => toggleMember(u.id)} className="rounded" />
+                    <span className="font-semibold text-gray-700 dark:text-gray-200">{u.name}</span>
+                    {u.rank && <span className="text-gray-400 dark:text-gray-500">({u.rank})</span>}
+                    {inAnotherCrew && (
+                      <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
+                        다른 조 소속 — 선택 시 이동
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
       <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">

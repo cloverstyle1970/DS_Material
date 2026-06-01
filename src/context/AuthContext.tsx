@@ -78,17 +78,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // 신DB accounts 에서 최신 권한·부서·테마 갱신 (재로그인 없이 반영)
           const { data: account } = await supabase
             .from("accounts")
-            .select("username, name, role, permissions, dept, theme")
+            .select("username, name, permissions, dept, theme")
             .eq("id", parsed.id)
             .maybeSingle();
 
           let freshUser: AuthUser = parsed;
           if (account) {
-            const isMaster = account.role === "마스터";
-            const permissions = (isMaster
-              ? ["admin"]
-              : (Array.isArray(account.permissions) ? account.permissions : [])
-            ) as Permission[];
+            // accounts.permissions 가 단일 진리원. role 컬럼은 표시용일 뿐 권한에 영향 없음.
+            const permissions = (Array.isArray(account.permissions) ? account.permissions : []) as Permission[];
             const theme = account.theme === "dark" ? "dark" : account.theme === "light" ? "light" : parsed.theme;
 
             freshUser = {

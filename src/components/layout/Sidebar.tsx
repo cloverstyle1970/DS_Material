@@ -10,7 +10,6 @@ type NavItem = {
   href: string;
   label: string;
   icon: string;
-  adminOnly?: boolean;
   section?: string;  // 그룹 내 서브섹션 라벨 (선택)
 };
 
@@ -27,10 +26,10 @@ const NAV_GROUPS: NavGroup[] = [
     label: "데이터관리",
     color: "text-sky-400",
     items: [
-      { href: "/data/users",             label: "사원 관리",        icon: "👤", adminOnly: true },
+      { href: "/data/users",             label: "사원 관리",        icon: "👤" },
       { href: "/data/profile",           label: "개인정보수정",     icon: "🪪" },
-      { href: "/data/company-info",      label: "회사 정보 관리",   icon: "🏢", adminOnly: true },
-      { href: "/data/permission-groups", label: "사용자권한그룹",   icon: "🔑", adminOnly: true },
+      { href: "/data/company-info",      label: "회사 정보 관리",   icon: "🏢" },
+      { href: "/data/permission-groups", label: "사용자권한그룹",   icon: "🔑" },
     ],
   },
   {
@@ -50,7 +49,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/quotes",         label: "견적서 목록",      icon: "📃" },
       { href: "/quotes/new",     label: "견적서 작성",      icon: "💰" },
       { href: "/quotes/labor-rates", label: "공정별 공수표",   icon: "🛠️" },
-      { href: "/quotes/settings", label: "견적 기본 설정",  icon: "⚙️", adminOnly: true },
+      { href: "/quotes/settings", label: "견적 기본 설정",  icon: "⚙️" },
     ],
   },
   {
@@ -70,7 +69,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/stats/period",     label: "기간별 입출고 내역", icon: "📅" },
       { href: "/stats/sites",      label: "현장/호기별 현황",   icon: "📍" },
       { href: "/stats/performance", label: "사원 실적 (매출)",   icon: "📈" },
-      { href: "/inventory-check",  label: "재고실사",           icon: "📊", adminOnly: true },
+      { href: "/inventory-check",  label: "재고실사",           icon: "📊" },
     ],
   },
   {
@@ -79,11 +78,11 @@ const NAV_GROUPS: NavGroup[] = [
     color: "text-rose-400",
     items: [
       { href: "/safety/tbm",         label: "TBM등록",                   icon: "🛡️" },
-      { href: "/safety/tbm/admin",   label: "TBM 관리(PC)",              icon: "🗂️", adminOnly: true },
-      { href: "/safety/tbm/master",  label: "TBM 마스터(PC)",            icon: "⚙️", adminOnly: true },
+      { href: "/safety/tbm/admin",   label: "TBM 관리(PC)",              icon: "🗂️" },
+      { href: "/safety/tbm/master",  label: "TBM 마스터(PC)",            icon: "⚙️" },
       { href: "#safety-risk",        label: "위험성평가",                 icon: "⚠️" },
       { href: "/uniform-safety",     label: "근무복·안전장구 신청",       icon: "🦺" },
-      { href: "/uniform-safety/admin", label: "근무복·안전장구 관리",     icon: "🗃️", adminOnly: true },
+      { href: "/uniform-safety/admin", label: "근무복·안전장구 관리",     icon: "🗃️" },
     ],
   },
   {
@@ -101,11 +100,11 @@ const NAV_GROUPS: NavGroup[] = [
     color: "text-purple-400",
     items: [
       { href: "/hr/company-vehicles",   label: "회사차량관리",   icon: "🚗", section: "관리" },
-      { href: "/hr/employee-register",  label: "사원등록",       icon: "🧑‍💼", section: "인사", adminOnly: true },
-      { href: "/hr/dept-rank",          label: "부서/직급관리", icon: "🏢", section: "인사", adminOnly: true },
-      { href: "/hr/team-crew",          label: "팀구성 관리",    icon: "🧑‍🤝‍🧑", section: "인사", adminOnly: true },
-      { href: "/hr/transfer",           label: "인사 이동",      icon: "🔄", section: "인사", adminOnly: true },
-      { href: "/hr/employment-status",  label: "재직상태 관리",  icon: "📋", section: "인사", adminOnly: true },
+      { href: "/hr/employee-register",  label: "사원등록",       icon: "🧑‍💼", section: "인사" },
+      { href: "/hr/dept-rank",          label: "부서/직급관리", icon: "🏢", section: "인사" },
+      { href: "/hr/team-crew",          label: "팀구성 관리",    icon: "🧑‍🤝‍🧑", section: "인사" },
+      { href: "/hr/transfer",           label: "인사 이동",      icon: "🔄", section: "인사" },
+      { href: "/hr/employment-status",  label: "재직상태 관리",  icon: "📋", section: "인사" },
     ],
   },
   {
@@ -130,7 +129,6 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
   const { user, logout } = useAuth();
   const { tabs, openTab } = useTabs();
   const viewOnly = user ? isViewOnly(user) : false;
-  const admin    = user ? isAdmin(user) : false;
 
   function handleNavClick() {
     if (typeof window !== "undefined" && window.innerWidth < 768) {
@@ -238,13 +236,20 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
       >
         {/* 로고 */}
         <div className="h-14 flex items-center px-4 border-b border-white/5 shrink-0">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-7 h-7 rounded-md bg-blue-500 flex items-center justify-center text-xs font-black tracking-tighter shrink-0">
               DS
             </div>
             <span className="text-sm font-bold tracking-tight whitespace-nowrap text-white">
-              자재관리 시스템
+              자재관리
             </span>
+            <a
+              href="https://daesol-sketch.github.io"
+              className="inline-flex items-center text-sm font-bold tracking-tight whitespace-nowrap text-white hover:text-blue-300 transition-colors"
+              title="유지보수 사이트로 이동"
+            >
+              유지보수
+            </a>
           </div>
         </div>
 
@@ -308,7 +313,6 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
           {/* 그룹 메뉴 */}
           {NAV_GROUPS.map((group, gi) => {
             const visibleItems = group.items
-              .filter(item => !item.adminOnly || admin)
               .filter(item => {
                 // 외부/플레이스홀더 링크(#로 시작)는 권한 체크 제외
                 if (item.href.startsWith("#")) return true;

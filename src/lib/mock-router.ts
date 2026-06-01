@@ -56,6 +56,7 @@ export interface ConstructionSchedule {
   manager: string;
   managerPhone: string;
   companyType: "TK" | "DS" | "" | null;
+  progressConfirmed: boolean; // 기성확인
 }
 
 // ── construction 헬퍼 ─────────────────────────────────────────────
@@ -155,18 +156,19 @@ function sendWebPush(params: {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function dbToConstSched(r: any): ConstructionSchedule {
   return {
-    id:            r.id,
-    requestId:     r.request_id     ?? null,
-    startDate:     r.start_date,
-    endDate:       r.end_date,
-    startTime:     r.start_time     ?? "",
-    siteName:      r.site_name      ?? "",
-    elevatorName:  r.elevator_name  ?? "",
-    details:       r.details        ?? "",
-    workers:       r.workers        ?? "",
-    manager:       r.manager        ?? "",
-    managerPhone:  r.manager_phone  ?? "",
-    companyType:   r.company_type   ?? null,
+    id:                r.id,
+    requestId:         r.request_id         ?? null,
+    startDate:         r.start_date,
+    endDate:           r.end_date,
+    startTime:         r.start_time         ?? "",
+    siteName:          r.site_name          ?? "",
+    elevatorName:      r.elevator_name      ?? "",
+    details:           r.details            ?? "",
+    workers:           r.workers            ?? "",
+    manager:           r.manager            ?? "",
+    managerPhone:      r.manager_phone      ?? "",
+    companyType:       r.company_type       ?? null,
+    progressConfirmed: r.progress_confirmed ?? false,
   };
 }
 
@@ -1102,17 +1104,18 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
   }
   if (path === "/api/construction-schedules") {
     const { data, error } = await supabase.from("construction_schedules").insert({
-      request_id:    body.requestId    || null,
-      start_date:    body.startDate,
-      end_date:      body.endDate      || body.startDate,
-      start_time:    body.startTime    || "",
-      site_name:     body.siteName     || "",
-      elevator_name: body.elevatorName || "",
-      details:       body.details      || "",
-      workers:       body.workers      || "",
-      manager:       body.manager      || "",
-      manager_phone: body.managerPhone || "",
-      company_type:  body.companyType  || null,
+      request_id:         body.requestId    || null,
+      start_date:         body.startDate,
+      end_date:           body.endDate      || body.startDate,
+      start_time:         body.startTime    || "",
+      site_name:          body.siteName     || "",
+      elevator_name:      body.elevatorName || "",
+      details:            body.details      || "",
+      workers:            body.workers      || "",
+      manager:            body.manager      || "",
+      manager_phone:      body.managerPhone || "",
+      company_type:       body.companyType  || null,
+      progress_confirmed: !!body.progressConfirmed,
     }).select().single();
     if (error) throw new MockApiError(error.message, 500);
     const sched = dbToConstSched(data);
@@ -1548,6 +1551,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
     if (body.manager      !== undefined) patch.manager       = body.manager;
     if (body.managerPhone !== undefined) patch.manager_phone = body.managerPhone;
     if (body.companyType  !== undefined) patch.company_type  = body.companyType || null;
+    if (body.progressConfirmed !== undefined) patch.progress_confirmed = !!body.progressConfirmed;
     const { data, error } = await supabase.from("construction_schedules")
       .update(patch).eq("id", numId).select().single();
     if (error) throw new MockApiError(error.message, 500);
