@@ -8,6 +8,7 @@ import { useAuth, isViewOnly, isAdmin } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
+import { downloadAllTablesBackup, NEWDB_TABLES, type BackupProgress } from "@/lib/db-backup";
 import DraggableModal from "@/components/common/DraggableModal";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
 import { formatPhone } from "@/lib/input-format";
@@ -583,6 +584,35 @@ export default function SitesClient({ initial, elevators }: Props) {
   const viewOnly = user ? isViewOnly(user) : true;
   const canEdit  = user ? !viewOnly : false;
   const canDownload = user ? !isViewOnly(user) : false;
+  const canBackup = user ? isAdmin(user) : false;
+
+  // 전체 테이블 백업 상태
+  const [backupRunning, setBackupRunning] = useState(false);
+  const [backupProgress, setBackupProgress] = useState<BackupProgress | null>(null);
+
+  async function handleBackupAll() {
+    if (backupRunning) return;
+    const ok = window.confirm(
+      `신DB 전체 ${NEWDB_TABLES.length}개 업무 테이블을 엑셀 1개 파일로 다운로드합니다.\n` +
+      `\n` +
+      `· 민감 컬럼(accounts.password, password_hash, ssn)은 자동 제외\n` +
+      `· 행수가 많은 테이블은 수십 초~수 분 소요\n` +
+      `· 파일 유출 시 사내 데이터 노출 위험 — 안전하게 보관하세요\n` +
+      `\n` +
+      `진행할까요?`
+    );
+    if (!ok) return;
+    setBackupRunning(true);
+    setBackupProgress({ currentTable: NEWDB_TABLES[0], doneTables: 0, totalTables: NEWDB_TABLES.length, rowsThisTable: 0 });
+    try {
+      await downloadAllTablesBackup(p => setBackupProgress(p));
+    } catch (err) {
+      alert(`백업 실패: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBackupRunning(false);
+      setBackupProgress(null);
+    }
+  }
 
   // Supabase 초기 로드 + Realtime 구독
   useEffect(() => {
@@ -800,15 +830,25 @@ export default function SitesClient({ initial, elevators }: Props) {
           <p className="text-xs text-gray-500 mt-0.5">현장 목록 조회 및 호기 정보 관리</p>
         </div>
         <div className="flex items-center gap-2">
+          {canBackup && (
+            <button onClick={handleBackupAll} disabled={backupRunning}
+              title={`신DB 전체 ${NEWDB_TABLES.length}개 업무 테이블 백업`}
+              className="px-4 py-2 rounded-lg border border-amber-300 bg-amber-50 text-sm text-amber-700 hover:bg-amber-100 transition-colors flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-wait">
+              <span className="text-xs">🗄️</span>
+              {backupRunning && backupProgress
+                ? `백업 중 ${backupProgress.doneTables}/${backupProgress.totalTables} · ${backupProgress.currentTable}`
+                : "전체 테이블 백업"}
+            </button>
+          )}
           {canDownload && (
-            <button onClick={downloadExcel}
-              className="px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1.5">
+            <button onClick={downloadExcel} disabled={backupRunning}
+              className="px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1.5 disabled:opacity-60">
               <span className="text-xs">📥</span> {checkedSiteIds.size > 0 ? `선택 ${checkedSiteIds.size}건` : "엑셀 다운로드"}
             </button>
           )}
           {canEdit && (
-            <button onClick={() => setShowAdd(true)}
-              className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-1.5">
+            <button onClick={() => setShowAdd(true)} disabled={backupRunning}
+              className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-1.5 disabled:opacity-60">
               + 현장 등록
             </button>
           )}
