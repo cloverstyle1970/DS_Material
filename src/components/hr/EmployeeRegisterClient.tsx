@@ -44,7 +44,7 @@ interface Form {
   permission_group_id: number | null;
 }
 
-const DEFAULT_PASSWORD = "1234";
+const DEFAULT_PASSWORD = "000000";
 
 interface FamilyMember {
   relationship: string;
@@ -295,10 +295,10 @@ export default function EmployeeRegisterClient() {
     if (!form.hireDate)        { setMessage({ type: "error", text: "[기본정보] 입사일을 입력하세요." }); setTab("basic"); return; }
     if (!form.phone.trim())    { setMessage({ type: "error", text: "[기본정보] 휴대폰 번호를 입력하세요." }); setTab("basic"); return; }
     if (!form.initial_password.trim()) {
-      setMessage({ type: "error", text: "[기본정보] 초기 비밀번호를 입력하세요. (기본 1234)" }); setTab("basic"); return;
+      setMessage({ type: "error", text: "[기본정보] 초기 비밀번호를 입력하세요. (기본 000000)" }); setTab("basic"); return;
     }
-    if (form.initial_password.length < 4) {
-      setMessage({ type: "error", text: "[기본정보] 초기 비밀번호는 4자 이상이어야 합니다." }); setTab("basic"); return;
+    if (form.initial_password.length < 6) {
+      setMessage({ type: "error", text: "[기본정보] 초기 비밀번호는 6자 이상이어야 합니다." }); setTab("basic"); return;
     }
 
     // 긴급연락처 — 선택. 지정된 경우에만 필수필드 검증
@@ -360,7 +360,6 @@ export default function EmployeeRegisterClient() {
       // role 컬럼은 표시용 기본값("직원")만 채운다.
       const payload = {
         username: form.name.trim(),   // accounts: username 이 단일 진리원 (name 컬럼 미사용)
-        password: form.initial_password,
         role: "직원",
         ssn: form.ssn || null,
         gender: form.gender || null,
@@ -517,7 +516,7 @@ export default function EmployeeRegisterClient() {
     <div className="min-h-full bg-gray-50 dark:bg-gray-900">
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
         <h1 className="text-base font-bold text-gray-900 dark:text-white">사원등록</h1>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">탭으로 항목을 이동하며 입력합니다 (관리자 전용 · 초기 비밀번호 1234)</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">탭으로 항목을 이동하며 입력합니다 (관리자 전용 · 초기 비밀번호 000000)</p>
       </div>
 
       {/* 탭 네비 */}
@@ -768,7 +767,7 @@ export default function EmployeeRegisterClient() {
               <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3">🔐 로그인 비밀번호</h2>
               <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 items-end">
                 <div>
-                  <label className={labelCls}>초기 비밀번호 <span className="text-red-500">*</span> <span className="text-[10px] text-gray-400 ml-1">(기본 1234, 4자 이상)</span></label>
+                  <label className={labelCls}>초기 비밀번호 <span className="text-red-500">*</span> <span className="text-[10px] text-gray-400 ml-1">(기본 000000, 6자 이상)</span></label>
                   <input type="text" value={form.initial_password}
                     onChange={e => set("initial_password", e.target.value)}
                     placeholder={DEFAULT_PASSWORD}
@@ -778,7 +777,7 @@ export default function EmployeeRegisterClient() {
                 <button type="button"
                   onClick={() => set("initial_password", DEFAULT_PASSWORD)}
                   className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold whitespace-nowrap">
-                  ↻ 1234로 초기화
+                  ↻ 000000으로 초기화
                 </button>
               </div>
               <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-2">

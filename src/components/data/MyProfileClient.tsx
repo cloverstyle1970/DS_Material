@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, FormEvent } from "react";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { hashPassword } from "@/lib/password";
 import { formatDate as formatYmd, formatPhone, formatSsn } from "@/lib/input-format";
 
 // 사원관리(UsersClient)에서 관리자가 사원 이름을 클릭할 때 세팅됨
@@ -447,27 +448,29 @@ export default function MyProfileClient() {
     if (!user) return;
     setPwStatus(null);
     if (!currentPw) { setPwStatus({ type: "error", text: "현재 비밀번호를 입력하세요." }); return; }
-    if (newPw.length < 4) { setPwStatus({ type: "error", text: "새 비밀번호는 4자 이상이어야 합니다." }); return; }
+    if (newPw.length < 6) { setPwStatus({ type: "error", text: "새 비밀번호는 6자 이상이어야 합니다." }); return; }
     if (newPw !== confirmPw) { setPwStatus({ type: "error", text: "새 비밀번호가 일치하지 않습니다." }); return; }
     if (currentPw === newPw) { setPwStatus({ type: "error", text: "새 비밀번호가 현재 비밀번호와 같습니다." }); return; }
 
     setPwSubmitting(true);
     try {
-      // 신DB 로그인은 accounts.password(평문) 기반 → 비밀번호도 평문으로 검증/저장
+      // 신DB 로그인은 accounts.password_hash(SHA-256) 기반 → 비밀번호도 해시로 검증/저장
+      // (유지보수 사이트와 동일한 컬럼·해싱 방식으로 일원화)
       const { data: r, error: fErr } = await supabase
         .from("accounts")
-        .select("password")
+        .select("password_hash")
         .eq("id", user.id)
         .single();
       if (fErr || !r) { setPwStatus({ type: "error", text: "사용자 정보를 불러오지 못했습니다." }); return; }
-      const stored = r.password as string | null;
-      if (stored != null && currentPw !== stored) {
+      const stored = r.password_hash as string | null;
+      const currentHash = await hashPassword(currentPw);
+      if (stored != null && currentHash !== stored) {
         setPwStatus({ type: "error", text: "현재 비밀번호가 올바르지 않습니다." });
         return;
       }
       const { error: uErr } = await supabase
         .from("accounts")
-        .update({ password: newPw })
+        .update({ password_hash: await hashPassword(newPw) })
         .eq("id", user.id);
       if (uErr) { setPwStatus({ type: "error", text: `비밀번호 변경 실패: ${uErr.message}` }); return; }
       setPwStatus({ type: "success", text: "비밀번호가 변경되었습니다." });
@@ -958,7 +961,7 @@ export default function MyProfileClient() {
             {!isAdminEditing && (
             <div className={sectionCls}>
               <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-1">🔐 로그인 비밀번호 변경</h2>
-              <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-3">새 비밀번호는 4자 이상이어야 합니다.</p>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-3">새 비밀번호는 6자 이상이어야 합니다.</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className={labelCls}>현재 비밀번호</label>

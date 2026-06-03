@@ -1078,8 +1078,7 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
   }
   if (path === "/api/users") {
     const payload = userToDb(body);
-    // accounts NOT NULL 컬럼 기본값 보강 (password / role)
-    if (payload.password === undefined) payload.password = "000000";
+    // accounts NOT NULL 컬럼 기본값 보강 (role). 비밀번호는 password_hash(SHA-256)로 일원화됨.
     if (payload.role === undefined) {
       const perms = Array.isArray(body.permissions) ? body.permissions : [];
       payload.role = perms.includes("admin") ? "관리자" : "직원";

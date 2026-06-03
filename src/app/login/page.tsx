@@ -4,6 +4,7 @@ import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { hashPassword } from "@/lib/password";
 import type { Permission } from "@/lib/mock-users";
 
 export default function LoginPage() {
@@ -28,13 +29,15 @@ export default function LoginPage() {
 
     const username = name.trim();
 
-    // 신DB accounts 기반 인증: username + password(평문) 매칭.
-    // password 컬럼은 클라이언트로 내려받지 않고 필터 조건으로만 사용한다.
+    // 신DB accounts 기반 인증: username + password_hash(SHA-256) 매칭.
+    // 비밀번호는 SHA-256 해시로만 비교하며 평문/해시 모두 클라이언트로 내려받지 않는다.
+    // (유지보수 사이트와 동일한 password_hash 컬럼·해싱 방식으로 일원화됨)
+    const passwordHash = await hashPassword(password);
     const { data: account, error: qErr } = await supabase
       .from("accounts")
       .select("id, username, permissions, dept, theme, status")
       .eq("username", username)
-      .eq("password", password)
+      .eq("password_hash", passwordHash)
       .maybeSingle();
 
     if (qErr) {
