@@ -207,7 +207,7 @@ export default function LaborRatesClient() {
         </div>
         <input type="text" lang="ko" value={search} onChange={e => setSearch(e.target.value)}
           placeholder="분류·상세·비고 검색"
-          className="flex-1 max-w-md px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
+          className="flex-1 max-w-md px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-xs" />
         {!searching && groups.length > 0 && (
           <button type="button" onClick={toggleAll}
             className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 text-xs font-semibold hover:bg-gray-100 dark:hover:bg-gray-700">
@@ -543,7 +543,7 @@ function LaborCategoryManager({
           <div className="flex gap-2 mb-3">
             <input value={newMajor} onChange={e => setNewMajor(e.target.value)} lang="ko"
               onKeyDown={e => { if (e.key === "Enter") addMajor(); }}
-              placeholder="새 대분류명" className="flex-1 px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm" />
+              placeholder="새 대분류명" className="flex-1 px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm" />
             <button type="button" onClick={addMajor} disabled={busy || !newMajor.trim()}
               className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50">+ 대분류</button>
           </div>
@@ -581,7 +581,7 @@ function LaborCategoryManager({
                         <div className="flex gap-2 pl-6 py-1">
                           <input autoFocus value={newMidLabel} onChange={e => setNewMidLabel(e.target.value)} lang="ko"
                             onKeyDown={e => { if (e.key === "Enter") addMid(maj.id); if (e.key === "Escape") { setNewMidFor(null); setNewMidLabel(""); } }}
-                            placeholder="새 중분류명" className="flex-1 px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
+                            placeholder="새 중분류명" className="flex-1 px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-xs" />
                           <button type="button" onClick={() => addMid(maj.id)} disabled={busy} className="text-xs text-green-600 font-semibold">추가</button>
                           <button type="button" onClick={() => { setNewMidFor(null); setNewMidLabel(""); }} className="text-xs text-gray-400">취소</button>
                         </div>
@@ -612,7 +612,7 @@ function CatLabel({ c, canUpdate, onRename }: { c: LaborCat; canUpdate: boolean;
       <input autoFocus value={draft} onChange={e => setDraft(e.target.value)} lang="ko"
         onBlur={() => { setEditing(false); onRename(c, draft); }}
         onKeyDown={e => { if (e.key === "Enter") { setEditing(false); onRename(c, draft); } if (e.key === "Escape") { setDraft(c.label); setEditing(false); } }}
-        className="px-2 py-0.5 rounded border border-blue-300 bg-white dark:bg-gray-700 text-sm w-44" />
+        className="px-2 py-0.5 rounded border border-blue-300 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm w-44" />
     );
   }
   return (

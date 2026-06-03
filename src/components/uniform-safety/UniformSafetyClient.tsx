@@ -804,14 +804,14 @@ function EditModal({ request, onClose, onSaved }: {
                       <label className="block text-[10px] font-bold text-gray-500 mb-1">사이즈</label>
                       <input type="text" value={it.size} onChange={e => patch(it.id, { size: e.target.value })}
                         placeholder="예: 95, L, 270"
-                        className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
+                        className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-gray-100 text-xs" />
                     </div>
                   )}
                   <div className={isUniform ? "" : "col-span-2"}>
                     <label className="block text-[10px] font-bold text-gray-500 mb-1">수량</label>
                     <input type="number" min={1} value={it.qty}
                       onChange={e => patch(it.id, { qty: Math.max(1, parseInt(e.target.value) || 1) })}
-                      className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
+                      className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-gray-100 text-xs" />
                   </div>
                 </div>
               )}
@@ -822,7 +822,7 @@ function EditModal({ request, onClose, onSaved }: {
             <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1">비고</label>
             <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} lang="ko"
               placeholder="신청 사유나 참고 사항"
-              className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm resize-none" />
+              className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-gray-100 text-sm resize-none" />
           </div>
 
           {error && (

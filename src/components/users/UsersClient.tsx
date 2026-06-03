@@ -30,27 +30,27 @@ const COLUMNS: { key: SortKey; label: string }[] = [
 ];
 
 const STATUS_CLS: Record<string, string> = {
-  "재직": "bg-green-50 text-green-700",
-  "퇴직": "bg-gray-100 text-gray-500",
-  "휴직": "bg-amber-50 text-amber-700",
+  "재직": "bg-green-50 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+  "퇴직": "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300",
+  "휴직": "bg-amber-50 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
 };
 
 const PERMISSION_OPTIONS: { value: Permission; label: string; desc: string; color: string }[] = [
-  { value: "admin",       label: "시스템 관리자", desc: "모든 기능 접근",        color: "bg-red-50 text-red-600"    },
-  { value: "site_manage", label: "현장 관리",     desc: "현장 등록·수정 가능",   color: "bg-blue-50 text-blue-600"  },
-  { value: "view_only",   label: "조회 전용",     desc: "읽기만 가능",           color: "bg-gray-100 text-gray-500" },
+  { value: "admin",       label: "시스템 관리자", desc: "모든 기능 접근",        color: "bg-red-50 text-red-600 dark:bg-red-900/40 dark:text-red-300"    },
+  { value: "site_manage", label: "현장 관리",     desc: "현장 등록·수정 가능",   color: "bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300"  },
+  { value: "view_only",   label: "조회 전용",     desc: "읽기만 가능",           color: "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300" },
 ];
 
 function PermBadge({ perms }: { perms: string[] }) {
-  if (perms.includes("admin")) return <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-50 text-red-600">시스템 관리자</span>;
+  if (perms.includes("admin")) return <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-50 text-red-600 dark:bg-red-900/40 dark:text-red-300">시스템 관리자</span>;
   const menuPerms = perms.filter(p => p.startsWith("menu:"));
   const viewOnly = perms.includes("view_only");
   const siteManage = perms.includes("site_manage");
   return (
     <>
-      {siteManage && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-50 text-blue-600">현장 관리</span>}
-      {viewOnly && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-500">조회 전용</span>}
-      {menuPerms.length > 0 && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-600">상세 권한 {menuPerms.length}개</span>}
+      {siteManage && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">현장 관리</span>}
+      {viewOnly && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300">조회 전용</span>}
+      {menuPerms.length > 0 && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300">상세 권한 {menuPerms.length}개</span>}
     </>
   );
 }
@@ -152,14 +152,14 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
       {/* 툴바 */}
       <div className="flex items-center gap-3 flex-wrap">
         {/* 상태 필터 */}
-        <div className="flex gap-1 p-1 bg-gray-100 rounded-xl shrink-0">
+        <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl shrink-0">
           {(["전체", "재직", "퇴직", "휴직"] as const).map(s => {
             const count = s === "전체" ? users.length : users.filter(u => u.status === s).length;
             return (
               <button key={s} type="button" onClick={() => { setStatusFilter(s); resetPage(); }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors
                   ${statusFilter === s
-                    ? s === "전체" ? "bg-gray-900 text-white shadow-sm" : "bg-white text-gray-700 shadow-sm"
+                    ? s === "전체" ? "bg-gray-900 text-white shadow-sm" : "bg-white text-gray-700 shadow-sm dark:bg-gray-700 dark:text-gray-100"
                     : isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-400 hover:text-gray-600"}`}>
                 {s} <span className="font-normal opacity-70">{count}</span>
               </button>
@@ -172,7 +172,7 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
           <input lang="ko" value={query} onChange={e => { setQuery(e.target.value); resetPage(); }}
             placeholder="이름, 부서, 직급, 전화번호 검색"
-            className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white" />
+            className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 dark:placeholder:text-gray-500" />
           {query && (
             <button type="button" onClick={() => { setQuery(""); resetPage(); }}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
@@ -296,10 +296,10 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
         onClose={() => setSelected(null)}
         panelClassName="w-full max-w-md mx-4 max-h-[85vh]"
         header={selected && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 shrink-0">
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-semibold text-gray-800">{selected.name}</h2>
+                <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">{selected.name}</h2>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CLS[selected.status ?? ""] ?? "bg-gray-100 text-gray-500"}`}>{selected.status}</span>
               </div>
               <p className="text-xs text-gray-400 mt-0.5">{selected.dept} · {selected.rank}</p>
@@ -331,7 +331,7 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
               ].map(([label, value]) => (
                 <div key={label} className="flex gap-3">
                   <span className="text-gray-400 w-24 shrink-0 text-sm">{label}</span>
-                  <span className="text-gray-800 text-sm break-all">{value}</span>
+                  <span className="text-gray-800 dark:text-gray-100 text-sm break-all">{value}</span>
                 </div>
               ))}
               {(selected.permissions ?? []).length > 0 && (

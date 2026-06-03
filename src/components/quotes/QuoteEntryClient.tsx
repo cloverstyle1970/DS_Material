@@ -1418,7 +1418,7 @@ function QuoteEntryInner() {
                       <span>5. 절사금액</span>
                       <input type="text" inputMode="numeric" value={truncateAmount === 0 ? "" : fmtNum(truncateAmount)}
                         onChange={e => { setTruncateAmount(parseNum(e.target.value)); setTruncateManual(true); }}
-                        placeholder="0" className="w-32 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-right tabular-nums" />
+                        placeholder="0" className="w-32 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-right tabular-nums" />
                       {truncateManual ? (
                         <button type="button" onClick={() => setTruncateManual(false)}
                           className="text-[10px] px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-100 border border-blue-200 dark:border-blue-700">
@@ -1501,9 +1501,9 @@ function QuoteEntryInner() {
                 {revisionNotes.map(n => (
                   <div key={n.key} className="flex items-center gap-2">
                     <input type="date" value={n.revised_date} onChange={e => patchNote(n.key, { revised_date: e.target.value })}
-                      className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 tabular-nums shrink-0" />
+                      className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 tabular-nums shrink-0" />
                     <input type="text" value={n.content} onChange={e => patchNote(n.key, { content: e.target.value })} lang="ko"
-                      placeholder="수정 내용" className="flex-1 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700" />
+                      placeholder="수정 내용" className="flex-1 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
                     <button type="button" onClick={() => removeRevisionNote(n.key)} className="text-red-400 hover:text-red-600 px-1 shrink-0">×</button>
                   </div>
                 ))}

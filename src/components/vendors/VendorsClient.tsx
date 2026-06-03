@@ -79,8 +79,8 @@ function VendorFormModal({ title, initial, saving, error, onSubmit, onClose, sub
       onClose={onClose}
       panelClassName="w-full max-w-lg mx-4 max-h-[90vh]"
       header={
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-          <h2 className="text-base font-semibold text-gray-800">{title}</h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 shrink-0">
+          <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">{title}</h2>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
       }
@@ -89,11 +89,11 @@ function VendorFormModal({ title, initial, saving, error, onSubmit, onClose, sub
           {/* 거래처명 + 구분 */}
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
-              <label className="block text-xs font-medium text-gray-600 mb-1">거래처명 <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">거래처명 <span className="text-red-500">*</span></label>
               <input value={f.name} onChange={set("name")} required className={field} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">구분 <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">구분 <span className="text-red-500">*</span></label>
               <select value={f.type} onChange={set("type")} className={field}>
                 <option value="매입">매입</option>
                 <option value="매출">매출</option>
@@ -105,11 +105,11 @@ function VendorFormModal({ title, initial, saving, error, onSubmit, onClose, sub
           {/* 사업자번호 + 대표자 */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">사업자번호</label>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">사업자번호</label>
               <input value={f.bizNo} onChange={set("bizNo")} placeholder="000-00-00000" className={field} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">대표자명</label>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">대표자명</label>
               <input value={f.representative} onChange={set("representative")} className={field} />
             </div>
           </div>
@@ -117,11 +117,11 @@ function VendorFormModal({ title, initial, saving, error, onSubmit, onClose, sub
           {/* 업태 + 종목 */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">업태</label>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">업태</label>
               <input value={f.bizType} onChange={set("bizType")} className={field} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">종목</label>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">종목</label>
               <input value={f.bizItem} onChange={set("bizItem")} className={field} />
             </div>
           </div>
@@ -129,13 +129,13 @@ function VendorFormModal({ title, initial, saving, error, onSubmit, onClose, sub
           {/* 전화 + 팩스 */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">전화번호</label>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">전화번호</label>
               <input value={f.phone}
                 onChange={e => setF(p => ({ ...p, phone: formatPhone(e.target.value) }))}
                 placeholder="031-000-0000" inputMode="tel" maxLength={14} className={field + " font-mono"} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">팩스번호</label>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">팩스번호</label>
               <input value={f.fax}
                 onChange={e => setF(p => ({ ...p, fax: formatPhone(e.target.value) }))}
                 placeholder="031-000-0000" inputMode="tel" maxLength={14} className={field + " font-mono"} />
@@ -144,7 +144,7 @@ function VendorFormModal({ title, initial, saving, error, onSubmit, onClose, sub
 
           {/* 주소 */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">주소 (도로명)</label>
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">주소 (도로명)</label>
             <div className="flex gap-2">
               <input value={f.address} onChange={set("address")} placeholder="도로명주소 검색 또는 직접 입력" className={`${field} flex-1`} />
               <button
@@ -164,33 +164,33 @@ function VendorFormModal({ title, initial, saving, error, onSubmit, onClose, sub
                     },
                   }).open();
                 }}
-                className="shrink-0 px-3 py-2 rounded-lg border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 hover:border-slate-300 transition-colors whitespace-nowrap"
+                className="shrink-0 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-slate-300 transition-colors whitespace-nowrap"
               >
                 🔍 주소 검색
               </button>
             </div>
             {f.postalCode && (
-              <p className="mt-1 text-xs text-gray-400">우편번호: {f.postalCode}</p>
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">우편번호: {f.postalCode}</p>
             )}
           </div>
 
           {/* 계산서 */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">계산서담당</label>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">계산서담당</label>
               <input value={f.invoiceManager} onChange={set("invoiceManager")} className={field} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">계산서메일</label>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">계산서메일</label>
               <input value={f.invoiceEmail} onChange={set("invoiceEmail")} type="email" className={field} />
             </div>
           </div>
 
-          {error && <p className="text-sm text-red-500 bg-red-50 rounded-lg px-4 py-2.5">{error}</p>}
+          {error && <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/30 rounded-lg px-4 py-2.5">{error}</p>}
 
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose}
-              className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">취소</button>
+              className="flex-1 rounded-lg border border-gray-200 dark:border-gray-600 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">취소</button>
             <button type="submit" disabled={saving || !f.name.trim()}
               className={`flex-1 rounded-lg py-2.5 text-sm font-medium text-white disabled:opacity-50 transition-colors ${submitCls}`}>
               {saving ? "저장 중..." : submitLabel}
@@ -473,13 +473,13 @@ export default function VendorsClient({ initial }: Props) {
         onClose={() => setSelected(null)}
         panelClassName="w-full max-w-md mx-4 max-h-[85vh]"
         header={selected && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 shrink-0">
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-semibold text-gray-800">{selected.name}</h2>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${TYPE_CLS[selected.type ?? "매출"]}`}>{selected.type}</span>
+                <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">{selected.name}</h2>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${activeCls[selected.type ?? "매출"]}`}>{selected.type}</span>
               </div>
-              <p className="text-xs text-gray-400 mt-0.5">코드 {selected.vendorCode ?? "-"}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">코드 {selected.vendorCode ?? "-"}</p>
             </div>
             <div className="flex items-center gap-2">
               {admin && (
@@ -510,8 +510,8 @@ export default function VendorsClient({ initial }: Props) {
                 ["계산서메일", selected.invoiceEmail],
               ].map(([label, value]) => (
                 <div key={label} className="flex gap-3">
-                  <span className="text-gray-400 w-24 shrink-0 text-sm">{label}</span>
-                  <span className="text-gray-800 text-sm break-all">{value || "-"}</span>
+                  <span className="text-gray-400 dark:text-gray-500 w-24 shrink-0 text-sm">{label}</span>
+                  <span className="text-gray-800 dark:text-gray-100 text-sm break-all">{value || "-"}</span>
                 </div>
               ))}
           </div>
@@ -554,19 +554,19 @@ export default function VendorsClient({ initial }: Props) {
         z={60}
         header={
           <div className="px-6 pt-6 pb-2">
-            <h3 className="text-base font-semibold text-gray-800">거래처 삭제</h3>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">거래처 삭제</h3>
           </div>
         }
       >
         {deleteConfirm && (
           <div className="px-6 pb-6">
-            <p className="text-sm text-gray-600 mb-1">
-              <span className="font-medium text-gray-800">{deleteConfirm.name}</span>을(를) 삭제하시겠습니까?
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">
+              <span className="font-medium text-gray-800 dark:text-gray-100">{deleteConfirm.name}</span>을(를) 삭제하시겠습니까?
             </p>
             <p className="text-xs text-red-500 mb-5">삭제 후 복구할 수 없습니다.</p>
             <div className="flex gap-3">
               <button type="button" onClick={() => setDeleteConfirm(null)}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors">취소</button>
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">취소</button>
               <button type="button" onClick={() => handleDelete(deleteConfirm)}
                 className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition-colors">삭제</button>
             </div>

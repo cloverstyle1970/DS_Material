@@ -289,20 +289,20 @@ export default function TransactionBulkUploadModal({ mode, onClose, onSaved }: P
                             : r.errors.length > 0 ? <span className="text-orange-600 font-bold">!</span>
                             : <span className="text-slate-400">·</span>}
                         </td>
-                        <td className="px-2 py-2 font-mono break-all">{r.materialId || "-"}</td>
-                        <td className="px-2 py-2 break-words">{r.materialName || <span className="text-slate-400">-</span>}</td>
-                        <td className="px-2 py-2 text-right tabular-nums">{r.qty || "-"}</td>
-                        <td className="px-2 py-2 break-words">
+                        <td className="px-2 py-2 font-mono break-all text-gray-800 dark:text-gray-200">{r.materialId || "-"}</td>
+                        <td className="px-2 py-2 break-words text-gray-800 dark:text-gray-200">{r.materialName || <span className="text-slate-400">-</span>}</td>
+                        <td className="px-2 py-2 text-right tabular-nums text-gray-800 dark:text-gray-200">{r.qty || "-"}</td>
+                        <td className="px-2 py-2 break-words text-gray-800 dark:text-gray-200">
                           <div>{r.siteName || "-"}</div>
                           {isOutbound && <div className="text-slate-500 text-[11px]">{r.elevatorName || ""}</div>}
                         </td>
-                        <td className="px-2 py-2 break-words font-mono text-[11px]">
+                        <td className="px-2 py-2 break-words font-mono text-[11px] text-gray-800 dark:text-gray-200">
                           {r.serialNos.length > 0 ? r.serialNos.join(", ") : <span className="font-sans text-slate-400">-</span>}
                         </td>
                         {isOutbound && (
-                          <td className="px-2 py-2 text-center">{r.requiresReturn ? "Y" : "N"}</td>
+                          <td className="px-2 py-2 text-center text-gray-800 dark:text-gray-200">{r.requiresReturn ? "Y" : "N"}</td>
                         )}
-                        <td className="px-2 py-2 break-words">{r.note || "-"}</td>
+                        <td className="px-2 py-2 break-words text-gray-800 dark:text-gray-200">{r.note || "-"}</td>
                         <td className="px-2 py-2 text-red-600 dark:text-red-400 break-words whitespace-normal">
                           {r.message || r.errors.join(", ")}
                         </td>

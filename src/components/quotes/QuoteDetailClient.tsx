@@ -679,14 +679,14 @@ function QuoteDetailInner() {
             <input type="text" inputMode="numeric" value={payForm.amount}
               onChange={e => setPayForm(f => ({ ...f, amount: formatMoney(e.target.value) }))}
               placeholder={`최대 ${fmtNum(header.total_amount)}원`}
-              className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-right tabular-nums font-bold" />
+              className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm text-right tabular-nums font-bold" />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">방법</label>
               <select value={payForm.method}
                 onChange={e => setPayForm(f => ({ ...f, method: e.target.value as PaymentMethod }))}
-                className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm">
+                className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm">
                 {(["계좌이체","현금","카드","어음","기타"] as const).map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
@@ -694,20 +694,20 @@ function QuoteDetailInner() {
               <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">입금일</label>
               <input type="date" value={payForm.paid_at}
                 onChange={e => setPayForm(f => ({ ...f, paid_at: e.target.value }))}
-                className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm" />
+                className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm" />
             </div>
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">입금자명</label>
             <input type="text" value={payForm.depositor_name} lang="ko"
               onChange={e => setPayForm(f => ({ ...f, depositor_name: e.target.value }))}
-              className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm" />
+              className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm" />
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">비고</label>
             <input type="text" value={payForm.note} lang="ko"
               onChange={e => setPayForm(f => ({ ...f, note: e.target.value }))}
-              className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm" />
+              className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm" />
           </div>
           <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
             <input type="checkbox" checked={payForm.is_prepaid}
@@ -717,7 +717,7 @@ function QuoteDetailInner() {
           </label>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setPayAddOpen(false)} disabled={paySaving}
-              className="px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-sm">취소</button>
+              className="px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-sm">취소</button>
             <button type="button" onClick={savePayment} disabled={paySaving}
               className="px-5 py-2 rounded bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 disabled:opacity-50">
               {paySaving ? "등록 중..." : "💵 입금 등록"}

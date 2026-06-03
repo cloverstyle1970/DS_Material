@@ -276,17 +276,17 @@ export default function PurchaseOrderBulkUploadModal({ onClose, onSaved }: Props
                             : r.errors.length > 0 ? <span className="text-orange-600 font-bold">!</span>
                             : <span className="text-slate-400">·</span>}
                         </td>
-                        <td className="px-2 py-2 font-mono break-all">{r.materialId || "-"}</td>
-                        <td className="px-2 py-2 break-words">{r.materialName || <span className="text-slate-400">-</span>}</td>
-                        <td className="px-2 py-2 text-right tabular-nums">{r.qty || "-"}</td>
-                        <td className="px-2 py-2 break-words">{r.vendorName || "-"}</td>
-                        <td className="px-2 py-2 text-right tabular-nums">{fmtNumOr(r.unitPrice)}</td>
-                        <td className="px-2 py-2 break-words">
+                        <td className="px-2 py-2 font-mono break-all text-gray-800 dark:text-gray-200">{r.materialId || "-"}</td>
+                        <td className="px-2 py-2 break-words text-gray-800 dark:text-gray-200">{r.materialName || <span className="text-slate-400">-</span>}</td>
+                        <td className="px-2 py-2 text-right tabular-nums text-gray-800 dark:text-gray-200">{r.qty || "-"}</td>
+                        <td className="px-2 py-2 break-words text-gray-800 dark:text-gray-200">{r.vendorName || "-"}</td>
+                        <td className="px-2 py-2 text-right tabular-nums text-gray-800 dark:text-gray-200">{fmtNumOr(r.unitPrice)}</td>
+                        <td className="px-2 py-2 break-words text-gray-800 dark:text-gray-200">
                           <div>{r.siteName || "-"}</div>
                           <div className="text-slate-500 text-[11px]">{r.elevatorName || ""}</div>
                         </td>
-                        <td className="px-2 py-2 break-words">{r.requesterName || "-"}</td>
-                        <td className="px-2 py-2 break-words">{r.note || "-"}</td>
+                        <td className="px-2 py-2 break-words text-gray-800 dark:text-gray-200">{r.requesterName || "-"}</td>
+                        <td className="px-2 py-2 break-words text-gray-800 dark:text-gray-200">{r.note || "-"}</td>
                         <td className="px-2 py-2 text-red-600 dark:text-red-400 break-words whitespace-normal">
                           {r.message || r.errors.join(", ")}
                         </td>

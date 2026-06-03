@@ -458,13 +458,13 @@ export default function PermissionGroupsClient() {
                   <input type="text" value={editing.name}
                     onChange={e => setEditing(p => p ? { ...p, name: e.target.value } : p)}
                     disabled={editing.is_system_role}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm disabled:bg-gray-100 dark:disabled:bg-gray-900/40 disabled:cursor-not-allowed" />
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 disabled:bg-gray-100 dark:disabled:bg-gray-900/40 disabled:cursor-not-allowed" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">색상</label>
                   <select value={editing.color}
                     onChange={e => setEditing(p => p ? { ...p, color: e.target.value } : p)}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm">
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100">
                     {COLOR_OPTIONS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
                   </select>
                 </div>
@@ -472,7 +472,7 @@ export default function PermissionGroupsClient() {
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">정렬</label>
                   <input type="number" value={editing.sort_order}
                     onChange={e => setEditing(p => p ? { ...p, sort_order: Number(e.target.value) || 0 } : p)}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-mono" />
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 font-mono" />
                 </div>
                 <div className="flex gap-2 justify-end">
                   <button type="button" onClick={saveGroup} disabled={saving}
@@ -492,7 +492,7 @@ export default function PermissionGroupsClient() {
                 <input type="text" value={editing.description ?? ""}
                   onChange={e => setEditing(p => p ? { ...p, description: e.target.value } : p)}
                   placeholder="그룹 설명 (예: 보수팀 일반 사원용)"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm" />
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100" />
               </div>
             </div>
 
@@ -707,7 +707,7 @@ export default function PermissionGroupsClient() {
                   <input type="text" value={userSearch}
                     onChange={e => setUserSearch(e.target.value)}
                     placeholder="이름·부서 검색"
-                    className="flex-1 px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
+                    className="flex-1 px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs text-gray-900 dark:text-gray-100" />
                 </div>
                 <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-2">
                   ℹ️ 사용자는 하나의 그룹에만 속할 수 있습니다. 이미 다른 그룹에 속한 사용자는 해당 그룹에서 먼저 제거하세요.

@@ -257,7 +257,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
             <VendorInlineSearch value={vendorName} onChange={setVendorName} vendors={vendors} />
           </FormField>
           <FormField label="담당자">
-            <input type="text" value={user?.name ?? ""} readOnly className={inputCls + " bg-gray-50 text-gray-600"} />
+            <input type="text" value={user?.name ?? ""} readOnly className={inputCls + " bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 cursor-not-allowed"} />
           </FormField>
           <FormField label="참조" wide>
             <div className="flex items-center gap-2">

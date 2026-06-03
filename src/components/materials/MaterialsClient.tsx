@@ -43,7 +43,7 @@ function StockCell({ material, editable }: { material: MaterialRecord; editable:
     return (
       <div className="flex items-center gap-1">
         <input type="number" min={0} value={draft} onChange={e => setDraft(Number(e.target.value))}
-          className="w-16 rounded border border-slate-300 px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-slate-400" />
+          className="w-16 rounded border border-slate-300 dark:bg-gray-700 dark:border-gray-600 text-gray-900 dark:text-gray-100 px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-slate-400" />
         <button onClick={save} disabled={saving} className="text-xs text-green-600 hover:text-green-800 font-medium">저장</button>
         <button onClick={() => { setDraft(qty); setEditing(false); }} className="text-xs text-gray-400 hover:text-gray-600">취소</button>
       </div>
@@ -53,7 +53,7 @@ function StockCell({ material, editable }: { material: MaterialRecord; editable:
   return (
     <span
       onClick={() => editable && setEditing(true)}
-      className={`${qty === 0 ? "text-red-600" : qty <= LOW_STOCK_THRESHOLD ? "text-orange-500" : "text-gray-700"} ${editable ? "cursor-pointer group" : ""} flex items-center gap-1.5`}
+      className={`${qty === 0 ? "text-red-600" : qty <= LOW_STOCK_THRESHOLD ? "text-orange-500" : "text-gray-700 dark:text-gray-200"} ${editable ? "cursor-pointer group" : ""} flex items-center gap-1.5`}
     >
       <span className="font-medium">{fmtNum(qty)}</span>
       {editable && <span className="text-gray-300 text-xs opacity-0 group-hover:opacity-100 transition-opacity">✏️</span>}
@@ -265,7 +265,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
       <div className="space-y-2.5">
         <div className="flex items-center gap-3 flex-wrap">
           {/* DS / TK 토글 */}
-          <div className="flex gap-1 p-1 bg-gray-100 rounded-xl shrink-0">
+          <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl shrink-0">
             {(["전체", "DS", "TK"] as const).map(t => (
               <button key={t} type="button" onClick={() => { setMatType(t); setSelected(new Set()); resetPage(); }}
                 className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors

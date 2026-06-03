@@ -335,17 +335,17 @@ export default function UniformSafetyAdminClient() {
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 mb-1">시작일</label>
                 <input type="date" value={mgFrom} onChange={e => setMgFrom(e.target.value)}
-                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
+                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-gray-100 text-xs" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 mb-1">종료일</label>
                 <input type="date" value={mgTo} onChange={e => setMgTo(e.target.value)}
-                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
+                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-gray-100 text-xs" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 mb-1">구분</label>
                 <select value={mgType} onChange={e => setMgType(e.target.value as typeof mgType)}
-                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs">
+                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-gray-100 text-xs">
                   <option value="all">전체</option>
                   <option value="근무복">근무복</option>
                   <option value="안전장구">안전장구</option>
@@ -354,7 +354,7 @@ export default function UniformSafetyAdminClient() {
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 mb-1">사용자</label>
                 <select value={mgUserId} onChange={e => setMgUserId(e.target.value)}
-                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs">
+                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-gray-100 text-xs">
                   <option value="">전체</option>
                   {users.map(u => <option key={u.id} value={String(u.id)}>{u.name}{u.dept ? ` (${u.dept})` : ""}</option>)}
                 </select>
@@ -362,7 +362,7 @@ export default function UniformSafetyAdminClient() {
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 mb-1">물품</label>
                 <select value={mgMaterial} onChange={e => setMgMaterial(e.target.value)}
-                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs">
+                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-gray-100 text-xs">
                   <option value="">전체</option>
                   {materialOptions.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>
@@ -390,17 +390,17 @@ export default function UniformSafetyAdminClient() {
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 mb-1">시작일</label>
                 <input type="date" value={histFrom} onChange={e => setHistFrom(e.target.value)}
-                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
+                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-gray-100 text-xs" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 mb-1">종료일</label>
                 <input type="date" value={histTo} onChange={e => setHistTo(e.target.value)}
-                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
+                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-gray-100 text-xs" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 mb-1">구분</label>
                 <select value={histType} onChange={e => setHistType(e.target.value as typeof histType)}
-                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs">
+                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-gray-100 text-xs">
                   <option value="all">전체</option>
                   <option value="근무복">근무복</option>
                   <option value="안전장구">안전장구</option>
@@ -409,7 +409,7 @@ export default function UniformSafetyAdminClient() {
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 mb-1">사용자</label>
                 <select value={histUserId} onChange={e => setHistUserId(e.target.value)}
-                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs">
+                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-gray-100 text-xs">
                   <option value="">전체</option>
                   {users.map(u => <option key={u.id} value={String(u.id)}>{u.name}{u.dept ? ` (${u.dept})` : ""}</option>)}
                 </select>
@@ -417,7 +417,7 @@ export default function UniformSafetyAdminClient() {
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 mb-1">물품</label>
                 <select value={histMaterial} onChange={e => setHistMaterial(e.target.value)}
-                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs">
+                  className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-gray-100 text-xs">
                   <option value="">전체</option>
                   {materialOptions.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>

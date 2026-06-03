@@ -824,10 +824,10 @@ export default function SitesClient({ initial, elevators }: Props) {
   return (
     <div className="flex flex-col h-full">
       {/* 상단 헤더 */}
-      <div className="shrink-0 px-6 py-4 bg-white border-b border-gray-200 flex items-center justify-between gap-4">
+      <div className="shrink-0 px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-base font-semibold text-gray-800">현장/호기 관리</h1>
-          <p className="text-xs text-gray-500 mt-0.5">현장 목록 조회 및 호기 정보 관리</p>
+          <h1 className="text-base font-semibold text-gray-800 dark:text-gray-100">현장/호기 관리</h1>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">현장 목록 조회 및 호기 정보 관리</p>
         </div>
         <div className="flex items-center gap-2">
           {canBackup && (
@@ -876,7 +876,7 @@ export default function SitesClient({ initial, elevators }: Props) {
                   className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-lg leading-none ${isDark ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-600"}`}>×</button>
               )}
             </div>
-            <div className="mt-2 flex gap-1 p-1 bg-gray-100 rounded-xl">
+            <div className="mt-2 flex gap-1 p-1 bg-gray-100 dark:bg-gray-700 rounded-xl">
               {(["전체", "DS", "TK"] as const).map(t => (
                 <button key={t} type="button" onClick={() => { setCompanyFilter(t); setPage(1); }}
                   className={`flex-1 py-1 rounded-lg text-xs font-semibold transition-colors ${

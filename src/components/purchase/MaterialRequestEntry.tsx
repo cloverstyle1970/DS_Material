@@ -155,10 +155,10 @@ export default function MaterialRequestEntry() {
             <SiteInlineSearch value={siteName} onChange={setSiteName} sites={sites} />
           </FormField>
           <FormField label="신청자">
-            <input type="text" value={user?.name ?? ""} readOnly className={inputCls + " bg-gray-50 text-gray-600"} />
+            <input type="text" value={user?.name ?? ""} readOnly className={inputCls + " bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 cursor-not-allowed"} />
           </FormField>
           <FormField label="부서">
-            <input type="text" value={user?.dept ?? ""} readOnly className={inputCls + " bg-gray-50 text-gray-600"} />
+            <input type="text" value={user?.dept ?? ""} readOnly className={inputCls + " bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 cursor-not-allowed"} />
           </FormField>
           <FormField label="참조" wide>
             <div className="flex items-center gap-2">
