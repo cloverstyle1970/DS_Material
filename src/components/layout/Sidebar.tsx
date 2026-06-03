@@ -314,11 +314,9 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
           {NAV_GROUPS.map((group, gi) => {
             const visibleItems = group.items
               .filter(item => {
-                // 외부/플레이스홀더 링크(#로 시작)는 권한 체크 제외
+                // 외부/플레이스홀더 링크(#로 시작)는 권한 체크 제외 (페이지 없는 자리표시)
                 if (item.href.startsWith("#")) return true;
-                // 개인정보수정·근무복/안전장구 신청은 모든 직원이 사용하는 자가신청 메뉴
-                if (item.href === "/data/profile") return true;
-                if (item.href === "/uniform-safety") return true;
+                // 그 외 모든 메뉴는 권한 그룹 설정의 체크박스(menu:{href}:read)를 따른다.
                 // admin이면 모두 허용, 아니면 read 권한 보유한 메뉴만 노출
                 return user ? hasMenuPermission(user, item.href, "read") : false;
               });
