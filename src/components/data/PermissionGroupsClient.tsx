@@ -32,6 +32,7 @@ const PERMISSION_TREE: MenuSection[] = [
       { href: "/data/profile",          label: "개인정보수정", ops: ["read","update"] },
       { href: "/data/company-info",     label: "회사 정보 관리" },
       { href: "/data/permission-groups",label: "사용자권한그룹" },
+      { href: "/manual",                label: "도움말 매뉴얼 관리", ops: ["update"] },
     ],
   },
   {

@@ -11,10 +11,14 @@ CREATE TABLE IF NOT EXISTS manuals (
   category      TEXT NOT NULL,
   title         TEXT NOT NULL,
   content       TEXT NOT NULL,
+  pdf_url       TEXT,
   sort_order    INTEGER NOT NULL DEFAULT 0,
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_by    TEXT
 );
+
+-- 기존 테이블에 pdf_url 컬럼이 없을 경우 보강 (클라이언트가 PDF 매뉴얼 업로드에 사용)
+ALTER TABLE manuals ADD COLUMN IF NOT EXISTS pdf_url TEXT;
 
 -- 인덱스 추가 (카테고리별/순서별 정렬 최적화)
 CREATE INDEX IF NOT EXISTS idx_manuals_category ON manuals(category);
@@ -322,6 +326,22 @@ TBM 등록 양식은 총 **8가지 핵심 영역**으로 구성되어 있습니�
     '시스템'
   )
 ON CONFLICT DO NOTHING;
+
+-- 매뉴얼 PDF 보관 Storage 버킷 (클라이언트 MANUAL_DOCS_BUCKET = 'manual-docs')
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('manual-docs', 'manual-docs', TRUE, 52428800, ARRAY['application/pdf'])
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "manual_docs_auth_upload" ON storage.objects;
+DROP POLICY IF EXISTS "manual_docs_public_read" ON storage.objects;
+DROP POLICY IF EXISTS "manual_docs_auth_delete" ON storage.objects;
+
+CREATE POLICY "manual_docs_auth_upload"
+  ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'manual-docs');
+CREATE POLICY "manual_docs_public_read"
+  ON storage.objects FOR SELECT USING (bucket_id = 'manual-docs');
+CREATE POLICY "manual_docs_auth_delete"
+  ON storage.objects FOR DELETE USING (bucket_id = 'manual-docs');
 
 -- 검증 쿼리
 SELECT column_name, data_type FROM information_schema.columns
