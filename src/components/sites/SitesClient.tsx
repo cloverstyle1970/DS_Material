@@ -95,7 +95,7 @@ function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: Elevato
           </div>
           <div>
             <label className={labelCls}>호기명 <span className="text-red-500">*</span></label>
-            <input value={unitName} onChange={e => setUnitName(e.target.value)} placeholder="예: 1호기" required className={fieldCls} />
+            <input value={unitName} onChange={e => setUnitName(e.target.value)} placeholder="예: 508-1" required className={fieldCls} />
           </div>
           <div>
             <label className={labelCls}>승강기 번호</label>

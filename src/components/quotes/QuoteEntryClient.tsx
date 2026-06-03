@@ -309,7 +309,7 @@ function QuoteEntryInner() {
       }
     })();
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
-    supabase.from("accounts").select("id, name, dept, team").order("name")
+    supabase.from("accounts").select("id, name:username, dept, team").order("username")
       .then(({ data }) => { if (data) setEmployees(data as typeof employees); });
   }, []);
 
@@ -527,11 +527,15 @@ function QuoteEntryInner() {
       const { data: ms } = await supabase.from("managed_sites")
         .select("id, contract_type, contract_start, contract_end, warranty_start, warranty_end, company_type")
         .eq("site_name", siteName).maybeSingle();
+      // 호기 식별 기준은 installation_place (비어있을 때만 unit_name fallback)
       const elev = (ms as { id?: number } | null)?.id != null
         ? await supabase.from("site_elevators")
-            .select("unit_name").eq("site_id", (ms as { id: number }).id).order("unit_name")
-        : { data: [] as { unit_name: string }[] };
-      setElevatorOptions((elev.data ?? []).map(e => (e as { unit_name: string }).unit_name).filter(Boolean));
+            .select("installation_place, unit_name").eq("site_id", (ms as { id: number }).id).order("installation_place")
+        : { data: [] as { installation_place: string | null; unit_name: string | null }[] };
+      setElevatorOptions((elev.data ?? []).map(e => {
+        const r = e as { installation_place: string | null; unit_name: string | null };
+        return r.installation_place ?? r.unit_name ?? "";
+      }).filter(Boolean));
       const info = (ms ?? null) as SiteContractInfo | null;
       setSiteInfo(info);
       // FM 계약구분이면 charge_type 자동 '무상' 권유 (수정 모드에서는 사용자가 저장한 값을 보존)

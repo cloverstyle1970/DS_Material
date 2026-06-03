@@ -32,7 +32,7 @@ export default function LoginPage() {
     // password 컬럼은 클라이언트로 내려받지 않고 필터 조건으로만 사용한다.
     const { data: account, error: qErr } = await supabase
       .from("accounts")
-      .select("id, username, name, permissions, dept, theme, status")
+      .select("id, username, permissions, dept, theme, status")
       .eq("username", username)
       .eq("password", password)
       .maybeSingle();

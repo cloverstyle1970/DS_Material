@@ -310,9 +310,9 @@ export default function MyProfileClient() {
 
       // 후속 load가 시작됐다면 이 응답은 무시 (target 사용자가 admin 자신으로 덮어쓰이지 않도록)
       if (reqId !== loadReqRef.current) return;
-      // accounts: 실제 식별자는 username → name 으로 정규화해 다운스트림과 일관 유지
+      // accounts: username 이 단일 진리원 → name 필드로 정규화해 다운스트림과 일관 유지
       const raw = u.data as (UserRow & { username?: string }) | null;
-      const r = raw ? { ...raw, name: raw.username ?? raw.name } as UserRow : null;
+      const r = raw ? { ...raw, name: raw.username ?? "" } as UserRow : null;
       if (r) {
         setRow(r);
         setEditName(r.name ?? "");
@@ -551,8 +551,7 @@ export default function MyProfileClient() {
         safety_shoes_size: shoesSize || null,
       };
       if (isAdminEditing) {
-        usersPatch.name      = editName.trim();
-        usersPatch.username  = editName.trim();   // accounts: username 이 실제 식별자 → 함께 갱신
+        usersPatch.username  = editName.trim();   // accounts: username 이 단일 진리원 (name 컬럼 미사용)
         usersPatch.ssn       = editSsn || null;
         usersPatch.hire_date = editHireDate || null;
         usersPatch.dept      = editDept || null;

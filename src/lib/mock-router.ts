@@ -271,11 +271,12 @@ function siteToDb(d: any): Record<string, unknown> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function dbToElevator(r: any, siteName?: string): ElevatorRecord {
-  // site_elevators 스키마: site_id(FK), unit_name, elevator_number, elevator_model
+  // site_elevators 스키마: site_id(FK), installation_place(호기 식별 기준), unit_name, elevator_number, elevator_model
+  // 호기 표시·선택값은 installation_place 를 기준으로 함 (unit_name 은 빈 값일 때만 fallback)
   return {
     id:             r.id,
     siteName:       siteName ?? r.site_name ?? "",
-    unitName:       r.unit_name        ?? null,
+    unitName:       r.installation_place ?? r.unit_name ?? null,
     elevatorNo:     r.elevator_number  ?? null,
     emergencyPhone: r.emergency_phone  ?? null, // site_elevators엔 컬럼 없음 → null
     modelName:      r.elevator_model   ?? null,
@@ -285,7 +286,7 @@ function dbToElevator(r: any, siteName?: string): ElevatorRecord {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function elevatorToDb(d: any): Record<string, unknown> {
   const obj: Record<string, unknown> = {};
-  if (d.unitName   !== undefined) obj.unit_name       = d.unitName;
+  if (d.unitName   !== undefined) obj.installation_place = d.unitName; // 호기 기준 = installation_place
   if (d.elevatorNo !== undefined) obj.elevator_number = d.elevatorNo;
   if (d.modelName  !== undefined) obj.elevator_model  = d.modelName;
   // 현장(site_id)·emergencyPhone 은 라우트에서 별도 처리 (site_elevators 스키마)
@@ -333,10 +334,10 @@ function vendorToDb(d: any): Record<string, unknown> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function dbToUser(r: any): UserRecord {
-  // 신DB 정본은 accounts. username 이 실제 식별자(병합 기준).
+  // 신DB 정본은 accounts. username 이 단일 진리원 (name 컬럼 미사용).
   return {
     id:          r.id,
-    name:        r.username ?? r.name,
+    name:        r.username,
     dept:        r.dept        ?? null,
     rank:        r.rank        ?? null,
     ssn:         r.ssn         ?? null,
@@ -352,9 +353,9 @@ function dbToUser(r: any): UserRecord {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function userToDb(d: any): Record<string, unknown> {
-  // accounts 테이블로 직접 매핑. name 입력은 username/name 양쪽에 거울 저장.
+  // accounts 테이블로 직접 매핑. username 이 단일 진리원 (name 컬럼 미사용).
   const obj: Record<string, unknown> = {};
-  if (d.name        !== undefined) { obj.username = d.name; obj.name = d.name; }
+  if (d.name        !== undefined) obj.username = d.name;
   if (d.dept        !== undefined) obj.dept        = d.dept;
   if (d.rank        !== undefined) obj.rank        = d.rank;
   if (d.ssn         !== undefined) obj.ssn         = d.ssn;
@@ -746,7 +747,7 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const all: ElevatorRecord[] = [];
     for (let offset = 0; ; offset += PAGE) {
-      let query = supabase.from("site_elevators").select("*").order("unit_name").range(offset, offset + PAGE - 1);
+      let query = supabase.from("site_elevators").select("*").order("installation_place").range(offset, offset + PAGE - 1);
       if (siteId !== undefined) query = query.eq("site_id", siteId);
       const { data, error } = await query;
       if (error) throw new MockApiError(error.message, 500);
@@ -1034,7 +1035,7 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
     const { data: site } = await supabase.from("managed_sites").select("id").eq("site_name", siteName).maybeSingle();
     if (!site) throw new MockApiError("현장을 찾을 수 없습니다", 404);
     const { data, error } = await supabase.from("site_elevators")
-      .insert({ site_id: (site as any).id, unit_name: unitName || null, elevator_number: elevatorNo || null })
+      .insert({ site_id: (site as any).id, installation_place: unitName || null, elevator_number: elevatorNo || null })
       .select().single();
     if (error) throw new MockApiError(error.message, 500);
     return dbToElevator(data, siteName);

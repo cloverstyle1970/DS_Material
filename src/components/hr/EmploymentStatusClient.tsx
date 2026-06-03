@@ -81,11 +81,11 @@ export default function EmploymentStatusClient() {
     const [{ data: histData }, { data: empData }] = await Promise.all([
       supabase
         .from("user_status_history")
-        .select("id,user_id,status_type,event_date,reason,user:accounts(id,username,name,status)")
+        .select("id,user_id,status_type,event_date,reason,user:accounts(id,username,name:username,status)")
         .in("status_type", [...STATUS_TYPES])
         .order("event_date", { ascending: false })
         .order("id", { ascending: false }),
-      supabase.from("accounts").select("id,username,name,dept,rank,status").order("username"),
+      supabase.from("accounts").select("id,username,name:username,dept,rank,status").order("username"),
     ]);
     setRows((histData ?? []) as unknown as StatusRow[]);
     setEmployees((empData ?? []) as EmployeeRow[]);

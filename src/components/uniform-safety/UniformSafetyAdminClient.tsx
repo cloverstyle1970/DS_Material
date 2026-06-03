@@ -85,7 +85,7 @@ export default function UniformSafetyAdminClient() {
         .select("*, items:uniform_safety_request_items(*)")
         .order("requested_at", { ascending: false })
         .limit(500),
-      supabase.from("accounts").select("id, name, dept").eq("status", "재직").order("name"),
+      supabase.from("accounts").select("id, name:username, dept").eq("status", "재직").order("username"),
       supabase.from("materials").select("id, name, unit, model_no, stock_qty").like("id", "D9902%").order("id"),
       supabase.from("materials").select("id, name, unit, model_no, stock_qty").like("id", "D9903%").order("id"),
       supabase.from("categories").select("code, label").eq("level", "sub").eq("major_code", "99").eq("mid_code", "02"),

@@ -170,13 +170,17 @@ export default function ClaimEntryClient() {
     if (!siteName.trim()) { setElevatorOptions([]); return; }
     (async () => {
       // 신DB: 현장은 managed_sites(site_name), 호기는 site_elevators(site_id FK)
+      // 호기 식별 기준은 installation_place (비어있을 때만 unit_name fallback)
       const { data: ms } = await supabase.from("managed_sites")
         .select("id, contract_type").eq("site_name", siteName).maybeSingle();
       const elev = (ms as { id?: number } | null)?.id != null
         ? await supabase.from("site_elevators")
-            .select("unit_name").eq("site_id", (ms as { id: number }).id).order("unit_name")
-        : { data: [] as { unit_name: string }[] };
-      setElevatorOptions((elev.data ?? []).map(e => (e as { unit_name: string }).unit_name).filter(Boolean));
+            .select("installation_place, unit_name").eq("site_id", (ms as { id: number }).id).order("installation_place")
+        : { data: [] as { installation_place: string | null; unit_name: string | null }[] };
+      setElevatorOptions((elev.data ?? []).map(e => {
+        const r = e as { installation_place: string | null; unit_name: string | null };
+        return r.installation_place ?? r.unit_name ?? "";
+      }).filter(Boolean));
       const ct = (ms as { contract_type: string | null } | null)?.contract_type;
       if (ct && (ct === "TK-FM" || ct === "대솔FM" || ct === "DS-FM")) {
         setMode("무상신청");

@@ -11,7 +11,7 @@ import { formatPhone } from "@/lib/input-format";
 import { fmtNum } from "@/lib/format";
 
 // ── 공통 필드 입력 스타일 ───────────────────────────────────
-const field = "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-slate-400";
+const field = "w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-slate-400";
 
 const TYPE_CLS: Record<VendorType, string> = {
   매입: "bg-blue-50 text-blue-600",

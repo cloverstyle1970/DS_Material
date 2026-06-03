@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // 신DB accounts 에서 최신 권한·부서·테마 갱신 (재로그인 없이 반영)
           const { data: account } = await supabase
             .from("accounts")
-            .select("username, name, permissions, dept, theme")
+            .select("username, permissions, dept, theme")
             .eq("id", parsed.id)
             .maybeSingle();
 

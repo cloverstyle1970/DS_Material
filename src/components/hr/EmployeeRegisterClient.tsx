@@ -359,8 +359,7 @@ export default function EmployeeRegisterClient() {
       // 신DB 정본은 accounts. 권한은 permissions / permission_group_id 가 단일 진리원이므로
       // role 컬럼은 표시용 기본값("직원")만 채운다.
       const payload = {
-        username: form.name.trim(),
-        name: form.name.trim(),
+        username: form.name.trim(),   // accounts: username 이 단일 진리원 (name 컬럼 미사용)
         password: form.initial_password,
         role: "직원",
         ssn: form.ssn || null,

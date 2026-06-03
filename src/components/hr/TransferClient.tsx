@@ -88,10 +88,10 @@ export default function TransferClient() {
     const [{ data: histData }, { data: empData }, { data: deptData }, { data: rankData }] = await Promise.all([
       supabase
         .from("user_status_history")
-        .select("id,user_id,status_type,event_date,from_dept,to_dept,from_rank,to_rank,reason,user:accounts(id,username,name)")
+        .select("id,user_id,status_type,event_date,from_dept,to_dept,from_rank,to_rank,reason,user:accounts(id,username,name:username)")
         .order("event_date", { ascending: false })
         .order("id", { ascending: false }),
-      supabase.from("accounts").select("id,username,name,dept,rank,status").order("username"),
+      supabase.from("accounts").select("id,username,name:username,dept,rank,status").order("username"),
       supabase.from("departments").select("*").eq("is_active", true).order("sort_order"),
       supabase.from("ranks").select("*").eq("is_active", true).order("sort_order"),
     ]);
