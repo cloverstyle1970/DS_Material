@@ -64,9 +64,11 @@ function maskSsn(ssn: string | null): string {
   return s;
 }
 
-/** accounts 테이블 전체(비밀번호 포함)를 엑셀로 다운로드 */
+/** accounts 테이블 전체를 엑셀로 다운로드 (민감 컬럼 password/password_hash 제외) */
 async function downloadAccountsExcel() {
   const PAGE = 1000;
+  // 보안: 비밀번호 관련 컬럼은 추출에서 제외
+  const SENSITIVE_COLS = ["password", "password_hash"];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const all: any[] = [];
   for (let offset = 0; ; offset += PAGE) {
@@ -77,7 +79,11 @@ async function downloadAccountsExcel() {
       .range(offset, offset + PAGE - 1);
     if (error) throw new Error(error.message);
     if (!data || data.length === 0) break;
-    all.push(...data);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const row of data as any[]) {
+      for (const col of SENSITIVE_COLS) delete row[col];
+      all.push(row);
+    }
     if (data.length < PAGE) break;
   }
   if (all.length === 0) {
