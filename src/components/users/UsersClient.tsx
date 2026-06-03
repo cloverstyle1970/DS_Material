@@ -64,26 +64,28 @@ function maskSsn(ssn: string | null): string {
   return s;
 }
 
-/** accounts 테이블 전체를 엑셀로 다운로드 (민감 컬럼 password/password_hash 제외) */
+// 엑셀 추출 컬럼 — 비밀번호(password/password_hash)는 의도적으로 제외해 아예 받아오지 않음
+const ACCOUNT_EXPORT_COLS =
+  "id, username, role, site_name, created_at, name, phone, position, team, unit, " +
+  "\"group\", dept, rank, ssn, cert, hire_date, resign_date, status, address, permissions, " +
+  "theme, photo_url, emergency_contact, postal_code, uniform_top_size, uniform_bottom_size, " +
+  "safety_shoes_size, email, gender, blood_type, permission_group_id, crew_id, " +
+  "notifications_enabled, push_enabled";
+
+/** accounts 테이블을 엑셀로 다운로드 (비밀번호 컬럼은 조회 자체에서 제외) */
 async function downloadAccountsExcel() {
   const PAGE = 1000;
-  // 보안: 비밀번호 관련 컬럼은 추출에서 제외
-  const SENSITIVE_COLS = ["password", "password_hash"];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const all: any[] = [];
   for (let offset = 0; ; offset += PAGE) {
     const { data, error } = await supabase
       .from("accounts")
-      .select("*")
+      .select(ACCOUNT_EXPORT_COLS)
       .order("id")
       .range(offset, offset + PAGE - 1);
     if (error) throw new Error(error.message);
     if (!data || data.length === 0) break;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const row of data as any[]) {
-      for (const col of SENSITIVE_COLS) delete row[col];
-      all.push(row);
-    }
+    all.push(...data);
     if (data.length < PAGE) break;
   }
   if (all.length === 0) {
