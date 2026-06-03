@@ -11,6 +11,8 @@ import { fmtNum } from "@/lib/format";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
 import DraggableModal from "@/components/common/DraggableModal";
 import PermissionsModal from "./PermissionsModal";
+import * as XLSX from "xlsx";
+import { supabase } from "@/lib/supabase";
 
 export const ADMIN_EDIT_USER_KEY = "ds_admin_edit_user_id";
 
@@ -60,6 +62,40 @@ function maskSsn(ssn: string | null): string {
   const s = String(ssn);
   if (s.length >= 7) return s.slice(0, 6) + "-" + s[6] + "******";
   return s;
+}
+
+/** accounts 테이블 전체(비밀번호 포함)를 엑셀로 다운로드 */
+async function downloadAccountsExcel() {
+  const PAGE = 1000;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const all: any[] = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await supabase
+      .from("accounts")
+      .select("*")
+      .order("id")
+      .range(offset, offset + PAGE - 1);
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < PAGE) break;
+  }
+  if (all.length === 0) {
+    alert("accounts 테이블에 데이터가 없습니다.");
+    return;
+  }
+  const ws = XLSX.utils.json_to_sheet(all);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "accounts");
+  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([buf], { type: "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `accounts_전체_${stamp}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export default function UsersClient({ initial }: { initial: UserRecord[] }) {
@@ -186,6 +222,27 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
               ? `${statusFilter} ${fmtNum(filtered.length)}명`
               : `전체 ${fmtNum(users.length)}명`}
         </span>
+
+        {/* accounts 전체 엑셀 다운로드 (관리자 전용) */}
+        {meIsAdmin && (
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await downloadAccountsExcel();
+              } catch (e) {
+                alert(`다운로드 실패: ${getErrorMessage(e)}`);
+              }
+            }}
+            className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
+              isDark
+                ? "border-emerald-700 bg-emerald-900/40 text-emerald-300 hover:bg-emerald-800/60"
+                : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+            }`}
+          >
+            📥 계정 전체 엑셀
+          </button>
+        )}
       </div>
 
       {/* 테이블 */}
