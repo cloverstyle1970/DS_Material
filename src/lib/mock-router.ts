@@ -278,7 +278,7 @@ function dbToElevator(r: any, siteName?: string): ElevatorRecord {
     siteName:       siteName ?? r.site_name ?? "",
     unitName:       r.installation_place ?? r.unit_name ?? null,
     elevatorNo:     r.elevator_number  ?? null,
-    emergencyPhone: r.emergency_phone  ?? null, // site_elevators엔 컬럼 없음 → null
+    emergencyPhone: r.emergency_phone  ?? null, // site_elevators.emergency_phone (호기 단위 비통번호)
     modelName:      r.elevator_model   ?? null,
   };
 }
