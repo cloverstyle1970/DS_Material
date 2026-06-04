@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, FormEvent } from "react";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { hashPassword } from "@/lib/password";
+import { changeAuthPassword } from "@/lib/auth-ops";
 import { formatDate as formatYmd, formatPhone, formatSsn } from "@/lib/input-format";
 
 // 사원관리(UsersClient)에서 관리자가 사원 이름을 클릭할 때 세팅됨
@@ -454,25 +454,29 @@ export default function MyProfileClient() {
 
     setPwSubmitting(true);
     try {
-      // 신DB 로그인은 accounts.password_hash(SHA-256) 기반 → 비밀번호도 해시로 검증/저장
-      // (유지보수 사이트와 동일한 컬럼·해싱 방식으로 일원화)
+      // 신DB 로그인은 accounts.password(평문) 기반 → 유지보수 사이트와 동일 컬럼으로 일원화.
       const { data: r, error: fErr } = await supabase
         .from("accounts")
-        .select("password_hash")
+        .select("password")
         .eq("id", user.id)
         .single();
       if (fErr || !r) { setPwStatus({ type: "error", text: "사용자 정보를 불러오지 못했습니다." }); return; }
-      const stored = r.password_hash as string | null;
-      const currentHash = await hashPassword(currentPw);
-      if (stored != null && currentHash !== stored) {
+      const stored = r.password as string | null;
+      if (stored != null && currentPw !== stored) {
         setPwStatus({ type: "error", text: "현재 비밀번호가 올바르지 않습니다." });
         return;
       }
       const { error: uErr } = await supabase
         .from("accounts")
-        .update({ password_hash: await hashPassword(newPw) })
+        .update({ password: newPw })
         .eq("id", user.id);
       if (uErr) { setPwStatus({ type: "error", text: `비밀번호 변경 실패: ${uErr.message}` }); return; }
+      // 유지보수 사이트(auth.users) 측 비번도 같이 갱신해 두 시스템 비번을 일치시킨다.
+      const authRes = await changeAuthPassword(user.id, newPw);
+      if (!authRes.ok) {
+        setPwStatus({ type: "error", text: `비밀번호 변경 실패(유지보수 동기화): ${authRes.error}` });
+        return;
+      }
       setPwStatus({ type: "success", text: "비밀번호가 변경되었습니다." });
       setCurrentPw(""); setNewPw(""); setConfirmPw("");
     } finally {

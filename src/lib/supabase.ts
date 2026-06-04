@@ -3,8 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 // 신DB 고정 접속값. anon 키는 공개(publishable) 키로, 클라이언트 번들 노출이 정상이며 RLS로 보호된다.
 // 배포 Secret 값 손상(붙여넣기 시 개행 끼임 등)으로 401이 반복돼, env를 읽지 않고 코드에 직접 고정한다.
 // (키 교체가 필요하면 이 값을 수정. .replace 로 혹시 모를 공백도 한 번 더 정리)
-const SUPABASE_URL = "https://bbnmxwpacdfqvicybhau.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJibm14d3BhY2RmcXZpY3liaGF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NDA3NDYsImV4cCI6MjA5MTAxNjc0Nn0.cGqnmu5BeaXosxoE-IEmjX-dF4zDYipzpYb5hhc8S6I".replace(/\s/g, "");
+export const SUPABASE_URL = "https://bbnmxwpacdfqvicybhau.supabase.co";
+export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJibm14d3BhY2RmcXZpY3liaGF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NDA3NDYsImV4cCI6MjA5MTAxNjc0Nn0.cGqnmu5BeaXosxoE-IEmjX-dF4zDYipzpYb5hhc8S6I".replace(/\s/g, "");
 
 const rawClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY || "placeholder");
 

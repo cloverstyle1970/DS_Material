@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, FormEvent } from "react";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { hashPassword } from "@/lib/password";
+import { createAuthUser } from "@/lib/auth-ops";
 import { formatDate, formatPhone, formatSsn, genderFromSsn } from "@/lib/input-format";
 
 const STORAGE_BUCKET = "employee-photos";
@@ -351,7 +351,6 @@ export default function EmployeeRegisterClient() {
     try {
       const photoUrl = await uploadPhoto();
       const fullAddress = [form.address_basic, form.address_detail].filter(Boolean).join(" ").trim();
-      const initialPwHash = await hashPassword(form.initial_password);
 
       const newPermissions = form.permission_group_id
         ? (permGroups.find(g => g.id === form.permission_group_id)?.permissions ?? [])
@@ -381,7 +380,7 @@ export default function EmployeeRegisterClient() {
         safety_shoes_size: form.safety_shoes_size || null,
         permission_group_id: form.permission_group_id,
         permissions: newPermissions,
-        password_hash: initialPwHash,
+        password: form.initial_password,
       };
       const { data: inserted, error: insErr } = await supabase.from("accounts")
         .insert(payload).select("id").single();
@@ -390,6 +389,13 @@ export default function EmployeeRegisterClient() {
         throw insErr;
       }
       const newUserId = inserted?.id as number;
+
+      // 유지보수 사이트(auth.users)에도 동일 계정 생성 — 안 만들면 유지보수 로그인 불가.
+      // 이메일 키는 `${account_id}@daesol.el` 규약(admin-auth-ops 내부에서 조립).
+      const authRes = await createAuthUser(newUserId, form.initial_password);
+      if (!authRes.ok) {
+        console.warn("[employee-register] admin-auth-ops create 실패:", authRes.error);
+      }
 
       // 가족 (긴급연락처 포함, 이름·관계가 모두 비어있는 행은 제외)
       const validFamily = family.filter(m => m.relationship.trim() && m.name.trim());
