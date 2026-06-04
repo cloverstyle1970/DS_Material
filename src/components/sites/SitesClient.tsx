@@ -121,49 +121,6 @@ function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: Elevato
   );
 }
 
-// ── 비상통화장치 호기별 dedup ──────────────────────────────────
-// 같은 번호가 여러 호기에 매칭되면 정렬상 가장 빠른 호기 1개에만 배치.
-// unit이 빈/매칭 안 되는 번호는 첫 호기에 배치.
-interface DeviceItem { number: string; unit?: string; slot?: number; note?: string }
-function dedupDevicesByUnit(
-  devices: DeviceItem[],
-  elevators: { unitName: string | null }[],
-): Map<string, DeviceItem[]> {
-  const unitOrder = elevators.map(e => e.unitName ?? "");
-  const firstUnit = unitOrder[0] ?? "";
-  const filtered = devices.filter(d => d.number?.trim());
-  const numberToUnit = new Map<string, string>();
-  const seen = new Set<string>();
-  for (const d of filtered) {
-    const num = d.number.trim();
-    if (seen.has(num)) continue;
-    seen.add(num);
-    const candidates = filtered
-      .filter(x => x.number.trim() === num && x.unit && unitOrder.includes(x.unit))
-      .map(x => x.unit!);
-    if (candidates.length > 0) {
-      numberToUnit.set(num, unitOrder.find(u => candidates.includes(u)) ?? firstUnit);
-    } else {
-      numberToUnit.set(num, firstUnit);
-    }
-  }
-  const result = new Map<string, DeviceItem[]>();
-  const placed = new Set<string>();
-  for (const u of unitOrder) result.set(u, []);
-  for (const d of filtered) {
-    const num = d.number.trim();
-    if (placed.has(num)) continue;
-    const target = numberToUnit.get(num) ?? firstUnit;
-    placed.add(num);
-    if (!result.has(target)) result.set(target, []);
-    result.get(target)!.push({ ...d, number: num });
-  }
-  for (const items of result.values()) {
-    items.sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
-  }
-  return result;
-}
-
 // ── 날짜 입력 정규화: "20260512" → "2026-05-12" ─────────────────
 function normalizeDateInput(s: string): string {
   const trimmed = (s ?? "").trim();
@@ -671,7 +628,6 @@ export default function SitesClient({ initial, elevators }: Props) {
         (s.companyType?.toLowerCase().includes(q) ?? false) ||
         (s.vendor?.toLowerCase().includes(q) ?? false) ||
         (s.emergencyDevice?.toLowerCase().includes(q) ?? false) ||
-        (s.emergencyDevices?.some(d => d.number.toLowerCase().includes(q)) ?? false) ||
         elevatorMatchBySite.has(s.name)
       );
     }
@@ -696,59 +652,13 @@ export default function SitesClient({ initial, elevators }: Props) {
       : sites;
     const label = checkedSiteIds.size > 0 ? `선택${checkedSiteIds.size}건` : "전체";
 
-    // 대솔이엘_관리현장 원본과 동일한 34컬럼, 1행=1호기 포맷
-    const epLabels = [
-      "비상통화장치", "비상통화장치2", "비상통화장치3", "비상통화장치4", "비상통화장치5",
-      "비상통화장치6", "비상통화장치7", "비상통화장치8", "비상통화장치9", "비상통화장치10",
-    ];
+    // 1행=1호기. 비상통화장치는 호기 단위 컬럼(site_elevators.emergency_phone)을 그대로 1열로 내보낸다.
     const rows: Record<string, string | number | null>[] = [];
     for (const s of list) {
       const myElevs = allElevators.filter(e => e.siteName === s.name);
       const targets: (ElevatorRecord | null)[] = myElevs.length > 0 ? myElevs : [null];
-      const allDevices = s.emergencyDevices ?? [];
-      const unitOrder = myElevs.map(e => e.unitName ?? "");
 
-      // 번호별 표시 호기 결정:
-      //   - 후보 unit(matchedUnits 안의 것) 중 호기 정렬상 가장 빠른 호기에 1번만 배치
-      //   - 후보 없거나 unit이 빈 경우 → 첫 호기
-      const numberToUnit = new Map<string, string>();    // unitName 또는 "" (첫 호기)
-      const seenNumbers = new Set<string>();
-      for (const d of allDevices) {
-        const num = d.number?.trim();
-        if (!num || seenNumbers.has(num)) continue;
-        seenNumbers.add(num);
-        const candidates = allDevices
-          .filter(x => x.number?.trim() === num && x.unit && unitOrder.includes(x.unit))
-          .map(x => x.unit!);
-        if (candidates.length > 0) {
-          const earliest = unitOrder.find(u => candidates.includes(u)) ?? "";
-          numberToUnit.set(num, earliest);
-        } else {
-          numberToUnit.set(num, ""); // 첫 호기
-        }
-      }
-
-      targets.forEach((e, idx) => {
-        const myUnit = e?.unitName ?? "";
-        // 이 호기에 표시할 unique 번호들 — 입력 순서 유지하면서 dedup
-        const myNumbers: { number: string; slot: number }[] = [];
-        const placed = new Set<string>();
-        for (const d of allDevices) {
-          const num = d.number?.trim();
-          if (!num || placed.has(num)) continue;
-          const target = numberToUnit.get(num);
-          const goesHere = target === "" ? idx === 0 : target === myUnit;
-          if (goesHere) {
-            myNumbers.push({ number: num, slot: d.slot ?? myNumbers.length + 1 });
-            placed.add(num);
-          }
-        }
-        myNumbers.sort((a, b) => a.slot - b.slot);
-        const epCols: Record<string, string> = {};
-        for (let i = 0; i < 10; i++) {
-          epCols[epLabels[i]] = myNumbers[i]?.number ?? "";
-        }
-
+      targets.forEach((e) => {
         rows.push({
           현장명: s.name,
           현장별칭: s.alias ?? "",
@@ -770,7 +680,7 @@ export default function SitesClient({ initial, elevators }: Props) {
           현장전화: s.sitePhone ?? "",
           현장연락처2: s.siteMobile ?? "",
           팩스: s.fax ?? "",
-          ...epCols,
+          비상통화장치: e?.emergencyPhone ?? "",
           "담당자 메일": s.managerEmail ?? "",
           "승강기 소재지": s.address ?? "",
           비고: s.note ?? "",
@@ -1128,23 +1038,7 @@ export default function SitesClient({ initial, elevators }: Props) {
                 </div>
               )}
 
-              {/* 비상통화장치 */}
-              <EmergencyDevicesPanel
-                key={selected.id}
-                site={selected}
-                elevators={selectedElevators}
-                canEdit={canEdit}
-                isDark={isDark}
-                onSaved={async () => {
-                  const updated = await api.get<SiteRecord[]>("/api/sites").catch(() => null);
-                  if (!updated) return;
-                  setSites(updated);
-                  const refreshed = updated.find(s => s.id === selected.id) ?? null;
-                  setSelected(refreshed);
-                }}
-              />
-
-              {/* 호기 목록 */}
+              {/* 호기 목록 (비상통화장치는 호기 단위 컬럼 site_elevators.emergency_phone 로 통일) */}
               <div className={`rounded-xl border overflow-hidden transition-colors ${isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
                 <div className={`flex items-center justify-between px-5 py-3.5 border-b ${isDark ? "border-gray-700" : "border-gray-100"}`}>
                   <div className="flex items-center gap-2">
@@ -1181,17 +1075,18 @@ export default function SitesClient({ initial, elevators }: Props) {
                         </tr>
                       </thead>
                       <tbody className={`divide-y ${isDark ? "divide-gray-700" : "divide-gray-50"}`}>
-                        {(() => {
-                          const deviceMap = dedupDevicesByUnit(selected.emergencyDevices ?? [], selectedElevators);
-                          return selectedElevators.map((e, idx) => {
-                            const myDevices = deviceMap.get(e.unitName ?? "") ?? [];
-                            return (
+                        {selectedElevators.map((e, idx) => {
+                          // 같은 비통번호가 직전 호기와 같으면 첫 호기에만 표시(빈 칸 dedup).
+                          // null/빈 값은 dedup 대상에서 제외 — 항상 "—" 로 표기.
+                          const prev = idx > 0 ? selectedElevators[idx - 1] : null;
+                          const sameAsAbove = !!e.emergencyPhone && prev?.emergencyPhone === e.emergencyPhone;
+                          return (
                           <tr key={e.id} className={`transition-colors ${isDark ? "hover:bg-gray-700" : "hover:bg-gray-50"}`}>
                             <td className={`px-4 py-3 text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>{idx + 1}</td>
                             <td className={`px-4 py-3 font-medium whitespace-nowrap ${isDark ? "text-gray-200" : "text-gray-800"}`}>{e.unitName ?? "—"}</td>
                             <td className={`px-4 py-3 font-mono text-xs whitespace-nowrap ${isDark ? "text-blue-400" : "text-blue-600"}`}>{e.elevatorNo ?? "—"}</td>
                             <td className={`px-4 py-3 font-mono text-xs ${isDark ? "text-gray-300" : "text-gray-600"}`}>
-                              {myDevices.length === 0 ? "—" : myDevices.map(d => d.number).join(", ")}
+                              {sameAsAbove ? "" : (e.emergencyPhone ?? "—")}
                             </td>
                             {canEdit && (
                               <td className="px-4 py-3">
@@ -1210,9 +1105,8 @@ export default function SitesClient({ initial, elevators }: Props) {
                               </td>
                             )}
                           </tr>
-                            );
-                          });
-                        })()}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -1292,136 +1186,3 @@ export default function SitesClient({ initial, elevators }: Props) {
   );
 }
 
-// ── 비상통화장치 인라인 편집 패널 ──────────────────────────────
-function EmergencyDevicesPanel({
-  site, elevators, canEdit, isDark, onSaved,
-}: {
-  site: SiteRecord;
-  elevators: ElevatorRecord[];
-  canEdit: boolean;
-  isDark: boolean;
-  onSaved: () => void;
-}) {
-  const [devices, setDevices] = useState(
-    site.emergencyDevices?.length ? site.emergencyDevices : []
-  );
-  const [editing, setEditing] = useState(false);
-  const [saving,  setSaving]  = useState(false);
-
-  function patch(i: number, field: "number" | "unit" | "note", value: string) {
-    setDevices(prev => prev.map((d, j) => j === i ? { ...d, [field]: value } : d));
-  }
-
-  async function save() {
-    setSaving(true);
-    try {
-      // 같은 unit 그룹별로 slot 1, 2, ... 자동 부여
-      const filtered = devices.filter(d => d.number.trim());
-      const slotByUnit: Record<string, number> = {};
-      const submitted = filtered.map(d => {
-        const u = d.unit ?? "";
-        slotByUnit[u] = (slotByUnit[u] ?? 0) + 1;
-        return { number: d.number.trim(), unit: u, slot: slotByUnit[u], note: d.note ?? "" };
-      });
-      await api.patch(`/api/sites/${site.id}`, { emergencyDevices: submitted });
-    } catch (e) {
-      alert(getErrorMessage(e));
-    } finally {
-      setSaving(false);
-    }
-    setEditing(false);
-    onSaved();
-  }
-
-  function cancel() {
-    setDevices(site.emergencyDevices?.length ? site.emergencyDevices : []);
-    setEditing(false);
-  }
-
-  const cardCls = `rounded-xl border p-4 transition-colors ${isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`;
-  const inputCls = `rounded-lg border px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 ${isDark ? "bg-gray-700 border-gray-600 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"}`;
-
-  return (
-    <div className={cardCls}>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className={`text-xs font-semibold uppercase tracking-wide ${isDark ? "text-gray-400" : "text-gray-500"}`}>비상통화장치</h3>
-        {canEdit && !editing && (
-          <button type="button" onClick={() => setEditing(true)}
-            className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${isDark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}>
-            편집
-          </button>
-        )}
-      </div>
-
-      {editing ? (
-        <div className="space-y-2">
-          {devices.map((d, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <select
-                value={d.unit ?? ""}
-                onChange={e => patch(i, "unit", e.target.value)}
-                className={`${inputCls} w-24 shrink-0`}
-              >
-                <option value="">현장공통</option>
-                {elevators.map(ev => (
-                  <option key={ev.id} value={ev.unitName ?? ""}>{ev.unitName ?? "-"}</option>
-                ))}
-              </select>
-              <input
-                value={d.number}
-                onChange={e => patch(i, "number", e.target.value)}
-                placeholder="전화번호"
-                className={`${inputCls} w-36 shrink-0`}
-              />
-              <input
-                value={d.note ?? ""}
-                onChange={e => patch(i, "note", e.target.value)}
-                placeholder="비고"
-                className={`${inputCls} flex-1`}
-              />
-              <button type="button"
-                onClick={() => setDevices(prev => prev.filter((_, j) => j !== i))}
-                className="text-gray-300 hover:text-red-400 text-xl leading-none shrink-0">×</button>
-            </div>
-          ))}
-          <button type="button"
-            onClick={() => setDevices(prev => [...prev, { number: "", unit: "", note: "" }])}
-            className={`text-xs px-2.5 py-1 rounded-lg transition-colors ${isDark ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-            + 추가
-          </button>
-          <div className="flex gap-2 pt-1">
-            <button type="button" onClick={cancel}
-              className={`flex-1 text-xs py-1.5 rounded-lg border transition-colors ${isDark ? "border-gray-600 text-gray-400 hover:bg-gray-700" : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}>
-              취소
-            </button>
-            <button type="button" onClick={save} disabled={saving}
-              className="flex-1 text-xs py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50">
-              {saving ? "저장 중..." : "저장"}
-            </button>
-          </div>
-        </div>
-      ) : (() => {
-        const grouped = dedupDevicesByUnit(devices, elevators);
-        const totalShown = Array.from(grouped.values()).reduce((sum, arr) => sum + arr.length, 0);
-        if (totalShown === 0) {
-          return <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>등록된 비상통화장치가 없습니다.</p>;
-        }
-        return (
-          <div className="space-y-1.5">
-            {Array.from(grouped.entries()).map(([unit, items]) =>
-              items.map((d, i) => (
-                <div key={`${unit}-${i}`} className="flex items-center gap-3 text-sm">
-                  <span className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${isDark ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600"}`}>
-                    {unit || "현장공통"}
-                  </span>
-                  <span className={`font-mono font-medium ${isDark ? "text-gray-200" : "text-gray-800"}`}>{d.number}</span>
-                  {d.note && <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>{d.note}</span>}
-                </div>
-              ))
-            )}
-          </div>
-        );
-      })()}
-    </div>
-  );
-}
