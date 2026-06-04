@@ -699,6 +699,31 @@ export default function SitesClient({ initial, elevators }: Props) {
     URL.revokeObjectURL(url);
   }
 
+  // 비통번호가 비어 있는 호기 전수 추출 — 사용자가 채워 넣을 작업지 용도
+  function downloadBlankEmergencyPhoneExcel() {
+    const blanks = allElevators
+      .filter(e => !e.emergencyPhone || !e.emergencyPhone.trim())
+      .sort((a, b) => (a.siteName ?? "").localeCompare(b.siteName ?? "") || (a.unitName ?? "").localeCompare(b.unitName ?? ""));
+    const rows = blanks.map(e => ({
+      현장명: e.siteName ?? "",
+      호기ID: e.id,
+      호기명: e.unitName ?? "",
+      승강기번호: e.elevatorNo ?? "",
+      기종: e.modelName ?? "",
+      비상통화장치: "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [{ wch: 38 }, { wch: 8 }, { wch: 14 }, { wch: 12 }, { wch: 18 }, { wch: 18 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "비통번호_미입력_호기");
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([buf], { type: "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `호기_비통번호_미입력_${stamp}.xlsx`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function reload() {
     const updated = await api.get<SiteRecord[]>("/api/sites").catch(() => null);
     if (!updated) { alert("현장 목록 조회에 실패했습니다."); return; }
@@ -756,6 +781,16 @@ export default function SitesClient({ initial, elevators }: Props) {
               <span className="text-xs">📥</span> {checkedSiteIds.size > 0 ? `선택 ${checkedSiteIds.size}건` : "엑셀 다운로드"}
             </button>
           )}
+          {canDownload && (() => {
+            const blankCount = allElevators.filter(e => !e.emergencyPhone || !e.emergencyPhone.trim()).length;
+            return (
+              <button onClick={downloadBlankEmergencyPhoneExcel} disabled={backupRunning || blankCount === 0}
+                title="비상통화장치가 비어 있는 호기 전수 — 채워서 일괄 입력하는 작업지"
+                className="px-4 py-2 rounded-lg border border-amber-200 text-sm text-amber-700 hover:bg-amber-50 transition-colors flex items-center gap-1.5 disabled:opacity-60">
+                <span className="text-xs">📞</span> 빈 비통번호 {blankCount}건
+              </button>
+            );
+          })()}
           {canEdit && (
             <button onClick={() => setShowAdd(true)} disabled={backupRunning}
               className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-1.5 disabled:opacity-60">
