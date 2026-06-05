@@ -593,22 +593,24 @@ export default function SitesClient({ initial, elevators }: Props) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
-  // 호기명 / 승강기번호 / 비상통화장치 끝 4자리로 매칭되는 호기들 — 현장명별 그룹
+  // 호기명 / 승강기번호 / 비상통화장치 끝 4자리로 매칭되는 호기들 — 현장명별 그룹.
+  // matchKind 로 매칭 사유 보존: 칩 색/내용 분기에 사용 (호기번호 매칭=파랑, 비통번호 매칭=주황).
+  type ElevatorMatch = { elevator: ElevatorRecord; matchKind: "unit" | "elevatorNo" | "emergency" };
   const elevatorMatchBySite = useMemo(() => {
-    if (!q) return new Map<string, ElevatorRecord[]>();
+    if (!q) return new Map<string, ElevatorMatch[]>();
     const qDigits = q.replace(/\D/g, "");
-    const matched = new Map<string, ElevatorRecord[]>();
+    const matched = new Map<string, ElevatorMatch[]>();
     for (const e of allElevators) {
-      let hit = false;
-      if (e.unitName?.toLowerCase().includes(q))          hit = true;
-      else if (e.elevatorNo?.toLowerCase().includes(q))   hit = true;
+      let matchKind: ElevatorMatch["matchKind"] | null = null;
+      if (e.unitName?.toLowerCase().includes(q))          matchKind = "unit";
+      else if (e.elevatorNo?.toLowerCase().includes(q))   matchKind = "elevatorNo";
       else if (e.emergencyPhone && qDigits) {
         const phoneDigits = e.emergencyPhone.replace(/\D/g, "");
-        if (phoneDigits.slice(-4).includes(qDigits))      hit = true;
+        if (phoneDigits.slice(-4).includes(qDigits))      matchKind = "emergency";
       }
-      if (hit) {
+      if (matchKind) {
         const arr = matched.get(e.siteName) ?? [];
-        arr.push(e);
+        arr.push({ elevator: e, matchKind });
         matched.set(e.siteName, arr);
       }
     }
@@ -915,14 +917,26 @@ export default function SitesClient({ initial, elevators }: Props) {
                             if (!matched?.length) return null;
                             return (
                               <div className="mt-1 flex flex-wrap gap-1">
-                                {matched.map(e => (
-                                  <span key={e.id} className={`text-[11px] px-1.5 py-0.5 rounded font-bold ${
-                                    isDark ? "bg-blue-900/40 text-blue-300 border border-blue-700/60"
-                                           : "bg-blue-50 text-blue-700 border border-blue-200"
-                                  }`}>
-                                    {e.unitName ?? "?"}{e.elevatorNo ? ` · ${e.elevatorNo}` : ""}
-                                  </span>
-                                ))}
+                                {matched.map(({ elevator: e, matchKind }) => {
+                                  const isEmergency = matchKind === "emergency";
+                                  const cls = isEmergency
+                                    ? isDark ? "bg-orange-900/40 text-orange-300 border border-orange-700/60"
+                                             : "bg-orange-50 text-orange-700 border border-orange-200"
+                                    : isDark ? "bg-blue-900/40 text-blue-300 border border-blue-700/60"
+                                             : "bg-blue-50 text-blue-700 border border-blue-200";
+                                  const tail = isEmergency
+                                    ? ` ☎${(e.emergencyPhone ?? "").replace(/\D/g, "").slice(-4)}`
+                                    : e.elevatorNo ? ` · ${e.elevatorNo}` : "";
+                                  return (
+                                    <span
+                                      key={e.id}
+                                      title={isEmergency ? `비상통화장치: ${e.emergencyPhone ?? ""}` : undefined}
+                                      className={`text-[11px] px-1.5 py-0.5 rounded font-bold ${cls}`}
+                                    >
+                                      {e.unitName ?? "?"}{tail}
+                                    </span>
+                                  );
+                                })}
                               </div>
                             );
                           })()}
