@@ -28,28 +28,38 @@ export default function LoginPage() {
 
     const username = name.trim();
 
-    // 1) accounts.username → id 매핑. Supabase Auth는 ${id}@daesol.el 이메일 키로 동작.
-    //    비번 검증은 signInWithPassword가 담당 — accounts.password 직접 비교는 제거.
-    const { data: account, error: qErr } = await supabase
-      .from("accounts")
-      .select("id, username, permissions, dept, theme")
-      .eq("username", username)
-      .maybeSingle();
-
-    if (qErr) {
-      console.error("[login] accounts 조회 실패:", qErr);
-      setError(`로그인 처리 오류: ${qErr.message || qErr.code || "네트워크 오류"} — 캐시 새로고침(Ctrl+Shift+R) 후 재시도하세요.`);
-      setSubmitting(false);
-      return;
+    // 1) accounts.username → id 매핑.
+    //    RLS 강화 후엔 anon으로 accounts 직접 SELECT 가 막히므로 SECURITY DEFINER RPC 우선.
+    //    RPC 미적용 환경(=현재처럼 USING TRUE)에서는 fallback 으로 직접 SELECT 도 통과.
+    let accountId: number | null = null;
+    const { data: rpcId, error: rpcErr } = await supabase.rpc(
+      "lookup_account_id_by_username",
+      { p_username: username }
+    );
+    if (!rpcErr && rpcId != null) {
+      accountId = Number(rpcId);
+    } else {
+      const { data: row, error: selErr } = await supabase
+        .from("accounts")
+        .select("id")
+        .eq("username", username)
+        .maybeSingle();
+      if (selErr) {
+        console.error("[login] accounts 조회 실패:", selErr);
+        setError(`로그인 처리 오류: ${selErr.message || selErr.code || "네트워크 오류"} — 캐시 새로고침(Ctrl+Shift+R) 후 재시도하세요.`);
+        setSubmitting(false);
+        return;
+      }
+      if (row?.id != null) accountId = Number(row.id);
     }
-    if (!account) {
+    if (!accountId) {
       setError("아이디 또는 비밀번호가 올바르지 않습니다.");
       setSubmitting(false);
       return;
     }
 
     // 2) Supabase Auth 로그인 — JWT 세션이 sb-* localStorage 키에 자동 저장.
-    const email = `${account.id}@daesol.el`;
+    const email = `${accountId}@daesol.el`;
     const { error: authErr } = await supabase.auth.signInWithPassword({ email, password });
     if (authErr) {
       setError("아이디 또는 비밀번호가 올바르지 않습니다.");
@@ -57,12 +67,25 @@ export default function LoginPage() {
       return;
     }
 
-    // 3) 권한·부서·테마는 여전히 accounts 가 단일 진리원.
+    // 3) authenticated 상태에서 권한·부서·테마 fetch (RLS 강화 후에도 통과).
+    const { data: account, error: qErr } = await supabase
+      .from("accounts")
+      .select("id, username, permissions, dept, theme")
+      .eq("id", accountId)
+      .maybeSingle();
+    if (qErr || !account) {
+      console.error("[login] 인증 후 accounts 조회 실패:", qErr);
+      await supabase.auth.signOut().catch(() => {});
+      setError(`로그인 처리 오류: ${qErr?.message ?? "사용자 정보를 불러오지 못함"}`);
+      setSubmitting(false);
+      return;
+    }
+
     const permissions = (Array.isArray(account.permissions) ? account.permissions : []) as Permission[];
 
     login({
       id: Number(account.id),
-      name: account.username,                 // username = 실제 사용자 식별자(데이터 병합 기준)
+      name: account.username ?? username,
       dept: account.dept ?? "",
       permissions,
       theme: account.theme === "dark" ? "dark" : account.theme === "light" ? "light" : undefined,
