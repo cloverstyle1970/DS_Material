@@ -70,52 +70,97 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const t = setTimeout(async () => {
+    let cancelled = false;
+
+    // Supabase Auth 세션이 단일 진리원. localStorage[STORAGE_KEY]는 화면 표시용 캐시.
+    // 세션의 user.email = `${accounts.id}@daesol.el` 규약(daesol.el은 가짜 도메인 — 키 용도).
+    async function syncFromSession() {
       try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          // 신DB accounts 에서 최신 권한·부서·테마 갱신 (재로그인 없이 반영)
-          const { data: account } = await supabase
-            .from("accounts")
-            .select("username, permissions, dept, theme")
-            .eq("id", parsed.id)
-            .maybeSingle();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (cancelled) return;
 
-          let freshUser: AuthUser = parsed;
-          if (account) {
-            // accounts.permissions 가 단일 진리원. role 컬럼은 표시용일 뿐 권한에 영향 없음.
-            const permissions = (Array.isArray(account.permissions) ? account.permissions : []) as Permission[];
-            const theme = account.theme === "dark" ? "dark" : account.theme === "light" ? "light" : parsed.theme;
+        const stored: AuthUser | null = (() => {
+          try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            return raw ? (JSON.parse(raw) as AuthUser) : null;
+          } catch { return null; }
+        })();
 
-            freshUser = {
-              ...parsed,
-              name: account.username ?? parsed.name,
-              dept: account.dept ?? "",
-              permissions,
-              theme,
-            };
-            applyTheme(theme);
-          } else {
-            applyTheme(parsed.theme);
-          }
+        if (!session) {
+          // Auth 세션 없으면 localStorage 캐시도 무효화 (클라이언트만의 로그인 상태 방지)
+          if (stored) localStorage.removeItem(STORAGE_KEY);
+          setUser(null);
+          return;
+        }
 
+        const email = session.user.email ?? "";
+        const id = Number(email.split("@")[0]);
+        if (!Number.isFinite(id) || id <= 0) {
+          await supabase.auth.signOut();
+          localStorage.removeItem(STORAGE_KEY);
+          setUser(null);
+          return;
+        }
+
+        const { data: account } = await supabase
+          .from("accounts")
+          .select("username, permissions, dept, theme")
+          .eq("id", id)
+          .maybeSingle();
+
+        if (cancelled) return;
+
+        if (account) {
+          const permissions = (Array.isArray(account.permissions) ? account.permissions : []) as Permission[];
+          const theme = account.theme === "dark" ? "dark" : account.theme === "light" ? "light" : stored?.theme;
+          const freshUser: AuthUser = {
+            id,
+            name: account.username ?? stored?.name ?? "",
+            dept: account.dept ?? "",
+            permissions,
+            theme,
+          };
           setUser(freshUser);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
+          applyTheme(theme);
+        } else {
+          // 세션은 있는데 accounts 행이 없음 → 사고. 세션 정리.
+          await supabase.auth.signOut();
+          localStorage.removeItem(STORAGE_KEY);
+          setUser(null);
         }
-      } catch {}
-      setIsLoading(false);
-    }, 0);
-    return () => clearTimeout(t);
+      } catch {
+        // 무시 — 로딩 플래그만 푼다
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+
+    syncFromSession();
+
+    // 다른 탭/창에서 로그아웃되면 즉시 반영. SIGNED_IN은 login()이 직접 setUser 하므로 처리 불필요.
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        setUser(null);
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   function login(u: AuthUser) {
+    // signInWithPassword 는 로그인 페이지에서 이미 호출됨. 여기서는 user state + 캐시만.
     setUser(u);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
     applyTheme(u.theme);
   }
 
   function logout() {
+    void supabase.auth.signOut().catch(() => {});
     setUser(null);
     localStorage.removeItem(STORAGE_KEY);
   }

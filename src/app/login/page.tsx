@@ -28,17 +28,15 @@ export default function LoginPage() {
 
     const username = name.trim();
 
-    // 신DB accounts 기반 인증: username + password(평문) 매칭.
-    // 유지보수 사이트와 동일한 컬럼(accounts.password)을 사용해 비밀번호가 일원화된다.
+    // 1) accounts.username → id 매핑. Supabase Auth는 ${id}@daesol.el 이메일 키로 동작.
+    //    비번 검증은 signInWithPassword가 담당 — accounts.password 직접 비교는 제거.
     const { data: account, error: qErr } = await supabase
       .from("accounts")
-      .select("id, username, permissions, dept, theme, status")
+      .select("id, username, permissions, dept, theme")
       .eq("username", username)
-      .eq("password", password)
       .maybeSingle();
 
     if (qErr) {
-      // 조회 자체 실패(예: Invalid API key=옛 번들 캐시, 네트워크) — 비번 문제와 구분해 노출
       console.error("[login] accounts 조회 실패:", qErr);
       setError(`로그인 처리 오류: ${qErr.message || qErr.code || "네트워크 오류"} — 캐시 새로고침(Ctrl+Shift+R) 후 재시도하세요.`);
       setSubmitting(false);
@@ -50,7 +48,16 @@ export default function LoginPage() {
       return;
     }
 
-    // accounts.permissions 가 단일 진리원. role 컬럼은 표시용일 뿐 권한에 영향 없음.
+    // 2) Supabase Auth 로그인 — JWT 세션이 sb-* localStorage 키에 자동 저장.
+    const email = `${account.id}@daesol.el`;
+    const { error: authErr } = await supabase.auth.signInWithPassword({ email, password });
+    if (authErr) {
+      setError("아이디 또는 비밀번호가 올바르지 않습니다.");
+      setSubmitting(false);
+      return;
+    }
+
+    // 3) 권한·부서·테마는 여전히 accounts 가 단일 진리원.
     const permissions = (Array.isArray(account.permissions) ? account.permissions : []) as Permission[];
 
     login({
