@@ -78,7 +78,7 @@ BEGIN
     'notifications', 'manuals', 'annual_events',
     'construction_schedules', 'construction_requests',
     'uniform_safety_requests', 'uniform_safety_request_items',
-    'push_subscriptions'
+    'push_subscriptions', 'sales_tax'
   ] LOOP
     IF NOT EXISTS (
       SELECT 1 FROM information_schema.tables
