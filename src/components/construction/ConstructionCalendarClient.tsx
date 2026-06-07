@@ -332,7 +332,7 @@ function CalendarContent() {
           </h2>
           <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-lg px-2 py-1">
             <button onClick={() => setCurrentDate(new Date(year, month - 1, 1))} className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white">&lt;</button>
-            <span className="font-bold w-24 text-center dark:text-white">{year}년 {month + 1}월</span>
+            <span className="font-bold w-24 text-center text-gray-900 dark:text-white">{year}년 {month + 1}월</span>
             <button onClick={() => setCurrentDate(new Date(year, month + 1, 1))} className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white">&gt;</button>
           </div>
           <div className="flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
