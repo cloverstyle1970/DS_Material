@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { MaterialUnitRecord } from "@/lib/mock-material-units";
-import { useAuth, isAdmin } from "@/context/AuthContext";
+import { useAuth, hasMenuPermission } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
@@ -35,13 +35,16 @@ export default function InventoryCheckClient() {
   const router = useRouter();
   const { theme } = useTheme();
 
-  // 관리자 권한 확인
+  // 접근 권한 확인 (재고실사 메뉴 권한)
   useEffect(() => {
-    if (user && !isAdmin(user)) {
-      alert("관리자만 접근할 수 있습니다.");
-      router.replace("/dashboard");
+    if (user && !hasMenuPermission(user, "/inventory-check", "read")) {
+      alert("재고실사 메뉴 접근 권한이 없습니다.");
+      router.replace("/me");
     }
   }, [user, router]);
+
+  // 쓰기 권한: 없으면 조회만(실사 반영·폐기 버튼 숨김)
+  const canWrite = user ? (hasMenuPermission(user, "/inventory-check", "create") || hasMenuPermission(user, "/inventory-check", "update")) : false;
 
   useEffect(() => {
     fetchMaterials();
@@ -311,26 +314,30 @@ export default function InventoryCheckClient() {
             <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
               선택된 자재: {selected.size}개
             </span>
-            <button
-              onClick={handleSave}
-              disabled={saving || selected.size === 0}
-              className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? "반영 중..." : "실사 반영"}
-            </button>
+            {canWrite && (
+              <button
+                onClick={handleSave}
+                disabled={saving || selected.size === 0}
+                className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? "반영 중..." : "실사 반영"}
+              </button>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-500 dark:text-gray-400">
               미확인 {Math.max(0, units.length - confirmedUnits.size)}건
             </span>
-            <button
-              onClick={handleScrapUnchecked}
-              disabled={saving || units.length === 0 || confirmedUnits.size === units.length}
-              className="flex items-center gap-2 bg-red-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? "처리 중..." : "체크 안된 unit 일괄 폐기"}
-            </button>
+            {canWrite && (
+              <button
+                onClick={handleScrapUnchecked}
+                disabled={saving || units.length === 0 || confirmedUnits.size === units.length}
+                className="flex items-center gap-2 bg-red-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? "처리 중..." : "체크 안된 unit 일괄 폐기"}
+              </button>
+            )}
           </div>
         )}
       </div>

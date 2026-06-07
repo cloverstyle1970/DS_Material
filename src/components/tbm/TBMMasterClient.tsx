@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth, isAdmin } from "@/context/AuthContext";
+import { useAuth, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
 import {
@@ -17,14 +17,15 @@ export default function TBMMasterClient() {
   const [tab, setTab] = useState<Tab>("safety");
 
   if (!user) return <div className="p-8 text-center text-sm text-gray-500">로그인이 필요합니다.</div>;
-  if (!isAdmin(user)) {
+  if (!hasMenuPermission(user, "/safety/tbm/master", "read")) {
     return (
       <div className="p-12 text-center">
         <div className="text-5xl mb-3">🔒</div>
-        <div className="text-base font-semibold text-gray-700 dark:text-gray-200">관리자 권한이 필요합니다</div>
+        <div className="text-base font-semibold text-gray-700 dark:text-gray-200">접근 권한이 없습니다</div>
       </div>
     );
   }
+  const canWrite = hasMenuPermission(user, "/safety/tbm/master", "create") || hasMenuPermission(user, "/safety/tbm/master", "update");
 
   return (
     <div className="min-h-full bg-gray-50 dark:bg-gray-900">
@@ -54,10 +55,10 @@ export default function TBMMasterClient() {
       </div>
 
       <div className="px-6 py-4">
-        {tab === "safety" && <SafetyRulesEditor />}
-        {tab === "repair" && <RepairTypesEditor />}
-        {tab === "fault" && <FaultTypesEditor />}
-        {tab === "checklist" && <ChecklistEditor />}
+        {tab === "safety" && <SafetyRulesEditor canWrite={canWrite} />}
+        {tab === "repair" && <RepairTypesEditor canWrite={canWrite} />}
+        {tab === "fault" && <FaultTypesEditor canWrite={canWrite} />}
+        {tab === "checklist" && <ChecklistEditor canWrite={canWrite} />}
       </div>
     </div>
   );
@@ -70,20 +71,22 @@ export default function TBMMasterClient() {
 const inputCls = "px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400";
 const cardCls = "bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden";
 
-function ToggleActive({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+function ToggleActive({ value, onChange, canWrite = true }: { value: boolean; onChange: (v: boolean) => void; canWrite?: boolean }) {
+  const cls = `text-[10px] font-bold px-2 py-0.5 rounded-full ${
+    value
+      ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300"
+      : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+  }`;
+  if (!canWrite) return <span className={cls}>{value ? "활성" : "비활성"}</span>;
   return (
-    <button type="button" onClick={() => onChange(!value)}
-      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-        value
-          ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300"
-          : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
-      }`}>
+    <button type="button" onClick={() => onChange(!value)} className={cls}>
       {value ? "활성" : "비활성"}
     </button>
   );
 }
 
-function ActionButtons({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+function ActionButtons({ onEdit, onDelete, canWrite = true }: { onEdit: () => void; onDelete: () => void; canWrite?: boolean }) {
+  if (!canWrite) return <span className="text-gray-300 dark:text-gray-600 text-[11px]">—</span>;
   return (
     <div className="flex gap-1 justify-end">
       <button type="button" onClick={onEdit}
@@ -102,7 +105,7 @@ function ActionButtons({ onEdit, onDelete }: { onEdit: () => void; onDelete: () 
 // 안전수칙 에디터
 // ============================================================
 
-function SafetyRulesEditor() {
+function SafetyRulesEditor({ canWrite }: { canWrite: boolean }) {
   const [items, setItems] = useState<SafetyRule[]>([]);
   const [editing, setEditing] = useState<SafetyRule | null>(null);
   const [showNew, setShowNew] = useState(false);
@@ -129,10 +132,10 @@ function SafetyRulesEditor() {
     <div className={cardCls}>
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
         <div className="text-xs text-gray-500 dark:text-gray-400">총 {items.length}건</div>
-        <button type="button" onClick={() => setShowNew(true)}
+        {canWrite && <button type="button" onClick={() => setShowNew(true)}
           className="px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800">
           + 안전수칙 추가
-        </button>
+        </button>}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -155,8 +158,8 @@ function SafetyRulesEditor() {
                 <td className="px-3 py-2 text-center text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{CATEGORY_LABELS[r.category]}</td>
                 <td className="px-3 py-2 text-center text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{SEASON_LABELS[r.season]}</td>
                 <td className="px-3 py-2 text-center text-xs text-gray-500 dark:text-gray-400">{r.sort_order}</td>
-                <td className="px-3 py-2 text-center"><ToggleActive value={r.is_active} onChange={v => toggleActive(r.id, v)} /></td>
-                <td className="px-3 py-2 text-center"><ActionButtons onEdit={() => setEditing(r)} onDelete={() => remove(r.id)} /></td>
+                <td className="px-3 py-2 text-center"><ToggleActive value={r.is_active} onChange={v => toggleActive(r.id, v)} canWrite={canWrite} /></td>
+                <td className="px-3 py-2 text-center"><ActionButtons onEdit={() => setEditing(r)} onDelete={() => remove(r.id)} canWrite={canWrite} /></td>
               </tr>
             ))}
           </tbody>
@@ -263,8 +266,8 @@ function SafetyRuleModal({ initial, onClose, onSaved }: {
 // ============================================================
 
 function SimpleTypeEditor({
-  table, codePrefix, title,
-}: { table: "tbm_repair_types" | "tbm_fault_types"; codePrefix: string; title: string }) {
+  table, codePrefix, title, canWrite,
+}: { table: "tbm_repair_types" | "tbm_fault_types"; codePrefix: string; title: string; canWrite: boolean }) {
   const [items, setItems] = useState<(RepairType | FaultType)[]>([]);
   const [editing, setEditing] = useState<RepairType | FaultType | null>(null);
   const [showNew, setShowNew] = useState(false);
@@ -291,10 +294,10 @@ function SimpleTypeEditor({
     <div className={cardCls}>
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
         <div className="text-xs text-gray-500 dark:text-gray-400">총 {items.length}건</div>
-        <button type="button" onClick={() => setShowNew(true)}
+        {canWrite && <button type="button" onClick={() => setShowNew(true)}
           className="px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800">
           + {title} 추가
-        </button>
+        </button>}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -313,8 +316,8 @@ function SimpleTypeEditor({
                 <td className="px-3 py-2 text-center text-xs font-mono text-gray-700 dark:text-gray-200 whitespace-nowrap">{r.code}</td>
                 <td className="px-3 py-2 text-center text-xs text-gray-700 dark:text-gray-200">{r.label}</td>
                 <td className="px-3 py-2 text-center text-xs text-gray-500 dark:text-gray-400">{r.sort_order}</td>
-                <td className="px-3 py-2 text-center"><ToggleActive value={r.is_active} onChange={v => toggleActive(r.id, v)} /></td>
-                <td className="px-3 py-2 text-center"><ActionButtons onEdit={() => setEditing(r)} onDelete={() => remove(r.id)} /></td>
+                <td className="px-3 py-2 text-center"><ToggleActive value={r.is_active} onChange={v => toggleActive(r.id, v)} canWrite={canWrite} /></td>
+                <td className="px-3 py-2 text-center"><ActionButtons onEdit={() => setEditing(r)} onDelete={() => remove(r.id)} canWrite={canWrite} /></td>
               </tr>
             ))}
           </tbody>
@@ -399,19 +402,19 @@ function SimpleTypeModal({
   );
 }
 
-function RepairTypesEditor() {
-  return <SimpleTypeEditor table="tbm_repair_types" codePrefix="RT" title="공사구분" />;
+function RepairTypesEditor({ canWrite }: { canWrite: boolean }) {
+  return <SimpleTypeEditor table="tbm_repair_types" codePrefix="RT" title="공사구분" canWrite={canWrite} />;
 }
 
-function FaultTypesEditor() {
-  return <SimpleTypeEditor table="tbm_fault_types" codePrefix="FT" title="고장증상" />;
+function FaultTypesEditor({ canWrite }: { canWrite: boolean }) {
+  return <SimpleTypeEditor table="tbm_fault_types" codePrefix="FT" title="고장증상" canWrite={canWrite} />;
 }
 
 // ============================================================
 // 체크리스트
 // ============================================================
 
-function ChecklistEditor() {
+function ChecklistEditor({ canWrite }: { canWrite: boolean }) {
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [editing, setEditing] = useState<ChecklistItem | null>(null);
   const [showNew, setShowNew] = useState(false);
@@ -453,10 +456,10 @@ function ChecklistEditor() {
           ))}
           <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">총 {filtered.length}건</span>
         </div>
-        <button type="button" onClick={() => setShowNew(true)}
+        {canWrite && <button type="button" onClick={() => setShowNew(true)}
           className="px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800">
           + 항목 추가
-        </button>
+        </button>}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -483,8 +486,8 @@ function ChecklistEditor() {
                 </td>
                 <td className="px-3 py-2 text-center text-xs text-gray-700 dark:text-gray-200">{r.label}</td>
                 <td className="px-3 py-2 text-center text-xs text-gray-500 dark:text-gray-400">{r.sort_order}</td>
-                <td className="px-3 py-2 text-center"><ToggleActive value={r.is_active} onChange={v => toggleActive(r.id, v)} /></td>
-                <td className="px-3 py-2 text-center"><ActionButtons onEdit={() => setEditing(r)} onDelete={() => remove(r.id)} /></td>
+                <td className="px-3 py-2 text-center"><ToggleActive value={r.is_active} onChange={v => toggleActive(r.id, v)} canWrite={canWrite} /></td>
+                <td className="px-3 py-2 text-center"><ActionButtons onEdit={() => setEditing(r)} onDelete={() => remove(r.id)} canWrite={canWrite} /></td>
               </tr>
             ))}
           </tbody>

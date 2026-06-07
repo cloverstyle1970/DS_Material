@@ -70,7 +70,7 @@ export default function LoginPage() {
     // 3) authenticated 상태에서 권한·부서·테마 fetch (RLS 강화 후에도 통과).
     const { data: account, error: qErr } = await supabase
       .from("accounts")
-      .select("id, username, permissions, dept, theme")
+      .select("id, username, permissions, dept, theme, permission_group_id")
       .eq("id", accountId)
       .maybeSingle();
     if (qErr || !account) {
@@ -83,12 +83,24 @@ export default function LoginPage() {
 
     const permissions = (Array.isArray(account.permissions) ? account.permissions : []) as Permission[];
 
+    // 비관리자(보수일반/공사일반) 판정용 그룹명 로드
+    let groupName: string | null = null;
+    if (account.permission_group_id != null) {
+      const { data: g } = await supabase
+        .from("permission_groups")
+        .select("name")
+        .eq("id", account.permission_group_id)
+        .maybeSingle();
+      groupName = g?.name ?? null;
+    }
+
     login({
       id: Number(account.id),
       name: account.username ?? username,
       dept: account.dept ?? "",
       permissions,
       theme: account.theme === "dark" ? "dark" : account.theme === "light" ? "light" : undefined,
+      groupName,
     });
     router.replace("/me");
   }

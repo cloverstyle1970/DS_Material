@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useAuth, isAdmin } from "@/context/AuthContext";
+import { useAuth, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
 
@@ -95,15 +95,16 @@ export default function TeamCrewClient() {
   if (!user) {
     return <div className="p-8 text-center text-sm text-gray-500">로그인이 필요합니다.</div>;
   }
-  if (!isAdmin(user)) {
+  if (!hasMenuPermission(user, "/hr/team-crew", "read")) {
     return (
       <div className="p-12 text-center">
         <div className="text-5xl mb-3">🔒</div>
-        <div className="text-base font-semibold text-gray-700 dark:text-gray-200">관리자 권한이 필요합니다</div>
-        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">팀구성 관리 페이지는 관리자만 접근할 수 있습니다.</div>
+        <div className="text-base font-semibold text-gray-700 dark:text-gray-200">접근 권한이 없습니다</div>
+        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">팀구성 관리 메뉴 권한이 필요합니다.</div>
       </div>
     );
   }
+  const canWrite = hasMenuPermission(user, "/hr/team-crew", "create") || hasMenuPermission(user, "/hr/team-crew", "update");
 
   return (
     <div className="min-h-full bg-gray-50 dark:bg-gray-900">
@@ -145,10 +146,12 @@ export default function TeamCrewClient() {
                     · 사원 {dUsers.length}명 · 조 {dCrews.length}개 · 미배정 {unassigned.length}명
                   </span>
                 </div>
-                <span onClick={e => { e.stopPropagation(); setAddingForDept(dept); }}
-                  className="px-2.5 py-1 text-[11px] rounded bg-slate-700 text-white font-semibold hover:bg-slate-800 cursor-pointer">
-                  + 조 추가
-                </span>
+                {canWrite && (
+                  <span onClick={e => { e.stopPropagation(); setAddingForDept(dept); }}
+                    className="px-2.5 py-1 text-[11px] rounded bg-slate-700 text-white font-semibold hover:bg-slate-800 cursor-pointer">
+                    + 조 추가
+                  </span>
+                )}
               </button>
 
               {isOpen && (
@@ -168,16 +171,18 @@ export default function TeamCrewClient() {
                             <span className="text-gray-500 dark:text-gray-400">· {members.length}명</span>
                             {!c.is_active && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">비활성</span>}
                           </div>
-                          <div className="flex items-center gap-1.5">
-                            <button type="button" onClick={() => setEditingCrew(c)}
-                              className="px-2.5 py-1 text-[11px] font-semibold rounded bg-blue-600 text-white hover:bg-blue-700">
-                              ✏️ 조 수정
-                            </button>
-                            <button type="button" onClick={() => void removeCrew(c)}
-                              className="px-2.5 py-1 text-[11px] font-semibold rounded bg-red-500 text-white hover:bg-red-600">
-                              🗑 삭제
-                            </button>
-                          </div>
+                          {canWrite && (
+                            <div className="flex items-center gap-1.5">
+                              <button type="button" onClick={() => setEditingCrew(c)}
+                                className="px-2.5 py-1 text-[11px] font-semibold rounded bg-blue-600 text-white hover:bg-blue-700">
+                                ✏️ 조 수정
+                              </button>
+                              <button type="button" onClick={() => void removeCrew(c)}
+                                className="px-2.5 py-1 text-[11px] font-semibold rounded bg-red-500 text-white hover:bg-red-600">
+                                🗑 삭제
+                              </button>
+                            </div>
+                          )}
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {members.length === 0 && (
@@ -187,9 +192,11 @@ export default function TeamCrewClient() {
                             <span key={m.id}
                               className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200">
                               {m.name} {m.rank && <span className="text-gray-400 dark:text-gray-500">({m.rank})</span>}
-                              <button type="button" onClick={() => void moveMemberToCrew(m.id, null)}
-                                title="조 배정 해제"
-                                className="text-gray-400 hover:text-red-500 leading-none">×</button>
+                              {canWrite && (
+                                <button type="button" onClick={() => void moveMemberToCrew(m.id, null)}
+                                  title="조 배정 해제"
+                                  className="text-gray-400 hover:text-red-500 leading-none">×</button>
+                              )}
                             </span>
                           ))}
                         </div>
@@ -210,7 +217,7 @@ export default function TeamCrewClient() {
                                   {m.crew_id && <span className="ml-1 text-[10px] text-red-600 dark:text-red-400">[타 부서 조에 잘못 배정됨]</span>}
                                 </td>
                                 <td className="py-1 text-right">
-                                  {dCrews.filter(c => c.is_active).length === 0 ? (
+                                  {!canWrite ? null : dCrews.filter(c => c.is_active).length === 0 ? (
                                     <span className="text-[10px] text-amber-700 dark:text-amber-300">활성 조 없음</span>
                                   ) : (
                                     <select value=""

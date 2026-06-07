@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, FormEvent } from "react";
-import { useAuth, isAdmin } from "@/context/AuthContext";
+import { useAuth, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { createAuthUser } from "@/lib/auth-ops";
 import { formatDate, formatPhone, formatSsn, genderFromSsn } from "@/lib/input-format";
@@ -209,12 +209,22 @@ export default function EmployeeRegisterClient() {
   if (!user) {
     return <div className="p-8 text-center text-sm text-gray-500">로그인이 필요합니다.</div>;
   }
-  if (!isAdmin(user)) {
+  if (!hasMenuPermission(user, "/hr/employee-register", "read")) {
     return (
       <div className="p-12 text-center">
         <div className="text-5xl mb-3">🔒</div>
-        <div className="text-base font-semibold text-gray-700 dark:text-gray-200">관리자 권한이 필요합니다</div>
-        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">사원등록 페이지는 관리자만 접근할 수 있습니다.</div>
+        <div className="text-base font-semibold text-gray-700 dark:text-gray-200">접근 권한이 없습니다</div>
+        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">사원등록 메뉴 권한이 필요합니다.</div>
+      </div>
+    );
+  }
+  // 사원등록은 등록(create) 전용 화면 — 쓰기 권한 없으면 조회만 안내
+  if (!hasMenuPermission(user, "/hr/employee-register", "create") && !hasMenuPermission(user, "/hr/employee-register", "update")) {
+    return (
+      <div className="p-12 text-center">
+        <div className="text-5xl mb-3">👁️</div>
+        <div className="text-base font-semibold text-gray-700 dark:text-gray-200">조회 전용 권한입니다</div>
+        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">사원등록 권한(생성/수정)이 없어 등록할 수 없습니다.</div>
       </div>
     );
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useAuth, isAdmin } from "@/context/AuthContext";
+import { useAuth, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
 import DraggableModal from "@/components/common/DraggableModal";
@@ -119,15 +119,16 @@ export default function EmploymentStatusClient() {
   if (!user) {
     return <div className="p-8 text-center text-sm text-gray-500">로그인이 필요합니다.</div>;
   }
-  if (!isAdmin(user)) {
+  if (!hasMenuPermission(user, "/hr/employment-status", "read")) {
     return (
       <div className="p-12 text-center">
         <div className="text-5xl mb-3">🔒</div>
-        <div className="text-base font-semibold text-gray-700 dark:text-gray-200">관리자 권한이 필요합니다</div>
-        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">재직상태 관리 페이지는 관리자만 접근할 수 있습니다.</div>
+        <div className="text-base font-semibold text-gray-700 dark:text-gray-200">접근 권한이 없습니다</div>
+        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">재직상태 관리 메뉴 권한이 필요합니다.</div>
       </div>
     );
   }
+  const canWrite = hasMenuPermission(user, "/hr/employment-status", "create") || hasMenuPermission(user, "/hr/employment-status", "update");
 
   return (
     <div className="min-h-full bg-gray-50 dark:bg-gray-900">
@@ -159,13 +160,15 @@ export default function EmploymentStatusClient() {
             ))}
           </select>
           <div className="flex-1" />
-          <button
-            type="button"
-            onClick={() => setShowNew(true)}
-            className="px-3 py-2 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800"
-          >
-            + 상태변경 등록
-          </button>
+          {canWrite && (
+            <button
+              type="button"
+              onClick={() => setShowNew(true)}
+              className="px-3 py-2 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800"
+            >
+              + 상태변경 등록
+            </button>
+          )}
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -181,15 +184,15 @@ export default function EmploymentStatusClient() {
                   <th className="px-3 py-2 text-center whitespace-nowrap">구분</th>
                   <th className="px-3 py-2 text-center whitespace-nowrap">현재 상태</th>
                   <th className="px-3 py-2 text-left">사유</th>
-                  <th className="px-3 py-2 text-right">액션</th>
+                  {canWrite && <th className="px-3 py-2 text-right">액션</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {loading && (
-                  <tr><td colSpan={6} className="px-3 py-8 text-center text-xs text-gray-500">불러오는 중…</td></tr>
+                  <tr><td colSpan={canWrite ? 6 : 5} className="px-3 py-8 text-center text-xs text-gray-500">불러오는 중…</td></tr>
                 )}
                 {!loading && filtered.length === 0 && (
-                  <tr><td colSpan={6} className="px-3 py-8 text-center text-xs text-gray-500">재직상태 변경 이력이 없습니다.</td></tr>
+                  <tr><td colSpan={canWrite ? 6 : 5} className="px-3 py-8 text-center text-xs text-gray-500">재직상태 변경 이력이 없습니다.</td></tr>
                 )}
                 {!loading && filtered.map(r => (
                   <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
@@ -202,15 +205,17 @@ export default function EmploymentStatusClient() {
                     </td>
                     <td className="px-3 py-2 text-center text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{r.user?.status ?? "-"}</td>
                     <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">{r.reason || "-"}</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => remove(r)}
-                        className="px-2 py-0.5 text-[11px] rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200"
-                      >
-                        삭제
-                      </button>
-                    </td>
+                    {canWrite && (
+                      <td className="px-3 py-2 text-right whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => remove(r)}
+                          className="px-2 py-0.5 text-[11px] rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200"
+                        >
+                          삭제
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

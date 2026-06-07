@@ -6,7 +6,7 @@ import Link from "next/link";
 import * as XLSX from "xlsx";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { MaterialRecord } from "@/lib/mock-materials";
-import { useAuth, isViewOnly } from "@/context/AuthContext";
+import { useAuth, isViewOnly, isNonManager } from "@/context/AuthContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNum } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
@@ -102,6 +102,8 @@ export default function StockHistoryClient({ mode, initial }: Props) {
   const [bulkOutboundLoading, setBulkOutboundLoading] = useState(false);
   const { user } = useAuth();
   const admin = user ? !isViewOnly(user) : false;
+  // 단가·금액은 비관리자(보수일반/공사일반)에게만 숨김. 그 외 관리자급은 노출.
+  const showFin = user ? !isNonManager(user) : false;
 
   const isInbound = mode === "입고";
   const signColor = isInbound ? "text-blue-600"                   : "text-orange-500";
@@ -251,8 +253,8 @@ export default function StockHistoryClient({ mode, initial }: Props) {
         자재명: t.materialName,
         규격: matMap.get(t.materialId) ?? "",
         수량: t.qty,
-        [isInbound ? "입고단가" : "출고단가"]: t.unitPrice ?? 0,
-        [isInbound ? "입고금액" : "출고금액"]: (t.unitPrice ?? 0) * t.qty,
+        [isInbound ? "입고단가" : "출고단가"]: showFin ? (t.unitPrice ?? 0) : "",
+        [isInbound ? "입고금액" : "출고금액"]: showFin ? (t.unitPrice ?? 0) * t.qty : "",
         이전재고: t.prevStock,
         이후재고: t.afterStock,
         현장: t.siteName ?? "",
@@ -415,10 +417,10 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                   {fmtNum(t.qty)}
                 </td>
                 <td className="px-2 py-3 text-right tabular-nums text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                  ₩{fmtNum(t.unitPrice ?? 0)}
+                  {showFin ? `₩${fmtNum(t.unitPrice ?? 0)}` : ""}
                 </td>
                 <td className={`px-2 py-3 text-right tabular-nums font-semibold whitespace-nowrap ${isInbound ? "text-blue-600 dark:text-blue-400" : "text-orange-500 dark:text-orange-400"}`}>
-                  ₩{fmtNum((t.unitPrice ?? 0) * t.qty)}
+                  {showFin ? `₩${fmtNum((t.unitPrice ?? 0) * t.qty)}` : ""}
                 </td>
                 <td className="px-2 py-3 text-center tabular-nums text-black dark:text-white whitespace-nowrap">
                   {fmtNum(t.prevStock)} → <span className="font-medium">{fmtNum(t.afterStock)}</span>
@@ -489,7 +491,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                 </td>
                 <td className="px-2 py-3"></td>
                 <td className={`px-2 py-3 text-right tabular-nums font-bold ${isInbound ? "text-blue-600 dark:text-blue-400" : "text-orange-500 dark:text-orange-400"}`}>
-                  ₩{fmtNum(sorted.reduce((acc, curr) => acc + (curr.qty * (curr.unitPrice ?? 0)), 0))}
+                  {showFin ? `₩${fmtNum(sorted.reduce((acc, curr) => acc + (curr.qty * (curr.unitPrice ?? 0)), 0))}` : ""}
                 </td>
                 <td colSpan={(isInbound ? 4 : 6) + (admin ? 1 : 0)} className="px-2 py-3"></td>
               </tr>

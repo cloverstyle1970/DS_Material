@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useAuth, isAdmin } from "@/context/AuthContext";
+import { useAuth, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 
 // ============================================================
@@ -194,7 +194,7 @@ export default function PermissionGroupsClient() {
     setLoaded(true);
   }
 
-  useEffect(() => { if (user && isAdmin(user)) void reload(); }, [user]);
+  useEffect(() => { if (hasMenuPermission(user, "/data/permission-groups", "read")) void reload(); }, [user]);
 
   useEffect(() => {
     if (selectedId == null && groups.length > 0) setSelectedId(groups[0].id);
@@ -207,15 +207,17 @@ export default function PermissionGroupsClient() {
   }, [selectedId, groups]);
 
   if (!user) return <div className="p-8 text-center text-sm text-gray-500">로그인이 필요합니다.</div>;
-  if (!isAdmin(user)) {
+  if (!hasMenuPermission(user, "/data/permission-groups", "read")) {
     return (
       <div className="p-12 text-center">
         <div className="text-5xl mb-3">🔒</div>
-        <div className="text-base font-semibold text-gray-700 dark:text-gray-200">관리자 권한이 필요합니다</div>
+        <div className="text-base font-semibold text-gray-700 dark:text-gray-200">접근 권한이 없습니다</div>
       </div>
     );
   }
   if (!loaded) return <div className="p-12 text-center text-sm text-gray-500">로딩 중...</div>;
+
+  const canWrite = hasMenuPermission(user, "/data/permission-groups", "create") || hasMenuPermission(user, "/data/permission-groups", "update");
 
   const members = users
     .filter(u => u.permission_group_id === selectedId)
@@ -409,8 +411,10 @@ export default function PermissionGroupsClient() {
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3">
           <div className="flex items-center justify-between mb-2 px-1">
             <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">그룹 ({groups.length})</h2>
-            <button type="button" onClick={addGroup}
-              className="px-2 py-1 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700">+ 추가</button>
+            {canWrite && (
+              <button type="button" onClick={addGroup}
+                className="px-2 py-1 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700">+ 추가</button>
+            )}
           </div>
           <div className="space-y-1">
             {groups.map(g => {
@@ -476,11 +480,13 @@ export default function PermissionGroupsClient() {
                     className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 font-mono" />
                 </div>
                 <div className="flex gap-2 justify-end">
-                  <button type="button" onClick={saveGroup} disabled={saving}
-                    className="px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 disabled:opacity-50">
-                    💾 저장
-                  </button>
-                  {!editing.is_system_role && (
+                  {canWrite && (
+                    <button type="button" onClick={saveGroup} disabled={saving}
+                      className="px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 disabled:opacity-50">
+                      💾 저장
+                    </button>
+                  )}
+                  {canWrite && !editing.is_system_role && (
                     <button type="button" onClick={deleteGroup}
                       className="px-3 py-2 rounded-lg bg-red-500 text-white text-xs font-semibold hover:bg-red-600">
                       삭제
@@ -515,8 +521,8 @@ export default function PermissionGroupsClient() {
                     </div>
                   )}
                   <label className="inline-flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={isAdminAll}
-                      onChange={e => toggleAdminAll(e.target.checked)} className="rounded" />
+                    <input type="checkbox" checked={isAdminAll} disabled={!canWrite}
+                      onChange={e => toggleAdminAll(e.target.checked)} className="rounded disabled:opacity-50" />
                     <span className="text-xs font-semibold text-rose-600 dark:text-rose-300">⚡ 전체 권한 (admin)</span>
                   </label>
                 </div>
@@ -551,9 +557,9 @@ export default function PermissionGroupsClient() {
                           </span>
                           <label onClick={e => e.stopPropagation()}
                             className="inline-flex items-center gap-1.5 cursor-pointer text-[11px] text-gray-600 dark:text-gray-300 ml-1">
-                            <input type="checkbox" checked={allOn}
+                            <input type="checkbox" checked={allOn} disabled={!canWrite}
                               ref={el => { if (el) el.indeterminate = !allOn && someOn; }}
-                              onChange={e => toggleAllInSection(sec, e.target.checked)} className="rounded" />
+                              onChange={e => toggleAllInSection(sec, e.target.checked)} className="rounded disabled:opacity-50" />
                             전체
                           </label>
                         </button>
@@ -579,8 +585,8 @@ export default function PermissionGroupsClient() {
                                       return (
                                         <td key={op} className="text-center px-2 py-2">
                                           {allowed ? (
-                                            <input type="checkbox" checked={editingPermSet.has(key)}
-                                              onChange={() => togglePerm(key)} className="rounded" />
+                                            <input type="checkbox" checked={editingPermSet.has(key)} disabled={!canWrite}
+                                              onChange={() => togglePerm(key)} className="rounded disabled:opacity-50" />
                                           ) : (
                                             <span className="text-gray-300 dark:text-gray-600">—</span>
                                           )}
@@ -609,10 +615,12 @@ export default function PermissionGroupsClient() {
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">멤버 ({members.length}명)</h2>
-                <button type="button" onClick={syncMembers} disabled={members.length === 0 || saving}
-                  className="px-3 py-1.5 rounded bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 disabled:opacity-50">
-                  ↻ 그룹 권한을 멤버 전체에 적용
-                </button>
+                {canWrite && (
+                  <button type="button" onClick={syncMembers} disabled={members.length === 0 || saving}
+                    className="px-3 py-1.5 rounded bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 disabled:opacity-50">
+                    ↻ 그룹 권한을 멤버 전체에 적용
+                  </button>
+                )}
               </div>
               {members.length === 0 ? (
                 <div className="text-center py-4 text-xs text-gray-400">이 그룹에 속한 사용자가 없습니다.</div>
@@ -652,10 +660,16 @@ export default function PermissionGroupsClient() {
                                 </span>
                               </td>
                               <td className="px-2 py-2 text-right whitespace-nowrap">
-                                <button type="button" onClick={() => openDetail(m)}
-                                  className="text-blue-600 hover:underline mr-3">세부권한</button>
-                                <button type="button" onClick={() => assignUser(m.id, null, false)}
-                                  className="text-red-500 hover:underline">제거</button>
+                                {canWrite ? (
+                                  <>
+                                    <button type="button" onClick={() => openDetail(m)}
+                                      className="text-blue-600 hover:underline mr-3">세부권한</button>
+                                    <button type="button" onClick={() => assignUser(m.id, null, false)}
+                                      className="text-red-500 hover:underline">제거</button>
+                                  </>
+                                ) : (
+                                  <span className="text-gray-300 dark:text-gray-600">—</span>
+                                )}
                               </td>
                             </tr>
                           );
@@ -701,6 +715,7 @@ export default function PermissionGroupsClient() {
               )}
 
               {/* 멤버 추가 */}
+              {canWrite && (
               <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-2 mb-2">
                   <h3 className="text-xs font-bold text-gray-700 dark:text-gray-300">멤버 추가</h3>
@@ -745,6 +760,7 @@ export default function PermissionGroupsClient() {
                   )}
                 </div>
               </div>
+              )}
             </div>
           </div>
         )}

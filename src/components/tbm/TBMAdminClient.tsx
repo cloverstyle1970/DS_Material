@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth, isAdmin } from "@/context/AuthContext";
+import { useAuth, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
 import {
@@ -47,15 +47,16 @@ export default function TBMAdminClient() {
   if (!user) {
     return <div className="p-8 text-center text-sm text-gray-500">로그인이 필요합니다.</div>;
   }
-  if (!isAdmin(user)) {
+  if (!hasMenuPermission(user, "/safety/tbm/admin", "read")) {
     return (
       <div className="p-12 text-center">
         <div className="text-5xl mb-3">🔒</div>
-        <div className="text-base font-semibold text-gray-700 dark:text-gray-200">관리자 권한이 필요합니다</div>
-        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">TBM 관리 페이지는 관리자만 접근할 수 있습니다.</div>
+        <div className="text-base font-semibold text-gray-700 dark:text-gray-200">접근 권한이 없습니다</div>
+        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">TBM 관리 메뉴 권한이 필요합니다.</div>
       </div>
     );
   }
+  const canWrite = hasMenuPermission(user, "/safety/tbm/admin", "create") || hasMenuPermission(user, "/safety/tbm/admin", "update");
 
   // -------- 데이터 로드 --------
   async function load() {
@@ -297,14 +298,18 @@ export default function TBMAdminClient() {
                           className="px-2 py-1 text-[11px] rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600">
                           상세
                         </button>
-                        <button type="button" onClick={() => startEdit(r)}
-                          className="ml-1 px-2 py-1 text-[11px] rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/70">
-                          수정
-                        </button>
-                        <button type="button" onClick={() => deleteTbm(r.id)}
-                          className="ml-1 px-2 py-1 text-[11px] rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/70">
-                          삭제
-                        </button>
+                        {canWrite && (
+                          <>
+                            <button type="button" onClick={() => startEdit(r)}
+                              className="ml-1 px-2 py-1 text-[11px] rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/70">
+                              수정
+                            </button>
+                            <button type="button" onClick={() => deleteTbm(r.id)}
+                              className="ml-1 px-2 py-1 text-[11px] rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/70">
+                              삭제
+                            </button>
+                          </>
+                        )}
                       </td>
                     </tr>
                   );
@@ -460,14 +465,18 @@ export default function TBMAdminClient() {
             </div>
 
             <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
-              <button type="button" onClick={() => deleteTbm(openDetail.id)}
-                className="px-4 py-2 rounded-lg text-sm font-semibold text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20">
-                삭제
-              </button>
-              <button type="button" onClick={() => startEdit(openDetail)}
-                className="px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700">
-                기본정보 수정
-              </button>
+              {canWrite && (
+                <>
+                  <button type="button" onClick={() => deleteTbm(openDetail.id)}
+                    className="px-4 py-2 rounded-lg text-sm font-semibold text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20">
+                    삭제
+                  </button>
+                  <button type="button" onClick={() => startEdit(openDetail)}
+                    className="px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700">
+                    기본정보 수정
+                  </button>
+                </>
+              )}
               <button type="button" onClick={() => setOpenDetail(null)}
                 className="px-4 py-2 rounded-lg text-sm font-semibold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600">
                 닫기

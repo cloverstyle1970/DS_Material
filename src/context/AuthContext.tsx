@@ -10,6 +10,7 @@ export interface AuthUser {
   dept: string;
   permissions: Permission[];
   theme?: "light" | "dark";
+  groupName?: string | null; // 소속 권한그룹명 (비관리자 판정용 — 로그인/세션동기화 때 로드)
 }
 
 function applyTheme(theme: "light" | "dark" | null | undefined) {
@@ -25,6 +26,13 @@ function perms(user: AuthUser): Permission[] {
 
 export function isAdmin(user: AuthUser): boolean {
   return perms(user).includes("admin");
+}
+
+// [규정] "비관리자" = 권한그룹이 "보수일반" 또는 "공사일반" 인 사용자(현장 일반 기사).
+// 단가·금액·수익금 등 민감 데이터는 이들에게 숨긴다(showFin = !isNonManager). isAdmin과 무관.
+const NON_MANAGER_GROUPS = ["보수일반", "공사일반"];
+export function isNonManager(user: AuthUser | null): boolean {
+  return !!user && NON_MANAGER_GROUPS.includes(user.groupName ?? "");
 }
 
 export function isViewOnly(user: AuthUser): boolean {
@@ -104,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const { data: account } = await supabase
           .from("accounts")
-          .select("username, permissions, dept, theme")
+          .select("username, permissions, dept, theme, permission_group_id")
           .eq("id", id)
           .maybeSingle();
 
@@ -113,12 +121,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (account) {
           const permissions = (Array.isArray(account.permissions) ? account.permissions : []) as Permission[];
           const theme = account.theme === "dark" ? "dark" : account.theme === "light" ? "light" : stored?.theme;
+          let groupName: string | null = null;
+          if (account.permission_group_id != null) {
+            const { data: g } = await supabase
+              .from("permission_groups")
+              .select("name")
+              .eq("id", account.permission_group_id)
+              .maybeSingle();
+            if (cancelled) return;
+            groupName = g?.name ?? null;
+          }
           const freshUser: AuthUser = {
             id,
             name: account.username ?? stored?.name ?? "",
             dept: account.dept ?? "",
             permissions,
             theme,
+            groupName,
           };
           setUser(freshUser);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));

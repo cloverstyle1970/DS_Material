@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { api } from "@/lib/api-client";
 import { fmtNum } from "@/lib/format";
-import { useAuth, isViewOnly, isAdmin } from "@/context/AuthContext";
+import { useAuth, isViewOnly, isNonManager } from "@/context/AuthContext";
 
 interface Transaction {
   id: number;
@@ -26,8 +26,8 @@ function fmtDate(iso: string) {
 
 export default function SiteStatsClient() {
   const { user } = useAuth();
-  // 입고·출고·수익금 등 금액/수량 재무 데이터는 관리자(admin)에게만 노출. 비관리자는 공란 처리.
-  const showFin = user ? isAdmin(user) : false;
+  // 금액(입고·출고·수익금)은 비관리자(보수일반/공사일반)에게만 숨김. 그 외 관리자급은 노출.
+  const showFin = user ? !isNonManager(user) : false;
   // 엑셀에는 전체 금액이 담기므로 다운로드도 관리자 전용으로 제한.
   const canDownload = showFin;
   const [selectedSite, setSelectedSite] = useState<string>("");

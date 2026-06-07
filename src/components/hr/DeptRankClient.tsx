@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth, isAdmin } from "@/context/AuthContext";
+import { useAuth, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
 
@@ -21,15 +21,17 @@ export default function DeptRankClient() {
   if (!user) {
     return <div className="p-8 text-center text-sm text-gray-500">로그인이 필요합니다.</div>;
   }
-  if (!isAdmin(user)) {
+  if (!hasMenuPermission(user, "/hr/dept-rank", "read")) {
     return (
       <div className="p-12 text-center">
         <div className="text-5xl mb-3">🔒</div>
-        <div className="text-base font-semibold text-gray-700 dark:text-gray-200">관리자 권한이 필요합니다</div>
-        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">부서/직급관리 페이지는 관리자만 접근할 수 있습니다.</div>
+        <div className="text-base font-semibold text-gray-700 dark:text-gray-200">접근 권한이 없습니다</div>
+        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">부서/직급관리 메뉴 권한이 필요합니다.</div>
       </div>
     );
   }
+  // 쓰기 권한: create 또는 update 보유 시 편집 가능. 없으면 조회 전용.
+  const canWrite = hasMenuPermission(user, "/hr/dept-rank", "create") || hasMenuPermission(user, "/hr/dept-rank", "update");
 
   return (
     <div className="min-h-full bg-gray-50 dark:bg-gray-900">
@@ -54,8 +56,8 @@ export default function DeptRankClient() {
       </div>
 
       <div className="px-6 py-4">
-        {tab === "dept" && <OrgEditor table="departments" title="부서" />}
-        {tab === "rank" && <OrgEditor table="ranks" title="직급" />}
+        {tab === "dept" && <OrgEditor table="departments" title="부서" canWrite={canWrite} />}
+        {tab === "rank" && <OrgEditor table="ranks" title="직급" canWrite={canWrite} />}
       </div>
     </div>
   );
@@ -65,7 +67,7 @@ export default function DeptRankClient() {
 // 부서/직급 공용 에디터
 // ============================================================
 
-function OrgEditor({ table, title }: { table: "departments" | "ranks"; title: string }) {
+function OrgEditor({ table, title, canWrite }: { table: "departments" | "ranks"; title: string; canWrite: boolean }) {
   const [items, setItems] = useState<OrgItem[]>([]);
   const [editing, setEditing] = useState<OrgItem | null>(null);
   const [showNew, setShowNew] = useState(false);
@@ -92,10 +94,12 @@ function OrgEditor({ table, title }: { table: "departments" | "ranks"; title: st
     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
         <div className="text-xs text-gray-500 dark:text-gray-400">총 {items.length}건</div>
-        <button type="button" onClick={() => setShowNew(true)}
-          className="px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800">
-          + {title} 추가
-        </button>
+        {canWrite && (
+          <button type="button" onClick={() => setShowNew(true)}
+            className="px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800">
+            + {title} 추가
+          </button>
+        )}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -104,37 +108,49 @@ function OrgEditor({ table, title }: { table: "departments" | "ranks"; title: st
               <th className="px-3 py-2 text-center">{title}명</th>
               <th className="px-3 py-2 text-center">정렬</th>
               <th className="px-3 py-2 text-center">상태</th>
-              <th className="px-3 py-2 text-right">액션</th>
+              {canWrite && <th className="px-3 py-2 text-right">액션</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {items.length === 0 && (
-              <tr><td colSpan={4} className="px-3 py-8 text-center text-xs text-gray-500">등록된 항목이 없습니다.</td></tr>
+              <tr><td colSpan={canWrite ? 4 : 3} className="px-3 py-8 text-center text-xs text-gray-500">등록된 항목이 없습니다.</td></tr>
             )}
             {items.map(r => (
               <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                 <td className="px-3 py-2 text-center text-xs font-semibold text-gray-800 dark:text-gray-100">{r.name}</td>
                 <td className="px-3 py-2 text-center text-xs text-gray-500 dark:text-gray-400">{r.sort_order}</td>
-                <td className="px-3 py-2">
-                  <button type="button" onClick={() => toggleActive(r.id, !r.is_active)}
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                <td className="px-3 py-2 text-center">
+                  {canWrite ? (
+                    <button type="button" onClick={() => toggleActive(r.id, !r.is_active)}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        r.is_active
+                          ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300"
+                          : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                      }`}>
+                      {r.is_active ? "활성" : "비활성"}
+                    </button>
+                  ) : (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                       r.is_active
                         ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300"
                         : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
                     }`}>
-                    {r.is_active ? "활성" : "비활성"}
-                  </button>
+                      {r.is_active ? "활성" : "비활성"}
+                    </span>
+                  )}
                 </td>
-                <td className="px-3 py-2 text-center whitespace-nowrap">
-                  <button type="button" onClick={() => setEditing(r)}
-                    className="px-2 py-0.5 text-[11px] rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 mr-1">
-                    수정
-                  </button>
-                  <button type="button" onClick={() => remove(r.id, r.name)}
-                    className="px-2 py-0.5 text-[11px] rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200">
-                    삭제
-                  </button>
-                </td>
+                {canWrite && (
+                  <td className="px-3 py-2 text-center whitespace-nowrap">
+                    <button type="button" onClick={() => setEditing(r)}
+                      className="px-2 py-0.5 text-[11px] rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 mr-1">
+                      수정
+                    </button>
+                    <button type="button" onClick={() => remove(r.id, r.name)}
+                      className="px-2 py-0.5 text-[11px] rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200">
+                      삭제
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
