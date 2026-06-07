@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { api } from "@/lib/api-client";
 import { fmtNum } from "@/lib/format";
-import { useAuth, isViewOnly } from "@/context/AuthContext";
+import { useAuth, isViewOnly, isAdmin } from "@/context/AuthContext";
 
 interface Transaction {
   id: number;
@@ -26,8 +26,41 @@ function fmtDate(iso: string) {
 
 export default function SiteStatsClient() {
   const { user } = useAuth();
-  const canDownload = user ? !isViewOnly(user) : false;
+  // 입고·출고·수익금 등 금액/수량 재무 데이터는 관리자(admin)에게만 노출. 비관리자는 공란 처리.
+  const showFin = user ? isAdmin(user) : false;
+  // 엑셀에는 전체 금액이 담기므로 다운로드도 관리자 전용으로 제한.
+  const canDownload = showFin;
   const [selectedSite, setSelectedSite] = useState<string>("");
+  // 좌측 '현장별 투입 현황'에서 현장명 클릭 시, 우측 '자재별 투입 현황'만 해당 현장으로 좁히는 필터.
+  // (좌측 목록은 그대로 유지 — 다른 현장을 이어서 클릭할 수 있도록)
+  const [detailSite, setDetailSite] = useState<string>("");
+  // 모바일(<768px)에서는 우측 패널 대신 팝업(모달)로 자재별 내역을 표시.
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const apply = () => setIsMobile(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  function handleSiteClick(site: string) {
+    if (isMobile) {
+      // 모바일: 해당 현장으로 좁히고 팝업 표시
+      setDetailSite(site);
+      setMobileDetailOpen(true);
+    } else {
+      // 데스크탑: 우측 패널 토글
+      setDetailSite(prev => (prev === site ? "" : site));
+    }
+  }
+
+  function closeMobileDetail() {
+    setMobileDetailOpen(false);
+    setDetailSite("");
+  }
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() - 3);
@@ -108,8 +141,11 @@ export default function SiteStatsClient() {
     return Object.values(map).sort((a, b) => b.outAmt - a.outAmt);
   }, [filtered]);
 
-  // 자재별 집계 (선택 현장 또는 전체)
+  // 자재별 집계 (좌측에서 클릭한 현장(detailSite)이 있으면 그 현장만, 없으면 검색 결과 전체)
   const materialStats = useMemo(() => {
+    const source = detailSite
+      ? filtered.filter(t => (t.siteName ?? "미지정") === detailSite)
+      : filtered;
     const map: Record<string, {
       id: string;
       name: string;
@@ -119,7 +155,7 @@ export default function SiteStatsClient() {
       outAmt: number;
       lastDate: string;
     }> = {};
-    filtered.forEach(t => {
+    source.forEach(t => {
       if (!map[t.materialId]) map[t.materialId] = { id: t.materialId, name: t.materialName, inQty: 0, inAmt: 0, outQty: 0, outAmt: 0, lastDate: "" };
       const price = t.unitPrice ?? 0;
       const amt = t.qty * price;
@@ -133,7 +169,7 @@ export default function SiteStatsClient() {
       if (t.createdAt > map[t.materialId].lastDate) map[t.materialId].lastDate = t.createdAt;
     });
     return Object.values(map).sort((a, b) => b.outAmt - a.outAmt); // Note: sorting by outbound amount
-  }, [filtered]);
+  }, [filtered, detailSite]);
 
   const totalIn  = filtered.filter(t => t.type === "입고").reduce((s, t) => s + t.qty, 0);
   const totalOut = filtered.filter(t => t.type === "출고").reduce((s, t) => s + t.qty, 0);
@@ -168,6 +204,67 @@ export default function SiteStatsClient() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = `현장투입현황_${stamp}.xlsx`; a.click();
     URL.revokeObjectURL(url);
+  }
+
+  // 자재별 투입 현황 본문 (우측 패널 + 모바일 팝업에서 공용)
+  function renderMaterialBody(scrollClass = "max-h-80") {
+    if (loading) {
+      return <div className="py-12 text-center text-gray-400 dark:text-gray-500 text-sm">데이터 로딩 중...</div>;
+    }
+    if (materialStats.length === 0) {
+      return (
+        <div className="py-12 text-center text-gray-400 dark:text-gray-500">
+          <p className="text-3xl mb-2">📦</p>
+          <p className="text-sm">해당 기간/현장의 데이터가 없습니다</p>
+        </div>
+      );
+    }
+    return (
+      <div className={`${scrollClass} overflow-auto`}>
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700 sticky top-0">
+            <tr>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">자재명</th>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">코드</th>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>차변 (입고)</th>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>대변 (출고)</th>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>수익금</th>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">최종처리일</th>
+            </tr>
+            <tr className="bg-gray-100/30 dark:bg-gray-800/20 text-[10px] text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-700">
+              <th></th>
+              <th></th>
+              <th className="px-2 py-1 font-normal border-r border-gray-200/20 dark:border-gray-700/20">수량</th>
+              <th className="px-2 py-1 font-normal pr-4">금액</th>
+              <th className="px-2 py-1 font-normal border-r border-gray-200/20 dark:border-gray-700/20">수량</th>
+              <th className="px-2 py-1 font-normal pr-4">금액</th>
+              <th className="px-2 py-1 font-normal border-r border-gray-200/20 dark:border-gray-700/20">수량</th>
+              <th className="px-2 py-1 font-normal pr-4">금액</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+            {materialStats.map(m => {
+              const balQty = m.outQty - m.inQty;
+              const balAmt = m.outAmt - m.inAmt;
+              return (
+                <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                  <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[150px] truncate">{m.name}</td>
+                  <td className="px-4 py-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{m.id}</td>
+                  <td className="px-2 py-3 text-center text-blue-600 font-medium tabular-nums border-r border-gray-200/20 dark:border-gray-700/20">{m.inQty > 0 ? fmtNum(m.inQty) : "—"}</td>
+                  <td className="px-2 py-3 text-right text-blue-600 font-medium tabular-nums pr-4">{showFin ? (m.inAmt > 0 ? `₩${fmtNum(m.inAmt)}` : "—") : ""}</td>
+                  <td className="px-2 py-3 text-center text-orange-500 font-medium tabular-nums border-r border-gray-200/20 dark:border-gray-700/20">{m.outQty > 0 ? fmtNum(m.outQty) : "—"}</td>
+                  <td className="px-2 py-3 text-right text-orange-500 font-medium tabular-nums pr-4">{showFin ? (m.outAmt > 0 ? `₩${fmtNum(m.outAmt)}` : "—") : ""}</td>
+                  <td className={`px-2 py-3 text-center font-bold tabular-nums border-r border-gray-200/20 dark:border-gray-700/20 ${balQty >= 0 ? "text-slate-700 dark:text-slate-300" : "text-red-500"}`}>{fmtNum(balQty)}</td>
+                  <td className={`px-2 py-3 text-right font-bold tabular-nums pr-4 ${balAmt >= 0 ? "text-slate-700 dark:text-slate-300" : "text-red-500"}`}>{showFin ? `₩${fmtNum(balAmt)}` : ""}</td>
+                  <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(m.lastDate)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
   }
 
   return (
@@ -226,14 +323,14 @@ export default function SiteStatsClient() {
       {/* 요약 카드 */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">조회 입고 금액 (차변)</p>
-          <p className="text-xl font-bold text-blue-600">₩{fmtNum(totalInAmt)}</p>
-          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">수량: {fmtNum(totalIn)} EA</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{showFin ? "조회 입고 금액 (차변)" : "조회 입고 수량 (차변)"}</p>
+          <p className="text-xl font-bold text-blue-600">{showFin ? `₩${fmtNum(totalInAmt)}` : `${fmtNum(totalIn)} EA`}</p>
+          {showFin && <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">수량: {fmtNum(totalIn)} EA</p>}
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">조회 출고 금액 (대변)</p>
-          <p className="text-xl font-bold text-orange-500">₩{fmtNum(totalOutAmt)}</p>
-          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">수량: {fmtNum(totalOut)} EA</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{showFin ? "조회 출고 금액 (대변)" : "조회 출고 수량 (대변)"}</p>
+          <p className="text-xl font-bold text-orange-500">{showFin ? `₩${fmtNum(totalOutAmt)}` : `${fmtNum(totalOut)} EA`}</p>
+          {showFin && <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">수량: {fmtNum(totalOut)} EA</p>}
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">관련 현장 수</p>
@@ -286,15 +383,19 @@ export default function SiteStatsClient() {
                 {siteStats.map(s => {
                   const balQty = s.outQty - s.inQty;
                   const balAmt = s.outAmt - s.inAmt;
+                  const isSelected = !isMobile && detailSite === s.site;
                   return (
-                    <tr key={s.site} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                      <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[160px] truncate">{s.site}</td>
+                    <tr key={s.site}
+                      onClick={() => handleSiteClick(s.site)}
+                      title={isMobile ? "클릭하여 자재별 내역 팝업 보기" : "클릭하여 우측 자재별 현황에 표시 (다시 클릭 시 해제)"}
+                      className={`cursor-pointer transition-colors ${isSelected ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-gray-50 dark:hover:bg-gray-700/30"}`}>
+                      <td className={`px-4 py-3 text-center font-medium max-w-[160px] truncate ${isSelected ? "text-blue-600 dark:text-blue-400 underline underline-offset-2" : "text-gray-800 dark:text-gray-200"}`}>{s.site}</td>
                       <td className="px-2 py-3 text-center text-blue-600 font-medium tabular-nums border-r border-gray-200/20 dark:border-gray-700/20">{fmtNum(s.inQty)}</td>
-                      <td className="px-2 py-3 text-right text-blue-600 font-medium tabular-nums pr-4">₩{fmtNum(s.inAmt)}</td>
+                      <td className="px-2 py-3 text-right text-blue-600 font-medium tabular-nums pr-4">{showFin ? `₩${fmtNum(s.inAmt)}` : ""}</td>
                       <td className="px-2 py-3 text-center text-orange-500 font-medium tabular-nums border-r border-gray-200/20 dark:border-gray-700/20">{fmtNum(s.outQty)}</td>
-                      <td className="px-2 py-3 text-right text-orange-500 font-medium tabular-nums pr-4">₩{fmtNum(s.outAmt)}</td>
+                      <td className="px-2 py-3 text-right text-orange-500 font-medium tabular-nums pr-4">{showFin ? `₩${fmtNum(s.outAmt)}` : ""}</td>
                       <td className={`px-2 py-3 text-center font-bold tabular-nums border-r border-gray-200/20 dark:border-gray-700/20 ${balQty >= 0 ? "text-slate-700 dark:text-slate-300" : "text-red-500"}`}>{fmtNum(balQty)}</td>
-                      <td className={`px-2 py-3 text-right font-bold tabular-nums pr-4 ${balAmt >= 0 ? "text-slate-700 dark:text-slate-300" : "text-red-500"}`}>₩{fmtNum(balAmt)}</td>
+                      <td className={`px-2 py-3 text-right font-bold tabular-nums pr-4 ${balAmt >= 0 ? "text-slate-700 dark:text-slate-300" : "text-red-500"}`}>{showFin ? `₩${fmtNum(balAmt)}` : ""}</td>
                       <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 tabular-nums">{fmtNum(s.materials.size)}</td>
                       <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(s.lastDate)}</td>
                     </tr>
@@ -309,64 +410,21 @@ export default function SiteStatsClient() {
         {/* 자재별 투입 현황 */}
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div className="px-5 py-3.5 border-b border-gray-100 dark:border-gray-700">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
               자재별 투입 현황
-              {selectedSite && <span className="ml-2 text-xs text-gray-400 dark:text-gray-500 font-normal">({selectedSite})</span>}
+              {detailSite ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 text-xs font-medium">
+                  {detailSite}
+                  <button type="button" onClick={() => setDetailSite("")}
+                    aria-label="현장 선택 해제"
+                    className="hover:text-blue-800 dark:hover:text-blue-100 leading-none">×</button>
+                </span>
+              ) : selectedSite ? (
+                <span className="ml-1 text-xs text-gray-400 dark:text-gray-500 font-normal">({selectedSite})</span>
+              ) : null}
             </h3>
           </div>
-          {loading ? (
-            <div className="py-12 text-center text-gray-400 dark:text-gray-500 text-sm">데이터 로딩 중...</div>
-          ) : materialStats.length === 0 ? (
-            <div className="py-12 text-center text-gray-400 dark:text-gray-500">
-              <p className="text-3xl mb-2">📦</p>
-              <p className="text-sm">해당 기간/현장의 데이터가 없습니다</p>
-            </div>
-          ) : (
-            <div className="max-h-80 overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700 sticky top-0">
-                  <tr>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">자재명</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">코드</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>차변 (입고)</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>대변 (출고)</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap" colSpan={2}>수익금</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">최종처리일</th>
-                  </tr>
-                  <tr className="bg-gray-100/30 dark:bg-gray-800/20 text-[10px] text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-700">
-                    <th></th>
-                    <th></th>
-                    <th className="px-2 py-1 font-normal border-r border-gray-200/20 dark:border-gray-700/20">수량</th>
-                    <th className="px-2 py-1 font-normal pr-4">금액</th>
-                    <th className="px-2 py-1 font-normal border-r border-gray-200/20 dark:border-gray-700/20">수량</th>
-                    <th className="px-2 py-1 font-normal pr-4">금액</th>
-                    <th className="px-2 py-1 font-normal border-r border-gray-200/20 dark:border-gray-700/20">수량</th>
-                    <th className="px-2 py-1 font-normal pr-4">금액</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-                  {materialStats.map(m => {
-                    const balQty = m.outQty - m.inQty;
-                    const balAmt = m.outAmt - m.inAmt;
-                    return (
-                      <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                        <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[150px] truncate">{m.name}</td>
-                        <td className="px-4 py-3 text-center font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{m.id}</td>
-                        <td className="px-2 py-3 text-center text-blue-600 font-medium tabular-nums border-r border-gray-200/20 dark:border-gray-700/20">{m.inQty > 0 ? fmtNum(m.inQty) : "—"}</td>
-                        <td className="px-2 py-3 text-right text-blue-600 font-medium tabular-nums pr-4">{m.inAmt > 0 ? `₩${fmtNum(m.inAmt)}` : "—"}</td>
-                        <td className="px-2 py-3 text-center text-orange-500 font-medium tabular-nums border-r border-gray-200/20 dark:border-gray-700/20">{m.outQty > 0 ? fmtNum(m.outQty) : "—"}</td>
-                        <td className="px-2 py-3 text-right text-orange-500 font-medium tabular-nums pr-4">{m.outAmt > 0 ? `₩${fmtNum(m.outAmt)}` : "—"}</td>
-                        <td className={`px-2 py-3 text-center font-bold tabular-nums border-r border-gray-200/20 dark:border-gray-700/20 ${balQty >= 0 ? "text-slate-700 dark:text-slate-300" : "text-red-500"}`}>{fmtNum(balQty)}</td>
-                        <td className={`px-2 py-3 text-right font-bold tabular-nums pr-4 ${balAmt >= 0 ? "text-slate-700 dark:text-slate-300" : "text-red-500"}`}>₩{fmtNum(balAmt)}</td>
-                        <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(m.lastDate)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {renderMaterialBody()}
         </div>
       </div>
 
@@ -414,15 +472,15 @@ export default function SiteStatsClient() {
                         {isIn ? fmtNum(t.qty) : "—"}
                       </td>
                       <td className="px-2 py-3 text-right text-blue-600 font-medium tabular-nums pr-4">
-                        {isIn ? `₩${fmtNum(amt)}` : "—"}
+                        {showFin ? (isIn ? `₩${fmtNum(amt)}` : "—") : ""}
                       </td>
-                      
+
                       {/* 대변 (출고) */}
                       <td className="px-2 py-3 text-center text-orange-500 font-medium tabular-nums border-r border-gray-200/20 dark:border-gray-700/20">
                         {!isIn ? fmtNum(t.qty) : "—"}
                       </td>
                       <td className="px-2 py-3 text-right text-orange-500 font-medium tabular-nums pr-4">
-                        {!isIn ? `₩${fmtNum(amt)}` : "—"}
+                        {showFin ? (!isIn ? `₩${fmtNum(amt)}` : "—") : ""}
                       </td>
                       
                       <td className="px-4 py-3 text-center text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{t.siteName ?? "—"}</td>
@@ -432,6 +490,28 @@ export default function SiteStatsClient() {
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* 모바일 전용: 현장명 클릭 시 자재별 내역 팝업 */}
+      {isMobile && mobileDetailOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={closeMobileDetail}>
+          <div className="bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-2xl max-h-[85vh] flex flex-col"
+            onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-3.5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between shrink-0">
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white truncate">자재별 투입 현황</h3>
+                <p className="text-xs text-blue-600 dark:text-blue-300 font-medium truncate">{detailSite}</p>
+              </div>
+              <button type="button" onClick={closeMobileDetail}
+                aria-label="닫기"
+                className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl leading-none ml-3">×</button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              {renderMaterialBody("max-h-none")}
+            </div>
           </div>
         </div>
       )}

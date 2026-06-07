@@ -17,7 +17,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.replace("/dashboard");
+      router.replace("/me");
     }
   }, [isLoading, isAuthenticated, router]);
 
@@ -90,7 +90,7 @@ export default function LoginPage() {
       permissions,
       theme: account.theme === "dark" ? "dark" : account.theme === "light" ? "light" : undefined,
     });
-    router.replace("/dashboard");
+    router.replace("/me");
   }
 
   if (isLoading || isAuthenticated) return null;

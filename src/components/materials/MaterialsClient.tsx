@@ -77,6 +77,17 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
   const [loading, setLoading] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  // 모바일(<768px)에서 자재코드/부품명 클릭 시 상세를 팝업으로 표시
+  const [isMobile, setIsMobile] = useState(false);
+  const [detailMaterial, setDetailMaterial] = useState<MaterialRecord | null>(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const apply = () => setIsMobile(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
 
   function toggleSort(key: SortKey) {
     if (key === sortKey) setSortDir(d => d === "asc" ? "desc" : "asc");
@@ -433,8 +444,12 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
                         </span>
                     }
                   </td>
-                  <td className={`px-4 py-3 text-center font-mono text-xs whitespace-nowrap ${isTkMaterial(m.id) ? TK_TEXT_CLASS : isDark ? "text-gray-300" : "text-slate-600"}`}>{m.id}</td>
-                  <td className={`px-4 py-3 text-center font-medium ${isTkMaterial(m.id) ? TK_TEXT_CLASS : isDark ? "text-white" : "text-gray-800"}`}>{m.name}</td>
+                  <td
+                    onClick={e => { if (isMobile) { e.stopPropagation(); setDetailMaterial(m); } }}
+                    className={`px-4 py-3 text-center font-mono text-xs whitespace-nowrap ${isMobile ? "underline underline-offset-2 decoration-dotted" : ""} ${isTkMaterial(m.id) ? TK_TEXT_CLASS : isDark ? "text-gray-300" : "text-slate-600"}`}>{m.id}</td>
+                  <td
+                    onClick={e => { if (isMobile) { e.stopPropagation(); setDetailMaterial(m); } }}
+                    className={`px-4 py-3 text-center font-medium ${isMobile ? "underline underline-offset-2 decoration-dotted" : ""} ${isTkMaterial(m.id) ? TK_TEXT_CLASS : isDark ? "text-white" : "text-gray-800"}`}>{m.name}</td>
                   <td className={`px-4 py-3 text-center ${isDark ? "text-gray-300" : "text-gray-500"}`}>{m.modelNo ?? "-"}</td>
                   <td className={`px-4 py-3 text-center ${isDark ? "text-gray-300" : "text-gray-500"}`}>{m.unit ?? "-"}</td>
                   {!viewOnly && (
@@ -581,6 +596,76 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
           onClose={() => setEditTarget(null)}
           onSaved={() => { setEditTarget(null); reload(); }}
         />
+      )}
+
+      {/* 모바일 전용: 자재코드/부품명 클릭 시 상세 팝업 */}
+      {detailMaterial && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center"
+          onClick={() => setDetailMaterial(null)}>
+          <div className="bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-md max-h-[85vh] flex flex-col"
+            onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-3.5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between shrink-0">
+              <div className="min-w-0 flex items-center gap-2">
+                {detailMaterial.isRepair
+                  ? <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300 shrink-0">RE</span>
+                  : <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
+                      detailMaterial.id.startsWith("D")
+                        ? "bg-red-50 text-red-600 dark:bg-red-900/60 dark:text-red-300"
+                        : "bg-blue-50 text-blue-600 dark:bg-blue-900/60 dark:text-blue-300"
+                    }`}>{detailMaterial.id.startsWith("D") ? "DS" : "TK"}</span>}
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white truncate">{detailMaterial.name}</h3>
+              </div>
+              <button type="button" onClick={() => setDetailMaterial(null)}
+                aria-label="닫기"
+                className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl leading-none ml-3">×</button>
+            </div>
+            <div className="flex-1 overflow-auto p-5">
+              <dl className="divide-y divide-gray-100 dark:divide-gray-700 text-sm">
+                {[
+                  { label: "자재코드", value: detailMaterial.id, mono: true },
+                  { label: "부품명", value: detailMaterial.name },
+                  { label: "별칭", value: detailMaterial.alias || "-" },
+                  { label: "규격", value: detailMaterial.modelNo || "-" },
+                  { label: "단위", value: detailMaterial.unit || "-" },
+                  ...(!viewOnly ? [{ label: "구매단가", value: `₩${fmtNumOr(detailMaterial.buyPrice)}` }] : []),
+                  { label: "판매단가", value: `₩${fmtNumOr(detailMaterial.sellPrice)}` },
+                  { label: "보관장소", value: detailMaterial.storageLoc || "-" },
+                  { label: "재고", value: `${fmtNum(detailMaterial.stockQty)} ${detailMaterial.unit || ""}`.trim() },
+                ].map(row => (
+                  <div key={row.label} className="flex items-start justify-between gap-3 py-2.5">
+                    <dt className="text-gray-500 dark:text-gray-400 shrink-0">{row.label}</dt>
+                    <dd className={`text-right font-medium text-gray-800 dark:text-gray-100 break-all ${row.mono ? "font-mono text-xs" : ""}`}>{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              {(detailMaterial.referenceImageUrl1 || detailMaterial.referenceImageUrl2) && (
+                <div className="mt-4">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">참고 사진</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[detailMaterial.referenceImageUrl1, detailMaterial.referenceImageUrl2]
+                      .filter((u): u is string => !!u)
+                      .map((url, i) => (
+                        <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                          className="block w-24 h-24 rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden bg-gray-50 dark:bg-gray-700">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={url} alt="" className="w-full h-full object-cover" />
+                        </a>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            {!viewOnly && (
+              <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2 shrink-0">
+                <button type="button"
+                  onClick={() => { const t = detailMaterial; setDetailMaterial(null); setEditTarget(t); }}
+                  className="px-4 py-2 rounded-lg bg-slate-700 text-white text-xs font-bold hover:bg-slate-800">
+                  수정
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </>
   );

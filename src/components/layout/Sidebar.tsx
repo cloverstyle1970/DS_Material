@@ -314,8 +314,9 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
           {NAV_GROUPS.map((group, gi) => {
             const visibleItems = group.items
               .filter(item => {
-                // 외부/플레이스홀더 링크(#로 시작)는 권한 체크 제외 (페이지 없는 자리표시)
-                if (item.href.startsWith("#")) return true;
+                // 외부/플레이스홀더 링크(#로 시작: 위험성평가·준비중 등 페이지 없는 자리표시)는
+                // 권한 체크박스가 없으므로 admin에게만 노출. 비관리자는 조회 권한과 무관하게 숨김.
+                if (item.href.startsWith("#")) return user ? isAdmin(user) : false;
                 // 그 외 모든 메뉴는 권한 그룹 설정의 체크박스(menu:{href}:read)를 따른다.
                 // admin이면 모두 허용, 아니면 read 권한 보유한 메뉴만 노출
                 return user ? hasMenuPermission(user, item.href, "read") : false;

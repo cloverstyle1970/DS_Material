@@ -75,8 +75,8 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
     const wasJustClosed = prevTabsRef.current.some(t => t.href === pathname);
     prevTabsRef.current = tabs;
     if (wasJustClosed) return;
-    // dashboard/settings/profile/manual는 메뉴 외 공통 페이지 — 권한 체크 우회
-    const isAlwaysAllowed = pathname === "/dashboard" || pathname === "/settings" || pathname === "/data/profile" || pathname === "/manual";
+    // me/dashboard/settings/profile/manual는 메뉴 외 공통 페이지 — 권한 체크 우회
+    const isAlwaysAllowed = pathname === "/me" || pathname === "/dashboard" || pathname === "/settings" || pathname === "/data/profile" || pathname === "/manual";
     const allowed = isAlwaysAllowed || isAdmin(user) || hasMenuPermission(user, pathname, "read");
     if (!allowed) return;
     if (isLimitReached) {
@@ -97,11 +97,11 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeHref]);
 
-  // 모든 탭이 닫혔으면 대시보드 자동 오픈
+  // 모든 탭이 닫혔으면 '내 대시보드' 자동 오픈 (로그인 후 기본 진입 탭)
   useEffect(() => {
     if (!isAuthenticated || !user) return;
     if (tabs.length === 0) {
-      openTab("/dashboard", "대시보드");
+      openTab("/me", "내 대시보드");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabs.length, isAuthenticated, user]);
