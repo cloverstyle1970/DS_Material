@@ -93,6 +93,18 @@ function CalendarContent() {
 
   const canSchedule = user && (isAdmin(user) || hasMenuPermission(user, "/construction/schedule", "create"));
 
+  // 모바일(<768px): 일정 클릭 시 내용 보기 팝업
+  const [isMobile, setIsMobile] = useState(false);
+  const [viewSchedule, setViewSchedule] = useState<ConstructionSchedule | null>(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const apply = () => setIsMobile(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
@@ -475,7 +487,7 @@ function CalendarContent() {
                     return (
                       <div
                         key={`sch-${sch.id}`}
-                        onClick={(e) => { e.stopPropagation(); openEditModal(sch); }}
+                        onClick={(e) => { e.stopPropagation(); if (isMobile) setViewSchedule(sch); else openEditModal(sch); }}
                         className={`text-xs px-2 py-1.5 rounded cursor-pointer leading-tight flex flex-col gap-0.5 bg-transparent border-2 ${baseTextCls} ${borderCls}`}
                         title={`${sch.siteName} ${sch.elevatorName ? `(${sch.elevatorName})` : ""}${sch.startTime ? ` ${sch.startTime}` : ""} / ${sch.details} / ${sch.workers}${sch.manager ? ` / 담당: ${sch.manager}${sch.managerPhone ? ` ${sch.managerPhone}` : ""}` : ""}${!isHoliday ? (hasTbm ? " · TBM 작성됨" : " · TBM 미작성") : ""}${isPaid ? " · 기성확인" : ""}`}
                       >
@@ -759,6 +771,66 @@ function CalendarContent() {
               )}
             </div>
       </DraggableModal>
+
+      {/* 모바일 전용: 공사 일정 내용 보기 팝업 */}
+      {viewSchedule && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center"
+          onClick={() => setViewSchedule(null)}>
+          <div className="bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-md max-h-[85vh] flex flex-col"
+            onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-3.5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between shrink-0">
+              <div className="min-w-0 flex items-center gap-2">
+                {viewSchedule.companyType === "TK"
+                  ? <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-blue-50 text-blue-600 dark:bg-blue-900/60 dark:text-blue-300 shrink-0">TK</span>
+                  : viewSchedule.companyType === "DS"
+                    ? <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-red-50 text-red-600 dark:bg-red-900/60 dark:text-red-300 shrink-0">DS</span>
+                    : null}
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                  {viewSchedule.siteName}{viewSchedule.elevatorName ? ` · ${viewSchedule.elevatorName}` : ""}
+                </h3>
+              </div>
+              <button type="button" onClick={() => setViewSchedule(null)}
+                aria-label="닫기"
+                className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl leading-none ml-3">×</button>
+            </div>
+            <div className="flex-1 overflow-auto p-5">
+              <dl className="divide-y divide-gray-100 dark:divide-gray-700 text-sm">
+                {[
+                  { label: "기간", value: viewSchedule.startDate === viewSchedule.endDate ? viewSchedule.startDate : `${viewSchedule.startDate} ~ ${viewSchedule.endDate}` },
+                  ...(viewSchedule.startTime ? [{ label: "작업시작", value: viewSchedule.startTime }] : []),
+                  { label: "현장명", value: viewSchedule.siteName },
+                  { label: "호기", value: viewSchedule.elevatorName || "-" },
+                  { label: "담당자", value: viewSchedule.manager || "-" },
+                  { label: "연락처", value: viewSchedule.managerPhone || "-", mono: true },
+                  { label: "작업자", value: viewSchedule.workers || "-" },
+                  { label: "기성확인", value: viewSchedule.progressConfirmed ? "확인" : "미확인" },
+                  ...(viewSchedule.siteName !== "공사휴무" ? [{ label: "TBM", value: tbmScheduleIds.has(viewSchedule.id) ? "작성됨" : "미작성" }] : []),
+                ].map(row => (
+                  <div key={row.label} className="flex items-start justify-between gap-3 py-2.5">
+                    <dt className="text-gray-500 dark:text-gray-400 shrink-0">{row.label}</dt>
+                    <dd className={`text-right font-medium text-gray-800 dark:text-gray-100 break-all ${"mono" in row && row.mono ? "font-mono" : ""}`}>{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              {viewSchedule.details && (
+                <div className="mt-4">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">공사내용 및 전달사항</p>
+                  <p className="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-wrap break-words bg-gray-50 dark:bg-gray-700/40 rounded-lg p-3">{viewSchedule.details}</p>
+                </div>
+              )}
+            </div>
+            {canSchedule && (
+              <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2 shrink-0">
+                <button type="button"
+                  onClick={() => { const s = viewSchedule; setViewSchedule(null); openEditModal(s); }}
+                  className="px-4 py-2 rounded-lg bg-orange-600 text-white text-xs font-bold hover:bg-orange-700">
+                  수정
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
