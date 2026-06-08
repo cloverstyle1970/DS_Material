@@ -1042,6 +1042,7 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
     const { data, error } = await supabase.from("site_elevators")
       .insert({
         site_id: (site as any).id,
+        unit_name:          unitName       || "",   // NOT NULL — 빈 문자열로라도 채움
         installation_place: unitName       || null,
         elevator_number:    elevatorNo     || null,
         emergency_phone:    emergencyPhone || null,
