@@ -149,7 +149,7 @@ export default function SerialEntryModal({ mode, materialId, materialName, initi
                 placeholder="S/N을 한 줄에 하나씩 입력 (예: SN-001)"
                 className="w-full px-2.5 py-1.5 text-xs font-mono border border-amber-300 dark:border-amber-700 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-300 placeholder:text-gray-400 dark:placeholder:text-gray-500 resize-y" />
               <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-                저장 시 새 S/N은 비추적 재고에서 1건씩 차감 · 출고 상태로 등록됩니다. 비추적 잔량 부족 시 거부됩니다.
+                저장 시 새 S/N은 비추적 재고에서 1건씩 차감 · 회수 체크 시 반납대기 / 미체크 시 출고 상태로 등록됩니다. 비추적 잔량 부족 시 거부됩니다.
               </p>
             </div>
           </div>
