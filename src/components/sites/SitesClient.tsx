@@ -52,6 +52,8 @@ function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: Elevato
   const [unitName,       setUnitName]       = useState(editElevator?.unitName       ?? "");
   const [elevatorNo,     setElevatorNo]     = useState(editElevator?.elevatorNo     ?? "");
   const [emergencyPhone, setEmergencyPhone] = useState(editElevator?.emergencyPhone ?? "");
+  const [ledgerNo,       setLedgerNo]       = useState(editElevator?.ledgerNo       ?? "");
+  const [jobNo,          setJobNo]          = useState(editElevator?.jobNo          ?? "");
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState("");
 
@@ -64,6 +66,8 @@ function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: Elevato
       unitName: unitName.trim(),
       elevatorNo: elevatorNo.trim() || null,
       emergencyPhone: emergencyPhone.trim() || null,
+      ledgerNo: ledgerNo.trim() || null,
+      jobNo:    jobNo.trim()    || null,
     };
     try {
       if (isEdit) await api.patch(`/api/elevators/${editElevator!.id}`, body);
@@ -104,6 +108,16 @@ function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: Elevato
           <div>
             <label className={labelCls}>비상통화장치</label>
             <input value={emergencyPhone} onChange={e => setEmergencyPhone(e.target.value)} placeholder="예: 012-2080-3565" className={fieldCls} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>원장번호</label>
+              <input value={ledgerNo} onChange={e => setLedgerNo(e.target.value)} placeholder="예: 721563" className={fieldCls} />
+            </div>
+            <div>
+              <label className={labelCls}>잡번호</label>
+              <input value={jobNo} onChange={e => setJobNo(e.target.value)} placeholder="예: K20220519" className={fieldCls} />
+            </div>
           </div>
           {error && <p className={`text-sm text-red-500 rounded-lg px-3 py-2 ${isDark ? "bg-red-900/30" : "bg-red-50"}`}>{error}</p>}
           <div className="flex gap-3 pt-1">
@@ -1118,6 +1132,8 @@ export default function SitesClient({ initial, elevators }: Props) {
                           <th className={`px-4 py-3 text-left text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>호기명</th>
                           <th className={`px-4 py-3 text-left text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>승강기 번호</th>
                           <th className={`px-4 py-3 text-left text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>비상통화장치</th>
+                          <th className={`px-4 py-3 text-left text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>원장번호</th>
+                          <th className={`px-4 py-3 text-left text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>잡번호</th>
                           {canEdit && (
                             <th className={`px-4 py-3 text-xs font-medium w-20 ${isDark ? "text-gray-400" : "text-gray-500"}`}></th>
                           )}
@@ -1137,6 +1153,8 @@ export default function SitesClient({ initial, elevators }: Props) {
                             <td className={`px-4 py-3 font-mono text-xs ${isDark ? "text-gray-300" : "text-gray-600"}`}>
                               {sameAsAbove ? "" : (e.emergencyPhone ?? "—")}
                             </td>
+                            <td className={`px-4 py-3 font-mono text-xs whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"}`}>{e.ledgerNo ?? "—"}</td>
+                            <td className={`px-4 py-3 font-mono text-xs whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"}`}>{e.jobNo ?? "—"}</td>
                             {canEdit && (
                               <td className="px-4 py-3">
                                 <div className="flex gap-1">

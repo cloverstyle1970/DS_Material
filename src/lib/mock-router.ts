@@ -280,16 +280,21 @@ function dbToElevator(r: any, siteName?: string): ElevatorRecord {
     elevatorNo:     r.elevator_number  ?? null,
     emergencyPhone: r.emergency_phone  ?? null, // site_elevators.emergency_phone (호기 단위 비통번호)
     modelName:      r.elevator_model   ?? null,
+    ledgerNo:       r.ledger_no        ?? null,
+    jobNo:          r.job_no           ?? null,
   };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function elevatorToDb(d: any): Record<string, unknown> {
   const obj: Record<string, unknown> = {};
-  if (d.unitName   !== undefined) obj.installation_place = d.unitName; // 호기 기준 = installation_place
-  if (d.elevatorNo !== undefined) obj.elevator_number = d.elevatorNo;
-  if (d.modelName  !== undefined) obj.elevator_model  = d.modelName;
-  // 현장(site_id)·emergencyPhone 은 라우트에서 별도 처리 (site_elevators 스키마)
+  if (d.unitName       !== undefined) obj.installation_place = d.unitName; // 호기 기준 = installation_place
+  if (d.elevatorNo     !== undefined) obj.elevator_number = d.elevatorNo;
+  if (d.modelName      !== undefined) obj.elevator_model  = d.modelName;
+  if (d.emergencyPhone !== undefined) obj.emergency_phone = d.emergencyPhone;
+  if (d.ledgerNo       !== undefined) obj.ledger_no       = d.ledgerNo;
+  if (d.jobNo          !== undefined) obj.job_no          = d.jobNo;
+  // site_id 는 라우트에서 별도 처리
   return obj;
 }
 
@@ -1029,13 +1034,20 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
     return dbToVendor(data);
   }
   if (path === "/api/elevators") {
-    const { siteName, unitName, elevatorNo } = body;
+    const { siteName, unitName, elevatorNo, emergencyPhone, ledgerNo, jobNo } = body;
     if (!siteName) throw new MockApiError("siteName 필수", 400);
     // 현장명 → site_id 해석 (site_elevators 는 FK 연결)
     const { data: site } = await supabase.from("managed_sites").select("id").eq("site_name", siteName).maybeSingle();
     if (!site) throw new MockApiError("현장을 찾을 수 없습니다", 404);
     const { data, error } = await supabase.from("site_elevators")
-      .insert({ site_id: (site as any).id, installation_place: unitName || null, elevator_number: elevatorNo || null })
+      .insert({
+        site_id: (site as any).id,
+        installation_place: unitName       || null,
+        elevator_number:    elevatorNo     || null,
+        emergency_phone:    emergencyPhone || null,
+        ledger_no:          ledgerNo       || null,
+        job_no:             jobNo          || null,
+      })
       .select().single();
     if (error) throw new MockApiError(error.message, 500);
     return dbToElevator(data, siteName);
