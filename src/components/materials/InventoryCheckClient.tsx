@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
 import { fmtNum } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
+import SerialEntryModal from "@/components/purchase/SerialEntryModal";
 
 type MatType = "전체" | "DS" | "TK";
 type CheckMode = "qty" | "sn";
@@ -23,6 +24,9 @@ export default function InventoryCheckClient() {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [actualQty, setActualQty] = useState<Record<string, number>>({});
+  // 실사 +입고분에 부여할 S/N (materialId → list)
+  const [serialMap, setSerialMap] = useState<Record<string, string[]>>({});
+  const [serialEditId, setSerialEditId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -198,6 +202,25 @@ export default function InventoryCheckClient() {
       alert("실사 반영할 자재를 선택해주세요.");
       return;
     }
+
+    // 사전 검증: +입고분에 부여된 S/N 갯수가 증가분보다 많으면 거부
+    for (const id of selected) {
+      const material = materials.find(m => m.id === id);
+      if (!material) continue;
+      const newQty = actualQty[id];
+      if (newQty === undefined) continue;
+      const diff = newQty - material.stockQty;
+      const sns = serialMap[id] ?? [];
+      if (sns.length > 0 && diff <= 0) {
+        alert(`${material.name}: 증가분이 없는데 S/N이 입력되어 있습니다. (실사재고 ${newQty} ≤ 전산재고 ${material.stockQty})`);
+        return;
+      }
+      if (sns.length > diff) {
+        alert(`${material.name}: S/N 갯수(${sns.length})가 입고 증가분(${diff})보다 많습니다.`);
+        return;
+      }
+    }
+
     if (!confirm(`선택한 ${selected.size}개 자재의 재고를 실사 반영하시겠습니까?`)) return;
 
     setSaving(true);
@@ -219,8 +242,9 @@ export default function InventoryCheckClient() {
         const diff = newQty - currentQty;
         const type = diff > 0 ? "입고" : "출고";
         const absDiff = Math.abs(diff);
+        const sns = serialMap[id] ?? [];
 
-        // 1. 트랜잭션 기록
+        // 1. 트랜잭션 기록 (+입고 시 S/N 함께 전달 → material_units 자동 등록)
         await api.post("/api/transactions", {
           type,
           materialId: material.id,
@@ -230,6 +254,7 @@ export default function InventoryCheckClient() {
           note: "재고실사 조정",
           userId: user?.id ?? 0,
           userName: user?.name ?? "시스템",
+          serialNos: type === "입고" && sns.length > 0 ? sns : null,
         });
 
         // 2. 재고 업데이트
@@ -239,6 +264,7 @@ export default function InventoryCheckClient() {
       alert(`${successCount}건의 재고실사가 반영되었습니다.`);
       setSelected(new Set());
       setActualQty({});
+      setSerialMap({});
       fetchMaterials();
     } catch (e) {
       alert(getErrorMessage(e));
@@ -377,13 +403,16 @@ export default function InventoryCheckClient() {
                 <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-300">보관장소</th>
                 <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-300">전산 재고</th>
                 <th className="px-4 py-3 text-center font-bold text-blue-600 dark:text-blue-400">실사 재고</th>
+                <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-300">+입고 S/N</th>
               </tr>
             </thead>
             <tbody className={`divide-y ${isDark ? "divide-gray-700" : "divide-gray-100"}`}>
               {filtered.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-16 text-gray-400">조회된 자재가 없습니다.</td></tr>
+                <tr><td colSpan={9} className="text-center py-16 text-gray-400">조회된 자재가 없습니다.</td></tr>
               ) : paginated.map(m => {
                 const isChecked = selected.has(m.id);
+                const diff = (actualQty[m.id] ?? m.stockQty) - m.stockQty;
+                const sns = serialMap[m.id] ?? [];
                 return (
                   <tr key={m.id}
                     onClick={() => toggleOne(m.id, m.stockQty)}
@@ -420,6 +449,17 @@ export default function InventoryCheckClient() {
                         />
                       ) : (
                         <span className="text-gray-300 dark:text-gray-600">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
+                      {isChecked && diff > 0 ? (
+                        <button type="button" onClick={() => setSerialEditId(m.id)}
+                          title={sns.length > 0 && sns.length < diff ? `${sns.length}건 추적 + ${diff - sns.length}건 비추적` : undefined}
+                          className={`text-xs px-2 py-1 rounded border font-medium transition-colors ${sns.length === 0 ? "border-gray-300 text-gray-500 bg-white hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600" : sns.length === diff ? "border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:bg-blue-900/30" : "border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:bg-amber-900/30"}`}>
+                          {sns.length === 0 ? "S/N (선택) ▾" : sns.length === diff ? `S/N ${sns.length}건 ▾` : `S/N ${sns.length}/${diff}건 ▾`}
+                        </button>
+                      ) : (
+                        <span className="text-gray-300 dark:text-gray-600 text-xs">-</span>
                       )}
                     </td>
                   </tr>
@@ -523,6 +563,25 @@ export default function InventoryCheckClient() {
         </div>
       </div>
       )}
+
+      {serialEditId && (() => {
+        const m = materials.find(x => x.id === serialEditId);
+        if (!m) return null;
+        const diff = (actualQty[m.id] ?? m.stockQty) - m.stockQty;
+        return (
+          <SerialEntryModal
+            mode="inbound"
+            materialId={m.id}
+            materialName={`${m.name} — 실사 +${diff} 입고`}
+            initial={serialMap[m.id] ?? []}
+            onClose={() => setSerialEditId(null)}
+            onSave={list => {
+              setSerialMap(prev => ({ ...prev, [m.id]: list }));
+              setSerialEditId(null);
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }

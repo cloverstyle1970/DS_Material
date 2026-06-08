@@ -20,6 +20,8 @@ export default function SerialEntryModal({ mode, materialId, materialName, initi
   const [checked, setChecked] = useState<Set<string>>(new Set(initial));
   const [loading, setLoading] = useState(false);
   const [query,   setQuery]   = useState("");
+  // 출고 모드 자유입력 — material_units에 없는 S/N(자재실사 등으로 들어온 비추적 재고)을 직접 입력
+  const [freeText, setFreeText] = useState("");
 
   useEffect(() => {
     if (mode !== "outbound") return;
@@ -58,7 +60,19 @@ export default function SerialEntryModal({ mode, materialId, materialName, initi
       if (dup) { alert(`중복된 S/N: ${dup}`); return; }
       onSave(list);
     } else {
-      onSave(Array.from(checked));
+      const freeList = freeText
+        .split(/[\r\n,]+/)
+        .map(s => s.trim())
+        .filter(Boolean);
+      // 체크박스 선택 + 자유입력 병합 (중복 제거, 순서 유지)
+      const merged: string[] = [];
+      const seen = new Set<string>();
+      for (const sn of [...checked, ...freeList]) {
+        if (seen.has(sn)) continue;
+        seen.add(sn);
+        merged.push(sn);
+      }
+      onSave(merged);
     }
   }
 
@@ -94,13 +108,19 @@ export default function SerialEntryModal({ mode, materialId, materialName, initi
             <div className="px-4 py-2.5 border-b border-gray-100 dark:border-gray-700 shrink-0 flex items-center gap-2">
               <input type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="S/N 검색"
                 className="flex-1 px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-300 placeholder:text-gray-400 dark:placeholder:text-gray-500" />
-              <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">재고 {filtered.length}개 / 선택 {checked.size}개</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+                재고 {filtered.length}개 / 선택 {checked.size}개
+                {(() => {
+                  const free = freeText.split(/[\r\n,]+/).map(s => s.trim()).filter(Boolean).length;
+                  return free > 0 ? ` + 자유입력 ${free}` : "";
+                })()}
+              </span>
             </div>
             <div className="flex-1 overflow-auto">
               {loading ? (
                 <div className="text-center py-8 text-xs text-gray-400">로딩 중...</div>
               ) : filtered.length === 0 ? (
-                <div className="text-center py-8 text-xs text-gray-400">재고 상태인 S/N이 없습니다.</div>
+                <div className="px-4 py-6 text-center text-xs text-gray-400">재고 상태인 S/N이 없습니다. 아래 자유입력란을 사용하세요.</div>
               ) : (
                 <ul className="divide-y divide-gray-50 dark:divide-gray-700">
                   {filtered.map(u => {
@@ -118,6 +138,19 @@ export default function SerialEntryModal({ mode, materialId, materialName, initi
                   })}
                 </ul>
               )}
+            </div>
+            <div className="border-t border-gray-100 dark:border-gray-700 px-4 py-3 shrink-0 bg-amber-50/40 dark:bg-amber-900/10">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                  자유입력 S/N <span className="font-normal text-[10px] text-gray-500 dark:text-gray-400">(자재실사 등으로 들어온 비추적 재고용)</span>
+                </label>
+              </div>
+              <textarea value={freeText} onChange={e => setFreeText(e.target.value)} rows={3}
+                placeholder="S/N을 한 줄에 하나씩 입력 (예: SN-001)"
+                className="w-full px-2.5 py-1.5 text-xs font-mono border border-amber-300 dark:border-amber-700 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-300 placeholder:text-gray-400 dark:placeholder:text-gray-500 resize-y" />
+              <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
+                저장 시 새 S/N은 비추적 재고에서 1건씩 차감 · 출고 상태로 등록됩니다. 비추적 잔량 부족 시 거부됩니다.
+              </p>
             </div>
           </div>
         )}
