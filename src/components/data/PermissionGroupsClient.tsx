@@ -98,6 +98,12 @@ const PERMISSION_TREE: MenuSection[] = [
       { href: "/hr/employment-status",  label: "재직상태 관리" },
     ],
   },
+  {
+    id: "accounting", label: "회계/세무", color: "text-indigo-500",
+    items: [
+      { href: "/payroll/payslip", label: "급여명세표" },
+    ],
+  },
 ];
 
 const ALL_PERM_KEYS: string[] = (() => {

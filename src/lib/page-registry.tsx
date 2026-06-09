@@ -43,6 +43,7 @@ import QuotesListClient from "@/components/quotes/QuotesListClient";
 import LaborRatesClient from "@/components/quotes/LaborRatesClient";
 import QuoteDetailClient from "@/components/quotes/QuoteDetailClient";
 import LegacyQuotesClient from "@/components/quotes/LegacyQuotesClient";
+import PayslipClient from "@/components/payroll/PayslipClient";
 import ManualCenterClient from "@/components/manual/ManualCenterClient";
 
 export interface PageEntry {
@@ -130,6 +131,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/quotes/legacy": {
     label: "구 견적조회",
     render: () => <LegacyQuotesClient />,
+  },
+  "/payroll/payslip": {
+    label: "급여명세표",
+    render: () => <PayslipClient />,
   },
   "/data/profile": {
     label: "개인정보수정",

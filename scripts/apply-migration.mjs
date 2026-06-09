@@ -60,6 +60,15 @@ try {
     }
   }
   console.log("✅ 적용 완료");
+
+  // PostgREST 스키마 캐시 reload — 새 테이블/컬럼을 즉시 인식하도록 시그널 전송.
+  // 보내지 않으면 화면에서 PGRST205("Could not find the table")가 잠시 발생할 수 있음.
+  try {
+    await client.query(`NOTIFY pgrst, 'reload schema'`);
+    console.log("✅ PostgREST 스키마 reload 시그널 전송");
+  } catch (e) {
+    console.warn("⚠ NOTIFY pgrst 실패 (캐시 자동 갱신 대기 필요):", e.message);
+  }
 } catch (e) {
   console.error("❌ SQL 실행 실패:", e.message);
   process.exitCode = 1;

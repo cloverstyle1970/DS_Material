@@ -113,7 +113,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "회계/세무",
     color: "text-indigo-400",
     items: [
-      { href: "#accounting", label: "준비중", icon: "💳" }
+      { href: "/payroll/payslip", label: "급여명세표", icon: "💵" },
     ],
   }
 ];
@@ -177,6 +177,7 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
     if (href === "/quotes/labor-rates") return pathname === "/quotes/labor-rates";
     if (href === "/quotes/settings") return pathname === "/quotes/settings";
     if (href === "/quotes/legacy") return pathname === "/quotes/legacy";
+    if (href === "/payroll/payslip") return pathname === "/payroll/payslip";
     return pathname === href || (href !== "/" && pathname.startsWith(href + "/"));
   }
 
