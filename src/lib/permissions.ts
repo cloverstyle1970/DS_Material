@@ -30,6 +30,7 @@ export const PERMISSION_MENUS: PermissionMenuGroup[] = [
       { href: "/quotes/new",         label: "견적서 작성" },
       { href: "/quotes/labor-rates", label: "공정별 공수표" },
       { href: "/quotes/settings",    label: "견적 기본 설정" },
+      { href: "/quotes/legacy",      label: "구 견적조회" },
     ],
   },
   {

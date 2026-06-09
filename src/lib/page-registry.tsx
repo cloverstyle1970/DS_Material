@@ -42,6 +42,7 @@ import QuoteSettingsClient from "@/components/quotes/QuoteSettingsClient";
 import QuotesListClient from "@/components/quotes/QuotesListClient";
 import LaborRatesClient from "@/components/quotes/LaborRatesClient";
 import QuoteDetailClient from "@/components/quotes/QuoteDetailClient";
+import LegacyQuotesClient from "@/components/quotes/LegacyQuotesClient";
 import ManualCenterClient from "@/components/manual/ManualCenterClient";
 
 export interface PageEntry {
@@ -125,6 +126,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/quotes/settings": {
     label: "견적 기본 설정",
     render: () => <QuoteSettingsClient />,
+  },
+  "/quotes/legacy": {
+    label: "구 견적조회",
+    render: () => <LegacyQuotesClient />,
   },
   "/data/profile": {
     label: "개인정보수정",

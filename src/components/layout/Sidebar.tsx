@@ -50,6 +50,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/quotes/new",     label: "견적서 작성",      icon: "💰" },
       { href: "/quotes/labor-rates", label: "공정별 공수표",   icon: "🛠️" },
       { href: "/quotes/settings", label: "견적 기본 설정",  icon: "⚙️" },
+      { href: "/quotes/legacy",  label: "구 견적조회",      icon: "📂" },
     ],
   },
   {
@@ -175,6 +176,7 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
     if (href === "/data/company-info") return pathname === "/data/company-info";
     if (href === "/quotes/labor-rates") return pathname === "/quotes/labor-rates";
     if (href === "/quotes/settings") return pathname === "/quotes/settings";
+    if (href === "/quotes/legacy") return pathname === "/quotes/legacy";
     return pathname === href || (href !== "/" && pathname.startsWith(href + "/"));
   }
 
