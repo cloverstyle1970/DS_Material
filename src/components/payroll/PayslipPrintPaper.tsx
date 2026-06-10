@@ -12,6 +12,7 @@ interface PayslipItem {
 
 interface Payslip {
   id: number;
+  slip_no?: string | null;
   emp_name: string;
   dept: string | null;
   rank: string | null;
@@ -50,7 +51,7 @@ const FIXED_DEDUCTION_ROWS = 12;
 
 const CALC_METHOD_LINES = [
   "1. 일할계산 : 월임금 / 당월총일수 * (당월재직일수-결근등)",
-  "2. 근태공제 : 통상시급 * 시각 또는 조퇴 시간",
+  "2. 근태공제 : 통상시급 * 지각 또는 조퇴 시간",
   "3. 추가연장수당 : 통상시급 * 연장시간 * 1.5",
   "4. 추가휴일수당 : 통상시급 * 휴일근로시간 * 1.5 (8시간을 초과하는 부분은 2.0)",
   "5. 고용보험 : 당월급여 * 0.9%",
@@ -66,8 +67,10 @@ export function PayslipCard({ payslip, year, month, payDate, no }: {
   year: number;
   month: number;
   payDate: string;
-  no: number;
+  no: number | string;
 }) {
+  // 엑셀 명세서 순번이 있으면 그것을 우선, 없으면 호출자가 전달한 fallback 사용
+  const displayNo = payslip.slip_no?.trim() ? payslip.slip_no.trim() : no;
   const earnings = payslip.items.filter(i => i.type === "earning").sort((a, b) => a.sort - b.sort);
   const deductions = payslip.items.filter(i => i.type === "deduction").sort((a, b) => a.sort - b.sort);
   const info = payslip.calc_info ?? {};
@@ -82,7 +85,7 @@ export function PayslipCard({ payslip, year, month, payDate, no }: {
       <div className="flex items-center border-b-2 border-black px-2 py-1.5">
         <div className="text-[8px] w-12 flex items-baseline gap-1">
           <span>no.</span>
-          <span className="font-bold">{no}</span>
+          <span className="font-bold">{displayNo}</span>
         </div>
         <div className="flex-1 text-center text-base font-black tracking-wider">{yy}년 {String(month).padStart(2, "0")}월분 급여명세서</div>
         <div className="w-12" />
@@ -182,7 +185,7 @@ export function PayslipCard({ payslip, year, month, payDate, no }: {
                       }}
                       rowSpan={earnRowSpan}
                     >
-                      월급여지급내역
+                      월급여 지급내역
                     </th>
                   )}
                   <td className="border border-black px-1 py-0 text-center" colSpan={2}>{e?.label ?? ""}</td>
@@ -198,7 +201,7 @@ export function PayslipCard({ payslip, year, month, payDate, no }: {
                       }}
                       rowSpan={dedRowSpan}
                     >
-                      4대보험및제세공과금등
+                      4대보험 및 제세공과금 등
                     </th>
                   )}
                   <td className="border border-black px-1 py-0 text-center" colSpan={2}>{d?.label ?? ""}</td>

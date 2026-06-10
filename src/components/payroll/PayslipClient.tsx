@@ -29,6 +29,7 @@ interface RegisteredPayslip {
   id: number;
   period_id: number;
   account_id: number | null;
+  slip_no: string | null;
   emp_name: string;
   dept: string | null;
   rank: string | null;
@@ -128,7 +129,7 @@ export default function PayslipClient() {
 
     const psRes = await supabase
       .from("payslips")
-      .select("id, period_id, account_id, emp_name, dept, rank, birth_yymmdd, company_name, gross, deduction, net, calc_info, remark")
+      .select("id, period_id, account_id, slip_no, emp_name, dept, rank, birth_yymmdd, company_name, gross, deduction, net, calc_info, remark")
       .eq("period_id", periodRes.data.id)
       .order("emp_name");
 
@@ -263,6 +264,7 @@ export default function PayslipClient() {
         const psIns = await supabase.from("payslips").insert({
           period_id: periodId,
           account_id: m.matchedAccountId,
+          slip_no: m.slipNo,
           emp_name: m.empName,
           dept: m.dept,
           rank: m.rank,

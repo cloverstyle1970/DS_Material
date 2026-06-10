@@ -37,6 +37,7 @@ export interface PayrollCalcInfo {
 
 export interface ParsedPayslip {
   rowIndex: number;
+  slipNo: string | null;     // A열 "no." 행의 B열 값 (명세서 순번)
   empName: string;
   dept: string | null;       // 이 양식엔 부서 없음 → null
   rank: string | null;
@@ -82,6 +83,9 @@ const START_MARKER_A = /^no\.?$/i;                // A열에 "no." 가 있으면
 const END_MARKER_B   = /수고\s*많|감사합니다/;     // B열에 마감 문구
 
 function parseBlock(rows: CellValue[][], start: number, end: number): ParsedPayslip | null {
+  // A열 "no." 행의 B열 = 명세서 순번
+  const slipNoRaw = (rows[start] ?? [])[1];
+  const slipNo = slipNoRaw == null || String(slipNoRaw).trim() === "" ? null : trimText(slipNoRaw);
   let empName = "";
   let rank: string | null = null;
   let birthYymmdd: string | null = null;
@@ -226,6 +230,7 @@ function parseBlock(rows: CellValue[][], start: number, end: number): ParsedPays
 
   return {
     rowIndex: start + 1,
+    slipNo,
     empName,
     dept: null,
     rank,
