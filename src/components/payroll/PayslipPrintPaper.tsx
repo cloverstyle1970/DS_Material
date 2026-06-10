@@ -87,7 +87,9 @@ export function PayslipCard({ payslip, year, month, payDate, no }: {
           <span>no.</span>
           <span className="font-bold">{displayNo}</span>
         </div>
-        <div className="flex-1 text-center text-base font-black tracking-wider">{yy}년 {String(month).padStart(2, "0")}월분 급여명세서</div>
+        <div className="flex-1 text-center text-base font-black tracking-wider">
+          <span className="tabular-nums">{yy}</span>년 <span className="tabular-nums">{String(month).padStart(2, "0")}</span>월분 급여명세서
+        </div>
         <div className="w-12" />
       </div>
 

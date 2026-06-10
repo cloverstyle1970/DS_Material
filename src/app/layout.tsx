@@ -7,14 +7,10 @@ import { AuthProvider } from "@/context/AuthContext";
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
-// 배포(GitHub Pages)는 basePath /DS_Material 하위라 매니페스트 경로에도 prefix 필요.
-// (Next metadata는 manifest URL에 basePath를 자동 적용하지 않음)
-const BASE_PATH = process.env.NODE_ENV === "production" ? "/DS_Material" : "";
-
 export const metadata: Metadata = {
   title: "DS 자재관리 시스템",
   description: "승강기 유지보수 스마트 자재관리 시스템",
-  manifest: `${BASE_PATH}/manifest.json`,
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
