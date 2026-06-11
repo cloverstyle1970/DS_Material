@@ -201,9 +201,11 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
   }
 
   function applyInbound(t: TransactionRecord) {
+    // remark는 사용자 메모 자리이므로 비워둠. 입고 식별은 inboundRef로,
+    // transaction note의 '입고 #N 출고완료' 패턴은 save() 단에서 자동 prepend.
     const row = newRow({
       materialId: t.materialId, materialName: t.materialName,
-      qty: t.qty, inboundRef: t.id, remark: `입고#${t.id} 참조`,
+      qty: t.qty, inboundRef: t.id, remark: "",
     });
     if (t.siteName && !siteName) setSiteName(t.siteName);
     setRows(prev => {
@@ -243,13 +245,24 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
       
       const batchId = isEdit && editBatchId ? editBatchId : crypto.randomUUID();
       for (const r of valid) {
+        // note 형식 표준: r.inboundRef가 있으면 '입고 #N 출고완료' 패턴 강제 포함.
+        // 사용자 메모는 ' / ' 구분자로 뒤에 append. 이 패턴이 InboundRefPopup
+        // 안전장치의 매칭 정규식에서 활용됨.
+        const userMemo = (r.remark || reference || "").trim();
+        let note: string | null;
+        if (r.inboundRef != null) {
+          const tag = `입고 #${r.inboundRef} 출고완료`;
+          note = userMemo ? `${tag} / ${userMemo}` : tag;
+        } else {
+          note = userMemo || null;
+        }
         await api.post("/api/transactions", {
           type: "출고", materialId: r.materialId, materialName: r.materialName,
           qty: r.qty, siteName: siteName || null,
           elevatorName: r.elevatorName || null,
           serialNos: r.serialNos.length > 0 ? r.serialNos : null,
           requiresReturn: r.requiresReturn,
-          note: r.remark || reference || null, userId: user.id, userName: user.name,
+          note, userId: user.id, userName: user.name,
           batchId,
           createdAt: isEdit ? outboundDate : undefined,
         });
@@ -765,7 +778,25 @@ function InboundRefPopup({ onSelect, onClose }: { onSelect: (t: TransactionRecor
   const [records, setRecords] = useState<TransactionRecord[]>([]);
   const [q, setQ] = useState("");
   useEffect(() => {
-    api.get<TransactionRecord[]>("/api/transactions?type=입고").then(data => setRecords(data.slice(0, 200))).catch(() => setRecords([]));
+    // 안전장치: type='입고' 후보 중에서 이미 출고에 참조된 입고는 제외.
+    // 출고 transaction의 note에 '입고 #N' 또는 옛 형식 '입고#N' 패턴이 있으면 매칭.
+    Promise.all([
+      api.get<TransactionRecord[]>("/api/transactions?type=입고"),
+      supabase.from("transactions").select("note").eq("type", "출고").ilike("note", "%입고%"),
+    ]).then(([inboundRecords, txRes]) => {
+      const matchedIds = new Set<number>();
+      const re = /입고\s*#(\d+)/g;
+      for (const t of (txRes.data ?? []) as { note: string | null }[]) {
+        if (!t.note) continue;
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(t.note)) !== null) {
+          const id = Number(m[1]);
+          if (id) matchedIds.add(id);
+        }
+      }
+      const remaining = inboundRecords.filter(r => !matchedIds.has(r.id));
+      setRecords(remaining.slice(0, 200));
+    }).catch(() => setRecords([]));
   }, []);
   const filtered = records.filter(t =>
     !q || t.materialName.toLowerCase().includes(q.toLowerCase()) ||
