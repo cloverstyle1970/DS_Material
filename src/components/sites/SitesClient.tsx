@@ -612,13 +612,16 @@ export default function SitesClient({ initial, elevators }: Props) {
   type ElevatorMatch = { elevator: ElevatorRecord; matchKind: "unit" | "elevatorNo" | "emergency" };
   const elevatorMatchBySite = useMemo(() => {
     if (!q) return new Map<string, ElevatorMatch[]>();
+    // 비통번호 매칭은 검색어가 숫자(+공백/하이픈)로만 구성된 경우에만 수행.
+    // "19단" 같은 한글 포함 검색에서 숫자만 추출해 엉뚱한 현장이 매칭되던 문제 방지.
     const qDigits = q.replace(/\D/g, "");
+    const isDigitOnlyQuery = qDigits.length > 0 && /^[\d\s-]+$/.test(q);
     const matched = new Map<string, ElevatorMatch[]>();
     for (const e of allElevators) {
       let matchKind: ElevatorMatch["matchKind"] | null = null;
       if (e.unitName?.toLowerCase().includes(q))          matchKind = "unit";
       else if (e.elevatorNo?.toLowerCase().includes(q))   matchKind = "elevatorNo";
-      else if (e.emergencyPhone && qDigits) {
+      else if (e.emergencyPhone && isDigitOnlyQuery) {
         const phoneDigits = e.emergencyPhone.replace(/\D/g, "");
         if (phoneDigits.slice(-4).includes(qDigits))      matchKind = "emergency";
       }
