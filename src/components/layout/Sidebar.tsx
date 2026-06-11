@@ -5,6 +5,22 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth, isViewOnly, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { useTabs, MAX_TABS } from "@/context/TabsContext";
 import { PAGE_REGISTRY } from "@/lib/page-registry";
+import { supabase } from "@/lib/supabase";
+
+const MAINTENANCE_SITE_URL = "https://men.daesol.kr";
+
+// 자재관리 → 유지보수 SSO 전달. 양쪽이 같은 Supabase 프로젝트라 토큰을 그대로 hash로 넘긴다.
+// 세션이 없으면 그냥 베이스 URL만 열어 평소 로그인 화면이 뜨도록.
+async function openMaintenanceSite() {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { window.open(MAINTENANCE_SITE_URL, "_blank"); return; }
+    const url = `${MAINTENANCE_SITE_URL}#access_token=${encodeURIComponent(session.access_token)}&refresh_token=${encodeURIComponent(session.refresh_token)}`;
+    window.open(url, "_blank");
+  } catch {
+    window.open(MAINTENANCE_SITE_URL, "_blank");
+  }
+}
 
 type NavItem = {
   href: string;
@@ -246,13 +262,14 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
             <span className="text-sm font-bold tracking-tight whitespace-nowrap text-white">
               자재관리
             </span>
-            <a
-              href="https://daesol-sketch.github.io"
+            <button
+              type="button"
+              onClick={openMaintenanceSite}
               className="inline-flex items-center text-sm font-bold tracking-tight whitespace-nowrap text-white hover:text-blue-300 transition-colors"
-              title="유지보수 사이트로 이동"
+              title="유지보수 사이트로 이동 (로그인 유지)"
             >
               유지보수
-            </a>
+            </button>
           </div>
         </div>
 

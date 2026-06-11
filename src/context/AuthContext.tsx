@@ -80,6 +80,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
+    // 유지보수 사이트(men.daesol.kr)에서 SSO 토큰을 hash로 넘겨온 경우 먼저 setSession.
+    // 양쪽이 같은 Supabase 프로젝트라서 access_token/refresh_token을 그대로 신뢰 가능.
+    async function consumeSsoHashIfPresent() {
+      if (typeof window === "undefined") return;
+      const hash = window.location.hash;
+      if (!hash.includes("access_token=")) return;
+      const params = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash);
+      const accessToken = params.get("access_token");
+      const refreshToken = params.get("refresh_token");
+      if (!accessToken || !refreshToken) return;
+      try {
+        await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+      } catch {
+        // 토큰이 유효하지 않거나 만료면 무시 — 평소 syncFromSession이 비세션 분기로 빠짐
+      } finally {
+        // 토큰이 URL 히스토리에 잔존하지 않도록 즉시 청소
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+    }
+
     // Supabase Auth 세션이 단일 진리원. localStorage[STORAGE_KEY]는 화면 표시용 캐시.
     // 세션의 user.email = `${accounts.id}@daesol.el` 규약(daesol.el은 가짜 도메인 — 키 용도).
     async function syncFromSession() {
@@ -155,9 +175,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    syncFromSession();
+    (async () => {
+      await consumeSsoHashIfPresent();
+      await syncFromSession();
+    })();
 
-    // 다른 탭/창에서 로그아웃되면 즉시 반영. SIGNED_IN은 login()이 직접 setUser 하므로 처리 불필요.
+    // 다른 탭/창에서 로그아웃되면 즉시 반영. SIGNED_IN은 login() 또는 위 bootstrap이 처리.
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT") {
         setUser(null);
