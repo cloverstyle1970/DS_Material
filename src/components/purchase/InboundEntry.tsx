@@ -171,11 +171,13 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
       orders.forEach(o => {
         const mat = mats.find(m => m.id === o.materialId);
         const spec = mat?.modelNo || "";
+        // remark는 사용자 메모 자리이므로 비워둠. 발주 식별은 orderId로,
+        // transaction note의 '발주 #N 입고완료' 패턴은 save() 단에서 자동 prepend.
         const patch = {
           materialId: o.materialId, materialName: o.materialName,
           spec,
           qty: o.qty, unitPrice: o.unitPrice ?? 0,
-          siteName: o.siteName ?? "", remark: `발주#${o.id}`, orderId: o.id,
+          siteName: o.siteName ?? "", remark: "", orderId: o.id,
           serialNos: [] as string[],
         };
         
@@ -218,11 +220,23 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
       
       const batchId = isEdit && editBatchId ? editBatchId : crypto.randomUUID();
       for (const r of valid) {
+        // note 형식 표준: r.orderId가 있으면 '발주 #N 입고완료' 패턴 강제 포함.
+        // 사용자 메모는 ' / ' 구분자로 뒤에 append. 이 패턴이 (a) OrderPopup 안전장치의
+        // 매칭 정규식, (b) mock-router의 입고 transaction 삭제 시 발주 status 원복(line 1789)
+        // 양쪽에서 사용됨.
+        const userMemo = (r.remark || reference || "").trim();
+        let note: string | null;
+        if (r.orderId != null) {
+          const tag = `발주 #${r.orderId} 입고완료`;
+          note = userMemo ? `${tag} / ${userMemo}` : tag;
+        } else {
+          note = userMemo || null;
+        }
         await api.post("/api/transactions", {
           type: "입고", materialId: r.materialId, materialName: r.materialName,
           qty: r.qty, siteName: r.siteName || null,
           serialNos: r.serialNos.length > 0 ? r.serialNos : null,
-          note: r.remark || reference || null, userId: user.id, userName: user.name,
+          note, userId: user.id, userName: user.name,
           batchId,
           createdAt: isEdit ? inboundDate : undefined,
         });
@@ -723,7 +737,27 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
   const [checked, setChecked] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    api.get<PurchaseOrderRecord[]>("/api/purchase-orders?status=발주").then(setOrders).catch(() => setOrders([]));
+    // 안전장치: status='발주'인 발주 중에서도 이미 입고 transaction이 있는 건은 제외.
+    // InboundEntry.save()의 status 갱신이 누락되거나(과거 잔존 데이터) 다른 경로로
+    // 입고 처리된 경우를 모두 커버하기 위함. transactions의 note에 '발주 #N' 또는
+    // '발주#N' 패턴이 매칭되면 미입고 리스트에서 빼낸다.
+    Promise.all([
+      api.get<PurchaseOrderRecord[]>("/api/purchase-orders?status=발주"),
+      supabase.from("transactions").select("note").eq("type", "입고").ilike("note", "%발주%"),
+    ]).then(([rawOrders, txRes]) => {
+      const matchedIds = new Set<number>();
+      const re = /발주\s*#(\d+)/g;
+      for (const t of (txRes.data ?? []) as { note: string | null }[]) {
+        if (!t.note) continue;
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(t.note)) !== null) {
+          const id = Number(m[1]);
+          if (id) matchedIds.add(id);
+        }
+      }
+      setOrders(rawOrders.filter(o => !matchedIds.has(o.id)));
+    }).catch(() => setOrders([]));
+
     api.get<MaterialRecord[]>("/api/materials").then(list => {
       const map: Record<string, string> = {};
       list.forEach(m => { map[m.id] = m.modelNo ?? ""; });
