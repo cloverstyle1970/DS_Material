@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { UserRecord, Permission } from "@/lib/mock-users";
-import { useAuth, isAdmin } from "@/context/AuthContext";
+import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useTabs, MAX_TABS } from "@/context/TabsContext";
 import { api, getErrorMessage } from "@/lib/api-client";
@@ -119,6 +119,8 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
 
   const { user: me } = useAuth();
   const meIsAdmin = me ? isAdmin(me) : false;
+  // 사원 클릭 시 개인정보수정 진입 권한 — admin 또는 사원관리 update 권한 보유
+  const canEditUser = me ? (meIsAdmin || hasMenuPermission(me, "/data/users", "update")) : false;
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const { tabs, openTab } = useTabs();
@@ -134,9 +136,9 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
     reloadUsers();
   }, [reloadUsers]);
 
-  // 관리자: 사원 이름 클릭 → 개인정보수정 탭에 대상 사용자로 진입
+  // 사원 이름 클릭 → 개인정보수정 탭에 대상 사용자로 진입 (admin 또는 사원관리 update 권한)
   function openProfileEdit(u: UserRecord) {
-    if (!meIsAdmin) return;
+    if (!canEditUser) return;
     try {
       sessionStorage.setItem(ADMIN_EDIT_USER_KEY, String(u.id));
       // MyProfileClient 가 같은 탭에 마운트돼 있으면 즉시 재로딩하도록 이벤트 발행
@@ -286,11 +288,11 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
                   className={`transition-colors cursor-pointer ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-50"}`}>
                   <td className={`px-4 py-3 text-center text-xs whitespace-nowrap ${isDark ? "text-gray-400" : "text-gray-400"}`}>{u.id}</td>
                   <td className={`px-4 py-3 text-center font-medium whitespace-nowrap ${isDark ? "text-white" : "text-gray-800"}`}>
-                    {meIsAdmin ? (
+                    {canEditUser ? (
                       <button
                         type="button"
                         onClick={e => { e.stopPropagation(); openProfileEdit(u); }}
-                        title="개인정보수정으로 이동 (관리자 편집 모드)"
+                        title="개인정보수정으로 이동"
                         className="inline-flex items-center gap-1 group hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                       >
                         <span className="underline decoration-dotted decoration-slate-400 group-hover:decoration-blue-500">{u.name}</span>
