@@ -11,14 +11,15 @@ const MAINTENANCE_SITE_URL = "https://men.daesol.kr";
 
 // 자재관리 → 유지보수 SSO 전달. 양쪽이 같은 Supabase 프로젝트라 토큰을 그대로 hash로 넘긴다.
 // 세션이 없으면 그냥 베이스 URL만 열어 평소 로그인 화면이 뜨도록.
+// 사용자 요청으로 새 창이 아닌 현재 창에서 이동.
 async function openMaintenanceSite() {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { window.open(MAINTENANCE_SITE_URL, "_blank"); return; }
+    if (!session) { window.location.href = MAINTENANCE_SITE_URL; return; }
     const url = `${MAINTENANCE_SITE_URL}#access_token=${encodeURIComponent(session.access_token)}&refresh_token=${encodeURIComponent(session.refresh_token)}`;
-    window.open(url, "_blank");
+    window.location.href = url;
   } catch {
-    window.open(MAINTENANCE_SITE_URL, "_blank");
+    window.location.href = MAINTENANCE_SITE_URL;
   }
 }
 
