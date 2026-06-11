@@ -7,6 +7,7 @@ import { MaterialRecord } from "@/lib/mock-materials";
 import { PurchaseOrderRecord } from "@/lib/mock-purchase-orders";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { supabase } from "@/lib/supabase";
 import { fmtNum, parseNum } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS, isRepairMaterial } from "@/lib/material-style";
 import DraggableModal from "@/components/common/DraggableModal";
@@ -225,6 +226,17 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
           batchId,
           createdAt: isEdit ? inboundDate : undefined,
         });
+      }
+      // 발주서 참조로 가져온 row가 있으면 해당 발주 상태를 "입고완료"로 갱신.
+      // 그렇지 않으면 OrderPopup 미입고 리스트(status=발주)에 계속 노출됨.
+      const orderIds = Array.from(new Set(
+        valid.map(r => r.orderId).filter((id): id is number => id !== null)
+      ));
+      if (orderIds.length > 0) {
+        const receivedAtIso = new Date(`${inboundDate}T00:00:00Z`).toISOString();
+        await supabase.from("purchase_orders")
+          .update({ status: "입고완료", received_at: receivedAtIso })
+          .in("id", orderIds);
       }
       window.dispatchEvent(new CustomEvent("ds:transactions_changed", { detail: { mode: "입고" } }));
       if (goList) router.push("/inbound");
