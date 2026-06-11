@@ -717,9 +717,16 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
     return store;
   }
   if (path === "/api/sites") {
-    const { data, error } = await supabase.from("managed_sites").select("*").order("site_name");
-    if (error) throw new MockApiError(error.message, 500);
-    return (data ?? []).map(dbToSite);
+    const PAGE = 1000;
+    const all: SiteRecord[] = [];
+    for (let offset = 0; ; offset += PAGE) {
+      const { data, error } = await supabase.from("managed_sites").select("*").order("site_name").range(offset, offset + PAGE - 1);
+      if (error) throw new MockApiError(error.message, 500);
+      const rows = data ?? [];
+      all.push(...rows.map(dbToSite));
+      if (rows.length < PAGE) break;
+    }
+    return all;
   }
   if (path === "/api/vendors") {
     const q    = params.get("q")?.toLowerCase();
