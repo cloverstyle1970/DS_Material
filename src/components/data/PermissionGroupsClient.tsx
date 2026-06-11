@@ -188,16 +188,29 @@ export default function PermissionGroupsClient() {
   function collapseAll() { setExpandedSections(new Set()); }
 
   async function reload() {
-    const [g, u] = await Promise.all([
-      supabase.from("permission_groups").select("*").order("sort_order"),
-      // 신DB 정본은 accounts. username 이 실제 식별자 → name 으로 별칭.
-      supabase.from("accounts")
-        .select("id, name:username, dept, rank, status, permission_group_id, permissions")
-        .eq("status", "재직")
-        .order("username"),
-    ]);
+    // groups는 단일 쿼리
+    const gRes = supabase.from("permission_groups").select("*").order("sort_order");
+    // accounts는 Supabase 기본 1000건 limit이 걸려 일부 사용자가 누락될 수 있어 페이지네이션.
+    // 누락되면 멤버 목록에도, syncMembers 적용 대상에도 빠져 권한이 안 반영됨.
+    async function loadAllAccounts(): Promise<UserRow[]> {
+      const PAGE = 1000;
+      const all: UserRow[] = [];
+      for (let offset = 0; ; offset += PAGE) {
+        const { data, error } = await supabase.from("accounts")
+          .select("id, name:username, dept, rank, status, permission_group_id, permissions")
+          .eq("status", "재직")
+          .order("username")
+          .range(offset, offset + PAGE - 1);
+        if (error) break;
+        const rows = (data ?? []) as UserRow[];
+        all.push(...rows);
+        if (rows.length < PAGE) break;
+      }
+      return all;
+    }
+    const [g, allUsers] = await Promise.all([gRes, loadAllAccounts()]);
     setGroups((g.data ?? []) as Group[]);
-    setUsers((u.data ?? []) as UserRow[]);
+    setUsers(allUsers);
     setLoaded(true);
   }
 
