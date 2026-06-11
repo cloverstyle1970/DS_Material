@@ -85,15 +85,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function consumeSsoHashIfPresent() {
       if (typeof window === "undefined") return;
       const hash = window.location.hash;
-      if (!hash.includes("access_token=")) return;
+      // [DEBUG] SSO 진단용 — 원인 파악 후 제거 예정
+      console.log("[SSO] href =", window.location.href);
+      console.log("[SSO] hash =", hash || "(empty)");
+      if (!hash.includes("access_token=")) {
+        console.log("[SSO] hash에 access_token 없음 → SSO 진입 아님");
+        return;
+      }
       const params = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash);
       const accessToken = params.get("access_token");
       const refreshToken = params.get("refresh_token");
-      if (!accessToken || !refreshToken) return;
+      console.log("[SSO] access_token 길이 =", accessToken?.length ?? 0, "refresh_token 길이 =", refreshToken?.length ?? 0);
+      if (!accessToken || !refreshToken) {
+        console.warn("[SSO] 토큰 파싱 실패");
+        return;
+      }
       try {
-        await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-      } catch {
-        // 토큰이 유효하지 않거나 만료면 무시 — 평소 syncFromSession이 비세션 분기로 빠짐
+        const result = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+        if (result.error) {
+          console.error("[SSO] setSession 실패:", result.error);
+        } else {
+          console.log("[SSO] setSession 성공, user.email =", result.data.user?.email);
+        }
+      } catch (e) {
+        console.error("[SSO] setSession 예외:", e);
       } finally {
         // 토큰이 URL 히스토리에 잔존하지 않도록 즉시 청소
         window.history.replaceState(null, "", window.location.pathname + window.location.search);
