@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, FormEvent } from "react";
-import { useAuth, isAdmin } from "@/context/AuthContext";
+import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { changeAuthPassword } from "@/lib/auth-ops";
 import { formatDate as formatYmd, formatPhone, formatSsn } from "@/lib/input-format";
@@ -152,6 +152,8 @@ function displaySsn(ssn: string | null | undefined): string {
 export default function MyProfileClient() {
   const { user } = useAuth();
   const meIsAdmin = user ? isAdmin(user) : false;
+  // 사원관리 update 권한 보유자도 다른 사용자 대리편집 허용 (UsersClient의 canEditUser와 동일 정책)
+  const canManageOtherUsers = user ? (meIsAdmin || hasMenuPermission(user, "/data/users", "update")) : false;
 
   // 관리자 대리편집 대상 (null = 본인 편집)
   // sessionStorage 값을 동기적으로 lazy-init해 첫 load부터 올바른 ID로 fire되게 함.
@@ -164,8 +166,8 @@ export default function MyProfileClient() {
       return Number.isFinite(id) ? id : null;
     } catch { return null; }
   });
-  // meIsAdmin이 아니면 sessionStorage 값을 무시 (비-admin은 무조건 본인 편집)
-  const effectiveTargetId = meIsAdmin ? adminTargetId : null;
+  // canManageOtherUsers가 아니면 sessionStorage 값을 무시 (대리편집 권한 없는 사용자는 본인 편집)
+  const effectiveTargetId = canManageOtherUsers ? adminTargetId : null;
   const editingUserId = effectiveTargetId ?? user?.id ?? null;
   const isAdminEditing = effectiveTargetId !== null && effectiveTargetId !== user?.id;
 
@@ -249,10 +251,10 @@ export default function MyProfileClient() {
     document.body.appendChild(s);
   }, []);
 
-  // 관리자 대리편집 대상 resolve — sessionStorage 변화에 반응
+  // 관리자/사원관리 update 권한자 대리편집 대상 resolve — sessionStorage 변화에 반응
   useEffect(() => {
     function resolve() {
-      if (!user || !isAdmin(user)) { setAdminTargetId(null); return; }
+      if (!user || !canManageOtherUsers) { setAdminTargetId(null); return; }
       try {
         const raw = sessionStorage.getItem(ADMIN_EDIT_USER_KEY);
         const id = raw ? Number(raw) : NaN;
@@ -262,7 +264,7 @@ export default function MyProfileClient() {
     resolve();
     window.addEventListener("ds:admin-edit-user-changed", resolve);
     return () => window.removeEventListener("ds:admin-edit-user-changed", resolve);
-  }, [user]);
+  }, [user, canManageOtherUsers]);
 
   // 부서/직급 마스터 — 대리편집 모드 진입 시 1회 로드
   useEffect(() => {
