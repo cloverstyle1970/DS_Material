@@ -1,8 +1,12 @@
 // Supabase Edge Function: push-send
 // POST body { userId, title, body, link?, refType?, refId?, tag? }
-//   - users.push_enabled = false 면 스킵
-//   - push_subscriptions에서 user_id 일치하는 모든 endpoint로 발사
+//   - accounts.push_enabled = false 면 스킵
+//   - push_subscriptions에서 account_id 일치하는 모든 endpoint로 발사
 //   - 410/404 응답 endpoint는 자동 정리
+//
+// 신DB 스키마: push_subscriptions(id, account_id, endpoint, subscription JSON, created_at)
+//             accounts.push_enabled (BOOLEAN)
+//             body의 userId는 외부 호환 위해 유지하되 DB에서는 account_id로 매핑.
 //
 // 배포: supabase functions deploy push-send
 // 환경변수: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (자동 주입)
@@ -67,16 +71,16 @@ Deno.serve(async (req: Request) => {
     const { userId, title } = body ?? {};
     if (!userId || !title) return jsonResponse({ error: "userId, title 필수" }, { status: 400 });
 
-    // push_enabled 확인
-    const { data: u } = await db.from("users").select("push_enabled").eq("id", userId).single();
+    // push_enabled 확인 (accounts 기준 — 신DB 표준)
+    const { data: u } = await db.from("accounts").select("push_enabled").eq("id", userId).single();
     if (u && u.push_enabled === false) {
       return jsonResponse({ sent: 0, reason: "push_disabled" });
     }
 
     const { data: subs, error: subErr } = await db
       .from("push_subscriptions")
-      .select("id, endpoint, p256dh, auth")
-      .eq("user_id", userId);
+      .select("id, endpoint, subscription")
+      .eq("account_id", userId);
     if (subErr) return jsonResponse({ error: subErr.message }, { status: 500 });
     if (!subs?.length) return jsonResponse({ sent: 0, reason: "no_subscription" });
 
@@ -94,9 +98,18 @@ Deno.serve(async (req: Request) => {
 
     await Promise.all(
       subs.map(async (s) => {
+        // subscription JSON에는 {endpoint, keys:{p256dh,auth}}이 그대로 보관됨.
+        // 일관성·디버그 편의로 row의 endpoint를 우선 사용.
+        const sub = s.subscription as { endpoint?: string; keys?: { p256dh?: string; auth?: string } } | null;
+        const p256dh = sub?.keys?.p256dh;
+        const auth   = sub?.keys?.auth;
+        if (!p256dh || !auth) {
+          staleIds.push(s.id);
+          return;
+        }
         try {
           await webpush.sendNotification(
-            { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+            { endpoint: s.endpoint, keys: { p256dh, auth } },
             payload,
             { TTL: 120 }
           );

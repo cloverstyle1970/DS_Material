@@ -4,6 +4,11 @@
 // DELETE body { userId, endpoint }
 //        해당 endpoint 행 삭제
 //
+// 신DB 스키마: push_subscriptions(id, account_id, endpoint, subscription JSON, created_at)
+//   subscription 컬럼에 PushSubscription JSON({endpoint, keys:{p256dh,auth}})을 그대로 보관.
+//   클라이언트와의 호환을 위해 body 이름은 userId로 유지하되 DB에는 account_id로 매핑.
+//   p256dh/auth/user_agent 컬럼은 신DB에 없음 → subscription JSON에 통합.
+//
 // 배포: supabase functions deploy push-subscribe
 // 환경변수: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (Supabase가 자동 주입)
 
@@ -36,17 +41,18 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
 
     if (req.method === "POST") {
-      const { userId, subscription, userAgent } = body ?? {};
+      const { userId, subscription, userAgent: _userAgent } = body ?? {};
       if (!userId || !subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
         return jsonResponse({ error: "userId, subscription 필수" }, { status: 400 });
       }
       const { error } = await db.from("push_subscriptions").upsert(
         {
-          user_id:    userId,
-          endpoint:   subscription.endpoint,
-          p256dh:     subscription.keys.p256dh,
-          auth:       subscription.keys.auth,
-          user_agent: userAgent ?? null,
+          account_id:   userId,
+          endpoint:     subscription.endpoint,
+          subscription: {
+            endpoint: subscription.endpoint,
+            keys: { p256dh: subscription.keys.p256dh, auth: subscription.keys.auth },
+          },
         },
         { onConflict: "endpoint" }
       );
