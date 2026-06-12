@@ -83,6 +83,12 @@ export const PERMISSION_MENUS: PermissionMenuGroup[] = [
       { href: "/payroll/payslip", label: "급여명세표" },
     ],
   },
+  {
+    group: "게시판",
+    items: [
+      { href: "/board/improvements", label: "개선요청" },
+    ],
+  },
 ];
 
 const ALL_HREFS: string[] = PERMISSION_MENUS.flatMap(g => g.items.map(i => i.href));

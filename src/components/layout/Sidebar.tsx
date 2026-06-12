@@ -132,6 +132,14 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/payroll/payslip", label: "급여명세표", icon: "💵" },
     ],
+  },
+  {
+    id: "board",
+    label: "게시판",
+    color: "text-teal-400",
+    items: [
+      { href: "/board/improvements", label: "개선요청", icon: "📮" },
+    ],
   }
 ];
 

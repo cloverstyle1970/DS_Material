@@ -45,6 +45,7 @@ import QuoteDetailClient from "@/components/quotes/QuoteDetailClient";
 import LegacyQuotesClient from "@/components/quotes/LegacyQuotesClient";
 import PayslipClient from "@/components/payroll/PayslipClient";
 import ManualCenterClient from "@/components/manual/ManualCenterClient";
+import ImprovementRequestsClient from "@/components/board/ImprovementRequestsClient";
 
 export interface PageEntry {
   label: string;
@@ -341,6 +342,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/construction/requests": {
     label: "공사 요청",
     render: () => <ConstructionRequestClient />,
+  },
+  "/board/improvements": {
+    label: "개선요청",
+    render: () => <ImprovementRequestsClient />,
   },
   "/settings": {
     label: "환경설정",
