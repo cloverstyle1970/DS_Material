@@ -61,7 +61,7 @@ supabase/                   # 보조 시드/리셋 SQL
 ### 2. 인증 / 권한 모델
 
 - 인증: `AuthContext` + localStorage(`ds_auth_user`). 서버 세션 없음. 새로고침 시 Supabase에서 `permissions/dept/theme` 재조회로 권한 변경 즉시 반영.
-- `accounts.permissions: text[]` 가 단일 진리원. 값은 다음 중 하나:
+- `accounts.permissions: jsonb` (문자열 배열로 사용. `permission_groups.permissions`는 `text[]` — 마이그레이션 작성 시 두 컬럼 타입 차이 주의) 가 단일 진리원. 값은 다음 중 하나:
   - `"admin"` — 전체 권한 (모든 메뉴/기능 통과)
   - `"site_manage"`, `"view_only"` — 레거시 플래그
   - `"menu:/path:read|create|update"` — 메뉴별 권한
