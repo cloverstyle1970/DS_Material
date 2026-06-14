@@ -2,6 +2,7 @@
 // Maps /api/* URL patterns to mock-*.ts functions directly, bypassing HTTP.
 
 import { supabase } from "./supabase";
+import { insertNotification } from "./notify";
 import type { SiteRecord } from "./mock-sites";
 import type { ElevatorRecord } from "./mock-elevators";
 import type { VendorRecord } from "./mock-vendors";
@@ -91,66 +92,6 @@ function dbToNotification(r: any): NotificationItem {
     isRead:    !!r.is_read,
     createdAt: r.created_at,
   };
-}
-
-async function insertNotification(params: {
-  userId: number;
-  type: string;
-  title: string;
-  message: string;
-  link?: string | null;
-  refType?: string | null;
-  refId?: number | null;
-}): Promise<void> {
-  // 수신자가 인앱 알림을 꺼두었으면 인앱 저장 스킵 (전역 on/off)
-  const { data: u } = await supabase.from("accounts")
-    .select("notifications_enabled").eq("id", params.userId).single();
-  if (!u || u.notifications_enabled !== false) {
-    await supabase.from("notifications").insert({
-      user_id:  params.userId,
-      type:     params.type,
-      title:    params.title,
-      message:  params.message,
-      link:     params.link    ?? null,
-      ref_type: params.refType ?? null,
-      ref_id:   params.refId   ?? null,
-    });
-  }
-
-  // Web Push도 함께 발사 (fire-and-forget — push 실패가 인앱에 영향 X).
-  // push_enabled 체크는 push-send Function 내부에서 처리.
-  sendWebPush(params).catch(e => console.warn("[push] send failed:", e));
-}
-
-function sendWebPush(params: {
-  userId: number;
-  type: string;
-  title: string;
-  message: string;
-  link?: string | null;
-  refType?: string | null;
-  refId?: number | null;
-}): Promise<void> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return Promise.resolve();
-  return fetch(`${url}/functions/v1/push-send`, {
-    method: "POST",
-    headers: {
-      "Content-Type":  "application/json",
-      "apikey":        key,
-      "Authorization": `Bearer ${key}`,
-    },
-    body: JSON.stringify({
-      userId:  params.userId,
-      title:   params.title,
-      body:    params.message,
-      link:    params.link    ?? null,
-      refType: params.refType ?? null,
-      refId:   params.refId   ?? null,
-      tag:     params.type, // 같은 type 알림은 직전 것을 덮어씀
-    }),
-  }).then(() => undefined);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

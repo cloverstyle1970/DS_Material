@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
+import { insertNotification } from "@/lib/notify";
 import Header from "@/components/layout/Header";
 
 type Status = "접수" | "검토중" | "반영" | "거부";
@@ -151,6 +152,7 @@ export default function ImprovementRequestsClient() {
           row={openRow}
           admin={admin}
           isAuthor={openRow.author_id === user?.id}
+          currentUserId={user?.id ?? null}
           onClose={() => setOpenId(null)}
           onChanged={() => { setOpenId(null); refresh(); }}
         />
@@ -246,8 +248,8 @@ function CreateModal({ onClose, onCreated, userId }: { onClose: () => void; onCr
   );
 }
 
-function DetailModal({ row, admin, isAuthor, onClose, onChanged }:
-  { row: Row; admin: boolean; isAuthor: boolean; onClose: () => void; onChanged: () => void }) {
+function DetailModal({ row, admin, isAuthor, currentUserId, onClose, onChanged }:
+  { row: Row; admin: boolean; isAuthor: boolean; currentUserId: number | null; onClose: () => void; onChanged: () => void }) {
   const canEdit = admin || isAuthor;
 
   const [editMode, setEditMode] = useState(false);
@@ -276,9 +278,26 @@ function DetailModal({ row, admin, isAuthor, onClose, onChanged }:
     if (!admin) return;
     setSaving(true);
     try {
-      const patch: Partial<Row> = { status, response: response.trim() || null };
+      const newResponse = response.trim() || null;
+      const patch: Partial<Row> = { status, response: newResponse };
       const { error } = await supabase.from("improvement_requests").update(patch).eq("id", row.id);
       if (error) throw error;
+
+      // 작성자에게 답변/상태변경 알림 (작성자 본인이 처리한 경우는 제외)
+      const responseChanged = newResponse !== (row.response ?? null);
+      const statusChanged = status !== row.status;
+      if (row.author_id !== currentUserId && (responseChanged || statusChanged)) {
+        await insertNotification({
+          userId:  row.author_id,
+          type:    "improvement_response",
+          title:   responseChanged ? "개선요청에 답변이 등록되었습니다" : "개선요청 처리상태가 변경되었습니다",
+          message: `[${status}] ${row.title}`,
+          link:    "/board/improvements",
+          refType: "improvement_request",
+          refId:   row.id,
+        }).catch(e => console.warn("[notify] 개선요청 알림 실패:", e));
+      }
+
       onChanged();
     } catch (e) {
       alert(e instanceof Error ? e.message : String(e));
