@@ -75,18 +75,27 @@ export default function LegacyQuotesClient() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("legacy_quotes")
-      .select("id, pdf_filename, pdf_url, pdf_path, quote_date, file_size, uploaded_by, created_at")
-      .order("quote_date", { ascending: false, nullsFirst: false })
-      .order("id", { ascending: false })
-      .limit(2000);
-    if (error) {
-      console.error("[legacy_quotes] load failed", error);
-      setRows([]);
-    } else {
-      setRows((data ?? []) as LegacyQuote[]);
+    // PostgREST 기본 max-rows(1000) 때문에 단일 조회는 1000건에서 잘림 → range로 전량 페이징
+    const PAGE = 1000;
+    const all: LegacyQuote[] = [];
+    let failed = false;
+    for (let offset = 0; ; offset += PAGE) {
+      const { data, error } = await supabase
+        .from("legacy_quotes")
+        .select("id, pdf_filename, pdf_url, pdf_path, quote_date, file_size, uploaded_by, created_at")
+        .order("quote_date", { ascending: false, nullsFirst: false })
+        .order("id", { ascending: false })
+        .range(offset, offset + PAGE - 1);
+      if (error) {
+        console.error("[legacy_quotes] load failed", error);
+        failed = true;
+        break;
+      }
+      const batch = (data ?? []) as LegacyQuote[];
+      all.push(...batch);
+      if (batch.length < PAGE) break;
     }
+    setRows(failed ? [] : all);
     setLoading(false);
   }, []);
 
