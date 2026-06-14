@@ -578,6 +578,22 @@ function extractId(path: string, prefix: string): string | null {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyBody = any;
 
+// PostgREST 기본 max-rows(1000) 회피 — build()로 매 페이지마다 새 쿼리를 만들어 range로 전량 조회
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function fetchAllRows(build: () => any): Promise<any[]> {
+  const PAGE = 1000;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const all: any[] = [];
+  for (let off = 0; ; off += PAGE) {
+    const { data, error } = await build().range(off, off + PAGE - 1);
+    if (error) throw new MockApiError(error.message, 500);
+    const batch = data ?? [];
+    all.push(...batch);
+    if (batch.length < PAGE) break;
+  }
+  return all;
+}
+
 async function routeGET(path: string, params: URLSearchParams): Promise<unknown> {
   if (path === "/api/dashboard") {
     const today = new Date().toISOString().split("T")[0];
@@ -775,13 +791,13 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
     const status     = params.get("status");
     const serialNo   = params.get("serialNo");
     const matQuery   = params.get("matQuery"); // 자재명/코드/규격 검색
-    let query = supabase.from("material_units").select("*").order("created_at", { ascending: false });
-    if (materialId) query = query.eq("material_id", materialId);
-    if (status)     query = query.eq("status", status);
-    if (serialNo)   query = query.ilike("serial_no", `%${serialNo}%`);
-    const { data, error } = await query;
-    if (error) throw new MockApiError(error.message, 500);
-    const rows = data ?? [];
+    const rows = await fetchAllRows(() => {
+      let q = supabase.from("material_units").select("*").order("created_at", { ascending: false });
+      if (materialId) q = q.eq("material_id", materialId);
+      if (status)     q = q.eq("status", status);
+      if (serialNo)   q = q.ilike("serial_no", `%${serialNo}%`);
+      return q;
+    });
 
     // 연결된 자재 정보를 한 번에 조회해서 unit에 합쳐 반환
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -838,38 +854,38 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
     const type = params.get("type");
     const requiresReturn = params.get("requiresReturn");
     const returnStatus   = params.get("returnStatus");
-    let query = supabase.from("transactions").select("*").order("created_at", { ascending: false });
-    if (type === "입고" || type === "출고") query = query.eq("type", type);
-    if (requiresReturn === "true")  query = query.eq("requires_return", true);
-    if (requiresReturn === "false") query = query.eq("requires_return", false);
-    if (returnStatus === "pending" || returnStatus === "returned") {
-      query = query.eq("return_status", returnStatus);
-    }
-    const { data, error } = await query;
-    if (error) throw new MockApiError(error.message, 500);
-    return (data ?? []).map(dbToTransaction);
+    const data = await fetchAllRows(() => {
+      let q = supabase.from("transactions").select("*").order("created_at", { ascending: false });
+      if (type === "입고" || type === "출고") q = q.eq("type", type);
+      if (requiresReturn === "true")  q = q.eq("requires_return", true);
+      if (requiresReturn === "false") q = q.eq("requires_return", false);
+      if (returnStatus === "pending" || returnStatus === "returned") q = q.eq("return_status", returnStatus);
+      return q;
+    });
+    return data.map(dbToTransaction);
   }
   if (path === "/api/material-requests") {
     const status = params.get("status");
-    let query = supabase.from("material_requests").select("*").order("requested_at", { ascending: false });
-    if (status) query = query.eq("status", status);
-    const { data, error } = await query;
-    if (error) throw new MockApiError(error.message, 500);
-    return (data ?? []).map(dbToRequest);
+    const data = await fetchAllRows(() => {
+      let q = supabase.from("material_requests").select("*").order("requested_at", { ascending: false });
+      if (status) q = q.eq("status", status);
+      return q;
+    });
+    return data.map(dbToRequest);
   }
   if (path === "/api/purchase-orders") {
     const status = params.get("status");
-    let query = supabase.from("purchase_orders").select("*").order("ordered_at", { ascending: false });
-    if (status) query = query.eq("status", status);
-    const { data, error } = await query;
-    if (error) throw new MockApiError(error.message, 500);
-    return (data ?? []).map(dbToOrder);
+    const data = await fetchAllRows(() => {
+      let q = supabase.from("purchase_orders").select("*").order("ordered_at", { ascending: false });
+      if (status) q = q.eq("status", status);
+      return q;
+    });
+    return data.map(dbToOrder);
   }
   if (path === "/api/users") {
     const q = params.get("q")?.toLowerCase();
-    const { data, error } = await supabase.from("accounts").select("*").order("username");
-    if (error) throw new MockApiError(error.message, 500);
-    let list = (data ?? []).map(dbToUser);
+    const data = await fetchAllRows(() => supabase.from("accounts").select("*").order("username"));
+    let list = data.map(dbToUser);
     if (q) list = list.filter(u =>
       u.name.toLowerCase().includes(q) ||
       (u.dept?.toLowerCase().includes(q) ?? false) ||
@@ -880,16 +896,14 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
     return list;
   }
   if (path === "/api/construction-requests") {
-    const { data, error } = await supabase.from("construction_requests")
-      .select("*").order("requested_at", { ascending: false });
-    if (error) throw new MockApiError(error.message, 500);
-    return (data ?? []).map(dbToConstReq);
+    const data = await fetchAllRows(() => supabase.from("construction_requests")
+      .select("*").order("requested_at", { ascending: false }));
+    return data.map(dbToConstReq);
   }
   if (path === "/api/construction-schedules") {
-    const { data, error } = await supabase.from("construction_schedules")
-      .select("*").order("start_date");
-    if (error) throw new MockApiError(error.message, 500);
-    return (data ?? []).map(dbToConstSched);
+    const data = await fetchAllRows(() => supabase.from("construction_schedules")
+      .select("*").order("start_date"));
+    return data.map(dbToConstSched);
   }
   if (path === "/api/annual-events") {
     const year = params.get("year");

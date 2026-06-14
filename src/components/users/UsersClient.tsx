@@ -163,8 +163,17 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
   const reloadUsers = useCallback(() => {
     api.get<UserRecord[]>("/api/users").then(setUsers).catch(() => {});
     // 자격 정보 로드 — 자체점검 보유자 + 사원별 만료 임박 계산 (배지/필터용)
-    supabase.from("user_certifications").select("user_id, self_check, expiry_date, cert_name").then(({ data }) => {
-      const rows = (data as { user_id: number; self_check: boolean | null; expiry_date: string | null; cert_name: string | null }[] | null) ?? [];
+    // PostgREST 기본 max-rows(1000) 회피 — range로 전량 페이징 (사원×자격 누적 대비)
+    (async () => {
+      type CertRow = { user_id: number; self_check: boolean | null; expiry_date: string | null; cert_name: string | null };
+      const PAGE = 1000;
+      const rows: CertRow[] = [];
+      for (let off = 0; ; off += PAGE) {
+        const { data } = await supabase.from("user_certifications").select("user_id, self_check, expiry_date, cert_name").range(off, off + PAGE - 1);
+        const batch = (data as CertRow[] | null) ?? [];
+        rows.push(...batch);
+        if (batch.length < PAGE) break;
+      }
       const sc = new Set<number>();
       const exp = new Map<number, { daysLeft: number; certName: string }>();
       for (const r of rows) {
@@ -178,7 +187,7 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
       }
       setSelfCheckIds(sc);
       setExpiryByUser(exp);
-    });
+    })();
   }, []);
   useReloadOnActivate(reloadUsers);
 
