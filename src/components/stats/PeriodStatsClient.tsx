@@ -62,6 +62,7 @@ export default function PeriodStatsClient() {
   const [viewMode, setViewMode] = useState<ViewMode>("monthly");
   const [year, setYear]         = useState(CURRENT_YEAR);
   const [companyFilter, setCompanyFilter] = useState<"전체" | "TK" | "DS">("전체");
+  const [matQuery, setMatQuery] = useState("");
   const [showChart, setShowChart] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,8 +85,19 @@ export default function PeriodStatsClient() {
         return companyFilter === "TK" ? isTk : !isTk;
       });
     }
+    const q = matQuery.trim().toLowerCase();
+    if (q) {
+      base = base.filter(t => t.materialName.toLowerCase().includes(q) || t.materialId.toLowerCase().includes(q));
+    }
     return base;
-  }, [transactions, year, viewMode, companyFilter]);
+  }, [transactions, year, viewMode, companyFilter, matQuery]);
+
+  // 자재 검색 자동완성 옵션
+  const materialOptions = useMemo(() => {
+    const set = new Set<string>();
+    transactions.forEach(t => set.add(t.materialName));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "ko"));
+  }, [transactions]);
 
   const periodSummary = useMemo(() => {
     const map: Record<string, { inbound: number; outbound: number; inQty: number; outQty: number }> = {};
@@ -189,6 +201,18 @@ export default function PeriodStatsClient() {
               }`}>{f}</button>
           ))}
         </div>
+        {/* 자재 검색 (자재명·코드 자동완성) */}
+        <div className="relative">
+          <input type="text" lang="ko" list="period-mat-options" value={matQuery}
+            onChange={e => setMatQuery(e.target.value)}
+            placeholder="자재명·코드 검색"
+            className="w-44 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          <datalist id="period-mat-options">{materialOptions.map(m => <option key={m} value={m} />)}</datalist>
+          {matQuery && (
+            <button type="button" onClick={() => setMatQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+          )}
+        </div>
         <div className="flex items-center gap-2 ml-auto">
           <button onClick={() => setShowChart(v => !v)}
             className="px-3.5 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
@@ -291,17 +315,17 @@ export default function PeriodStatsClient() {
           </div>
         ) : (
           <div className="overflow-auto max-h-[calc(100vh-250px)]">
-            <table className="w-full min-w-[560px] text-xs">
-              <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
+            <table className="w-full min-w-[560px] text-xs border-separate border-spacing-0">
+              <thead>
                 <tr>
-                  <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap sticky left-0 bg-gray-50 dark:bg-gray-700/50 z-10 min-w-[180px]">자재명</th>
-                  <th className="px-3 py-3 text-center font-medium text-gray-400 dark:text-gray-500 whitespace-nowrap font-mono min-w-[120px]">코드</th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap sticky left-0 top-0 z-30 bg-gray-50 dark:bg-gray-700 min-w-[180px] border-b border-gray-100 dark:border-gray-700">자재명</th>
+                  <th className="px-3 py-3 text-center font-medium text-gray-400 dark:text-gray-500 whitespace-nowrap font-mono min-w-[120px] sticky top-0 z-10 bg-gray-50 dark:bg-gray-700 border-b border-gray-100 dark:border-gray-700">코드</th>
                   {periods.map(p => (
-                    <th key={p} className="px-3 py-3 text-center font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap min-w-[80px]">
+                    <th key={p} className="px-3 py-3 text-center font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap min-w-[80px] sticky top-0 z-10 bg-gray-50 dark:bg-gray-700 border-b border-gray-100 dark:border-gray-700">
                       {periodDisplay(p, viewMode)}
                     </th>
                   ))}
-                  <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300 whitespace-nowrap bg-gray-100 dark:bg-gray-600/50 min-w-[80px] sticky right-0">합계</th>
+                  <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300 whitespace-nowrap bg-gray-100 dark:bg-gray-600 min-w-[80px] sticky right-0 top-0 z-30 border-b border-gray-100 dark:border-gray-700">합계</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
@@ -309,7 +333,7 @@ export default function PeriodStatsClient() {
                   const rowTotal = Object.values(m.periods).reduce((s, p) => s + p.in + p.out, 0);
                   return (
                     <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                      <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 whitespace-nowrap sticky left-0 bg-white dark:bg-gray-800">{m.name}</td>
+                      <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 whitespace-nowrap sticky left-0 z-10 bg-white dark:bg-gray-800">{m.name}</td>
                       <td className="px-3 py-3 text-center font-mono text-gray-400 dark:text-gray-500 whitespace-nowrap">{m.id}</td>
                       {periods.map(p => {
                         const cell = m.periods[p];
@@ -327,13 +351,13 @@ export default function PeriodStatsClient() {
                           </td>
                         );
                       })}
-                      <td className="px-4 py-3 text-center font-bold text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/30 sticky right-0">{fmtNum(rowTotal)}</td>
+                      <td className="px-4 py-3 text-center font-bold text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 sticky right-0 z-10">{fmtNum(rowTotal)}</td>
                     </tr>
                   );
                 })}
                 {/* 합계 행 */}
-                <tr className="bg-gray-100 dark:bg-gray-700/50 font-semibold border-t-2 border-gray-200 dark:border-gray-600">
-                  <td className="px-4 py-3 text-gray-700 dark:text-gray-200 sticky left-0 bg-gray-100 dark:bg-gray-700/50">합계</td>
+                <tr className="bg-gray-100 dark:bg-gray-700 font-semibold border-t-2 border-gray-200 dark:border-gray-600">
+                  <td className="px-4 py-3 text-gray-700 dark:text-gray-200 sticky left-0 z-10 bg-gray-100 dark:bg-gray-700">합계</td>
                   <td className="px-3 py-3" />
                   {periods.map(p => {
                     const total = pivotData.reduce((s, m) => s + (m.periods[p]?.in ?? 0) + (m.periods[p]?.out ?? 0), 0);
@@ -343,7 +367,7 @@ export default function PeriodStatsClient() {
                       </td>
                     );
                   })}
-                  <td className="px-4 py-3 text-center text-gray-800 dark:text-gray-200 bg-gray-200 dark:bg-gray-600/50 sticky right-0">
+                  <td className="px-4 py-3 text-center text-gray-800 dark:text-gray-200 bg-gray-200 dark:bg-gray-600 sticky right-0 z-10">
                     {fmtNum(pivotData.reduce((s, m) => s + Object.values(m.periods).reduce((s2, p) => s2 + p.in + p.out, 0), 0))}
                   </td>
                 </tr>
