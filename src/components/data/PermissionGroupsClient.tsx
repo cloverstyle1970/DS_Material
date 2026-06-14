@@ -104,6 +104,12 @@ const PERMISSION_TREE: MenuSection[] = [
       { href: "/payroll/payslip", label: "급여명세표" },
     ],
   },
+  {
+    id: "board", label: "게시판", color: "text-teal-500",
+    items: [
+      { href: "/board/improvements", label: "개선요청" },
+    ],
+  },
 ];
 
 const ALL_PERM_KEYS: string[] = (() => {
