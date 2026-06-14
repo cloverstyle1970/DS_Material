@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef, Fragment, DragEvent, ChangeEvent } from "react";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
+import { useViewMode } from "@/context/ViewModeContext";
 import { supabase } from "@/lib/supabase";
 
 const MENU_HREF = "/quotes/legacy";
@@ -67,6 +68,8 @@ export default function LegacyQuotesClient() {
 
   const admin = user ? isAdmin(user) : false;
   const canRead = !!user && (admin || hasMenuPermission(user, MENU_HREF, "read"));
+  const { viewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
   const canCreate = !!user && (admin || hasMenuPermission(user, MENU_HREF, "create"));
   const canDelete = admin;
 
@@ -246,7 +249,7 @@ export default function LegacyQuotesClient() {
           <h1 className="text-lg font-semibold text-gray-800 dark:text-white">구 견적조회</h1>
           <p className="text-sm text-gray-500 dark:text-gray-300 mt-0.5">과거 견적 PDF 아카이브 · 파일명 기반 검색 / 다운로드</p>
         </div>
-        {canCreate && (
+        {canCreate && !isMobile && (
           <button
             type="button"
             onClick={openUpload}
@@ -303,6 +306,30 @@ export default function LegacyQuotesClient() {
 
       {/* 목록 */}
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+        {isMobile ? (
+          <div className="divide-y divide-gray-100 dark:divide-gray-700">
+            {loading ? (
+              <div className="px-3 py-10 text-center text-sm text-gray-500 dark:text-gray-400">불러오는 중...</div>
+            ) : filtered.length === 0 ? (
+              <div className="px-3 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                {rows.length === 0 ? "등록된 PDF가 없습니다. [PDF 등록]으로 추가하세요." : "조건에 맞는 결과가 없습니다."}
+              </div>
+            ) : filtered.map(row => (
+              <div key={row.id} className="p-4">
+                <p className="font-medium text-gray-800 dark:text-gray-100 break-all">{row.pdf_filename}</p>
+                <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                  <span className="text-gray-400">견적작성 </span>{row.quote_date ?? "-"}
+                </div>
+                <div className="flex gap-1 mt-2 flex-wrap">
+                  <a href={row.pdf_url} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">👁 보기</a>
+                  <a href={row.pdf_url} download={row.pdf_filename}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">⬇ 다운로드</a>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
@@ -381,6 +408,7 @@ export default function LegacyQuotesClient() {
             </tbody>
           </table>
         </div>
+        )}
       </div>
 
       {/* 업로드 모달 */}
