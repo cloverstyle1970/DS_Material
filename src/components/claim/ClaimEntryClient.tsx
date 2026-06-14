@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useViewMode } from "@/context/ViewModeContext";
 import { supabase } from "@/lib/supabase";
 import { api } from "@/lib/api-client";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { visibleUserIds } from "@/lib/crew";
 
-const DEFAULT_ROW_COUNT = 5;
+const DEFAULT_ROW_COUNT = 1;
 
 type ClaimMode = "유상견적요청" | "무상신청" | "당직선출고";
 
@@ -81,6 +82,8 @@ function newRow(seed: Partial<ItemRow> = {}): ItemRow {
 
 export default function ClaimEntryClient() {
   const { user } = useAuth();
+  const { viewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
   const [mode, setMode] = useState<ClaimMode>("유상견적요청");
 
   // 헤더
@@ -307,6 +310,7 @@ export default function ClaimEntryClient() {
 
   const sectionCls = "bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5";
   const labelCls   = "block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1";
+  const fieldCls   = "w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400";
   const inputCls   = "w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100";
   const cellInput  = "w-full px-2 py-1 text-xs text-gray-900 dark:text-gray-100 border-0 bg-transparent focus:outline-none focus:bg-yellow-50 dark:focus:bg-yellow-900/20 focus:ring-1 focus:ring-blue-300";
 
@@ -386,6 +390,77 @@ export default function ClaimEntryClient() {
                 className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700">+ 행 추가</button>
             </div>
           </div>
+          {isMobile ? (
+          <div className="space-y-3">
+            {rows.map((r, i) => (
+              <div key={r.key} className="rounded-lg border border-gray-200 dark:border-gray-600 p-3 bg-gray-50/50 dark:bg-gray-700/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400">#{i + 1}</span>
+                  <button type="button" onClick={() => removeRow(r.key)} className="text-red-500 text-xs">삭제</button>
+                </div>
+                {/* 품목 검색 — 전체폭 입력 + 전체폭 드롭다운 */}
+                <div className="relative">
+                  <label className={labelCls}>품목 <span className="text-red-500">*</span></label>
+                  <input type="text" lang="ko" value={r.material_name}
+                    onChange={e => { patchRow(r.key, { material_name: e.target.value }); searchMaterial(r.key, e.target.value); }}
+                    onKeyDown={e => {
+                      if (!r.searchOpen || r.searchResults.length === 0) return;
+                      if (e.key === "ArrowDown") { e.preventDefault(); patchRow(r.key, { searchFocusIndex: Math.min(r.searchFocusIndex + 1, r.searchResults.length - 1) }); }
+                      else if (e.key === "ArrowUp") { e.preventDefault(); patchRow(r.key, { searchFocusIndex: Math.max(r.searchFocusIndex - 1, 0) }); }
+                      else if (e.key === "Enter") { e.preventDefault(); if (r.searchResults.length === 1) applyMaterial(r.key, r.searchResults[0]); else if (r.searchFocusIndex >= 0) applyMaterial(r.key, r.searchResults[r.searchFocusIndex]); }
+                      else if (e.key === "Escape") patchRow(r.key, { searchOpen: false });
+                    }}
+                    onBlur={() => setTimeout(() => patchRow(r.key, { searchOpen: false }), 150)}
+                    placeholder={`자재명·코드 (${matTypeFilter === "ALL" ? "전체" : matTypeFilter})`}
+                    className={fieldCls} />
+                  {r.searchOpen && r.searchResults.length > 0 && (
+                    <div className="absolute z-50 top-full left-0 mt-0.5 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl">
+                      <ul className="max-h-60 overflow-y-auto">
+                        {r.searchResults.map((m, idx) => (
+                          <li key={m.id}>
+                            <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => applyMaterial(r.key, m)}
+                              className={`w-full text-left px-3 py-2.5 border-b border-gray-50 dark:border-gray-700 last:border-0 ${r.searchFocusIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
+                              <div className="text-sm font-medium text-gray-800 dark:text-gray-200">{m.name}</div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[10px] font-mono text-slate-400">{m.id}</span>
+                                {m.modelNo && <span className="text-[10px] text-gray-500">{m.modelNo}</span>}
+                              </div>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className={labelCls}>호기</label>
+                    <input type="text" lang="ko" value={r.elevator_name} list={elevatorDatalistId}
+                      onChange={e => patchRow(r.key, { elevator_name: e.target.value })} placeholder="호기" className={fieldCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>규격</label>
+                    <input type="text" lang="ko" value={r.spec} onChange={e => patchRow(r.key, { spec: e.target.value })} className={fieldCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>단위</label>
+                    <input type="text" value={r.unit} onChange={e => patchRow(r.key, { unit: e.target.value })} className={fieldCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>수량</label>
+                    <input type="text" inputMode="numeric" value={r.qty === 0 ? "" : String(r.qty)}
+                      onChange={e => { const v = e.target.value.replace(/[^0-9.]/g, ""); patchRow(r.key, { qty: v === "" ? 0 : Number(v) }); }}
+                      className={fieldCls + " text-right"} />
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls}>비고</label>
+                  <input type="text" lang="ko" value={r.remark} onChange={e => patchRow(r.key, { remark: e.target.value })} className={fieldCls} />
+                </div>
+              </div>
+            ))}
+          </div>
+          ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
               <thead>
@@ -472,6 +547,7 @@ export default function ClaimEntryClient() {
               </tbody>
             </table>
           </div>
+          )}
         </div>
 
         {message && (

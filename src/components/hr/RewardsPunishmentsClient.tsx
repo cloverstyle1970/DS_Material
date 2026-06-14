@@ -56,12 +56,29 @@ export default function RewardsPunishmentsClient() {
   const [saving, setSaving] = useState(false);
 
   const reload = useCallback(() => {
-    supabase.from("user_rewards_punishments").select("id, user_id, kind, content, occurred_on").then(({ data }) => {
-      setRows((data as RPRow[] | null) ?? []);
-    });
-    supabase.from("accounts").select("id, username, dept, status").order("username").then(({ data }) => {
-      setAccounts((data as Account[] | null) ?? []);
-    });
+    // PostgREST 기본 max-rows(1000) 회피 — range로 전량 페이징
+    (async () => {
+      const PAGE = 1000;
+      const rpRows: RPRow[] = [];
+      for (let off = 0; ; off += PAGE) {
+        const { data } = await supabase.from("user_rewards_punishments").select("id, user_id, kind, content, occurred_on").range(off, off + PAGE - 1);
+        const batch = (data as RPRow[] | null) ?? [];
+        rpRows.push(...batch);
+        if (batch.length < PAGE) break;
+      }
+      setRows(rpRows);
+    })();
+    (async () => {
+      const PAGE = 1000;
+      const accRows: Account[] = [];
+      for (let off = 0; ; off += PAGE) {
+        const { data } = await supabase.from("accounts").select("id, username, dept, status").order("username").range(off, off + PAGE - 1);
+        const batch = (data as Account[] | null) ?? [];
+        accRows.push(...batch);
+        if (batch.length < PAGE) break;
+      }
+      setAccounts(accRows);
+    })();
   }, []);
   useReloadOnActivate(reload);
   useEffect(() => { reload(); }, [reload]);
