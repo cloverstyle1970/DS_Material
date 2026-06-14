@@ -11,6 +11,7 @@ import { useAutoPageSize } from "@/lib/useAutoPageSize";
 import { fmtNum } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 import SerialEntryModal from "@/components/purchase/SerialEntryModal";
+import * as XLSX from "xlsx";
 
 type MatType = "전체" | "DS" | "TK";
 type CheckMode = "qty" | "sn";
@@ -197,6 +198,55 @@ export default function InventoryCheckClient() {
     setActualQty(prev => ({ ...prev, [id]: isNaN(num) ? 0 : num }));
   }
 
+  // 재고실사 양식(자재코드·자재명·규격·전산재고·실사재고 빈칸) 엑셀 다운로드
+  function downloadInventoryTemplate() {
+    const rows = materials.map(m => ({
+      자재코드: m.id,
+      자재명: m.name,
+      규격: m.modelNo ?? "",
+      전산재고: m.stockQty,
+      실사재고: "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "재고실사");
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    XLSX.writeFile(wb, `재고실사_양식_${stamp}.xlsx`);
+  }
+
+  // 실사재고가 입력된 엑셀 업로드 → 코드 매칭하여 실사수량 일괄 입력(+선택). 저장은 '실사 반영' 버튼.
+  async function handleUploadExcel(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
+      const nextQty: Record<string, number> = {};
+      const nextSel = new Set<string>();
+      let matched = 0, skipped = 0;
+      for (const r of rows) {
+        const code = String(r["자재코드"] ?? "").trim();
+        const actual = r["실사재고"];
+        if (!code || actual === "" || actual === null || actual === undefined) continue;
+        const qty = Number(actual);
+        if (!Number.isFinite(qty) || qty < 0) { skipped++; continue; }
+        if (!materials.some(m => m.id === code)) { skipped++; continue; }
+        nextQty[code] = qty;
+        nextSel.add(code);
+        matched++;
+      }
+      if (matched === 0) { alert("반영할 행이 없습니다. '자재코드'·'실사재고' 열을 확인하세요."); return; }
+      setActualQty(prev => ({ ...prev, ...nextQty }));
+      setSelected(prev => new Set([...prev, ...nextSel]));
+      alert(`${matched}건 실사재고 입력됨${skipped > 0 ? ` (${skipped}건 건너뜀: 코드 불일치/빈값)` : ""}.\n내용 확인 후 '실사 반영'으로 저장하세요.`);
+    } catch (err) {
+      alert("엑셀 읽기 실패: " + getErrorMessage(err));
+    }
+  }
+
   async function handleSave() {
     if (selected.size === 0) {
       alert("실사 반영할 자재를 선택해주세요.");
@@ -340,6 +390,18 @@ export default function InventoryCheckClient() {
             <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
               선택된 자재: {selected.size}개
             </span>
+            {canWrite && (
+              <button type="button" onClick={downloadInventoryTemplate}
+                className="px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shrink-0">
+                📥 양식
+              </button>
+            )}
+            {canWrite && (
+              <label className="px-3 py-2.5 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-800/50 cursor-pointer transition-colors shrink-0">
+                📤 엑셀 업로드
+                <input type="file" accept=".xlsx,.xls" onChange={handleUploadExcel} className="hidden" />
+              </label>
+            )}
             {canWrite && (
               <button
                 onClick={handleSave}
