@@ -6,6 +6,8 @@ import { api, getErrorMessage } from "@/lib/api-client";
 import { MaterialUnitRecord, MaterialUnitStatus } from "@/lib/mock-material-units";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
+import { useViewMode } from "@/context/ViewModeContext";
+import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 import { fmtNum } from "@/lib/format";
 
 const STATUS_OPTIONS: { v: MaterialUnitStatus | "전체"; label: string; color: string }[] = [
@@ -23,6 +25,15 @@ function fmtDate(iso: string | null) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
 }
 
+function ymd(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+// 기본 기간: 이전주 일요일 ~ 당일(오늘)
+function defaultPeriod() {
+  const now = new Date();
+  const curSun = new Date(now); curSun.setDate(now.getDate() - now.getDay());
+  const prevSun = new Date(curSun); prevSun.setDate(curSun.getDate() - 7);
+  return { from: ymd(prevSun), to: ymd(now) };
+}
+
 function statusBadge(status: MaterialUnitStatus) {
   const map: Record<MaterialUnitStatus, string> = {
     "재고":     "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
@@ -37,6 +48,11 @@ function statusBadge(status: MaterialUnitStatus) {
 export default function SerialHistoryClient() {
   const { user } = useAuth();
   const canDownload = user ? !isViewOnly(user) : false;
+  const { viewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
+  const [dateFrom, setDateFrom] = useState(() => defaultPeriod().from);
+  const [dateTo,   setDateTo]   = useState(() => defaultPeriod().to);
+  const [companyFilter, setCompanyFilter] = useState<"전체" | "TK" | "DS">("전체");
   const [units,    setUnits]    = useState<MaterialUnitRecord[]>([]);
   const [loading,  setLoading]  = useState(false);
   const [snQuery,  setSnQuery]  = useState("");
@@ -64,7 +80,7 @@ export default function SerialHistoryClient() {
 
   function downloadExcel() {
     const stamp = new Date().toISOString().slice(0,10).replace(/-/g, "");
-    const rows = units.map(u => ({
+    const rows = displayUnits.map(u => ({
       "S/N":      u.serialNo,
       자재명:     u.materialName ?? "",
       자재코드:   u.materialId,
@@ -103,11 +119,24 @@ export default function SerialHistoryClient() {
     }
   }
 
+  // 클라이언트 추가 필터: 기간(입고일) + 회사구분(자재코드 TK/DS)
+  const displayUnits = useMemo(() => units.filter(u => {
+    const d = (u.inboundAt ?? "").slice(0, 10);
+    if (dateFrom && d < dateFrom) return false;
+    if (dateTo && d > dateTo) return false;
+    if (companyFilter !== "전체") {
+      const isTk = isTkMaterial(u.materialId);
+      if (companyFilter === "TK" && !isTk) return false;
+      if (companyFilter === "DS" && isTk) return false;
+    }
+    return true;
+  }), [units, dateFrom, dateTo, companyFilter]);
+
   const totalByStatus = useMemo(() => {
     const c: Record<string, number> = {};
-    units.forEach(u => { c[u.status] = (c[u.status] ?? 0) + 1; });
+    displayUnits.forEach(u => { c[u.status] = (c[u.status] ?? 0) + 1; });
     return c;
-  }, [units]);
+  }, [displayUnits]);
 
   return (
     <>
@@ -122,6 +151,26 @@ export default function SerialHistoryClient() {
                 <span className="ml-1.5 opacity-80">{totalByStatus[opt.v]}</span>
               )}
             </button>
+          ))}
+        </div>
+
+        {/* 기간 (기본: 이전주~당일) */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+            className="px-2 py-2 text-xs rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+          <span className="text-gray-300 dark:text-gray-600 text-xs">~</span>
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+            className="px-2 py-2 text-xs rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+        </div>
+        {/* 회사구분 (자재코드 기준 TK/DS) */}
+        <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shrink-0">
+          {(["전체","TK","DS"] as const).map(f => (
+            <button key={f} type="button" onClick={() => setCompanyFilter(f)}
+              className={`px-3 py-2 text-xs font-medium transition-colors ${
+                companyFilter === f
+                  ? f === "TK" ? "bg-blue-600 text-white" : f === "DS" ? "bg-red-500 text-white" : "bg-slate-700 text-white"
+                  : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+              }`}>{f}</button>
           ))}
         </div>
 
@@ -147,10 +196,10 @@ export default function SerialHistoryClient() {
           )}
         </div>
 
-        <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">{fmtNum(units.length)}건</span>
+        <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">{fmtNum(displayUnits.length)}건</span>
 
         {canDownload && (
-          <button type="button" onClick={downloadExcel} disabled={units.length === 0}
+          <button type="button" onClick={downloadExcel} disabled={displayUnits.length === 0}
             className="bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors shrink-0">
             엑셀 다운로드
           </button>
@@ -159,6 +208,61 @@ export default function SerialHistoryClient() {
 
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         {loading && <div className="text-center py-4 text-sm text-gray-400 dark:text-gray-500">로딩 중...</div>}
+        {isMobile ? (
+          displayUnits.length === 0 ? (
+            <div className="text-center py-16 text-gray-400 dark:text-gray-500">조건에 맞는 S/N이 없습니다.</div>
+          ) : (
+            <div className="divide-y divide-gray-100 dark:divide-gray-700">
+              {displayUnits.map(u => (
+                <div key={u.id} className="p-4">
+                  <div onClick={() => toggleOpen(u)} className="cursor-pointer">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="font-mono text-sm font-medium text-gray-800 dark:text-gray-100">{u.serialNo}</span>
+                      {statusBadge(u.status)}
+                    </div>
+                    <p className={`mt-1 text-sm ${isTkMaterial(u.materialId) ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-100"}`}>
+                      {u.materialName ?? "-"} <span className="font-mono text-xs text-gray-400">{u.materialId}</span>
+                    </p>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-gray-600 dark:text-gray-300 mt-1">
+                      <div><span className="text-gray-400">규격 </span>{u.materialModelNo ?? "-"}</div>
+                      <div className="truncate"><span className="text-gray-400">위치 </span>{u.currentSite ?? "-"}{u.currentElevator ? ` (${u.currentElevator})` : ""}</div>
+                      <div><span className="text-gray-400">입고 </span>{fmtDate(u.inboundAt)}</div>
+                      <div><span className="text-gray-400">최근 </span>{fmtDate(u.lastEventAt)}</div>
+                    </div>
+                  </div>
+                  {openId === u.id && (
+                    <div className="mt-2 border-t border-gray-100 dark:border-gray-700 pt-2">
+                      {historyLoading === u.id ? (
+                        <p className="text-xs text-gray-400 text-center py-2">이력 불러오는 중...</p>
+                      ) : !history[u.id] ? null : history[u.id].length === 0 ? (
+                        <p className="text-xs text-gray-400 text-center py-2">연결된 트랜잭션이 없습니다.</p>
+                      ) : (
+                        <ol className="relative border-l-2 border-slate-200 dark:border-slate-700 pl-5 space-y-3">
+                          {history[u.id].map(t => {
+                            const eventColor = t.type === "입고" ? "bg-blue-500" : t.requiresReturn ? (t.returnStatus === "returned" ? "bg-emerald-500" : "bg-amber-500") : "bg-orange-500";
+                            return (
+                              <li key={t.id} className="relative">
+                                <span className={`absolute -left-[27px] top-1 w-3 h-3 rounded-full ${eventColor} ring-2 ring-white dark:ring-gray-800`} />
+                                <div className="text-xs text-gray-500 dark:text-gray-400">{fmtDate(t.createdAt)}</div>
+                                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                  <span className={`text-xs font-bold ${t.type === "입고" ? "text-blue-600" : "text-orange-600"}`}>{t.type}</span>
+                                  {t.returnStatus === "returned" && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-medium">반납완료</span>}
+                                  <span className="text-xs text-gray-700 dark:text-gray-300">{t.siteName ?? "본사"}{t.elevatorName ? ` / ${t.elevatorName}` : ""}</span>
+                                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">{t.userName}</span>
+                                </div>
+                                {t.note && <div className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{t.note}</div>}
+                              </li>
+                            );
+                          })}
+                        </ol>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )
+        ) : (
         <div className="overflow-auto max-h-[calc(100vh-260px)]">
           <table className="w-full min-w-[860px] text-sm">
             <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
@@ -169,9 +273,9 @@ export default function SerialHistoryClient() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-              {units.length === 0 ? (
+              {displayUnits.length === 0 ? (
                 <tr><td colSpan={9} className="text-center py-16 text-gray-400 dark:text-gray-500">조건에 맞는 S/N이 없습니다.</td></tr>
-              ) : units.map(u => (
+              ) : displayUnits.map(u => (
                 <Fragment key={u.id}>
                   <tr onClick={() => toggleOpen(u)}
                     className="hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer transition-colors">
@@ -238,6 +342,7 @@ export default function SerialHistoryClient() {
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </>
   );

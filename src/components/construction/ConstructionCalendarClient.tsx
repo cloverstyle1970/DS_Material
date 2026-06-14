@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 import DraggableModal from "@/components/common/DraggableModal";
+import { useViewMode } from "@/context/ViewModeContext";
 import { getHolidaysForYear } from "@/lib/korean-holidays";
 import { formatPhone } from "@/lib/input-format";
 
@@ -57,6 +58,7 @@ function CalendarContent() {
   const [elevators, setElevators] = useState<{ id: number; unitName: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [calMode, setCalMode] = useState<"month" | "week">("month"); // 월간/주간 보기
   const [companyFilter, setCompanyFilter] = useState<"ALL" | "TK" | "DS">("ALL");
 
   // 공사일정 모달
@@ -93,17 +95,19 @@ function CalendarContent() {
 
   const canSchedule = user && (isAdmin(user) || hasMenuPermission(user, "/construction/schedule", "create"));
 
-  // 모바일(<768px): 일정 클릭 시 내용 보기 팝업
-  const [isMobile, setIsMobile] = useState(false);
+  // 모바일: 화면 모드(viewMode='mobile') 또는 실제 좁은 화면(<768px) 둘 중 하나면 모바일 UI
+  const { viewMode } = useViewMode();
+  const [narrowScreen, setNarrowScreen] = useState(false);
   const [viewSchedule, setViewSchedule] = useState<ConstructionSchedule | null>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
-    const apply = () => setIsMobile(mq.matches);
+    const apply = () => setNarrowScreen(mq.matches);
     apply();
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
   }, []);
+  const isMobile = viewMode === "mobile" || narrowScreen;
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -323,17 +327,53 @@ function CalendarContent() {
     return result;
   }, [year, month]);
 
+  // 주간 보기: currentDate가 속한 주(일~토) 7일
+  const weekCells = useMemo(() => {
+    const sunday = new Date(currentDate);
+    sunday.setDate(currentDate.getDate() - currentDate.getDay());
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(sunday);
+      d.setDate(sunday.getDate() + i);
+      const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      return { day: d.getDate(), dateStr: dStr };
+    });
+  }, [currentDate]);
+
+  // 현재 보기 모드에 따른 셀 배열 (월간: null 포함 / 주간: 7일)
+  const cells: ({ day: number; dateStr: string } | null)[] = calMode === "week" ? weekCells : daysInMonth;
+
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center gap-4">
+      <div className={`p-4 border-b border-gray-200 dark:border-gray-700 gap-2 ${isMobile ? "flex flex-col items-stretch" : "flex items-center justify-between"}`}>
+        <div className={`flex items-center gap-4 ${isMobile ? "flex-wrap gap-2" : ""}`}>
           <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
             <span className="text-orange-500">📅</span> 공사 일정
           </h2>
           <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-lg px-2 py-1">
-            <button onClick={() => setCurrentDate(new Date(year, month - 1, 1))} className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white">&lt;</button>
-            <span className="font-bold w-24 text-center text-gray-900 dark:text-white">{year}년 {month + 1}월</span>
-            <button onClick={() => setCurrentDate(new Date(year, month + 1, 1))} className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white">&gt;</button>
+            <button onClick={() => setCurrentDate(d => {
+              if (calMode === "week") { const n = new Date(d); n.setDate(d.getDate() - 7); return n; }
+              return new Date(d.getFullYear(), d.getMonth() - 1, 1);
+            })} className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white">&lt;</button>
+            <span className="font-bold w-28 text-center text-gray-900 dark:text-white text-sm">
+              {calMode === "week"
+                ? `${weekCells[0].dateStr.slice(5).replace("-", "/")} ~ ${weekCells[6].dateStr.slice(5).replace("-", "/")}`
+                : `${year}년 ${month + 1}월`}
+            </span>
+            <button onClick={() => setCurrentDate(d => {
+              if (calMode === "week") { const n = new Date(d); n.setDate(d.getDate() + 7); return n; }
+              return new Date(d.getFullYear(), d.getMonth() + 1, 1);
+            })} className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white">&gt;</button>
+          </div>
+          {/* 월간 / 주간 보기 토글 */}
+          <div className="flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
+            {(["month", "week"] as const).map(m => (
+              <button key={m} type="button" onClick={() => setCalMode(m)}
+                className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  calMode === m ? "bg-slate-600 text-white" : "bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600"
+                }`}>
+                {m === "month" ? "월" : "주"}
+              </button>
+            ))}
           </div>
           <div className="flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
             {(["ALL", "TK", "DS"] as const).map(f => (
@@ -411,14 +451,14 @@ function CalendarContent() {
       <div className="flex-1 overflow-auto p-4 relative">
         {loading && <div className="absolute inset-0 bg-white/50 dark:bg-gray-900/50 flex items-center justify-center z-10"><span className="loader"></span></div>}
 
-        <div className="grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-          {["일", "월", "화", "수", "목", "금", "토"].map((day, i) => (
+        <div className={`grid ${calMode === "week" ? "grid-cols-1" : "grid-cols-7"} gap-px bg-gray-200 dark:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden`}>
+          {calMode === "month" && ["일", "월", "화", "수", "목", "금", "토"].map((day, i) => (
             <div key={day} className={`bg-gray-50 dark:bg-gray-800 py-2 text-center text-xs font-bold ${i === 0 ? "text-red-500" : i === 6 ? "text-blue-500" : "text-gray-600 dark:text-gray-300"}`}>
               {day}
             </div>
           ))}
-          {daysInMonth.map((cell, idx) => {
-            if (!cell) return <div key={`empty-${idx}`} className="bg-white dark:bg-gray-800 min-h-[100px]" />;
+          {cells.map((cell, idx) => {
+            if (!cell) return <div key={`empty-${idx}`} className={`bg-white dark:bg-gray-800 ${isMobile ? "min-h-[56px]" : "min-h-[100px]"}`} />;
             const isSunday = idx % 7 === 0;
             const isSaturday = idx % 7 === 6;
             const holidayName = holidays.get(cell.dateStr);
@@ -438,18 +478,19 @@ function CalendarContent() {
             return (
               <div
                 key={cell.dateStr}
-                className={`min-h-[120px] p-1 border-t border-gray-100 dark:border-gray-700 transition-colors ${hasYeonga ? "bg-red-50 dark:bg-red-900/10" : "bg-white dark:bg-gray-800"} ${canSchedule ? "hover:bg-orange-50 dark:hover:bg-orange-900/20 cursor-pointer" : ""}`}
+                className={`${calMode === "week" ? "min-h-[72px]" : isMobile ? "min-h-[56px]" : "min-h-[120px]"} p-1 border-t border-gray-100 dark:border-gray-700 transition-colors ${hasYeonga ? "bg-red-50 dark:bg-red-900/10" : "bg-white dark:bg-gray-800"} ${canSchedule ? "hover:bg-orange-50 dark:hover:bg-orange-900/20 cursor-pointer" : ""}`}
                 onClick={(e) => {
                   if (e.target === e.currentTarget) openNewModal(cell.dateStr);
                 }}
               >
                 <div className={`flex items-baseline gap-1 px-1 py-0.5 ${isRed || hasYeonga ? "text-red-500" : isSaturday ? "text-blue-500" : "text-gray-700 dark:text-gray-300"}`}>
+                  {calMode === "week" && <span className="text-xs font-bold mr-1">{["일", "월", "화", "수", "목", "금", "토"][idx % 7]}요일</span>}
                   <span className="text-xs font-semibold">{cell.day}</span>
                   {holidayName && (
                     <span className="text-xs font-bold leading-none truncate">{holidayName}</span>
                   )}
                 </div>
-                <div className="flex flex-col gap-0.5 mt-0.5">
+                <div className={`gap-0.5 mt-0.5 flex ${calMode === "week" ? "flex-row flex-wrap items-start" : "flex-col"}`}>
                   {dayEvents.map(ev => (
                     <div
                       key={`ev-${ev.id}`}
@@ -488,19 +529,19 @@ function CalendarContent() {
                       <div
                         key={`sch-${sch.id}`}
                         onClick={(e) => { e.stopPropagation(); if (isMobile) setViewSchedule(sch); else openEditModal(sch); }}
-                        className={`text-xs px-2 py-1.5 rounded cursor-pointer leading-tight flex flex-col gap-0.5 bg-transparent border-2 ${baseTextCls} ${borderCls}`}
+                        className={`text-xs rounded cursor-pointer leading-tight flex flex-col gap-0.5 bg-transparent ${isMobile ? "px-1 py-0.5 border" : "px-2 py-1.5 border-2"} ${baseTextCls} ${borderCls}`}
                         title={`${sch.siteName} ${sch.elevatorName ? `(${sch.elevatorName})` : ""}${sch.startTime ? ` ${sch.startTime}` : ""} / ${sch.details} / ${sch.workers}${sch.manager ? ` / 담당: ${sch.manager}${sch.managerPhone ? ` ${sch.managerPhone}` : ""}` : ""}${!isHoliday ? (hasTbm ? " · TBM 작성됨" : " · TBM 미작성") : ""}${isPaid ? " · 기성확인" : ""}`}
                       >
                         <div className={`font-bold truncate text-[12px] ${titleTextCls}`}>
                           {sch.siteName}{sch.elevatorName ? ` · ${sch.elevatorName}` : ""}
                         </div>
-                        {sch.startTime && (
+                        {!isMobile && sch.startTime && (
                           <div className="truncate text-[11px] font-medium">{sch.startTime}</div>
                         )}
-                        {sch.details && (
+                        {!isMobile && sch.details && (
                           <div className={`truncate text-[11px] ${subTextCls}`}>{sch.details}</div>
                         )}
-                        {sch.workers && (
+                        {!isMobile && sch.workers && (
                           <div className={`truncate text-[11px] ${subTextCls}`}>👷 {sch.workers}</div>
                         )}
                       </div>
@@ -524,7 +565,7 @@ function CalendarContent() {
           </div>
         }
       >
-        <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
+        <form onSubmit={handleSubmit} className={`p-5 flex flex-col gap-4 ${isMobile ? "force-mobile" : ""}`}>
               {requestId && !editingId && (
                 <div className="bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 p-3 rounded-lg text-sm mb-2">
                   ℹ️ 선택하신 공사요청 정보를 기반으로 일정을 등록합니다.
@@ -673,7 +714,7 @@ function CalendarContent() {
           </div>
         }
       >
-        <div className="flex-1 overflow-y-auto">
+        <div className={`flex-1 overflow-y-auto ${isMobile ? "force-mobile" : ""}`}>
               {!showEventForm ? (
                 <div className="p-5 flex flex-col gap-3">
                   <button

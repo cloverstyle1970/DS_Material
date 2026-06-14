@@ -6,6 +6,7 @@ import { api, getErrorMessage } from "@/lib/api-client";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 import DraggableModal from "@/components/common/DraggableModal";
+import { useViewMode } from "@/context/ViewModeContext";
 import { formatPhone } from "@/lib/input-format";
 
 export interface ConstructionRequest {
@@ -25,9 +26,14 @@ interface SiteOption { id: number; name: string }
 
 export default function ConstructionRequestClient() {
   const { user } = useAuth();
+  const { viewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
   const [requests, setRequests] = useState<ConstructionRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [calMode, setCalMode] = useState<"month" | "week">("month"); // 기간 단위 (당월 기본)
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [onlyNoSchedule, setOnlyNoSchedule] = useState(false); // 일정 미등록건만 표시
 
   // Modal State
   const [siteName, setSiteName] = useState("");
@@ -158,8 +164,33 @@ export default function ConstructionRequestClient() {
     return req.requesterName === user.name;
   }
 
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  // 기간(당월 기본) — 공사 캘린더와 동일하게 주/월 단위
+  const periodRange = (() => {
+    if (calMode === "week") {
+      const sun = new Date(currentDate); sun.setDate(currentDate.getDate() - currentDate.getDay());
+      const sat = new Date(sun); sat.setDate(sun.getDate() + 6);
+      return { from: ymd(sun), to: ymd(sat), label: `${pad(sun.getMonth() + 1)}/${pad(sun.getDate())} ~ ${pad(sat.getMonth() + 1)}/${pad(sat.getDate())}` };
+    }
+    const first = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const last = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    return { from: ymd(first), to: ymd(last), label: `${currentDate.getFullYear()}년 ${currentDate.getMonth() + 1}월` };
+  })();
+  const filteredRequests = requests.filter(r => {
+    const d = (r.requestedAt ?? "").slice(0, 10);
+    if (d < periodRange.from || d > periodRange.to) return false;
+    // 일정 미등록건: 아직 일정이 잡히지 않은 요청(요청/접수 상태)
+    if (onlyNoSchedule && (r.status === "일정등록됨" || r.status === "완료")) return false;
+    return true;
+  });
+  const movePeriod = (dir: number) => setCurrentDate(d => {
+    if (calMode === "week") { const n = new Date(d); n.setDate(d.getDate() + dir * 7); return n; }
+    return new Date(d.getFullYear(), d.getMonth() + dir, 1);
+  });
+
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+    <div className={`flex flex-col h-full bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 ${isMobile ? "force-mobile" : ""}`}>
       <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
         <div>
           <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
@@ -175,14 +206,36 @@ export default function ConstructionRequestClient() {
         </button>
       </div>
 
+      {/* 기간 필터 — 당월 기본, 주/월 토글 */}
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-200 dark:border-gray-700 flex-wrap">
+        <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-lg px-2 py-1">
+          <button type="button" onClick={() => movePeriod(-1)} className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white">&lt;</button>
+          <span className="font-bold text-sm text-center min-w-[110px] text-gray-900 dark:text-white">{periodRange.label}</span>
+          <button type="button" onClick={() => movePeriod(1)} className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white">&gt;</button>
+        </div>
+        <div className="flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
+          {(["month", "week"] as const).map(m => (
+            <button key={m} type="button" onClick={() => setCalMode(m)}
+              className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+                calMode === m ? "bg-slate-600 text-white" : "bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600"
+              }`}>{m === "month" ? "월" : "주"}</button>
+          ))}
+        </div>
+        <label className="flex items-center gap-1.5 text-xs font-medium text-red-600 dark:text-red-400 cursor-pointer select-none">
+          <input type="checkbox" checked={onlyNoSchedule} onChange={e => setOnlyNoSchedule(e.target.checked)} className="rounded cursor-pointer" />
+          일정 미등록
+        </label>
+        <span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">{filteredRequests.length}건</span>
+      </div>
+
       <div className="flex-1 overflow-auto p-4">
         {loading ? (
           <div className="flex justify-center py-10"><span className="loader"></span></div>
-        ) : requests.length === 0 ? (
-          <div className="text-center py-20 text-gray-500 dark:text-gray-400">등록된 공사 요청이 없습니다.</div>
+        ) : filteredRequests.length === 0 ? (
+          <div className="text-center py-20 text-gray-500 dark:text-gray-400">해당 기간에 공사 요청이 없습니다.</div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {requests.map(req => {
+            {filteredRequests.map(req => {
               const isTk = req.companyType === "TK";
               return (
               <div key={req.id} className={`border-2 rounded-lg p-4 hover:shadow-md transition-shadow bg-gray-50 dark:bg-gray-800/50 ${
@@ -262,7 +315,7 @@ export default function ConstructionRequestClient() {
           </div>
         }
       >
-        <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
+        <form onSubmit={handleSubmit} className={`p-5 flex flex-col gap-4 ${isMobile ? "force-mobile" : ""}`}>
               <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">현장명 <span className="text-red-500">*</span></label>

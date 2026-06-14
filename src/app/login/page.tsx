@@ -70,7 +70,7 @@ export default function LoginPage() {
     // 3) authenticated 상태에서 권한·부서·테마 fetch (RLS 강화 후에도 통과).
     const { data: account, error: qErr } = await supabase
       .from("accounts")
-      .select("id, username, permissions, dept, theme, permission_group_id")
+      .select("id, username, permissions, dept, theme, view_mode, permission_group_id")
       .eq("id", accountId)
       .maybeSingle();
     if (qErr || !account) {
@@ -100,6 +100,7 @@ export default function LoginPage() {
       dept: account.dept ?? "",
       permissions,
       theme: account.theme === "dark" ? "dark" : account.theme === "light" ? "light" : undefined,
+      viewMode: account.view_mode === "mobile" ? "mobile" : "pc",
       groupName,
     });
     router.replace("/me");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useViewMode } from "@/context/ViewModeContext";
 import { CategoryStore } from "@/lib/mock-categories";
 import { generateMaterialCode } from "@/lib/category-codes";
 import { api, getErrorMessage } from "@/lib/api-client";
@@ -21,6 +22,8 @@ interface Props {
 
 export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
   const isRepairMode = !!source;
+  const { viewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
 
   const [cats, setCats] = useState<CategoryStore | null>(null);
   const [showCatManager, setShowCatManager] = useState(false);
@@ -175,7 +178,7 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
           </div>
         }
       >
-          <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4 max-h-[75vh] overflow-y-auto">
+          <form onSubmit={handleSubmit} className={`px-6 py-5 space-y-4 max-h-[75vh] overflow-y-auto ${isMobile ? "force-mobile" : ""}`}>
             {/* 코드 미리보기 / 직접 입력 */}
             <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg px-4 py-3 space-y-2">
               <div className="flex items-center justify-between gap-3">

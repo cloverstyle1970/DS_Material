@@ -9,6 +9,7 @@ import { MaterialRequestRecord, RequestStatus, RequestType } from "@/lib/mock-ma
 import { PurchaseOrderRecord, OrderStatus } from "@/lib/mock-purchase-orders";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { useAuth, isViewOnly, isAdmin } from "@/context/AuthContext";
+import { useViewMode } from "@/context/ViewModeContext";
 import StockHistoryClient from "@/components/stock/StockHistoryClient";
 import PurchaseOrderBulkUploadModal from "@/components/purchase/PurchaseOrderBulkUploadModal";
 import { api, getErrorMessage } from "@/lib/api-client";
@@ -46,8 +47,24 @@ function today() { return new Date().toISOString().substring(0, 10); }
 interface ReqSearch { dateFrom: string; dateTo: string; siteName: string; elevatorName: string; userName: string; material: string }
 interface OrdSearch { dateFrom: string; dateTo: string; siteName: string; vendorName: string; userName: string; requesterName: string; material: string }
 
-function defaultReq(): ReqSearch { return { dateFrom: today(), dateTo: today(), siteName: "", elevatorName: "", userName: "", material: "" }; }
-function defaultOrd(): OrdSearch { return { dateFrom: today(), dateTo: today(), siteName: "", vendorName: "", userName: "", requesterName: "", material: "" }; }
+function defaultReq(): ReqSearch {
+  // 기본 검색기간: 당월(1일 ~ 말일)
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const from = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-01`;
+  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  const to = `${last.getFullYear()}-${pad(last.getMonth() + 1)}-${pad(last.getDate())}`;
+  return { dateFrom: from, dateTo: to, siteName: "", elevatorName: "", userName: "", material: "" };
+}
+function defaultOrd(): OrdSearch {
+  // 기본 기간: 이전주 일요일 ~ 당일(오늘)
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const now = new Date();
+  const curSun = new Date(now); curSun.setDate(now.getDate() - now.getDay());
+  const prevSun = new Date(curSun); prevSun.setDate(curSun.getDate() - 7);
+  return { dateFrom: ymd(prevSun), dateTo: ymd(now), siteName: "", vendorName: "", userName: "", requesterName: "", material: "" };
+}
 
 function inRange(iso: string, from: string, to: string) {
   const d = iso.substring(0, 10);
@@ -202,6 +219,8 @@ function compareSort<T>(a: T, b: T, dir: SortDir) {
 }
 
 export default function RequestsClient({ initialRequests, initialOrders, initialInbound, initialOutbound, mode = "all", materialAliases = {} }: Props) {
+  const { viewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
   const defaultTab: Tab = mode === "orders-only" ? "발주" : "자재신청";
   const [tab, setTab]       = useState<Tab>(defaultTab);
   const [requests, setRequests] = useState(initialRequests);
@@ -258,6 +277,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
 
   // 자재신청 탭
   const [reqStatus,     setReqStatus]     = useState<RequestStatus | "전체">("전체");
+  const [reqCompany,    setReqCompany]    = useState<"전체" | "TK" | "DS">("전체");
   const [reqType,       setReqType]       = useState<RequestType | "기본" | "전체">("전체");
   const [reqSearch,     setReqSearch]     = useState<ReqSearch>(defaultReq);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
@@ -266,6 +286,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
 
   // 발주 탭
   const [ordStatus,    setOrdStatus]    = useState<OrderStatus | "전체">("전체");
+  const [ordCompany,   setOrdCompany]   = useState<"전체" | "TK" | "DS">("전체");
   const [ordDraft,     setOrdDraft]     = useState<OrdSearch>(defaultOrd);
   const [ordSearch,    setOrdSearch]    = useState<OrdSearch>(defaultOrd);
 
@@ -377,6 +398,12 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
   // ── 필터 (가시성 = 본인만 또는 전체) ─────────────────────────────
   const filteredReqs = visibleRequests.filter(r => {
     if (reqStatus !== "전체" && r.status !== reqStatus) return false;
+    if (reqCompany !== "전체") {
+      const hasTk = r.items.some(i => isTkMaterial(i.materialId));
+      const hasDs = r.items.some(i => !isTkMaterial(i.materialId));
+      if (reqCompany === "TK" && !hasTk) return false;
+      if (reqCompany === "DS" && !hasDs) return false;
+    }
     if (reqType !== "전체") {
       if (reqType === "기본") {
         if (r.requestType != null) return false;
@@ -419,6 +446,11 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
 
   const filteredOrds = orders.filter(o => {
     if (ordStatus !== "전체" && o.status !== ordStatus) return false;
+    if (ordCompany !== "전체") {
+      const isTk = isTkMaterial(o.materialId);
+      if (ordCompany === "TK" && !isTk) return false;
+      if (ordCompany === "DS" && isTk) return false;
+    }
     if (!inRange(o.orderedAt, ordSearch.dateFrom, ordSearch.dateTo)) return false;
     if (ordSearch.siteName     && !(o.siteName?.toLowerCase().includes(ordSearch.siteName.toLowerCase()))) return false;
     if (ordSearch.vendorName   && !(o.vendorName?.toLowerCase().includes(ordSearch.vendorName.toLowerCase()))) return false;
@@ -544,7 +576,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                 </button>
               ))}
             </div>
-            <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
+            <div className={`flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 ${isMobile ? "order-2" : ""}`}>
               {(["전체","무상신청","당직선출고","유상견적","기본"] as const).map(f => (
                 <button key={f} type="button" onClick={() => setReqType(f)}
                   className={`px-3 py-2 text-xs font-medium transition-colors ${reqType === f ? "bg-slate-700 text-white" : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"}`}
@@ -553,13 +585,26 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                 </button>
               ))}
             </div>
+            {/* 회사구분 필터 (자재코드 기준 TK/DS) — 모바일에서 상태필터 옆 */}
+            <div className={`flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 ${isMobile ? "order-1" : ""}`}>
+              {(["전체","TK","DS"] as const).map(f => (
+                <button key={f} type="button" onClick={() => setReqCompany(f)}
+                  className={`px-3 py-2 text-xs font-medium transition-colors ${
+                    reqCompany === f
+                      ? f === "TK" ? "bg-blue-600 text-white" : f === "DS" ? "bg-red-500 text-white" : "bg-slate-700 text-white"
+                      : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  }`}>
+                  {f}
+                </button>
+              ))}
+            </div>
             <Link href="/requests/new"
-              className="ml-auto px-4 py-2.5 rounded-xl text-sm font-semibold bg-slate-700 text-white hover:bg-slate-800 transition-colors">
+              className={`ml-auto px-4 py-2.5 rounded-xl text-sm font-semibold bg-slate-700 text-white hover:bg-slate-800 transition-colors ${isMobile ? "order-9" : ""}`}>
               전표 입력
             </Link>
             {admin && (
               <button type="button" onClick={downloadReqs}
-                className="bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 transition-colors">
+                className={`bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 transition-colors ${isMobile ? "order-9" : ""}`}>
                 {selectedReqIds.size > 0 ? `선택 ${selectedReqIds.size}건 다운로드` : "엑셀 다운로드"}
               </button>
             )}
@@ -598,8 +643,62 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
             <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">{sortedReqs.length}건</span>
           </div>
 
-          {/* 테이블 */}
+          {/* 목록 — 모바일: 카드 / PC: 테이블 */}
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {isMobile ? (
+              sortedReqs.length === 0 ? (
+                <div className="text-center py-16 text-gray-400 dark:text-gray-500">
+                  {visibleRequests.length === 0 ? (restrictToTeam ? "같은 팀의 자재 신청 내역이 없습니다." : "자재 신청 내역이 없습니다.") : "조건에 맞는 내역이 없습니다."}
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {sortedReqs.map(r => {
+                    const totalQty = r.items.reduce((s, i) => s + i.qty, 0);
+                    const kind = matKind(r.items.map(i => i.materialId));
+                    const elevators = Array.from(new Set(r.items.map(i => i.elevatorName).filter(Boolean)));
+                    const isOpen = expandedIds.has(r.id);
+                    return (
+                      <div key={r.id} className="p-4">
+                        <div onClick={() => toggleExpand(r.id)} className="cursor-pointer">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${reqStatusCls(r.status, kind)}`}>{r.status === "신청" ? kind : r.status}</span>
+                              {r.requestType && <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${REQ_TYPE_CLS[r.requestType]}`}>{r.requestType}</span>}
+                            </div>
+                            <span className="text-xs text-gray-400 dark:text-gray-500">{fmtDate(r.requestedAt)}</span>
+                          </div>
+                          <p className="font-medium text-gray-800 dark:text-gray-100 mt-1.5">{r.siteName ?? "-"}{elevators.length > 0 && <span className="text-gray-400 dark:text-gray-500"> ({elevators.length}호기)</span>}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-300 mt-0.5">{r.items[0]?.materialName ?? "-"}{r.items.length > 1 ? ` 외 ${r.items.length - 1}건` : ""} · 수량 {totalQty}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{r.requesterName} ({r.requesterDept}){r.note ? ` · ${r.note}` : ""}</p>
+                        </div>
+                        {admin && (r.status === "신청" || r.status === "처리중") && (
+                          <div className="flex gap-1 mt-2 flex-wrap">
+                            {r.status === "신청" && (
+                              <button type="button" disabled={actionLoading === r.id} onClick={() => handleReqAction(r.id, "처리중")}
+                                className="text-xs px-2 py-1 rounded-lg bg-yellow-50 text-yellow-700 hover:bg-yellow-100 whitespace-nowrap">처리중</button>
+                            )}
+                            <button type="button" disabled={actionLoading === r.id} onClick={() => handleReqAction(r.id, "출고처리")}
+                              className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 whitespace-nowrap">출고처리</button>
+                            <button type="button" disabled={actionLoading === r.id} onClick={() => handleReqAction(r.id, "취소")}
+                              className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">취소</button>
+                          </div>
+                        )}
+                        {isOpen && (
+                          <div className="mt-2 rounded-lg border border-gray-200 dark:border-gray-600 p-2 space-y-1">
+                            {r.items.map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between gap-2 text-xs">
+                                <span className="text-gray-600 dark:text-gray-300 min-w-0 truncate">{item.elevatorName ? `${item.elevatorName} · ` : ""}{item.materialName}</span>
+                                <span className="tabular-nums text-gray-700 dark:text-gray-300 shrink-0">{fmtNum(item.qty)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            ) : (
             <div className="overflow-auto max-h-[calc(100vh-250px)]">
             <table className="w-full min-w-[700px] text-sm">
               <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
@@ -756,6 +855,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
               </tbody>
             </table>
             </div>
+            )}
           </div>
         </div>
       )}
@@ -768,6 +868,19 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
               {(["전체","발주","입고완료","취소"] as const).map(f => (
                 <button key={f} type="button" onClick={() => setOrdStatus(f)}
                   className={`px-3 py-2 text-xs font-medium transition-colors ${ordStatus === f ? "bg-slate-700 text-white" : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
+                  {f}
+                </button>
+              ))}
+            </div>
+            {/* 회사구분 필터 (자재코드 기준 TK/DS) */}
+            <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
+              {(["전체","TK","DS"] as const).map(f => (
+                <button key={f} type="button" onClick={() => setOrdCompany(f)}
+                  className={`px-3 py-2 text-xs font-medium transition-colors ${
+                    ordCompany === f
+                      ? f === "TK" ? "bg-blue-600 text-white" : f === "DS" ? "bg-red-500 text-white" : "bg-slate-700 text-white"
+                      : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  }`}>
                   {f}
                 </button>
               ))}
@@ -850,8 +963,52 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
             <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">{sortedOrds.length}건</span>
           </form>
 
-          {/* 테이블 */}
+          {/* 목록 — 모바일: 카드 / PC: 테이블 */}
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {isMobile ? (
+              sortedOrds.length === 0 ? (
+                <div className="text-center py-16 text-gray-400 dark:text-gray-500">
+                  {orders.length === 0 ? "발주 내역이 없습니다." : "조건에 맞는 내역이 없습니다."}
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {sortedOrds.map(o => {
+                    const ordTag = o.note?.match(/^\[(.*?)\]/)?.[1] || "-";
+                    const noteText = (o.note ?? "").replace(/^\[[^\]]*\]\s*/, "").trim();
+                    return (
+                      <div key={o.id} className="p-4">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-blue-600 dark:text-blue-400">{ordTag}</span>
+                          <span className="text-xs text-gray-400 dark:text-gray-500">{fmtDateOnly(o.orderedAt)}</span>
+                        </div>
+                        <p className={`font-medium mt-1.5 ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-100"}`}>
+                          {o.materialName} <span className="font-mono text-xs text-gray-400">{o.materialId}</span>
+                        </p>
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-gray-600 dark:text-gray-300 mt-1">
+                          <div><span className="text-gray-400">규격 </span>{matModelMap.get(o.materialId) || "-"}</div>
+                          <div><span className="text-gray-400">수량 </span>{fmtNum(o.qty)}</div>
+                          <div className="col-span-2"><span className="text-gray-400">현장 </span>{o.siteName ?? "-"}{o.elevatorName ? ` · ${o.elevatorName}` : ""}</div>
+                          <div><span className="text-gray-400">거래처 </span>{o.vendorName ?? "-"}</div>
+                          <div><span className="text-gray-400">단가 </span>{fmtNumOr(o.unitPrice)}</div>
+                          <div><span className="text-gray-400">신청자 </span>{o.requesterName ?? "-"}</div>
+                          {noteText && <div className="col-span-2"><span className="text-gray-400">비고 </span>{noteText}</div>}
+                        </div>
+                        {admin && o.status === "발주" && (
+                          <div className="flex gap-1 mt-2 flex-wrap">
+                            <button type="button" disabled={actionLoading === o.id} onClick={() => router.push(`/purchase-orders/edit?id=${o.id}`)}
+                              className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 whitespace-nowrap">수정</button>
+                            <button type="button" disabled={actionLoading === o.id} onClick={() => handleOrdAction(o.id, "입고완료")}
+                              className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 whitespace-nowrap">입고완료</button>
+                            <button type="button" disabled={actionLoading === o.id} onClick={() => handleOrdDelete(o.id)}
+                              className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100">삭제</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            ) : (
             <div className="overflow-auto max-h-[calc(100vh-250px)]">
             <table className="w-full min-w-[700px] text-sm">
               <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
@@ -942,6 +1099,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
               </tbody>
             </table>
             </div>
+            )}
           </div>
         </div>
       )}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
+import { useViewMode } from "@/context/ViewModeContext";
 import { fmtNum } from "@/lib/format";
 
 // ============================================================
@@ -74,6 +75,8 @@ function subCodeOf(id: string): string {
 
 export default function UniformSafetyClient() {
   const { user } = useAuth();
+  const { viewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
   const [tab, setTab] = useState<Tab>("uniform");
 
   // 자재 풀 (탭별 분리)
@@ -341,7 +344,7 @@ export default function UniformSafetyClient() {
   const sectionCls = "bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5";
 
   return (
-    <div className="min-h-full bg-gray-50 dark:bg-gray-900">
+    <div className={`min-h-full bg-gray-50 dark:bg-gray-900 ${isMobile ? "force-mobile" : ""}`}>
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
         <h1 className="text-base font-bold text-gray-900 dark:text-white">근무복 · 개인안전장구 신청</h1>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">근무복은 개인정보의 사이즈를 자동 적용하며 수령완료 시 사이즈가 갱신됩니다.</p>
@@ -410,7 +413,12 @@ export default function UniformSafetyClient() {
                       <div>
                         <label className={labelCls}>자재</label>
                         <select value={s.material_id}
-                          onChange={e => updateSlot(i, { material_id: e.target.value })}
+                          onChange={e => {
+                            const mid = e.target.value;
+                            const mat = slotMaterials.find(m => m.id === mid);
+                            // 자재의 규격(model_no = 사이즈)을 사이즈 입력란에 자동 입력
+                            updateSlot(i, { material_id: mid, size: mat?.model_no ?? "" });
+                          }}
                           disabled={!s.enabled || !s.sub_code} className={inputCls}>
                           <option value="">
                             {!s.sub_code ? "품목 먼저 선택" : (slotMaterials.length === 0 ? "(자재 미등록)" : "자재 선택")}
@@ -534,8 +542,8 @@ export default function UniformSafetyClient() {
         {/* 내 신청 이력 (본인 신청만 조회 / 신청 상태일 때 본인은 수정·삭제 가능, 관리자는 모두) */}
         <div className={sectionCls}>
           <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3">내 신청 이력</h2>
-          {/* 필터: 기간 / 구분 / 상태 / 품목 */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
+          {/* 필터: 모바일은 시작|종료(2열), 구분|상태|품목(3열) */}
+          <div className={`gap-2 mb-3 ${isMobile ? "flex flex-wrap [&>div]:grow [&>div:nth-child(-n+2)]:basis-[calc(50%_-_4px)] [&>div:nth-child(n+3)]:basis-[calc(33.333%_-_6px)]" : "grid grid-cols-2 md:grid-cols-5"}`}>
             <div>
               <label className="block text-[10px] font-bold text-gray-500 mb-1">시작일</label>
               <input type="date" value={historyDateFrom} onChange={e => setHistoryDateFrom(e.target.value)}
@@ -553,17 +561,6 @@ export default function UniformSafetyClient() {
                 <option value="all">전체</option>
                 <option value="근무복">근무복</option>
                 <option value="안전장구">안전장구</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-gray-500 mb-1">상태</label>
-              <select value={historyStatusFilter} onChange={e => setHistoryStatusFilter(e.target.value as typeof historyStatusFilter)}
-                className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
-                <option value="all">전체</option>
-                <option value="신청">신청</option>
-                <option value="처리중">처리중</option>
-                <option value="수령완료">수령완료</option>
-                <option value="취소">취소</option>
               </select>
             </div>
             <div>
@@ -585,6 +582,17 @@ export default function UniformSafetyClient() {
                   </select>
                 );
               })()}
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 mb-1">상태</label>
+              <select value={historyStatusFilter} onChange={e => setHistoryStatusFilter(e.target.value as typeof historyStatusFilter)}
+                className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                <option value="all">전체</option>
+                <option value="신청">신청</option>
+                <option value="처리중">처리중</option>
+                <option value="수령완료">수령완료</option>
+                <option value="취소">취소</option>
+              </select>
             </div>
           </div>
           {(historyDateFrom || historyDateTo || historyMaterialFilter || historyTypeFilter !== "all" || historyStatusFilter !== "all") && (
@@ -706,6 +714,8 @@ function EditModal({ request, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void | Promise<void>;
 }) {
+  const { viewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
   const [items, setItems] = useState<EditableItem[]>(
     (request.items ?? []).map(it => ({
       id: it.id,
@@ -782,7 +792,7 @@ function EditModal({ request, onClose, onSaved }: {
         </div>
       }
     >
-        <div className="flex-1 overflow-y-auto p-5 space-y-3">
+        <div className={`flex-1 overflow-y-auto p-5 space-y-3 ${isMobile ? "force-mobile" : ""}`}>
           <div className="text-[11px] font-bold text-gray-600 dark:text-gray-300">신청 항목 ({remainingCount}개)</div>
           {items.map(it => (
             <div key={it.id} className={"rounded-lg border p-3 " + (it._deleted

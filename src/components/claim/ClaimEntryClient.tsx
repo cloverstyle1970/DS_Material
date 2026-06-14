@@ -333,7 +333,7 @@ export default function ClaimEntryClient() {
                   className={`p-3 rounded-lg border text-left transition-all ${
                     active
                       ? m.color + " ring-2 ring-offset-1 ring-blue-400"
-                      : "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-gray-400"
+                      : "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 hover:border-gray-400"
                   }`}>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-lg">{m.icon}</span>

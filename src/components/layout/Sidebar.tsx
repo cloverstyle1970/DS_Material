@@ -123,6 +123,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/hr/team-crew",          label: "팀구성 관리",    icon: "🧑‍🤝‍🧑", section: "인사" },
       { href: "/hr/transfer",           label: "인사 이동",      icon: "🔄", section: "인사" },
       { href: "/hr/employment-status",  label: "재직상태 관리",  icon: "📋", section: "인사" },
+      { href: "/hr/rewards-punishments", label: "상벌사항 관리",  icon: "🏅", section: "인사" },
     ],
   },
   {
@@ -145,11 +146,12 @@ const NAV_GROUPS: NavGroup[] = [
 
 interface Props {
   open: boolean;
+  isPc: boolean;  // 화면 모드(pc/mobile) — viewport 대신 이 값으로 레이아웃을 강제
   onToggle: () => void;
   onClose: () => void;
 }
 
-export default function Sidebar({ open, onToggle, onClose }: Props) {
+export default function Sidebar({ open, isPc, onToggle, onClose }: Props) {
   const pathname = usePathname();
   const router   = useRouter();
   const { user, logout } = useAuth();
@@ -157,9 +159,8 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
   const viewOnly = user ? isViewOnly(user) : false;
 
   function handleNavClick() {
-    if (typeof window !== "undefined" && window.innerWidth < 768) {
-      onClose();
-    }
+    // 모바일 모드에서는 메뉴 선택 시 오버레이 사이드바를 닫음
+    if (!isPc) onClose();
   }
 
   function handleMenuOpen(href: string, fallbackLabel: string) {
@@ -238,10 +239,10 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
 
   return (
     <>
-      {/* 모바일 백드롭 — md 이상에서는 숨김 */}
-      {open && (
+      {/* 모바일 모드 백드롭 — PC 모드에서는 표시하지 않음 */}
+      {open && !isPc && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          className="fixed inset-0 z-40 bg-black/50"
           onClick={onClose}
           aria-hidden="true"
         />
@@ -252,14 +253,11 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
         className={[
           "shrink-0 bg-slate-900 text-white flex flex-col",
           "transition-[transform,width] duration-200",
-          // 모바일: fixed 오버레이
-          "fixed inset-y-0 left-0 z-50 w-64",
-          // 데스크탑: 일반 플로우로 복귀
-          "md:relative md:inset-auto md:z-auto",
-          // 모바일: translate로 열기/닫기 / 데스크탑: 항상 translate-x-0
-          open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
-          // 데스크탑 닫힘: width 0
-          !open ? "md:w-0 md:overflow-hidden" : "",
+          isPc
+            // PC 모드: 일반 플로우로 고정 배치. 닫으면 width 0으로 접힘.
+            ? "relative inset-auto z-auto translate-x-0 " + (open ? "w-64" : "w-0 overflow-hidden")
+            // 모바일 모드: fixed 오버레이. translate로 열고 닫음.
+            : "fixed inset-y-0 left-0 z-50 w-64 " + (open ? "translate-x-0" : "-translate-x-full"),
         ].join(" ")}
       >
         {/* 로고 */}
@@ -444,15 +442,17 @@ export default function Sidebar({ open, onToggle, onClose }: Props) {
         </div>
       </aside>
 
-      {/* 데스크탑 토글 버튼 — 모바일에서는 숨김 */}
-      <button
-        type="button"
-        onClick={onToggle}
-        className="hidden md:flex shrink-0 self-start mt-3 w-5 h-10 items-center justify-center bg-slate-700 hover:bg-slate-600 text-white rounded-r-lg transition-colors z-10"
-        title={open ? "메뉴 숨기기" : "메뉴 표시"}
-      >
-        <span className="text-xs">{open ? "‹" : "›"}</span>
-      </button>
+      {/* PC 모드 토글 버튼 — 모바일 모드에서는 백드롭/햄버거로 제어하므로 숨김 */}
+      {isPc && (
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex shrink-0 self-start mt-3 w-5 h-10 items-center justify-center bg-slate-700 hover:bg-slate-600 text-white rounded-r-lg transition-colors z-10"
+          title={open ? "메뉴 숨기기" : "메뉴 표시"}
+        >
+          <span className="text-xs">{open ? "‹" : "›"}</span>
+        </button>
+      )}
     </>
   );
 }

@@ -11,6 +11,7 @@ import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNum } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 import DraggableModal from "@/components/common/DraggableModal";
+import { useViewMode } from "@/context/ViewModeContext";
 import Autocomplete from "@/components/common/Autocomplete";
 import TransactionBulkUploadModal from "./TransactionBulkUploadModal";
 
@@ -29,7 +30,15 @@ type SortDir = "asc" | "desc";
 type ColDef = { key: SortKey | null; label: string; sortable: boolean; outboundOnly?: boolean };
 
 function today() { return new Date().toISOString().substring(0, 10); }
-function defaultSearch(): Search { return { dateFrom: today(), dateTo: today(), siteName: "", userName: "", matQuery: "" }; }
+function defaultSearch(): Search {
+  // 기본 기간: 이전주 일요일 ~ 당일(오늘)
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const now = new Date();
+  const curSun = new Date(now); curSun.setDate(now.getDate() - now.getDay());
+  const prevSun = new Date(curSun); prevSun.setDate(curSun.getDate() - 7);
+  return { dateFrom: ymd(prevSun), dateTo: ymd(now), siteName: "", userName: "", matQuery: "" };
+}
 
 function inRange(iso: string, from: string, to: string) {
   const d = iso.substring(0, 10);
@@ -52,6 +61,8 @@ function inputCls() {
 }
 
 export default function StockHistoryClient({ mode, initial }: Props) {
+  const { viewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
   const [transactions, setTransactions] = useState(initial);
   const [sites, setSites] = useState<SiteOption[]>([]);
   const [userNames, setUserNames] = useState<string[]>([]);
@@ -92,6 +103,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
       .catch(() => {});
   }, []);
   const [search, setSearch] = useState<Search>(defaultSearch);
+  const [companyFilter, setCompanyFilter] = useState<"전체" | "TK" | "DS">("전체");
   const [sortKey, setSortKey] = useState<SortKey>("createdAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [editingTx, setEditingTx] = useState<TransactionRecord | null>(null);
@@ -126,6 +138,11 @@ export default function StockHistoryClient({ mode, initial }: Props) {
 
   const filtered = transactions.filter(t => {
     if (!inRange(t.createdAt, search.dateFrom, search.dateTo)) return false;
+    if (companyFilter !== "전체") {
+      const isTk = isTkMaterial(t.materialId);
+      if (companyFilter === "TK" && !isTk) return false;
+      if (companyFilter === "DS" && isTk) return false;
+    }
     if (search.siteName && !(t.siteName?.toLowerCase().includes(search.siteName.toLowerCase()))) return false;
     if (search.userName && !t.userName.toLowerCase().includes(search.userName.toLowerCase())) return false;
     if (search.matQuery) {
@@ -280,12 +297,24 @@ export default function StockHistoryClient({ mode, initial }: Props) {
   }
 
 
-  const hasFilter = search.dateFrom !== today() || search.dateTo !== today() || search.siteName || search.userName || search.matQuery;
+  const def = defaultSearch();
+  const hasFilter = search.dateFrom !== def.dateFrom || search.dateTo !== def.dateTo || search.siteName || search.userName || search.matQuery;
 
   return (
     <>
       {/* 툴바 */}
       <div className="flex items-center gap-3 flex-wrap">
+        {/* 회사구분 필터 (자재코드 기준 TK/DS) */}
+        <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shrink-0">
+          {(["전체","TK","DS"] as const).map(f => (
+            <button key={f} type="button" onClick={() => setCompanyFilter(f)}
+              className={`px-3 py-2 text-xs font-medium transition-colors ${
+                companyFilter === f
+                  ? f === "TK" ? "bg-blue-600 text-white" : f === "DS" ? "bg-red-500 text-white" : "bg-slate-700 text-white"
+                  : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+              }`}>{f}</button>
+          ))}
+        </div>
         {/* 검색 필터 */}
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-2.5 flex items-center gap-3 flex-wrap flex-1">
           <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">검색</span>
@@ -350,8 +379,69 @@ export default function StockHistoryClient({ mode, initial }: Props) {
         )}
       </div>
 
-      {/* 테이블 */}
+      {/* 목록 — 모바일: 카드 / PC: 테이블 */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        {isMobile ? (
+          sorted.length === 0 ? (
+            <div className="text-center py-16 text-gray-400 dark:text-gray-500">
+              {transactions.length === 0 ? `${mode} 내역이 없습니다.` : "조건에 맞는 내역이 없습니다."}
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100 dark:divide-gray-700">
+              {sorted.map(t => (
+                <div key={t.id} className="p-4">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className={`font-mono text-xs ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-gray-500 dark:text-gray-400"}`}>{t.materialId}</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">{fmtDateOnly(t.createdAt)}</span>
+                  </div>
+                  <p className={`font-medium mt-0.5 ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-100"}`}>{t.materialName}</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-gray-600 dark:text-gray-300 mt-1">
+                    <div><span className="text-gray-400">규격 </span>{matMap.get(t.materialId) || "-"}</div>
+                    <div><span className="text-gray-400">수량 </span>{fmtNum(t.qty)}</div>
+                    <div><span className="text-gray-400">재고 </span>{fmtNum(t.prevStock)} → {fmtNum(t.afterStock)}</div>
+                    <div className="truncate"><span className="text-gray-400">현장 </span>{t.siteName ?? "-"}{t.elevatorName ? ` (${t.elevatorName})` : ""}</div>
+                    {showFin && <div><span className="text-gray-400">단가 </span>₩{fmtNum(t.unitPrice ?? 0)}</div>}
+                    {showFin && <div><span className="text-gray-400">금액 </span>₩{fmtNum((t.unitPrice ?? 0) * t.qty)}</div>}
+                    {!isInbound && t.serialNo && <div className="col-span-2"><span className="text-gray-400">S/N </span><span className="font-mono">{t.serialNo}</span></div>}
+                    <div><span className="text-gray-400">담당 </span>{t.userName}</div>
+                    {t.note && <div className="col-span-2"><span className="text-gray-400">비고 </span>{t.note}</div>}
+                  </div>
+                  {!isInbound && (
+                    <div className="mt-2 text-xs">
+                      {t.returnStatus === "returned" ? (
+                        <span className={`px-2 py-0.5 rounded-full ${t.returnType === "unused" ? "bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" : "bg-green-50 text-green-700 dark:bg-green-900/40 dark:text-green-300"}`}>
+                          {t.returnType === "unused" ? "미사용반납" : "폐자재회수"}
+                        </span>
+                      ) : t.requiresReturn ? (
+                        admin ? (
+                          <button type="button" disabled={actionLoading === t.id} onClick={() => handleReturn(t, "반납등록")}
+                            className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 hover:bg-orange-200 disabled:opacity-50">폐자재회수</button>
+                        ) : <span className="px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">반납 대기</span>
+                      ) : admin ? (
+                        <button type="button" disabled={actionLoading === t.id} onClick={() => handleReturn(t, "미사용반납")}
+                          className="px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300 hover:bg-sky-100 disabled:opacity-50">미사용반납</button>
+                      ) : null}
+                    </div>
+                  )}
+                  {admin && (
+                    <div className="flex gap-1 mt-2 flex-wrap">
+                      <Link href={isInbound ? `/inbound/edit?id=${t.id}` : `/outbound/edit?id=${t.id}`}
+                        className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors">전표수정</Link>
+                      <button type="button" disabled={actionLoading === t.id} onClick={() => setEditingTx(t)}
+                        className="text-xs px-2 py-1 rounded-lg bg-gray-50 text-gray-700 hover:bg-gray-100 transition-colors">단건수정</button>
+                      <button type="button" disabled={actionLoading === t.id} onClick={() => handleDelete(t.id)}
+                        className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors">취소</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+              <div className="p-4 bg-gray-50 dark:bg-gray-700/40 flex items-center justify-between font-semibold text-sm">
+                <span>합계 {fmtNum(sorted.length)}건</span>
+                <span>수량 {fmtNum(sorted.reduce((a, c) => a + c.qty, 0))}{showFin ? ` · ₩${fmtNum(sorted.reduce((a, c) => a + c.qty * (c.unitPrice ?? 0), 0))}` : ""}</span>
+              </div>
+            </div>
+          )
+        ) : (
         <div className="overflow-auto max-h-[calc(100vh-250px)]">
         <table className="w-full min-w-[640px] text-sm">
           <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
@@ -499,6 +589,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
           </tbody>
         </table>
         </div>
+        )}
       </div>
 
       {editingTx && (
@@ -645,6 +736,8 @@ function BulkOutboundModal({
   onSubmit: (data: { outboundAt: string; siteName: string; elevatorName: string }) => void;
   loading: boolean;
 }) {
+  const { viewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
   const today = new Date().toISOString().slice(0, 10);
   const [outboundAt, setOutboundAt] = useState(today);
   const [siteName, setSiteName] = useState("");
@@ -661,7 +754,7 @@ function BulkOutboundModal({
     <DraggableModal
       open={true}
       onClose={onClose}
-      panelClassName="w-[640px]"
+      panelClassName={isMobile ? "w-full max-w-[640px] mx-4 max-h-[90vh]" : "w-[640px]"}
       header={
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-gray-700">
           <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">일괄 출고</h3>
@@ -669,7 +762,7 @@ function BulkOutboundModal({
         </div>
       }
     >
-      <div className="p-5 space-y-4">
+      <div className={`p-5 space-y-4 ${isMobile ? "force-mobile" : ""}`}>
         <div className="grid grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">출고일자 <span className="text-red-500">*</span></label>

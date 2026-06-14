@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Permission } from "@/lib/mock-users";
 import { supabase } from "@/lib/supabase";
+import { setStoredViewMode, type ViewMode } from "@/context/ViewModeContext";
 
 export interface AuthUser {
   id: number;
@@ -10,6 +11,7 @@ export interface AuthUser {
   dept: string;
   permissions: Permission[];
   theme?: "light" | "dark";
+  viewMode?: ViewMode; // 화면 레이아웃 모드(pc/mobile) — 환경설정에서 선택, 세션동기화 때 로드
   groupName?: string | null; // 소속 권한그룹명 (비관리자 판정용 — 로그인/세션동기화 때 로드)
 }
 
@@ -132,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const { data: account } = await supabase
           .from("accounts")
-          .select("username, permissions, dept, theme, permission_group_id")
+          .select("username, permissions, dept, theme, view_mode, permission_group_id")
           .eq("id", id)
           .maybeSingle();
 
@@ -141,6 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (account) {
           const permissions = (Array.isArray(account.permissions) ? account.permissions : []) as Permission[];
           const theme = account.theme === "dark" ? "dark" : account.theme === "light" ? "light" : stored?.theme;
+          const viewMode: ViewMode = account.view_mode === "mobile" ? "mobile" : "pc";
           let groupName: string | null = null;
           if (account.permission_group_id != null) {
             const { data: g } = await supabase
@@ -157,11 +160,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             dept: account.dept ?? "",
             permissions,
             theme,
+            viewMode,
             groupName,
           };
           setUser(freshUser);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
           applyTheme(theme);
+          setStoredViewMode(viewMode);
         } else {
           // 세션은 있는데 accounts 행이 없음 → 사고. 세션 정리.
           await supabase.auth.signOut();
@@ -199,6 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(u);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
     applyTheme(u.theme);
+    if (u.viewMode) setStoredViewMode(u.viewMode);
   }
 
   function logout() {

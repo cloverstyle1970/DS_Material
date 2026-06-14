@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useRef, FormEvent } from "react";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
+import { useViewMode } from "@/context/ViewModeContext";
 import { supabase } from "@/lib/supabase";
 import { changeAuthPassword } from "@/lib/auth-ops";
 import { formatDate as formatYmd, formatPhone, formatSsn } from "@/lib/input-format";
+import { daysUntilExpiry, EXPIRY_WARN_DAYS } from "@/lib/cert-expiry";
 
 // 사원관리(UsersClient)에서 관리자가 사원 이름을 클릭할 때 세팅됨
 // 같은 키를 UsersClient에서도 export 해 사용
@@ -151,6 +153,8 @@ function displaySsn(ssn: string | null | undefined): string {
 
 export default function MyProfileClient() {
   const { user } = useAuth();
+  const { viewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
   const meIsAdmin = user ? isAdmin(user) : false;
   // 사원관리 update 권한 보유자도 다른 사용자 대리편집 허용 (UsersClient의 canEditUser와 동일 정책)
   const canManageOtherUsers = user ? (meIsAdmin || hasMenuPermission(user, "/data/users", "update")) : false;
@@ -529,10 +533,13 @@ export default function MyProfileClient() {
         setTab("career"); return;
       }
     }
-    for (let i = 0; i < rps.length; i++) {
-      if (!rps[i].kind || !rps[i].content.trim()) {
-        setMessage({ type: "error", text: `[상벌사항] #${i + 1}의 구분과 내용은 필수입니다.` });
-        setTab("rp"); return;
+    // 상벌은 관리자 편집 시에만 검증 (본인은 조회 전용 → 기존 빈 값으로 저장이 막히지 않도록)
+    if (isAdminEditing) {
+      for (let i = 0; i < rps.length; i++) {
+        if (!rps[i].kind || !rps[i].content.trim()) {
+          setMessage({ type: "error", text: `[상벌사항] #${i + 1}의 구분과 내용은 필수입니다.` });
+          setTab("rp"); return;
+        }
       }
     }
 
@@ -655,43 +662,49 @@ export default function MyProfileClient() {
         if (cErr) throw cErr;
       }
 
-      // 상벌
-      await supabase.from("user_rewards_punishments").delete().eq("user_id", editingUserId);
-      if (rps.length > 0) {
-        const { error: rpErr } = await supabase.from("user_rewards_punishments").insert(
-          rps.map((r, i) => ({
-            user_id: editingUserId,
-            kind: r.kind,
-            content: r.content.trim(),
-            occurred_on: r.occurred_on || null,
-            sort_order: (i + 1) * 10,
-          }))
-        );
-        if (rpErr) throw rpErr;
-      }
-
-      // 발령/재직상태 이력
-      try {
-        await supabase.from("user_status_history").delete().eq("user_id", editingUserId);
-        const validSh = statusHistory.filter(s => s.status_type && s.event_date);
-        if (validSh.length > 0) {
-          const { error: shErr } = await supabase.from("user_status_history").insert(
-            validSh.map((s, i) => ({
+      // 상벌 — 관리자 편집 시에만 반영. 본인 저장 시에는 건드리지 않아 데이터 보존
+      // (조회 전용이므로 rps가 변경될 수 없고, 무조건 DELETE 시 로드 실패 등에서 유실 위험 차단)
+      if (isAdminEditing) {
+        await supabase.from("user_rewards_punishments").delete().eq("user_id", editingUserId);
+        if (rps.length > 0) {
+          const { error: rpErr } = await supabase.from("user_rewards_punishments").insert(
+            rps.map((r, i) => ({
               user_id: editingUserId,
-              status_type: s.status_type,
-              event_date: s.event_date || null,
-              reason: s.reason || null,
-              from_dept: s.from_dept || null,
-              to_dept: s.to_dept || null,
-              from_rank: s.from_rank || null,
-              to_rank: s.to_rank || null,
+              kind: r.kind,
+              content: r.content.trim(),
+              occurred_on: r.occurred_on || null,
               sort_order: (i + 1) * 10,
             }))
           );
-          if (shErr) throw shErr;
+          if (rpErr) throw rpErr;
         }
-      } catch (shSaveErr) {
-        console.error("user_status_history save failed (possibly table not migrated yet):", shSaveErr);
+      }
+
+      // 발령/재직상태 이력 — 관리자만 편집 가능하므로 admin일 때만 반영.
+      // 본인 저장 시에는 건드리지 않아, 로드 실패 등에서 이력이 유실되지 않게 한다(상벌과 동일).
+      if (meIsAdmin) {
+        try {
+          await supabase.from("user_status_history").delete().eq("user_id", editingUserId);
+          const validSh = statusHistory.filter(s => s.status_type && s.event_date);
+          if (validSh.length > 0) {
+            const { error: shErr } = await supabase.from("user_status_history").insert(
+              validSh.map((s, i) => ({
+                user_id: editingUserId,
+                status_type: s.status_type,
+                event_date: s.event_date || null,
+                reason: s.reason || null,
+                from_dept: s.from_dept || null,
+                to_dept: s.to_dept || null,
+                from_rank: s.from_rank || null,
+                to_rank: s.to_rank || null,
+                sort_order: (i + 1) * 10,
+              }))
+            );
+            if (shErr) throw shErr;
+          }
+        } catch (shSaveErr) {
+          console.error("user_status_history save failed (possibly table not migrated yet):", shSaveErr);
+        }
       }
 
       if (newPhotoUrl !== photoUrl) {
@@ -723,7 +736,7 @@ export default function MyProfileClient() {
   const sectionCls = "bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5";
 
   return (
-    <div className="min-h-full bg-gray-50 dark:bg-gray-900">
+    <div className={`min-h-full bg-gray-50 dark:bg-gray-900 ${isMobile ? "force-mobile" : ""}`}>
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
         <h1 className="text-base font-bold text-gray-900 dark:text-white">개인정보수정</h1>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
@@ -755,7 +768,7 @@ export default function MyProfileClient() {
               <button
                 key={t.key}
                 type="button"
-                onClick={() => setTab(t.key)}
+                onClick={() => { setTab(t.key); setMessage(null); }}
                 className={`whitespace-nowrap px-3 py-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors ${
                   active
                     ? "border-blue-500 text-blue-600 dark:text-blue-400"
@@ -1137,19 +1150,22 @@ export default function MyProfileClient() {
                         onChange={e => setCareers(p => p.map((x, idx) => idx === i ? { ...x, rank: e.target.value } : x))}
                         lang="ko" className={inputCls} />
                     </div>
-                    <div>
-                      <label className={labelCls}>입사일</label>
-                      <input type="text" value={c.joined_date}
-                        onChange={e => setCareers(p => p.map((x, idx) => idx === i ? { ...x, joined_date: formatYmd(e.target.value) } : x))}
-                        placeholder="YYYYMMDD" inputMode="numeric" maxLength={10}
-                        className={inputCls + " font-mono"} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>퇴사일</label>
-                      <input type="text" value={c.left_date}
-                        onChange={e => setCareers(p => p.map((x, idx) => idx === i ? { ...x, left_date: formatYmd(e.target.value) } : x))}
-                        placeholder="YYYYMMDD (재직 중이면 공백)" inputMode="numeric" maxLength={10}
-                        className={inputCls + " font-mono"} />
+                    {/* 입사일·퇴사일 — 모바일에서도 한 줄에 2열(flex는 force-mobile 1열 강제 대상 아님) */}
+                    <div className={isMobile ? "flex gap-2" : "contents"}>
+                      <div className={isMobile ? "flex-1 min-w-0" : ""}>
+                        <label className={labelCls}>입사일</label>
+                        <input type="text" value={c.joined_date}
+                          onChange={e => setCareers(p => p.map((x, idx) => idx === i ? { ...x, joined_date: formatYmd(e.target.value) } : x))}
+                          placeholder="YYYYMMDD" inputMode="numeric" maxLength={10}
+                          className={inputCls + " font-mono"} />
+                      </div>
+                      <div className={isMobile ? "flex-1 min-w-0" : ""}>
+                        <label className={labelCls}>퇴사일</label>
+                        <input type="text" value={c.left_date}
+                          onChange={e => setCareers(p => p.map((x, idx) => idx === i ? { ...x, left_date: formatYmd(e.target.value) } : x))}
+                          placeholder="YYYYMMDD (재직 중 공백)" inputMode="numeric" maxLength={10}
+                          className={inputCls + " font-mono"} />
+                      </div>
                     </div>
                     <div className="sm:col-span-2 lg:col-span-3">
                       <label className={labelCls}>담당업무</label>
@@ -1310,7 +1326,7 @@ export default function MyProfileClient() {
                         onChange={e => setCerts(p => p.map((x, idx) => idx === i ? { ...x, self_check: e.target.checked } : x))}
                         className="rounded" />
                       <span className={c.self_check ? "text-emerald-600 dark:text-emerald-300" : "text-gray-500 dark:text-gray-400"}>
-                        ✅ 자체점검여부
+                        자체점검여부
                       </span>
                     </label>
                     <div className="flex items-center gap-3">
@@ -1340,7 +1356,14 @@ export default function MyProfileClient() {
                         placeholder="YYYYMMDD" inputMode="numeric" maxLength={10} className={inputCls + " font-mono"} />
                     </div>
                     <div>
-                      <label className={labelCls}>만료일</label>
+                      <label className={labelCls}>
+                        만료일
+                        {(() => {
+                          const d = daysUntilExpiry(c.expiry_date);
+                          if (d === null || d > EXPIRY_WARN_DAYS) return null;
+                          return <span className={`ml-1 font-bold ${d < 0 ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"}`}>· {d < 0 ? "☠️ 만료됨" : `⚠️ D-${d} 임박`}</span>;
+                        })()}
+                      </label>
                       <input type="text" value={c.expiry_date}
                         onChange={e => setCerts(p => p.map((x, idx) => idx === i ? { ...x, expiry_date: formatYmd(e.target.value) } : x))}
                         placeholder="YYYYMMDD (없으면 공백)" inputMode="numeric" maxLength={10} className={inputCls + " font-mono"} />
@@ -1380,9 +1403,17 @@ export default function MyProfileClient() {
           <div className={sectionCls}>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">상벌사항 ({rps.length}건)</h2>
-              <button type="button" onClick={() => setRps(p => [...p, { ...EMPTY_RP }])}
-                className="px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800">+ 상벌 추가</button>
+              {/* 상벌은 관리 권한자(관리자 편집 모드)만 등록·수정 가능. 본인은 조회만. */}
+              {isAdminEditing && (
+                <button type="button" onClick={() => setRps(p => [...p, { ...EMPTY_RP }])}
+                  className="px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800">+ 상벌 추가</button>
+              )}
             </div>
+            {!isAdminEditing && (
+              <div className="mb-3 text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/40 rounded-lg px-3 py-2">
+                🔒 상벌사항은 관리자만 등록·수정할 수 있습니다. 본인은 조회만 가능합니다.
+              </div>
+            )}
             {rps.length === 0 && <div className="text-center py-4 text-xs text-gray-400">등록된 상벌 없음</div>}
             <div className="space-y-3">
               {rps.map((r, i) => (
@@ -1393,14 +1424,17 @@ export default function MyProfileClient() {
                 }`}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="text-[11px] font-bold text-gray-500">#{i + 1}</div>
-                    <button type="button" onClick={() => setRps(p => p.filter((_, idx) => idx !== i))} className="text-[11px] text-red-500">삭제</button>
+                    {isAdminEditing && (
+                      <button type="button" onClick={() => setRps(p => p.filter((_, idx) => idx !== i))} className="text-[11px] text-red-500">삭제</button>
+                    )}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-[100px_1fr_140px] gap-2">
                     <div>
                       <label className={labelCls}>구분 *</label>
                       <select value={r.kind}
                         onChange={e => setRps(p => p.map((x, idx) => idx === i ? { ...x, kind: e.target.value as RP["kind"] } : x))}
-                        className={inputCls}>
+                        disabled={!isAdminEditing}
+                        className={inputCls + (!isAdminEditing ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")}>
                         <option value="">선택</option>
                         <option value="상">🏆 상</option>
                         <option value="벌">⚠️ 벌</option>
@@ -1410,15 +1444,17 @@ export default function MyProfileClient() {
                       <label className={labelCls}>내용 *</label>
                       <input type="text" value={r.content}
                         onChange={e => setRps(p => p.map((x, idx) => idx === i ? { ...x, content: e.target.value } : x))}
+                        readOnly={!isAdminEditing}
                         placeholder="예: 우수사원 표창, 안전수칙 위반 경고"
-                        lang="ko" className={inputCls} />
+                        lang="ko" className={inputCls + (!isAdminEditing ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")} />
                     </div>
                     <div>
                       <label className={labelCls}>일자</label>
                       <input type="text" value={r.occurred_on}
                         onChange={e => setRps(p => p.map((x, idx) => idx === i ? { ...x, occurred_on: formatYmd(e.target.value) } : x))}
+                        readOnly={!isAdminEditing}
                         placeholder="YYYYMMDD" inputMode="numeric" maxLength={10}
-                        className={inputCls + " font-mono"} />
+                        className={inputCls + " font-mono" + (!isAdminEditing ? " bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : "")} />
                     </div>
                   </div>
                 </div>
@@ -1440,6 +1476,11 @@ export default function MyProfileClient() {
                   className="px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800">+ 이력 추가</button>
               )}
             </div>
+            {!meIsAdmin && (
+              <div className="mb-3 text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/40 rounded-lg px-3 py-2">
+                🔒 발령/재직 이력은 관리자만 등록·수정할 수 있습니다. 본인은 조회만 가능합니다.
+              </div>
+            )}
             {statusHistory.length === 0 && <div className="text-center py-4 text-xs text-gray-400">등록된 발령/재직 상태 변경 이력이 없습니다.</div>}
             <div className="space-y-3">
               {statusHistory.map((s, i) => (
@@ -1519,12 +1560,16 @@ export default function MyProfileClient() {
           }`}>{message.text}</div>
         )}
 
-        <div className="flex gap-2 pt-2 sticky bottom-0 bg-gray-50 dark:bg-gray-900 py-3 -mx-4 lg:-mx-6 px-4 lg:px-6 border-t border-gray-200 dark:border-gray-700">
-          <button type="submit" disabled={saving}
-            className="flex-1 px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 disabled:opacity-50">
-            {saving ? "저장 중..." : "저장"}
-          </button>
-        </div>
+        {/* 조회 전용 탭(본인의 상벌·발령)에서는 저장할 내용이 없으므로 저장 버튼을 숨긴다.
+            그 외 탭은 폼 전체를 일괄 저장하므로 버튼 유지. */}
+        {!((tab === "rp" && !isAdminEditing) || (tab === "status_history" && !meIsAdmin)) && (
+          <div className="flex gap-2 pt-2 sticky bottom-0 bg-gray-50 dark:bg-gray-900 py-3 -mx-4 lg:-mx-6 px-4 lg:px-6 border-t border-gray-200 dark:border-gray-700">
+            <button type="submit" disabled={saving}
+              className="flex-1 px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 disabled:opacity-50">
+              {saving ? "저장 중..." : "저장"}
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );

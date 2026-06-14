@@ -6,6 +6,47 @@ import { createClient } from "@supabase/supabase-js";
 export const SUPABASE_URL = "https://bbnmxwpacdfqvicybhau.supabase.co";
 export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJibm14d3BhY2RmcXZpY3liaGF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NDA3NDYsImV4cCI6MjA5MTAxNjc0Nn0.cGqnmu5BeaXosxoE-IEmjX-dF4zDYipzpYb5hhc8S6I".replace(/\s/g, "");
 
+// ──────────────────────────────────────────────────────────────────────────
+// getSession(클라이언트 초기화) 전 무효 세션 선제 정리
+// ------------------------------------------------------------------------
+// createClient()는 생성 직후 내부적으로 _recoverAndRefresh()를 자동 실행해
+// localStorage에 저장된 세션을 복구한다. 이때 세션이 만료됐고 refresh_token이
+// 서버에서 거부되면(로그아웃 잔재·토큰 회전·다른 프로젝트 토큰) auth-js가
+// `console.error(AuthApiError: Invalid Refresh Token: Refresh Token Not Found)`를
+// 남긴다. 비로그인 부팅마다 콘솔에 빨간 에러가 찍히므로, 클라이언트 생성(=모든
+// auth 동작·getSession) 전에 만료/깨진 세션을 선제 정리한다.
+//
+// 만료되지 않은(아직 유효한) 세션은 건드리지 않으므로, 정상 자동 로그인에는 영향이
+// 없다. storageKey 규칙·만료 마진(90s)은 supabase-js / auth-js 기본값과 동일하게 맞춤.
+// ──────────────────────────────────────────────────────────────────────────
+const SUPABASE_AUTH_STORAGE_KEY = `sb-${new URL(SUPABASE_URL).hostname.split(".")[0]}-auth-token`;
+
+function clearStaleAuthSession() {
+  if (typeof window === "undefined") return; // SSR/빌드 시 localStorage 없음 → skip
+  try {
+    const raw = window.localStorage.getItem(SUPABASE_AUTH_STORAGE_KEY);
+    if (!raw) return;
+    let session: { refresh_token?: string; expires_at?: number } | null;
+    try {
+      session = JSON.parse(raw);
+    } catch {
+      window.localStorage.removeItem(SUPABASE_AUTH_STORAGE_KEY); // 파싱 불가한 깨진 값
+      return;
+    }
+    const EXPIRY_MARGIN_MS = 90_000; // auth-js EXPIRY_MARGIN_MS(AUTO_REFRESH_TICK 3 × 30s)
+    const expiresAtMs = (session?.expires_at ?? 0) * 1000;
+    const expired = expiresAtMs - Date.now() < EXPIRY_MARGIN_MS;
+    // refresh_token이 없으면(복구 불가) 또는 만료 임박/만료면 제거 → 자동 refresh 시도 자체를 차단
+    if (!session?.refresh_token || expired) {
+      window.localStorage.removeItem(SUPABASE_AUTH_STORAGE_KEY);
+    }
+  } catch {
+    // localStorage 접근 불가(프라이빗 모드 등) — 무시
+  }
+}
+
+clearStaleAuthSession();
+
 const rawClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY || "placeholder");
 
 // ──────────────────────────────────────────────────────────────────────────

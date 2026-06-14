@@ -7,6 +7,7 @@ import { matchMenuHref } from "@/lib/permissions";
 import { PAGE_REGISTRY } from "@/lib/page-registry";
 import { TabsProvider, useTabs, MAX_TABS } from "@/context/TabsContext";
 import { TabActivationProvider } from "@/context/TabActivationContext";
+import { useViewMode } from "@/context/ViewModeContext";
 import Sidebar from "./Sidebar";
 import TabBar from "./TabBar";
 import SidebarContext from "@/context/SidebarContext";
@@ -16,14 +17,16 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { tabs, activeHref, openTab, setActive, isLimitReached } = useTabs();
+  const { viewMode } = useViewMode();
+  const isPc = viewMode === "pc";
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // 화면 모드(pc/mobile)에 따라 사이드바 기본 상태를 강제 설정.
+  // PC: 펼침(고정), 모바일: 접힘(오버레이). 모드 전환 시에도 재적용.
   useEffect(() => {
-    if (window.innerWidth >= 768) {
-      setSidebarOpen(true);
-    }
-  }, []);
+    setSidebarOpen(isPc);
+  }, [isPc]);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -121,11 +124,18 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
         {showShell && (
           <Sidebar
             open={sidebarOpen}
+            isPc={isPc}
             onToggle={() => setSidebarOpen(o => !o)}
             onClose={() => setSidebarOpen(false)}
           />
         )}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div
+          className={[
+            "flex-1 flex flex-col min-h-0 overflow-hidden",
+            // 모바일 모드: 콘텐츠를 모바일 폭 프레임으로 제한해 모바일 화면을 강제 재현
+            isPc ? "" : "mx-auto w-full max-w-md border-x border-gray-200 dark:border-gray-700 shadow-sm",
+          ].join(" ")}
+        >
           {showShell && !blockedByPermission && (
             <>
               <TabBar />

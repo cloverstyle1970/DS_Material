@@ -75,6 +75,7 @@ export const PERMISSION_MENUS: PermissionMenuGroup[] = [
       { href: "/hr/employee-register", label: "사원등록" },
       { href: "/hr/dept-rank",         label: "부서/직급관리" },
       { href: "/hr/team-crew",         label: "팀구성 관리" },
+      { href: "/hr/rewards-punishments", label: "상벌사항 관리" },
     ],
   },
   {

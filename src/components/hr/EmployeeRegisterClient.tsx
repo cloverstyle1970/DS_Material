@@ -1129,7 +1129,7 @@ export default function EmployeeRegisterClient() {
                         onChange={e => setCerts(prev => prev.map((x, idx) => idx === i ? { ...x, self_check: e.target.checked } : x))}
                         className="rounded" />
                       <span className={c.self_check ? "text-emerald-600 dark:text-emerald-300" : "text-gray-500 dark:text-gray-400"}>
-                        ✅ 자체점검여부
+                        자체점검여부
                       </span>
                     </label>
                     <div className="flex items-center gap-3">

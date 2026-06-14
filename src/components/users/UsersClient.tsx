@@ -5,9 +5,11 @@ import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { UserRecord, Permission } from "@/lib/mock-users";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useViewMode } from "@/context/ViewModeContext";
 import { useTabs, MAX_TABS } from "@/context/TabsContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNum } from "@/lib/format";
+import { daysUntilExpiry, isExpiryAlert, EXPIRY_WARN_DAYS } from "@/lib/cert-expiry";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
 import DraggableModal from "@/components/common/DraggableModal";
 import PermissionsModal from "./PermissionsModal";
@@ -54,6 +56,29 @@ function PermBadge({ perms }: { perms: string[] }) {
       {viewOnly && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300">조회 전용</span>}
       {menuPerms.length > 0 && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300">상세 권한 {menuPerms.length}개</span>}
     </>
+  );
+}
+
+function SelfCheckBadge() {
+  return (
+    <span title="자체점검 자격 보유"
+      className="inline-flex items-center align-middle text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300 whitespace-nowrap">
+      🛡️ 자체점검
+    </span>
+  );
+}
+
+function ExpiryBadge({ daysLeft, certName }: { daysLeft: number; certName?: string }) {
+  const expired = daysLeft < 0;
+  return (
+    <span title={`${certName ? certName + " · " : ""}${expired ? "자격 만료됨" : `자격 만료 ${daysLeft}일 전`}`}
+      className={`inline-flex items-center align-middle text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${
+        expired
+          ? "bg-red-50 text-red-600 dark:bg-red-900/40 dark:text-red-300"
+          : "bg-amber-50 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+      }`}>
+      {expired ? "☠️ 만료" : `⚠️ D-${daysLeft}`}
+    </span>
   );
 }
 
@@ -116,6 +141,12 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
   const [editPerms, setEditPerms]   = useState<UserRecord | null>(null);
   const [sortKey, setSortKey]       = useState<SortKey>("id");
   const [sortDir, setSortDir]       = useState<SortDir>("asc");
+  // 자체점검 자격 보유자(user_certifications.self_check=true) accounts.id 집합
+  const [selfCheckIds, setSelfCheckIds] = useState<Set<number>>(new Set());
+  const [selfCheckOnly, setSelfCheckOnly] = useState(false); // 자체점검 보유자만 필터
+  // 사원별 가장 임박한 자격 만료 정보 (만료일이 있는 자격 중 최소 잔여일)
+  const [expiryByUser, setExpiryByUser] = useState<Map<number, { daysLeft: number; certName: string }>>(new Map());
+  const [expiryOnly, setExpiryOnly] = useState(false); // 만료 임박/만료자만 필터
 
   const { user: me } = useAuth();
   const meIsAdmin = me ? isAdmin(me) : false;
@@ -123,12 +154,31 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
   const canEditUser = me ? (meIsAdmin || hasMenuPermission(me, "/data/users", "update")) : false;
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const { viewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
   const { tabs, openTab } = useTabs();
 
   // 숨어 있던 탭이 다시 보일 때 사원 목록을 다시 받아 stale 방지
   // (인사이동 탭에서 발령 등록 → accounts 변경분을 새로고침 없이 반영)
   const reloadUsers = useCallback(() => {
     api.get<UserRecord[]>("/api/users").then(setUsers).catch(() => {});
+    // 자격 정보 로드 — 자체점검 보유자 + 사원별 만료 임박 계산 (배지/필터용)
+    supabase.from("user_certifications").select("user_id, self_check, expiry_date, cert_name").then(({ data }) => {
+      const rows = (data as { user_id: number; self_check: boolean | null; expiry_date: string | null; cert_name: string | null }[] | null) ?? [];
+      const sc = new Set<number>();
+      const exp = new Map<number, { daysLeft: number; certName: string }>();
+      for (const r of rows) {
+        const uid = Number(r.user_id);
+        if (r.self_check) sc.add(uid);
+        const d = daysUntilExpiry(r.expiry_date);
+        if (d !== null) {
+          const prev = exp.get(uid);
+          if (!prev || d < prev.daysLeft) exp.set(uid, { daysLeft: d, certName: r.cert_name ?? "" });
+        }
+      }
+      setSelfCheckIds(sc);
+      setExpiryByUser(exp);
+    });
   }, []);
   useReloadOnActivate(reloadUsers);
 
@@ -165,6 +215,8 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
   const q = query.trim().toLowerCase();
   const filtered = users.filter(u => {
     if (statusFilter !== "전체" && u.status !== statusFilter) return false;
+    if (selfCheckOnly && !selfCheckIds.has(u.id)) return false;
+    if (expiryOnly && !isExpiryAlert(expiryByUser.get(u.id)?.daysLeft ?? null)) return false;
     if (!q) return true;
     return (
       u.name.toLowerCase().includes(q) ||
@@ -189,21 +241,28 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
     });
   }, [filtered, sortKey, sortDir]);
 
+  // 전체 사원 중 만료 임박/만료 자격 보유자 수 (집계용)
+  const expiringCount = useMemo(() => {
+    let n = 0;
+    expiryByUser.forEach(e => { if (isExpiryAlert(e.daysLeft)) n++; });
+    return n;
+  }, [expiryByUser]);
+
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
   const paginated  = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   return (
     <>
-      {/* 툴바 */}
-      <div className="flex items-center gap-3 flex-wrap">
+      {/* 툴바 — 모바일: 세로 스택 / PC: 가로 */}
+      <div className={`flex gap-3 ${isMobile ? "flex-col" : "items-center flex-wrap"}`}>
         {/* 상태 필터 */}
-        <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl shrink-0">
+        <div className={`flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl ${isMobile ? "w-full justify-between" : "shrink-0"}`}>
           {(["전체", "재직", "퇴직", "휴직"] as const).map(s => {
             const count = s === "전체" ? users.length : users.filter(u => u.status === s).length;
             return (
               <button key={s} type="button" onClick={() => { setStatusFilter(s); resetPage(); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${isMobile ? "flex-1" : ""}
                   ${statusFilter === s
                     ? s === "전체" ? "bg-gray-900 text-white shadow-sm" : "bg-white text-gray-700 shadow-sm dark:bg-gray-700 dark:text-gray-100"
                     : isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-400 hover:text-gray-600"}`}>
@@ -213,8 +272,30 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
           })}
         </div>
 
+        {/* 자체점검 자격 보유자 필터 + 집계(전체 보유자 수) */}
+        <button type="button" onClick={() => { setSelfCheckOnly(v => !v); resetPage(); }}
+          title="자체점검 자격 보유자만 보기"
+          className={`${isMobile ? "w-full justify-center" : "shrink-0"} flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
+            selfCheckOnly
+              ? "border-emerald-500 bg-emerald-500 text-white"
+              : isDark ? "border-emerald-700 bg-emerald-900/30 text-emerald-300 hover:bg-emerald-800/50" : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+          }`}>
+          🛡️ 자체점검 <span className="font-normal opacity-80">{fmtNum(selfCheckIds.size)}</span>
+        </button>
+
+        {/* 자격 만료 임박/만료자 필터 + 집계 */}
+        <button type="button" onClick={() => { setExpiryOnly(v => !v); resetPage(); }}
+          title={`자격 만료 임박(D-${EXPIRY_WARN_DAYS})·만료자만 보기`}
+          className={`${isMobile ? "w-full justify-center" : "shrink-0"} flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
+            expiryOnly
+              ? "border-amber-500 bg-amber-500 text-white"
+              : isDark ? "border-amber-700 bg-amber-900/30 text-amber-300 hover:bg-amber-800/50" : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+          }`}>
+          ⚠️ 만료임박 <span className="font-normal opacity-80">{fmtNum(expiringCount)}</span>
+        </button>
+
         {/* 검색 */}
-        <div className="relative flex-1 min-w-48">
+        <div className={`relative min-w-48 ${isMobile ? "w-full" : "flex-1"}`}>
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
           <input lang="ko" value={query} onChange={e => { setQuery(e.target.value); resetPage(); }}
             placeholder="이름, 부서, 직급, 전화번호 검색"
@@ -225,38 +306,89 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
           )}
         </div>
 
-        <span className="text-sm text-gray-500 shrink-0">
-          {q
-            ? `검색 ${fmtNum(filtered.length)}명`
-            : statusFilter !== "전체"
-              ? `${statusFilter} ${fmtNum(filtered.length)}명`
-              : `전체 ${fmtNum(users.length)}명`}
-        </span>
+        {/* 카운트 + 엑셀 — 모바일에서는 한 줄로 묶음 */}
+        <div className={isMobile ? "flex items-center justify-between w-full" : "contents"}>
+          <span className="text-sm text-gray-500 shrink-0">
+            {expiryOnly
+              ? `만료임박 ${fmtNum(filtered.length)}명`
+              : selfCheckOnly
+                ? `자체점검 ${fmtNum(filtered.length)}명`
+                : q
+                  ? `검색 ${fmtNum(filtered.length)}명`
+                  : statusFilter !== "전체"
+                    ? `${statusFilter} ${fmtNum(filtered.length)}명`
+                    : `전체 ${fmtNum(users.length)}명`}
+          </span>
 
-        {/* accounts 전체 엑셀 다운로드 (관리자 전용) */}
-        {meIsAdmin && (
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                await downloadAccountsExcel();
-              } catch (e) {
-                alert(`다운로드 실패: ${getErrorMessage(e)}`);
-              }
-            }}
-            className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
-              isDark
-                ? "border-emerald-700 bg-emerald-900/40 text-emerald-300 hover:bg-emerald-800/60"
-                : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-            }`}
-          >
-            📥 계정 전체 엑셀
-          </button>
-        )}
+          {/* accounts 전체 엑셀 다운로드 (관리자 전용) */}
+          {meIsAdmin && (
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await downloadAccountsExcel();
+                } catch (e) {
+                  alert(`다운로드 실패: ${getErrorMessage(e)}`);
+                }
+              }}
+              className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
+                isDark
+                  ? "border-emerald-700 bg-emerald-900/40 text-emerald-300 hover:bg-emerald-800/60"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+              }`}
+            >
+              📥 계정 전체 엑셀
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* 테이블 */}
+      {/* 목록 — 모바일: 카드 / PC: 테이블 */}
       <div className={`rounded-xl border overflow-hidden transition-colors ${isDark ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
+        {isMobile ? (
+          <div className={`divide-y ${isDark ? "divide-gray-700" : "divide-gray-100"}`}>
+            {filtered.length === 0 ? (
+              <div className={`text-center py-12 text-sm ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                {q ? "검색 결과가 없습니다" : "등록된 사용자가 없습니다"}
+              </div>
+            ) : paginated.map(u => (
+              <div key={u.id} onClick={() => setSelected(u)}
+                className={`p-4 cursor-pointer transition-colors ${isDark ? "active:bg-gray-800" : "active:bg-gray-50"}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {canEditUser ? (
+                        <button type="button" onClick={e => { e.stopPropagation(); openProfileEdit(u); }}
+                          className="font-semibold text-gray-800 dark:text-white underline decoration-dotted decoration-slate-400">
+                          {u.name}
+                        </button>
+                      ) : <span className="font-semibold text-gray-800 dark:text-white">{u.name}</span>}
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_CLS[u.status ?? ""] ?? "bg-gray-100 text-gray-500"}`}>{u.status ?? "-"}</span>
+                      {selfCheckIds.has(u.id) && <SelfCheckBadge />}
+                      {(() => {
+                        const e = expiryByUser.get(u.id);
+                        if (!e || !isExpiryAlert(e.daysLeft)) return null;
+                        return <ExpiryBadge daysLeft={e.daysLeft} certName={e.certName} />;
+                      })()}
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">#{u.id} · {u.dept ?? "-"} · {u.rank ?? "-"}</p>
+                  </div>
+                  {meIsAdmin && (
+                    <button type="button" onClick={e => { e.stopPropagation(); setEditPerms(u); }}
+                      className={`shrink-0 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${isDark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-200 text-gray-500 hover:bg-slate-50"}`}>
+                      권한
+                    </button>
+                  )}
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
+                  <div><span className="text-gray-400">전화 </span>{u.phone ?? "-"}</div>
+                  <div><span className="text-gray-400">입사 </span>{u.hireDate ?? "-"}</div>
+                  <div className="col-span-2 truncate"><span className="text-gray-400">자격증 </span>{u.cert ?? "-"}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
         <div className="overflow-auto max-h-[calc(100vh-250px)]">
           <table className="w-full min-w-[700px] text-sm">
             <thead className={`sticky top-0 z-10 border-b transition-colors ${isDark ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-100"}`}>
@@ -299,6 +431,12 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
                         <span className="text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">✏️</span>
                       </button>
                     ) : u.name}
+                    {selfCheckIds.has(u.id) && <>{" "}<SelfCheckBadge /></>}
+                    {(() => {
+                      const e = expiryByUser.get(u.id);
+                      if (!e || !isExpiryAlert(e.daysLeft)) return null;
+                      return <>{" "}<ExpiryBadge daysLeft={e.daysLeft} certName={e.certName} /></>;
+                    })()}
                   </td>
                   <td className={`px-4 py-3 text-center whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"}`}>{u.dept ?? "-"}</td>
                   <td className={`px-4 py-3 text-center whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"}`}>{u.rank ?? "-"}</td>
@@ -323,9 +461,18 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
             </tbody>
           </table>
         </div>
+        )}
 
-        {/* 페이지네이션 */}
-        {totalPages > 1 && (
+        {/* 페이지네이션 — 모바일: 이전/다음만 간소화 */}
+        {totalPages > 1 && (isMobile ? (
+          <div className={`flex items-center justify-between px-4 py-3 border-t ${isDark ? "border-gray-700 bg-gray-800/60" : "border-gray-100 bg-gray-50/60"}`}>
+            <button onClick={() => changePage(safePage - 1)} disabled={safePage === 1}
+              className={`px-3 py-2 rounded-lg text-xs font-medium disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${isDark ? "text-gray-300 bg-gray-700/60 hover:bg-gray-700" : "text-gray-600 bg-gray-100 hover:bg-gray-200"}`}>‹ 이전</button>
+            <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>{safePage} / {totalPages} 페이지 · {fmtNum(sorted.length)}명</span>
+            <button onClick={() => changePage(safePage + 1)} disabled={safePage === totalPages}
+              className={`px-3 py-2 rounded-lg text-xs font-medium disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${isDark ? "text-gray-300 bg-gray-700/60 hover:bg-gray-700" : "text-gray-600 bg-gray-100 hover:bg-gray-200"}`}>다음 ›</button>
+          </div>
+        ) : (
           <div className={`flex items-center justify-between px-5 py-3 border-t ${isDark ? "border-gray-700 bg-gray-800/60" : "border-gray-100 bg-gray-50/60"}`}>
             <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
               {fmtNum((safePage - 1) * PAGE_SIZE + 1)}–{fmtNum(Math.min(safePage * PAGE_SIZE, sorted.length))} / {fmtNum(sorted.length)}명
@@ -354,7 +501,7 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
             </div>
             <span className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>{safePage} / {totalPages} 페이지</span>
           </div>
-        )}
+        ))}
       </div>
 
       {/* 상세 모달 (읽기 전용) */}
@@ -401,6 +548,22 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
                   <span className="text-gray-800 dark:text-gray-100 text-sm break-all">{value}</span>
                 </div>
               ))}
+              {selfCheckIds.has(selected.id) && (
+                <div className="flex gap-3">
+                  <span className="text-gray-400 w-24 shrink-0 text-sm">자체점검</span>
+                  <SelfCheckBadge />
+                </div>
+              )}
+              {(() => {
+                const e = expiryByUser.get(selected.id);
+                if (!e || !isExpiryAlert(e.daysLeft)) return null;
+                return (
+                  <div className="flex gap-3">
+                    <span className="text-gray-400 w-24 shrink-0 text-sm">자격만료</span>
+                    <ExpiryBadge daysLeft={e.daysLeft} certName={e.certName} />
+                  </div>
+                );
+              })()}
               {(selected.permissions ?? []).length > 0 && (
                 <div className="flex gap-3">
                   <span className="text-gray-400 w-24 shrink-0 text-sm">권한</span>

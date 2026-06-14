@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { VendorRecord, VendorType } from "@/lib/mock-vendors";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useViewMode } from "@/context/ViewModeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
 import DraggableModal from "@/components/common/DraggableModal";
@@ -70,6 +71,8 @@ interface ModalProps {
 
 function VendorFormModal({ title, initial, saving, error, onSubmit, onClose, submitLabel, submitCls }: ModalProps) {
   const [f, setF] = useState<FormState>(initial);
+  const { viewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
   const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setF(p => ({ ...p, [k]: e.target.value }));
 
@@ -85,7 +88,7 @@ function VendorFormModal({ title, initial, saving, error, onSubmit, onClose, sub
         </div>
       }
     >
-        <form onSubmit={e => { e.preventDefault(); onSubmit(f); }} className="px-6 py-5 space-y-3 overflow-y-auto flex-1">
+        <form onSubmit={e => { e.preventDefault(); onSubmit(f); }} className={`px-6 py-5 space-y-3 overflow-y-auto flex-1 ${isMobile ? "force-mobile" : ""}`}>
           {/* 거래처명 + 구분 */}
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
@@ -244,6 +247,8 @@ export default function VendorsClient({ initial }: Props) {
   const admin = user ? !isViewOnly(user) : false;
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const { viewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
 
   const TYPE_CLS_DARK: Record<VendorType, string> = {
     매입: "bg-blue-900/60 text-blue-300",
@@ -333,10 +338,10 @@ export default function VendorsClient({ initial }: Props) {
 
   return (
     <>
-      {/* 툴바 */}
-      <div className="flex items-center gap-3 flex-wrap">
+      {/* 툴바 — 모바일: 세로 스택 / PC: 가로 */}
+      <div className={`flex gap-3 ${isMobile ? "flex-col" : "items-center flex-wrap"}`}>
         {/* 구분 필터 */}
-        <div className="flex gap-1 p-1 bg-gray-100 rounded-xl shrink-0">
+        <div className={`flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl ${isMobile ? "w-full justify-between" : "shrink-0"}`}>
           {(["전체", "매입", "매출", "공통"] as const).map(t => {
             const count = t === "전체" ? vendors.length
               : t === "매입" ? vendors.filter(v => v.type === "매입" || v.type === "공통").length
@@ -344,7 +349,7 @@ export default function VendorsClient({ initial }: Props) {
               : vendors.filter(v => v.type === "공통").length;
             return (
               <button key={t} type="button" onClick={() => { setTypeFilter(t); resetPage(); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${isMobile ? "flex-1" : ""}
                   ${typeFilter === t
                     ? t === "전체" ? "bg-gray-900 text-white shadow-sm" : "bg-white text-gray-700 shadow-sm"
                     : isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-400 hover:text-gray-600"}`}>
@@ -355,7 +360,7 @@ export default function VendorsClient({ initial }: Props) {
         </div>
 
         {/* 검색 */}
-        <div className="relative flex-1 min-w-48">
+        <div className={`relative min-w-48 ${isMobile ? "w-full" : "flex-1"}`}>
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
           <input lang="ko" value={query} onChange={e => { setQuery(e.target.value); resetPage(); }}
             placeholder="거래처명, 대표자, 사업자번호, 전화번호 검색"
@@ -366,24 +371,62 @@ export default function VendorsClient({ initial }: Props) {
           )}
         </div>
 
-        <span className="text-sm text-gray-500 shrink-0">
-          {q
-            ? `검색 ${fmtNum(filtered.length)}건`
-            : typeFilter !== "전체"
-              ? `${typeFilter} ${fmtNum(filtered.length)}건`
-              : `전체 ${fmtNum(vendors.length)}건`}
-        </span>
+        {/* 카운트 + 등록 — 모바일에서는 한 줄로 묶음 */}
+        <div className={isMobile ? "flex items-center justify-between w-full" : "contents"}>
+          <span className="text-sm text-gray-500 shrink-0">
+            {q
+              ? `검색 ${fmtNum(filtered.length)}건`
+              : typeFilter !== "전체"
+                ? `${typeFilter} ${fmtNum(filtered.length)}건`
+                : `전체 ${fmtNum(vendors.length)}건`}
+          </span>
 
-        {admin && (
-          <button type="button" onClick={() => { setShowAdd(true); setError(""); }}
-            className="bg-slate-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors shrink-0">
-            + 거래처 등록
-          </button>
-        )}
+          {admin && (
+            <button type="button" onClick={() => { setShowAdd(true); setError(""); }}
+              className="bg-slate-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors shrink-0">
+              + 거래처 등록
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* 테이블 */}
+      {/* 목록 — 모바일: 카드 / PC: 테이블 */}
       <div className={`rounded-xl border overflow-hidden transition-colors ${isDark ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
+        {isMobile ? (
+          <div className={`divide-y ${isDark ? "divide-gray-700" : "divide-gray-100"}`}>
+            {filtered.length === 0 ? (
+              <div className={`text-center py-12 text-sm ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                {q ? "검색 결과가 없습니다" : "등록된 거래처가 없습니다"}
+              </div>
+            ) : paginated.map(v => (
+              <div key={v.id} onClick={() => setSelected(v)}
+                className={`p-4 cursor-pointer transition-colors ${isDark ? "active:bg-gray-800" : "active:bg-gray-50"}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`font-semibold ${isDark ? "text-white" : "text-gray-800"}`}>{v.name}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${activeCls[v.type]}`}>{v.type}</span>
+                    </div>
+                    <div className="mt-1.5 space-y-0.5 text-xs text-gray-600 dark:text-gray-300">
+                      <div><span className="text-gray-400">대표 </span>{v.representative ?? "-"}</div>
+                      <div><span className="text-gray-400">사업자 </span><span className="font-mono">{v.bizNo ?? "-"}</span></div>
+                      <div><span className="text-gray-400">전화 </span>{v.phone ?? "-"}</div>
+                      <div className="break-all"><span className="text-gray-400">주소 </span>{v.address ?? "-"}</div>
+                    </div>
+                  </div>
+                  {admin && (
+                    <div className="flex flex-col gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                      <button type="button" onClick={() => { setEditTarget(v); setError(""); }}
+                        className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${isDark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-200 text-gray-500 hover:bg-slate-50"}`}>수정</button>
+                      <button type="button" onClick={() => setDeleteConfirm(v)}
+                        className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${isDark ? "border-red-800 text-red-400 hover:bg-red-900/40" : "border-red-100 text-red-400 hover:bg-red-50"}`}>삭제</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
         <div className="overflow-auto max-h-[calc(100vh-250px)]">
         <table className="w-full min-w-[700px] text-sm">
           <thead className={`sticky top-0 z-10 border-b transition-colors ${isDark ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-100"}`}>
@@ -433,9 +476,18 @@ export default function VendorsClient({ initial }: Props) {
           </tbody>
         </table>
         </div>
+        )}
 
-        {/* 페이지네이션 */}
-        {totalPages > 1 && (
+        {/* 페이지네이션 — 모바일: 이전/다음만 간소화 */}
+        {totalPages > 1 && (isMobile ? (
+          <div className={`flex items-center justify-between px-4 py-3 border-t ${isDark ? "border-gray-700 bg-gray-800/60" : "border-gray-100 bg-gray-50/60"}`}>
+            <button onClick={() => changePage(safePage - 1)} disabled={safePage === 1}
+              className={`px-3 py-2 rounded-lg text-xs font-medium disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${isDark ? "text-gray-300 bg-gray-700/60 hover:bg-gray-700" : "text-gray-600 bg-gray-100 hover:bg-gray-200"}`}>‹ 이전</button>
+            <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>{safePage} / {totalPages} 페이지 · {fmtNum(sorted.length)}건</span>
+            <button onClick={() => changePage(safePage + 1)} disabled={safePage === totalPages}
+              className={`px-3 py-2 rounded-lg text-xs font-medium disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${isDark ? "text-gray-300 bg-gray-700/60 hover:bg-gray-700" : "text-gray-600 bg-gray-100 hover:bg-gray-200"}`}>다음 ›</button>
+          </div>
+        ) : (
           <div className={`flex items-center justify-between px-5 py-3 border-t ${isDark ? "border-gray-700 bg-gray-800/60" : "border-gray-100 bg-gray-50/60"}`}>
             <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
               {fmtNum((safePage - 1) * PAGE_SIZE + 1)}–{fmtNum(Math.min(safePage * PAGE_SIZE, sorted.length))} / {fmtNum(sorted.length)}건
@@ -464,7 +516,7 @@ export default function VendorsClient({ initial }: Props) {
             </div>
             <span className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>{safePage} / {totalPages} 페이지</span>
           </div>
-        )}
+        ))}
       </div>
 
       {/* 상세 보기 */}

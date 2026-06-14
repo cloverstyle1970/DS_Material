@@ -2,29 +2,34 @@
 
 import { useTabs, MAX_TABS } from "@/context/TabsContext";
 import { useSidebar } from "@/context/SidebarContext";
+import { useViewMode } from "@/context/ViewModeContext";
 import NotificationBell from "./NotificationBell";
 
 export default function TabBar() {
   const { tabs, activeHref, setActive, closeTab } = useTabs();
   const { openSidebar } = useSidebar();
+  const { viewMode } = useViewMode();
+  const isPc = viewMode === "pc";
 
   if (tabs.length === 0) return null;
 
   return (
     <div className="no-print flex items-center bg-gray-100 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700 px-2 pt-1.5 gap-1 overflow-x-auto shrink-0">
-      {/* 모바일 햄버거 버튼 — 모든 탭에서 사이드바 열기 */}
-      <button
-        type="button"
-        onClick={openSidebar}
-        className="md:hidden shrink-0 self-center mb-1.5 p-2 rounded-lg text-gray-500 hover:bg-gray-200 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors"
-        aria-label="메뉴 열기"
-      >
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <line x1="2" y1="4" x2="16" y2="4" />
-          <line x1="2" y1="9" x2="16" y2="9" />
-          <line x1="2" y1="14" x2="16" y2="14" />
-        </svg>
-      </button>
+      {/* 모바일 모드 햄버거 버튼 — 오버레이 사이드바 열기 (PC 모드에서는 사이드바가 고정이라 숨김) */}
+      {!isPc && (
+        <button
+          type="button"
+          onClick={openSidebar}
+          className="shrink-0 self-center mb-1.5 p-2 rounded-lg text-gray-500 hover:bg-gray-200 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors"
+          aria-label="메뉴 열기"
+        >
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="2" y1="4" x2="16" y2="4" />
+            <line x1="2" y1="9" x2="16" y2="9" />
+            <line x1="2" y1="14" x2="16" y2="14" />
+          </svg>
+        </button>
+      )}
       {tabs.map(tab => {
         const active = tab.href === activeHref;
         return (

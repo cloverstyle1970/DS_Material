@@ -5,6 +5,8 @@ import * as XLSX from "xlsx";
 import { api } from "@/lib/api-client";
 import { fmtNum } from "@/lib/format";
 import { useAuth, isViewOnly, isNonManager } from "@/context/AuthContext";
+import { useViewMode } from "@/context/ViewModeContext";
+import { isTkMaterial } from "@/lib/material-style";
 
 interface Transaction {
   id: number;
@@ -34,13 +36,16 @@ export default function SiteStatsClient() {
   // 좌측 '현장별 투입 현황'에서 현장명 클릭 시, 우측 '자재별 투입 현황'만 해당 현장으로 좁히는 필터.
   // (좌측 목록은 그대로 유지 — 다른 현장을 이어서 클릭할 수 있도록)
   const [detailSite, setDetailSite] = useState<string>("");
+  const [companyFilter, setCompanyFilter] = useState<"전체" | "TK" | "DS">("전체");
   // 모바일(<768px)에서는 우측 패널 대신 팝업(모달)로 자재별 내역을 표시.
-  const [isMobile, setIsMobile] = useState(false);
+  const { viewMode } = useViewMode();
+  const [narrowScreen, setNarrowScreen] = useState(false);
+  const isMobile = viewMode === "mobile" || narrowScreen;
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
-    const apply = () => setIsMobile(mq.matches);
+    const apply = () => setNarrowScreen(mq.matches);
     apply();
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
@@ -108,9 +113,14 @@ export default function SiteStatsClient() {
       if (dateFrom && d < dateFrom) return false;
       if (dateTo   && d > dateTo)   return false;
       if (siteQuery && !(t.siteName ?? "").toLowerCase().includes(siteQuery)) return false;
+      if (companyFilter !== "전체") {
+        const isTk = isTkMaterial(t.materialId);
+        if (companyFilter === "TK" && !isTk) return false;
+        if (companyFilter === "DS" && isTk) return false;
+      }
       return true;
     });
-  }, [transactions, dateFrom, dateTo, selectedSite]);
+  }, [transactions, dateFrom, dateTo, selectedSite, companyFilter]);
 
   // 현장별 집계
   const siteStats = useMemo(() => {
@@ -294,6 +304,17 @@ export default function SiteStatsClient() {
             <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
               className="px-2.5 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-xs text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400" />
           </div>
+          {/* 회사구분 (자재코드 기준 TK/DS) */}
+          <div className="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
+            {(["전체","TK","DS"] as const).map(f => (
+              <button key={f} type="button" onClick={() => setCompanyFilter(f)}
+                className={`px-3 py-2 text-xs font-medium transition-colors border-r border-gray-200 dark:border-gray-600 last:border-0 ${
+                  companyFilter === f
+                    ? f === "TK" ? "bg-blue-600 text-white" : f === "DS" ? "bg-red-500 text-white" : "bg-slate-700 text-white"
+                    : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                }`}>{f}</button>
+            ))}
+          </div>
           {/* 현장 필터 (입력 + 자동완성) */}
           <div className="relative flex items-center">
             <input type="text" lang="ko" list="site-stats-options"
@@ -323,22 +344,22 @@ export default function SiteStatsClient() {
       {/* 요약 카드 */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{showFin ? "조회 입고 금액 (차변)" : "조회 입고 수량 (차변)"}</p>
-          <p className="text-xl font-bold text-blue-600">{showFin ? `₩${fmtNum(totalInAmt)}` : `${fmtNum(totalIn)} EA`}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{showFin ? "조회 입고 금액 (차변)" : (isMobile ? "입고 수량" : "조회 입고 수량 (차변)")}</p>
+          <p className="text-xl font-bold text-blue-600">{showFin ? `₩${fmtNum(totalInAmt)}` : (isMobile ? fmtNum(totalIn) : `${fmtNum(totalIn)} EA`)}</p>
           {showFin && <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">수량: {fmtNum(totalIn)} EA</p>}
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{showFin ? "조회 출고 금액 (대변)" : "조회 출고 수량 (대변)"}</p>
-          <p className="text-xl font-bold text-orange-500">{showFin ? `₩${fmtNum(totalOutAmt)}` : `${fmtNum(totalOut)} EA`}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{showFin ? "조회 출고 금액 (대변)" : (isMobile ? "출고 수량" : "조회 출고 수량 (대변)")}</p>
+          <p className="text-xl font-bold text-orange-500">{showFin ? `₩${fmtNum(totalOutAmt)}` : (isMobile ? fmtNum(totalOut) : `${fmtNum(totalOut)} EA`)}</p>
           {showFin && <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">수량: {fmtNum(totalOut)} EA</p>}
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">관련 현장 수</p>
-          <p className="text-xl font-bold text-slate-700 dark:text-slate-300">{fmtNum(siteStats.length)}<span className="text-xs font-normal text-gray-400 dark:text-gray-500 ml-1">곳</span></p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{isMobile ? "현장 수" : "관련 현장 수"}</p>
+          <p className="text-xl font-bold text-slate-700 dark:text-slate-300">{fmtNum(siteStats.length)}{!isMobile && <span className="text-xs font-normal text-gray-400 dark:text-gray-500 ml-1">곳</span>}</p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">투입 자재 종수</p>
-          <p className="text-xl font-bold text-purple-600 dark:text-purple-400">{fmtNum(materialStats.length)}<span className="text-xs font-normal text-gray-400 dark:text-gray-500 ml-1">종</span></p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{isMobile ? "자재종류" : "투입 자재 종수"}</p>
+          <p className="text-xl font-bold text-purple-600 dark:text-purple-400">{fmtNum(materialStats.length)}{!isMobile && <span className="text-xs font-normal text-gray-400 dark:text-gray-500 ml-1">종</span>}</p>
         </div>
       </div>
 

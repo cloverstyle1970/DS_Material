@@ -32,6 +32,7 @@ import TeamCrewClient from "@/components/hr/TeamCrewClient";
 import CompanyVehiclesClient from "@/components/hr/CompanyVehiclesClient";
 import TransferClient from "@/components/hr/TransferClient";
 import EmploymentStatusClient from "@/components/hr/EmploymentStatusClient";
+import RewardsPunishmentsClient from "@/components/hr/RewardsPunishmentsClient";
 import MyProfileClient from "@/components/data/MyProfileClient";
 import CompanyInfoClient from "@/components/data/CompanyInfoClient";
 import PermissionGroupsClient from "@/components/data/PermissionGroupsClient";
@@ -96,6 +97,18 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/hr/employment-status": {
     label: "재직상태 관리",
     render: () => <EmploymentStatusClient />,
+  },
+  "/hr/rewards-punishments": {
+    label: "상벌사항 관리",
+    render: () => (
+      <div className="p-6 space-y-4">
+        <div>
+          <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">상벌사항 관리</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">사원 상벌 이력 등록·수정·삭제</p>
+        </div>
+        <RewardsPunishmentsClient />
+      </div>
+    ),
   },
   "/uniform-safety": {
     label: "근무복·안전장구 신청",

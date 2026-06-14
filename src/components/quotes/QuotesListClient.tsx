@@ -55,6 +55,8 @@ export default function QuotesListClient() {
   if (!user) return <div className="p-8 text-center text-sm text-gray-500">로그인이 필요합니다.</div>;
   const admin = isAdmin(user);
   const canRead = admin || hasMenuPermission(user, MENU_HREF, "read");
+  // 견적서 작성 메뉴(/quotes/new) 권한이 있어야 작성 버튼 노출 (없으면 클릭 시 대시보드로 리다이렉트됨)
+  const canCreate = admin || hasMenuPermission(user, "/quotes/new", "read");
   const canDelete = admin;
   if (!canRead) {
     return (
@@ -122,19 +124,21 @@ export default function QuotesListClient() {
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">견적서 목록</h1>
           <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">총 {rows.length}건</p>
         </div>
-        <Link href="/quotes/new"
-          className="px-4 py-2 rounded bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">
-          + 견적서 작성
-        </Link>
+        {canCreate && (
+          <Link href="/quotes/new"
+            className="px-4 py-2 rounded bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">
+            + 견적서 작성
+          </Link>
+        )}
       </div>
 
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-1.5">
           <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-            className="px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
+            className="px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs text-gray-900 dark:text-gray-100" />
           <span className="text-gray-400 text-xs">~</span>
           <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-            className="px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs" />
+            className="px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs text-gray-900 dark:text-gray-100" />
         </div>
         <div className="flex gap-1">
           {(["all","작성중","발행","승인","취소"] as StatusFilter[]).map(f => {

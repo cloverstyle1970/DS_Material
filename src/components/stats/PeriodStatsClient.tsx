@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { api } from "@/lib/api-client";
 import { fmtNum } from "@/lib/format";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
+import { isTkMaterial } from "@/lib/material-style";
 
 interface Transaction {
   id: number;
@@ -60,6 +61,7 @@ export default function PeriodStatsClient() {
   const canDownload = user ? !isViewOnly(user) : false;
   const [viewMode, setViewMode] = useState<ViewMode>("monthly");
   const [year, setYear]         = useState(CURRENT_YEAR);
+  const [companyFilter, setCompanyFilter] = useState<"전체" | "TK" | "DS">("전체");
   const [showChart, setShowChart] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,12 +77,15 @@ export default function PeriodStatsClient() {
   const periods = useMemo(() => generatePeriodLabels(year, viewMode), [year, viewMode]);
 
   const filteredTx = useMemo(() => {
-    if (viewMode === "yearly") return transactions;
-    return transactions.filter(t => {
-      const d = new Date(t.createdAt);
-      return d.getFullYear() === year;
-    });
-  }, [transactions, year, viewMode]);
+    let base = viewMode === "yearly" ? transactions : transactions.filter(t => new Date(t.createdAt).getFullYear() === year);
+    if (companyFilter !== "전체") {
+      base = base.filter(t => {
+        const isTk = isTkMaterial(t.materialId);
+        return companyFilter === "TK" ? isTk : !isTk;
+      });
+    }
+    return base;
+  }, [transactions, year, viewMode, companyFilter]);
 
   const periodSummary = useMemo(() => {
     const map: Record<string, { inbound: number; outbound: number; inQty: number; outQty: number }> = {};
@@ -173,6 +178,17 @@ export default function PeriodStatsClient() {
             {YEARS.map(y => <option key={y} value={y}>{y}년</option>)}
           </select>
         )}
+        {/* 회사구분 (자재코드 기준 TK/DS) */}
+        <div className="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
+          {(["전체","TK","DS"] as const).map(f => (
+            <button key={f} type="button" onClick={() => setCompanyFilter(f)}
+              className={`px-3 py-2 text-xs font-medium transition-colors border-r border-gray-200 dark:border-gray-600 last:border-0 ${
+                companyFilter === f
+                  ? f === "TK" ? "bg-blue-600 text-white" : f === "DS" ? "bg-red-500 text-white" : "bg-slate-700 text-white"
+                  : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+              }`}>{f}</button>
+          ))}
+        </div>
         <div className="flex items-center gap-2 ml-auto">
           <button onClick={() => setShowChart(v => !v)}
             className="px-3.5 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">

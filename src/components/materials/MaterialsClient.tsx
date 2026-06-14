@@ -8,6 +8,7 @@ import EditMaterialModal from "./EditMaterialModal";
 import BulkUploadModal from "./BulkUploadModal";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useViewMode } from "@/context/ViewModeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNumOr, fmtNum } from "@/lib/format";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
@@ -77,13 +78,15 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
   const [loading, setLoading] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
-  // 모바일(<768px)에서 자재코드/부품명 클릭 시 상세를 팝업으로 표시
-  const [isMobile, setIsMobile] = useState(false);
+  // 모바일: 화면 모드(viewMode='mobile') 또는 실제 좁은 화면(<768px). 자재코드/부품명 클릭 시 상세 팝업.
+  const { viewMode } = useViewMode();
+  const [narrowScreen, setNarrowScreen] = useState(false);
   const [detailMaterial, setDetailMaterial] = useState<MaterialRecord | null>(null);
+  const isMobile = viewMode === "mobile" || narrowScreen;
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
-    const apply = () => setIsMobile(mq.matches);
+    const apply = () => setNarrowScreen(mq.matches);
     apply();
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
@@ -267,19 +270,19 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
         { key: "stockQty",   label: "재고"     },
         { key: null,         label: "사진"     },
       ];
-  const colSpan = COLUMNS.length + 1 + (viewOnly ? 0 : 1); // checkbox + edit
+  const colSpan = COLUMNS.length + (isMobile ? 0 : 1) + (viewOnly ? 0 : 1); // (모바일 외)checkbox + edit
   const isDark = theme === "dark";
 
   return (
     <>
       {/* 툴바 */}
       <div className="space-y-2.5">
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className={`gap-3 ${isMobile ? "flex flex-col items-stretch" : "flex items-center flex-wrap"}`}>
           {/* DS / TK 토글 */}
-          <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl shrink-0">
+          <div className={`flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl ${isMobile ? "w-full justify-between" : "shrink-0"}`}>
             {(["전체", "DS", "TK"] as const).map(t => (
               <button key={t} type="button" onClick={() => { setMatType(t); setSelected(new Set()); resetPage(); }}
-                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${isMobile ? "flex-1" : ""}
                   ${matType === t
                     ? t === "DS" ? "bg-red-500 text-white shadow-sm"
                       : t === "TK" ? "bg-blue-600 text-white shadow-sm"
@@ -291,7 +294,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
           </div>
 
           {/* 검색 */}
-          <div className="relative flex-1 min-w-48">
+          <div className={`relative min-w-48 ${isMobile ? "w-full" : "flex-1"}`}>
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
             <input
               lang="ko"
@@ -306,7 +309,8 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
             )}
           </div>
 
-          {/* 건수 */}
+          {/* 건수 + 버튼 — 모바일에서는 한 묶음으로 줄바꿈 */}
+          <div className={isMobile ? "flex items-center gap-2 flex-wrap w-full" : "contents"}>
           <span className="text-sm text-gray-500 shrink-0">
             {q
               ? `검색 ${fmtNum(filtered.length)}종`
@@ -352,6 +356,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
               + 자재 등록
             </button>
           )}
+          </div>
         </div>
       </div>
 
@@ -375,14 +380,16 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
           }`}>
             <tr>
               {/* 전체 선택 체크박스 */}
-              <th className="px-4 py-3 w-8">
-                <input type="checkbox"
-                  checked={allChecked}
-                  ref={el => { if (el) el.indeterminate = !allChecked && someChecked; }}
-                  onChange={toggleAll}
-                  className="w-4 h-4 rounded border-gray-300 accent-slate-700 cursor-pointer"
-                />
-              </th>
+              {!isMobile && (
+                <th className="px-4 py-3 w-8">
+                  <input type="checkbox"
+                    checked={allChecked}
+                    ref={el => { if (el) el.indeterminate = !allChecked && someChecked; }}
+                    onChange={toggleAll}
+                    className="w-4 h-4 rounded border-gray-300 accent-slate-700 cursor-pointer"
+                  />
+                </th>
+              )}
               {COLUMNS.map(c => {
                 const active = c.key !== null && c.key === sortKey;
                 const alignCls = "text-center";
@@ -428,10 +435,12 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
                 <tr key={m.id}
                   onClick={() => toggleOne(m.id)}
                   className={`transition-colors cursor-pointer ${rowBg}`}>
-                  <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                    <input type="checkbox" checked={isChecked} onChange={() => toggleOne(m.id)}
-                      className="w-4 h-4 rounded border-gray-300 accent-slate-700 cursor-pointer" />
-                  </td>
+                  {!isMobile && (
+                    <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                      <input type="checkbox" checked={isChecked} onChange={() => toggleOne(m.id)}
+                        className="w-4 h-4 rounded border-gray-300 accent-slate-700 cursor-pointer" />
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-center">
                     {m.isRepair
                       ? <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${isDark ? "bg-green-900/60 text-green-300" : "bg-green-100 text-green-700"}`}>RE</span>

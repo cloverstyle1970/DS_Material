@@ -6,6 +6,7 @@ import { SiteRecord } from "@/lib/mock-sites";
 import { ElevatorRecord } from "@/lib/mock-elevators";
 import { useAuth, isViewOnly, isAdmin } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useViewMode } from "@/context/ViewModeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
 import { downloadAllTablesBackup, NEWDB_TABLES, type BackupProgress } from "@/lib/db-backup";
@@ -46,6 +47,8 @@ interface ElevatorFormModalProps {
 function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: ElevatorFormModalProps) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const { viewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
   const fieldCls = `w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 ${isDark ? "border-gray-600 bg-gray-700 text-gray-100 placeholder:text-gray-400" : "border-gray-200 bg-white text-gray-900"}`;
   const labelCls = `block text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`;
   const isEdit = !!editElevator;
@@ -92,7 +95,7 @@ function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: Elevato
         </div>
       }
     >
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+        <form onSubmit={handleSubmit} className={`px-6 py-5 space-y-4 ${isMobile ? "force-mobile" : ""}`}>
           <div>
             <label className={labelCls}>현장명</label>
             <input value={siteName} readOnly className={fieldCls + (isDark ? " !bg-gray-900/40 !text-gray-400" : " !bg-gray-50 !text-gray-500")} />
@@ -154,6 +157,8 @@ interface AddSiteModalProps { onClose: () => void; onSaved: () => void; editSite
 function AddSiteModal({ onClose, onSaved, editSite, existingElevators }: AddSiteModalProps) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const { viewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
   const fieldCls = `w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 ${isDark ? "border-gray-600 bg-gray-700 text-gray-100 placeholder:text-gray-400" : "border-gray-200 bg-white text-gray-900"}`;
   const labelCls = `block text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`;
   const isEdit = !!editSite;
@@ -275,7 +280,7 @@ function AddSiteModal({ onClose, onSaved, editSite, existingElevators }: AddSite
         </div>
       }
     >
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-3 overflow-y-auto flex-1">
+        <form onSubmit={handleSubmit} className={`px-6 py-5 space-y-3 overflow-y-auto flex-1 ${isMobile ? "force-mobile" : ""}`}>
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
               <label className={labelCls}>현장명 <span className="text-red-500">*</span></label>
@@ -369,7 +374,7 @@ function AddSiteModal({ onClose, onSaved, editSite, existingElevators }: AddSite
                   ? (existingElevators ?? []).map(e => e.unitName ?? "")
                   : elevatorsToAdd.map(e => e.unitName).filter(u => u.trim());
                 return (
-                  <div key={i} className="flex items-center gap-2">
+                  <div key={i} className={`flex items-center gap-2 ${isMobile ? "flex-wrap" : ""}`}>
                     <select value={d.unit ?? ""}
                       onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, unit: e.target.value } : x))}
                       className={`${fieldCls} w-24 shrink-0`}>
@@ -606,6 +611,8 @@ export default function SitesClient({ initial, elevators }: Props) {
   const q = query.trim().toLowerCase();
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const { viewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
 
   // 호기명 / 승강기번호 / 비상통화장치 끝 4자리로 매칭되는 호기들 — 현장명별 그룹.
   // matchKind 로 매칭 사유 보존: 칩 색/내용 분기에 사용 (호기번호 매칭=파랑, 비통번호 매칭=주황).
@@ -660,10 +667,17 @@ export default function SitesClient({ initial, elevators }: Props) {
 
   function changePage(next: number) { setPage(Math.max(1, Math.min(next, totalPages))); }
 
-  const selectedElevators = useMemo(() =>
-    selected ? allElevators.filter(e => e.siteName === selected.name) : [],
-    [allElevators, selected]
-  );
+  const selectedElevators = useMemo(() => {
+    if (!selected) return [];
+    // id 중복 방어 — state 병합/중복 로드로 동일 호기가 두 번 들어가면 key 충돌이 나므로 제거
+    const seen = new Set<ElevatorRecord["id"]>();
+    return allElevators.filter(e => {
+      if (e.siteName !== selected.name) return false;
+      if (seen.has(e.id)) return false;
+      seen.add(e.id);
+      return true;
+    });
+  }, [allElevators, selected]);
 
   function downloadExcel() {
     const list = checkedSiteIds.size > 0
@@ -757,10 +771,13 @@ export default function SitesClient({ initial, elevators }: Props) {
 
   async function reloadElevators(siteName: string) {
     const updated = await api.get<ElevatorRecord[]>(`/api/elevators?site=${encodeURIComponent(siteName)}`).catch(() => [] as ElevatorRecord[]);
-    setAllElevators(prev => [
-      ...prev.filter(e => e.siteName !== siteName),
-      ...updated,
-    ]);
+    setAllElevators(prev => {
+      // 해당 현장 호기를 갈아끼우되, id 기준으로 유일화(siteName 표기 불일치 등으로 인한 중복 방지)
+      const merged = [...prev.filter(e => e.siteName !== siteName), ...updated];
+      const byId = new Map<ElevatorRecord["id"], ElevatorRecord>();
+      for (const e of merged) byId.set(e.id, e);
+      return Array.from(byId.values());
+    });
     setShowElevatorForm(false);
     setEditElevator(null);
     setDeleteElevatorTarget(null);
@@ -776,14 +793,14 @@ export default function SitesClient({ initial, elevators }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className={`flex flex-col h-full ${isMobile ? "force-mobile" : ""}`}>
       {/* 상단 헤더 */}
-      <div className="shrink-0 px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-4">
+      <div className={`shrink-0 px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 gap-4 ${isMobile ? "flex flex-col" : "flex items-center justify-between"}`}>
         <div>
           <h1 className="text-base font-semibold text-gray-800 dark:text-gray-100">현장/호기 관리</h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">현장 목록 조회 및 호기 정보 관리</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className={`flex items-center gap-2 flex-wrap ${isMobile ? "" : "justify-end"}`}>
           {canBackup && (
             <button onClick={handleBackupAll} disabled={backupRunning}
               title={`신DB 전체 ${NEWDB_TABLES.length}개 업무 테이블 백업`}
@@ -822,8 +839,8 @@ export default function SitesClient({ initial, elevators }: Props) {
       {/* 좌우 분할 패널 */}
       <div className="flex flex-1 min-h-0">
 
-        {/* ── 좌측: 현장 목록 ─────────────────────────────────── */}
-        <div className={`w-80 xl:w-96 shrink-0 flex flex-col border-r transition-colors ${isDark ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-white"}`}>
+        {/* ── 좌측: 현장 목록 (모바일: 현장 선택 시 숨기고 상세로 전환) ───────── */}
+        <div className={`${isMobile ? (selected ? "hidden" : "w-full") : "w-80 xl:w-96"} shrink-0 flex flex-col border-r transition-colors ${isDark ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-white"}`}>
           {/* 검색 */}
           <div className={`shrink-0 p-3 border-b transition-colors ${isDark ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
             <div className="relative">
@@ -942,7 +959,7 @@ export default function SitesClient({ initial, elevators }: Props) {
                                     : isDark ? "bg-blue-900/40 text-blue-300 border border-blue-700/60"
                                              : "bg-blue-50 text-blue-700 border border-blue-200";
                                   const tail = isEmergency
-                                    ? ` ☎${(e.emergencyPhone ?? "").replace(/\D/g, "").slice(-4)}`
+                                    ? ` ☎${e.emergencyPhone ?? ""}`
                                     : e.elevatorNo ? ` · ${e.elevatorNo}` : "";
                                   return (
                                     <span
@@ -989,8 +1006,8 @@ export default function SitesClient({ initial, elevators }: Props) {
           </div>
         </div>
 
-        {/* ── 우측: 현장 상세 + 호기 목록 ──────────────────────── */}
-        <div className={`flex-1 overflow-y-auto transition-colors ${isDark ? "bg-gray-900" : "bg-gray-50"}`}>
+        {/* ── 우측: 현장 상세 + 호기 목록 (모바일: 미선택 시 숨김) ──────────── */}
+        <div className={`${isMobile && !selected ? "hidden" : "flex-1"} overflow-y-auto transition-colors ${isDark ? "bg-gray-900" : "bg-gray-50"}`}>
           {!selected ? (
             <div className={`flex flex-col items-center justify-center h-full min-h-64 ${isDark ? "text-gray-600" : "text-gray-400"}`}>
               <p className="text-5xl mb-4">🏙️</p>
@@ -1035,8 +1052,12 @@ export default function SitesClient({ initial, elevators }: Props) {
                       </button>
                     )}
                     <button onClick={() => setSelected(null)}
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isDark ? "hover:bg-gray-700 text-gray-500 hover:text-gray-300" : "hover:bg-gray-100 text-gray-400 hover:text-gray-600"}`}>
-                      ×
+                      className={`rounded-lg flex items-center justify-center gap-1 transition-colors ${
+                        isMobile
+                          ? "px-3 h-8 text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700"
+                          : `w-8 h-8 ${isDark ? "hover:bg-gray-700 text-gray-500 hover:text-gray-300" : "hover:bg-gray-100 text-gray-400 hover:text-gray-600"}`
+                      }`}>
+                      {isMobile ? "← 목록" : "×"}
                     </button>
                   </div>
                 </div>
@@ -1125,6 +1146,32 @@ export default function SitesClient({ initial, elevators }: Props) {
                   <div className={`text-center py-10 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
                     <p className="text-2xl mb-1">🛗</p>
                     <p className="text-sm">등록된 호기가 없습니다</p>
+                  </div>
+                ) : isMobile ? (
+                  <div className={`divide-y ${isDark ? "divide-gray-700" : "divide-gray-100"}`}>
+                    {selectedElevators.map((e, idx) => (
+                      <div key={e.id} className="p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className={`font-medium ${isDark ? "text-gray-100" : "text-gray-800"}`}>{idx + 1}. {e.unitName ?? "—"}</p>
+                            <div className="mt-1.5 space-y-0.5 text-xs text-gray-600 dark:text-gray-300">
+                              <div><span className="text-gray-400">승강기번호 </span><span className={`font-mono ${isDark ? "text-blue-400" : "text-blue-600"}`}>{e.elevatorNo ?? "—"}</span></div>
+                              <div><span className="text-gray-400">비상통화 </span><span className="font-mono">{e.emergencyPhone ?? "—"}</span></div>
+                              <div><span className="text-gray-400">원장번호 </span><span className="font-mono">{e.ledgerNo ?? "—"}</span></div>
+                              <div><span className="text-gray-400">잡번호 </span><span className="font-mono">{e.jobNo ?? "—"}</span></div>
+                            </div>
+                          </div>
+                          {canEdit && (
+                            <div className="flex flex-col gap-1 shrink-0">
+                              <button onClick={() => { setEditElevator(e); setShowElevatorForm(true); }}
+                                className={`text-xs px-2.5 py-1 rounded border transition-colors ${isDark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-200 text-gray-500 hover:bg-slate-50"}`}>수정</button>
+                              <button onClick={() => setDeleteElevatorTarget(e)}
+                                className={`text-xs px-2.5 py-1 rounded border transition-colors ${isDark ? "border-red-800 text-red-400 hover:bg-red-900/40" : "border-red-100 text-red-400 hover:bg-red-50"}`}>삭제</button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <div className="overflow-auto max-h-[calc(100vh-250px)]">

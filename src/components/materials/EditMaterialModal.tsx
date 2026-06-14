@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, FormEvent } from "react";
+import { useViewMode } from "@/context/ViewModeContext";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
@@ -18,6 +19,8 @@ interface Props {
 }
 
 export default function EditMaterialModal({ material, onClose, onSaved }: Props) {
+  const { viewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
   const [name,       setName]       = useState(material.name);
   const [alias,      setAlias]      = useState(material.alias ?? "");
   const [modelNo,    setModelNo]    = useState(material.modelNo ?? "");
@@ -111,7 +114,7 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
         </div>
       }
     >
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4 max-h-[75vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className={`px-6 py-5 space-y-4 max-h-[75vh] overflow-y-auto ${isMobile ? "force-mobile" : ""}`}>
           {/* 부품명 */}
           <div>
             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">부품명 <span className="text-red-500">*</span></label>
