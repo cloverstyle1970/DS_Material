@@ -84,27 +84,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // 유지보수 사이트(men.daesol.kr)에서 SSO 토큰을 hash로 넘겨온 경우 먼저 setSession.
     // 양쪽이 같은 Supabase 프로젝트라서 access_token/refresh_token을 그대로 신뢰 가능.
-    async function consumeSsoHashIfPresent() {
-      if (typeof window === "undefined") return;
+    // 반환값: SSO 진입 성공 여부. 호출자(syncFromSession)는 이 값으로 signOut 회피 결정.
+    async function consumeSsoHashIfPresent(): Promise<boolean> {
+      if (typeof window === "undefined") return false;
       const hash = window.location.hash;
-      if (!hash.includes("access_token=")) return;
+      if (!hash.includes("access_token=")) return false;
       const params = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash);
       const accessToken = params.get("access_token");
       const refreshToken = params.get("refresh_token");
-      if (!accessToken || !refreshToken) return;
+      if (!accessToken || !refreshToken) return false;
+      let ok = false;
       try {
-        await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+        const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+        ok = !error;
       } catch {
-        // 토큰이 유효하지 않거나 만료면 무시 — 평소 syncFromSession이 비세션 분기로 빠짐
+        ok = false;
       } finally {
         // 토큰이 URL 히스토리에 잔존하지 않도록 즉시 청소
         window.history.replaceState(null, "", window.location.pathname + window.location.search);
       }
+      return ok;
     }
 
     // Supabase Auth 세션이 단일 진리원. localStorage[STORAGE_KEY]는 화면 표시용 캐시.
     // 세션의 user.email = `${accounts.id}@daesol.el` 규약(daesol.el은 가짜 도메인 — 키 용도).
-    async function syncFromSession() {
+    //
+    // skipSignOut: SSO 진입(men.daesol.kr) 경로일 때 true. 양쪽이 같은 Supabase 프로젝트의
+    // 같은 auth.sessions row를 공유하므로, 우리가 signOut을 부르면 송신 측 세션도 함께
+    // session_not_found 가 된다. SSO 실패 시에는 setUser(null)만으로 로그인 화면 유도.
+    async function syncFromSession(opts: { skipSignOut?: boolean } = {}) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (cancelled) return;
@@ -126,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const email = session.user.email ?? "";
         const id = Number(email.split("@")[0]);
         if (!Number.isFinite(id) || id <= 0) {
-          await supabase.auth.signOut();
+          if (!opts.skipSignOut) await supabase.auth.signOut();
           localStorage.removeItem(STORAGE_KEY);
           setUser(null);
           return;
@@ -169,7 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setStoredViewMode(viewMode);
         } else {
           // 세션은 있는데 accounts 행이 없음 → 사고. 세션 정리.
-          await supabase.auth.signOut();
+          if (!opts.skipSignOut) await supabase.auth.signOut();
           localStorage.removeItem(STORAGE_KEY);
           setUser(null);
         }
@@ -181,8 +189,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     (async () => {
-      await consumeSsoHashIfPresent();
-      await syncFromSession();
+      const cameViaSso = await consumeSsoHashIfPresent();
+      await syncFromSession({ skipSignOut: cameViaSso });
     })();
 
     // 다른 탭/창에서 로그아웃되면 즉시 반영. SIGNED_IN은 login() 또는 위 bootstrap이 처리.
