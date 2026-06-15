@@ -1,9 +1,9 @@
 /**
- * 비상?�화?�치 ?�???�합:
- * - elevators.emergency_phone, sites.emergency_device(?�수) 값을
- *   sites.emergency_devices(jsonb)�?모으�? * - ??컬럼?� NULL 처리.
+ * 비상?�화?�치 ?�???�합:
+ * - elevators.emergency_phone, sites.emergency_device(?�수) 값을
+ *   sites.emergency_devices(jsonb)�?모으�? * - ??컬럼?� NULL 처리.
  *
- * ?�행:
+ * ?�행:
  *   npx tsx scripts/site-import/unify_emergency.ts --dry-run
  *   npx tsx scripts/site-import/unify_emergency.ts
  */
@@ -45,12 +45,12 @@ function normalize(s: string | null | undefined): string {
 
 async function main() {
   const mode = DRY ? "[DRY-RUN]" : "[APPLY]";
-  console.log(`${mode} 비상?�화?�치 ?�합 ?�작\n`);
+  console.log(`${mode} 비상?�화?�치 ?�합 ?�작\n`);
 
   const sites = await fetchAll("sites");
   const elevs = await fetchAll("elevators");
 
-  // ?�장�?elevators 그룹
+  // ?�장�?elevators 그룹
   const elevsBySite = new Map<string, typeof elevs>();
   for (const e of elevs) {
     const arr = elevsBySite.get(e.site_name) ?? [];
@@ -71,7 +71,7 @@ async function main() {
     const numSet = new Set(current.map(d => normalize(d.number)));
     const additions: typeof current = [];
 
-    // 1) elevators.emergency_phone ?�수
+    // 1) elevators.emergency_phone ?�수
     const myElevs = elevsBySite.get(s.name) ?? [];
     for (const e of myElevs) {
       const p = e.emergency_phone;
@@ -86,7 +86,7 @@ async function main() {
       }
     }
 
-    // 2) sites.emergency_device(?�수) ?�수
+    // 2) sites.emergency_device(?�수) ?�수
     const single = s.emergency_device;
     let needSingleClear = false;
     if (single && typeof single === "string") {
@@ -108,25 +108,25 @@ async function main() {
     }
   }
 
-  console.log(`sites ?�데?�트 ?�??           : ${siteUpdates}`);
-  console.log(`  - elevators.phone ?�수      : ${elevAddedCount}�?);
-  console.log(`  - emergency_device ?�수 ?�수: ${singleAddedCount}�?);
-  console.log(`elevators.emergency_phone 비우�? ${elevPhonesCleared}�?);
+  console.log(`sites ?�데?�트 ?�??           : ${siteUpdates}`);
+  console.log(`  - elevators.phone ?�수      : ${elevAddedCount}�?);
+  console.log(`  - emergency_device ?�수 ?�수: ${singleAddedCount}�?);
+  console.log(`elevators.emergency_phone 비우�? ${elevPhonesCleared}�?);
 
   if (DRY) {
-    // ?�플 5건만 출력
-    console.log("\n[?�플 ?�이???�데?�트 5�?");
+    // ?�플 5건만 출력
+    console.log("\n[?�플 ?�이???�데?�트 5�?");
     for (const u of siteSubmits.slice(0, 5)) {
       const sname = sites.find(x => x.id === u.id)?.name;
       console.log(`  id=${u.id} ${sname}`);
       console.log(`    emergency_devices=${JSON.stringify(u.emergency_devices)}`);
     }
-    console.log("\n[DRY-RUN] 변�??�이 종료");
+    console.log("\n[DRY-RUN] 변�??�이 종료");
     return;
   }
 
-  // ?�용: sites
-  console.log("\n??sites ?�데?�트 ?�용");
+  // ?�용: sites
+  console.log("\n??sites ?�데?�트 ?�용");
   for (let i = 0; i < siteSubmits.length; i += 50) {
     const chunk = siteSubmits.slice(i, i + 50);
     for (const u of chunk) {
@@ -139,9 +139,9 @@ async function main() {
   }
   console.log("");
 
-  // ?�용: elevators.emergency_phone NULL
+  // ?�용: elevators.emergency_phone NULL
   if (elevSubmits.length > 0) {
-    console.log(`??elevators.emergency_phone NULL 처리 (${elevSubmits.length}�?`);
+    console.log(`??elevators.emergency_phone NULL 처리 (${elevSubmits.length}�?`);
     for (let i = 0; i < elevSubmits.length; i += 200) {
       const chunk = elevSubmits.slice(i, i + 200);
       const { error } = await supabase.from("elevators")
@@ -152,8 +152,8 @@ async function main() {
     console.log("");
   }
 
-  // ?�드 JSON ?�동기화
-  console.log("???�드 JSON ?�동기화");
+  // ?�드 JSON ?�동기화
+  console.log("???�드 JSON ?�동기화");
   const dbSites = await fetchAll("sites");
   const dbElevs = await fetchAll("elevators");
   const seedSites = dbSites.map(r => ({
@@ -161,7 +161,7 @@ async function main() {
     companyType: r.company_type ?? null, contractType: r.contract_type ?? null,
     contractDate: r.contract_date ?? null, contractStart: r.contract_start ?? null,
     contractEnd: r.contract_end ?? null,
-    primaryInspector: r.primary_inspector ?? null,
+    primaryInspector: r.main_inspector ?? null,
     subInspector: r.sub_inspector ?? null, subInspector2: r.sub_inspector2 ?? null,
     sitePhone: r.site_phone ?? null, siteMobile: r.site_mobile ?? null,
     fax: r.fax ?? null, managerPhone: r.manager_phone ?? null,
@@ -182,7 +182,7 @@ async function main() {
   }));
   writeFileSync(resolve(process.cwd(), "src/data/sites.json"),     JSON.stringify(seedSites, null, 2), "utf-8");
   writeFileSync(resolve(process.cwd(), "src/data/elevators.json"), JSON.stringify(seedElevs, null, 2), "utf-8");
-  console.log("\n???�합 ?�료");
+  console.log("\n???�합 ?�료");
 }
 
 main().catch(e => { console.error("[FATAL]", e); process.exit(1); });

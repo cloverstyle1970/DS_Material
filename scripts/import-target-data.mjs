@@ -61,7 +61,7 @@ async function importSites() {
       contract_date:     excelDate(row[3]),
       contract_start:    excelDate(row[4]),
       contract_end:      excelDate(row[5]),
-      primary_inspector: str(row[6]),
+      main_inspector:    str(row[6]),
       sub_inspector:     str(row[7]),
       sub_inspector2:    str(row[8]),
       site_phone:        str(row[9]),

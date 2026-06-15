@@ -152,7 +152,7 @@ function dbToSite(r: any): SiteRecord {
     contractDate:      r.contract_date      ?? null,
     contractStart:     r.contract_start     ?? null,
     contractEnd:       r.contract_end       ?? null,
-    primaryInspector:  r.primary_inspector  ?? null,
+    primaryInspector:  r.main_inspector     ?? null,
     subInspector:      r.sub_inspector      ?? null,
     subInspector2:     r.sub_inspector2     ?? null,
     sitePhone:         r.site_phone         ?? null,
@@ -187,7 +187,7 @@ function siteToDb(d: any): Record<string, unknown> {
   if (d.contractDate      !== undefined) obj.contract_date      = d.contractDate;
   if (d.contractStart     !== undefined) obj.contract_start     = d.contractStart;
   if (d.contractEnd       !== undefined) obj.contract_end       = d.contractEnd;
-  if (d.primaryInspector  !== undefined) obj.primary_inspector  = d.primaryInspector;
+  if (d.primaryInspector  !== undefined) obj.main_inspector     = d.primaryInspector;
   if (d.subInspector      !== undefined) obj.sub_inspector      = d.subInspector;
   if (d.subInspector2     !== undefined) obj.sub_inspector2     = d.subInspector2;
   if (d.sitePhone         !== undefined) obj.site_phone         = d.sitePhone;

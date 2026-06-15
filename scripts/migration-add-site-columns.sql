@@ -10,7 +10,7 @@ ALTER TABLE public.sites
   ADD COLUMN IF NOT EXISTS contract_date     DATE,
   ADD COLUMN IF NOT EXISTS contract_start    DATE,
   ADD COLUMN IF NOT EXISTS contract_end      DATE,
-  ADD COLUMN IF NOT EXISTS primary_inspector TEXT,
+  ADD COLUMN IF NOT EXISTS main_inspector    TEXT,
   ADD COLUMN IF NOT EXISTS sub_inspector     TEXT,
   ADD COLUMN IF NOT EXISTS sub_inspector2    TEXT,
   ADD COLUMN IF NOT EXISTS site_phone        TEXT,

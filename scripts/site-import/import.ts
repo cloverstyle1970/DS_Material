@@ -1,14 +1,14 @@
 /**
- * 2026-05-13 ?µí•© ?‘ì? import ?¤í¬ë¦½íŠ¸.
+ * 2026-05-13 ?ï¿½í•© ?ï¿½ï¿½? import ?ï¿½í¬ë¦½íŠ¸.
  *
- * ?¤í–‰:
- *   npx tsx scripts/site-import/import.ts --dry-run   # ë³€ê²½ì‚¬??§Œ ì¶œë ¥, ?¤ì œ ?°ê¸° ?†ìŒ
- *   npx tsx scripts/site-import/import.ts             # ?¤ì œ ?ìš© (--apply ?€ ?™ì¼)
+ * ?ï¿½í–‰:
+ *   npx tsx scripts/site-import/import.ts --dry-run   # ë³€ê²½ì‚¬??ï¿½ï¿½ ì¶œë ¥, ?ï¿½ì œ ?ï¿½ê¸° ?ï¿½ìŒ
+ *   npx tsx scripts/site-import/import.ts             # ?ï¿½ì œ ?ï¿½ìš© (--apply ?ï¿½ ?ï¿½ì¼)
  *
- * ?¬ì „ ì¡°ê±´:
- *   1) supabase/sites_elevators_extend.sql ??Supabase Dashboard ?ì„œ ?¤í–‰?˜ì—¬ ì»¬ëŸ¼ ?•ì¥
- *   2) scripts/site-import/convert.py ë¥??¤í–‰?˜ì—¬ import-payload.json ?ì„±
- *   3) .env.local ??NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY (?ëŠ” SUPABASE_SERVICE_ROLE_KEY)
+ * ?ï¿½ì „ ì¡°ê±´:
+ *   1) supabase/sites_elevators_extend.sql ??Supabase Dashboard ?ï¿½ì„œ ?ï¿½í–‰?ï¿½ì—¬ ì»¬ëŸ¼ ?ï¿½ì¥
+ *   2) scripts/site-import/convert.py ï¿½??ï¿½í–‰?ï¿½ì—¬ import-payload.json ?ï¿½ì„±
+ *   3) .env.local ??NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY (?ï¿½ëŠ” SUPABASE_SERVICE_ROLE_KEY)
  */
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
@@ -29,7 +29,7 @@ const SUPABASE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error("[ERR] NEXT_PUBLIC_SUPABASE_URL / KEY ê°€ .env.local ???†ìŠµ?ˆë‹¤.");
+  console.error("[ERR] NEXT_PUBLIC_SUPABASE_URL / KEY ê°€ .env.local ???ï¿½ìŠµ?ï¿½ë‹¤.");
   process.exit(1);
 }
 
@@ -92,7 +92,7 @@ function siteToDb(s: SitePayload) {
     contract_start:     s.contractStart,
     contract_end:       s.contractEnd,
     warranty_end:       s.warrantyEnd,
-    primary_inspector:  s.primaryInspector,
+    main_inspector:     s.primaryInspector,
     sub_inspector:      s.subInspector,
     sub_inspector2:     s.subInspector2,
     site_phone:         s.sitePhone,
@@ -120,7 +120,7 @@ async function main() {
   const payload: Payload = JSON.parse(readFileSync(PAYLOAD_PATH, "utf-8"));
   const mode = DRY ? "[DRY-RUN]" : "[APPLY]";
 
-  console.log(`${mode} Import ?œì‘`);
+  console.log(`${mode} Import ?ï¿½ì‘`);
   console.log(`  sites          : ${payload.sites.length} (new=${payload.sites.filter(s=>!s.id).length})`);
   console.log(`  elevators      : ${payload.elevators.length} (new=${payload.elevators.filter(e=>!e.id).length})`);
   console.log(`  rename         : ${Object.keys(payload.renameMap).length}`);
@@ -128,32 +128,32 @@ async function main() {
   console.log(`  elevs delete   : ${payload.elevatorsToDelete.length + payload.placeholderElevatorIds.length}`);
 
   if (DRY) {
-    console.log("\n[DRY-RUN] Supabase ë³€ê²??†ì´ ì¢…ë£Œ. ?¤ì œ ?ìš©?€ ?¸ì ?†ì´ ?¤í–‰?˜ì„¸??");
+    console.log("\n[DRY-RUN] Supabase ë³€ï¿½??ï¿½ì´ ì¢…ë£Œ. ?ï¿½ì œ ?ï¿½ìš©?ï¿½ ?ï¿½ì ?ï¿½ì´ ?ï¿½í–‰?ï¿½ì„¸??");
     return;
   }
 
-  // 1) placeholder + orphan elevators ?? œ (FK ì¶©ëŒ ë°©ì?)
+  // 1) placeholder + orphan elevators ??ï¿½ï¿½ (FK ì¶©ëŒ ë°©ï¿½?)
   const elevIdsToDelete = [
     ...payload.elevatorsToDelete,
     ...payload.placeholderElevatorIds,
   ];
   if (elevIdsToDelete.length > 0) {
-    console.log(`\n??elevators ?? œ (${elevIdsToDelete.length}ê°?`);
+    console.log(`\n??elevators ??ï¿½ï¿½ (${elevIdsToDelete.length}ï¿½?`);
     const { error } = await supabase.from("elevators").delete().in("id", elevIdsToDelete);
     if (error) throw new Error(`elevators delete: ${error.message}`);
   }
 
-  // 2) orphan sites ?? œ
+  // 2) orphan sites ??ï¿½ï¿½
   if (payload.sitesToDelete.length > 0) {
-    console.log(`??sites ?? œ (${payload.sitesToDelete.length}ê°?`);
+    console.log(`??sites ??ï¿½ï¿½ (${payload.sitesToDelete.length}ï¿½?`);
     const { error } = await supabase.from("sites").delete().in("name", payload.sitesToDelete);
     if (error) throw new Error(`sites delete: ${error.message}`);
   }
 
-  // 3) sites: id ?ˆëŠ” ?‰ì? update, id ?†ëŠ” ?‰ì? insert
+  // 3) sites: id ?ï¿½ëŠ” ?ï¿½ï¿½? update, id ?ï¿½ëŠ” ?ï¿½ï¿½? insert
   const sitesUpdate = payload.sites.filter(s => s.id !== undefined).map(siteToDb);
   const sitesInsert = payload.sites.filter(s => s.id === undefined).map(siteToDb);
-  console.log(`??sites update (${sitesUpdate.length}ê°?`);
+  console.log(`??sites update (${sitesUpdate.length}ï¿½?`);
   for (let i = 0; i < sitesUpdate.length; i += 100) {
     const chunk = sitesUpdate.slice(i, i + 100);
     const { error } = await supabase.from("sites").upsert(chunk, { onConflict: "id" });
@@ -162,15 +162,15 @@ async function main() {
   }
   console.log("");
   if (sitesInsert.length > 0) {
-    console.log(`??sites insert new (${sitesInsert.length}ê°?`);
+    console.log(`??sites insert new (${sitesInsert.length}ï¿½?`);
     const { error } = await supabase.from("sites").insert(sitesInsert);
     if (error) throw new Error(`sites insert: ${error.message}`);
   }
 
-  // 4) elevators: id ?ˆëŠ” ?‰ì? update, id ?†ëŠ” ?‰ì? insert
+  // 4) elevators: id ?ï¿½ëŠ” ?ï¿½ï¿½? update, id ?ï¿½ëŠ” ?ï¿½ï¿½? insert
   const elevsUpdate = payload.elevators.filter(e => e.id !== undefined).map(elevatorToDb);
   const elevsInsert = payload.elevators.filter(e => e.id === undefined).map(elevatorToDb);
-  console.log(`??elevators update (${elevsUpdate.length}ê°?`);
+  console.log(`??elevators update (${elevsUpdate.length}ï¿½?`);
   for (let i = 0; i < elevsUpdate.length; i += 200) {
     const chunk = elevsUpdate.slice(i, i + 200);
     const { error } = await supabase.from("elevators").upsert(chunk, { onConflict: "id" });
@@ -179,13 +179,13 @@ async function main() {
   }
   console.log("");
   if (elevsInsert.length > 0) {
-    console.log(`??elevators insert new (${elevsInsert.length}ê°?`);
+    console.log(`??elevators insert new (${elevsInsert.length}ï¿½?`);
     const { error } = await supabase.from("elevators").insert(elevsInsert);
     if (error) throw new Error(`elevators insert: ${error.message}`);
   }
 
-  // 5) src/data/*.json ?™ê¸°??(?œë“œ ?Œì¼)
-  console.log("???œë“œ JSON ?¬ì¡°?ŒÂ·ë™ê¸°í™”");
+  // 5) src/data/*.json ?ï¿½ê¸°??(?ï¿½ë“œ ?ï¿½ì¼)
+  console.log("???ï¿½ë“œ JSON ?ï¿½ì¡°?ï¿½Â·ë™ê¸°í™”");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async function fetchAll(table: string): Promise<any[]> {
     const PAGE = 1000;
@@ -213,7 +213,7 @@ async function main() {
     contractDate:      r.contract_date ?? null,
     contractStart:     r.contract_start ?? null,
     contractEnd:       r.contract_end ?? null,
-    primaryInspector:  r.primary_inspector ?? null,
+    primaryInspector:  r.main_inspector ?? null,
     subInspector:      r.sub_inspector ?? null,
     subInspector2:     r.sub_inspector2 ?? null,
     sitePhone:         r.site_phone ?? null,
@@ -248,10 +248,10 @@ async function main() {
 
   writeFileSync(SITES_JSON, JSON.stringify(seedSites, null, 2), "utf-8");
   writeFileSync(ELEVS_JSON, JSON.stringify(seedElevs, null, 2), "utf-8");
-  console.log(`  sites.json     : ${seedSites.length}ê°?);
-  console.log(`  elevators.json : ${seedElevs.length}ê°?);
+  console.log(`  sites.json     : ${seedSites.length}ï¿½?);
+  console.log(`  elevators.json : ${seedElevs.length}ï¿½?);
 
-  console.log("\n??Import ?„ë£Œ");
+  console.log("\n??Import ?ï¿½ë£Œ");
 }
 
 main().catch((err) => {

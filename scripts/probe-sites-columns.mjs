@@ -10,7 +10,7 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 
 const candidates = [
   "id", "name", "password", "created_at", "company_type", "contract_type", "contract_date",
-  "contract_start", "contract_end", "primary_inspector", "sub_inspector", "sub_inspector2",
+  "contract_start", "contract_end", "main_inspector", "sub_inspector", "sub_inspector2",
   "site_phone", "site_mobile", "fax", "manager_phone", "manager_email", "address", "entry_info",
   "vendor", "customer_email", "job_no", "note", "emergency_device"
 ];
