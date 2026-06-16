@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth, isAdmin } from "@/context/AuthContext";
+import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { useTabs, MAX_TABS } from "@/context/TabsContext";
 import { supabase } from "@/lib/supabase";
 import { visibleUserIds } from "@/lib/crew";
@@ -55,6 +55,10 @@ function fmtDT(iso: string): string {
 export default function QuoteRequestsListClient() {
   const { user } = useAuth();
   const admin = user ? isAdmin(user) : false;
+  // 권한그룹에서 /claim/quote-requests:read 권한을 받은 사람도 전체 조회 가능
+  const canViewAll = user ? (admin || hasMenuPermission(user, "/claim/quote-requests", "read")) : false;
+  // update 권한 → 견적서 작성·상태 변경(견적작성중/취소)·삭제 가능
+  const canEdit = user ? (admin || hasMenuPermission(user, "/claim/quote-requests", "update")) : false;
   const router = useRouter();
   const { tabs, openTab } = useTabs();
 
@@ -69,15 +73,15 @@ export default function QuoteRequestsListClient() {
     setLoading(true);
     let query = supabase.from("quote_requests")
       .select("*").order("requested_at", { ascending: false });
-    // 비관리자는 같은 팀(users.dept) 청구만 조회
-    const ids = await visibleUserIds(user);
+    // 비관리자는 같은 팀(users.dept) 청구만 조회 — 단, 메뉴 read 권한자는 전체 조회
+    const ids = await visibleUserIds(user, "/claim/quote-requests");
     if (ids) query = query.in("requester_id", ids);
     const { data } = await query;
     setList((data ?? []) as QuoteRequest[]);
     setLoading(false);
   }
 
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [user?.id, admin]);
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [user?.id, canViewAll]);
 
   const filtered = useMemo(
     () => filter === "전체" ? list : list.filter(r => r.status === filter),
@@ -129,14 +133,14 @@ export default function QuoteRequestsListClient() {
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">📋 견적요청 목록</h1>
-            {!admin && (
+            {!canViewAll && (
               <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
                 👤 본인 청구만 표시 중
               </span>
             )}
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            {admin
+            {canViewAll
               ? "보수원의 유상 청구 — 견적 담당자가 견적서를 작성합니다."
               : "내가 등록한 유상 견적요청 — 견적서 발행 여부를 확인할 수 있습니다."}
           </p>
@@ -269,7 +273,7 @@ export default function QuoteRequestsListClient() {
                 </table>
               </div>
 
-              {admin && (
+              {canEdit && (
                 <div className="mt-4 flex gap-2 flex-wrap">
                   {selected.status === "신청" && (
                     <button type="button" onClick={() => goToQuoteEntry(selected)}

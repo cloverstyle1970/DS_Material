@@ -8,7 +8,7 @@ import * as XLSX from "xlsx";
 import { MaterialRequestRecord, RequestStatus, RequestType } from "@/lib/mock-material-requests";
 import { PurchaseOrderRecord, OrderStatus } from "@/lib/mock-purchase-orders";
 import { TransactionRecord } from "@/lib/mock-transactions";
-import { useAuth, isViewOnly, isAdmin } from "@/context/AuthContext";
+import { useAuth, isViewOnly, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { useViewMode } from "@/context/ViewModeContext";
 import StockHistoryClient from "@/components/stock/StockHistoryClient";
 import PurchaseOrderBulkUploadModal from "@/components/purchase/PurchaseOrderBulkUploadModal";
@@ -309,8 +309,12 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
 
   const { user } = useAuth();
   const admin = user ? !isViewOnly(user) : false;
-  // 자재신청 가시성: 관리자(admin perm)는 전체, 그 외는 같은 팀(users.dept) 신청만
-  const restrictToTeam = user ? !isAdmin(user) : false;
+  // 자재신청 가시성: admin 또는 권한그룹에서 /requests:read 부여자는 전체, 그 외는 같은 팀(users.dept) 신청만
+  const restrictToTeam = user ? (!isAdmin(user) && !hasMenuPermission(user, "/requests", "read")) : false;
+  // 자재신청 처리(상태 변경): admin 또는 권한그룹 /requests:update 부여자
+  const canEditReq = user ? (admin || hasMenuPermission(user, "/requests", "update")) : false;
+  // 자재신청 조회 전체(엑셀 다운로드 포함): admin/!isViewOnly 또는 read 권한자
+  const canViewAllReq = user ? (admin || hasMenuPermission(user, "/requests", "read")) : false;
   const visibleRequests = useMemo(() => {
     if (!restrictToTeam || !user) return requests;
     const dept = (user.dept ?? "").trim();
@@ -602,7 +606,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
               className={`ml-auto px-4 py-2.5 rounded-xl text-sm font-semibold bg-slate-700 text-white hover:bg-slate-800 transition-colors ${isMobile ? "order-9" : ""}`}>
               전표 입력
             </Link>
-            {admin && (
+            {canViewAllReq && (
               <button type="button" onClick={downloadReqs}
                 className={`bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 transition-colors ${isMobile ? "order-9" : ""}`}>
                 {selectedReqIds.size > 0 ? `선택 ${selectedReqIds.size}건 다운로드` : "엑셀 다운로드"}
@@ -671,7 +675,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                           <p className="text-sm text-gray-600 dark:text-gray-300 mt-0.5">{r.items[0]?.materialName ?? "-"}{r.items.length > 1 ? ` 외 ${r.items.length - 1}건` : ""} · 수량 {totalQty}</p>
                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{r.requesterName} ({r.requesterDept}){r.note ? ` · ${r.note}` : ""}</p>
                         </div>
-                        {admin && (r.status === "신청" || r.status === "처리중") && (
+                        {canEditReq && (r.status === "신청" || r.status === "처리중") && (
                           <div className="flex gap-1 mt-2 flex-wrap">
                             {r.status === "신청" && (
                               <button type="button" disabled={actionLoading === r.id} onClick={() => handleReqAction(r.id, "처리중")}
@@ -730,12 +734,12 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                       </th>
                     );
                   })}
-                  {admin && <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">처리</th>}
+                  {canEditReq && <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">처리</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                 {sortedReqs.length === 0 ? (
-                  <tr><td colSpan={admin ? 11 : 10} className="text-center py-16 text-gray-400 dark:text-gray-500">
+                  <tr><td colSpan={canEditReq ? 11 : 10} className="text-center py-16 text-gray-400 dark:text-gray-500">
                     {visibleRequests.length === 0
                       ? (restrictToTeam ? "같은 팀의 자재 신청 내역이 없습니다." : "자재 신청 내역이 없습니다.")
                       : "조건에 맞는 내역이 없습니다."}
@@ -790,7 +794,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                         <td className="px-2 py-3 text-center tabular-nums text-gray-700 dark:text-gray-300">{totalQty}</td>
                         <td className="px-2 py-3 text-center text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{r.requesterName} <span className="text-gray-400 dark:text-gray-500">({r.requesterDept})</span></td>
                         <td className="px-2 py-3 text-center text-gray-400 dark:text-gray-500 text-xs max-w-[120px] truncate">{r.note ?? "-"}</td>
-                        {admin && (
+                        {canEditReq && (
                           <td className="px-2 py-3" onClick={e => e.stopPropagation()}>
                             {r.status === "신청" && (
                               <div className="flex gap-1">
@@ -818,7 +822,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                       </tr>
                       {isOpen && (
                         <tr className="bg-slate-50/60 dark:bg-gray-700/20">
-                          <td colSpan={admin ? 11 : 10} className="px-6 py-3">
+                          <td colSpan={canEditReq ? 11 : 10} className="px-6 py-3">
                             <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 overflow-hidden">
                               <table className="w-full text-xs">
                                 <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50">

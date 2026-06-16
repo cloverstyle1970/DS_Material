@@ -118,7 +118,7 @@ export default function ClaimEntryClient() {
   async function loadHistory() {
     if (!user) return;
     setHistLoading(true);
-    const ids = await visibleUserIds(user);
+    const ids = await visibleUserIds(user, "/claim/new");
     let qrQ = supabase.from("quote_requests")
       .select("id, request_no, requested_at, site_name, work_title, status, quote_id, quote_request_items(material_name)")
       .order("requested_at", { ascending: false })
