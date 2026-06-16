@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 
 import DashboardContent from "@/components/dashboard/DashboardContent";
 import MyDashboardContent from "@/components/me/MyDashboardContent";
+import NotificationsClient from "@/components/me/NotificationsClient";
 import SettingsContent from "@/components/settings/SettingsContent";
 import UsersClient from "@/components/users/UsersClient";
 import VendorsClient from "@/components/vendors/VendorsClient";
@@ -61,6 +62,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/me": {
     label: "내 대시보드",
     render: () => <MyDashboardContent />,
+  },
+  "/me/notifications": {
+    label: "내 알림",
+    render: () => <NotificationsClient />,
   },
   "/safety/tbm": {
     label: "TBM",

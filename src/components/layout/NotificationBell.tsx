@@ -130,8 +130,8 @@ export default function NotificationBell() {
             )}
           </div>
           <div className="px-4 py-2 border-t border-gray-100 dark:border-slate-700 text-center">
-            <a href="/me" className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
-              내 대시보드에서 전체 보기 →
+            <a href="/me/notifications" className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+              전체 알림 보기 →
             </a>
           </div>
         </div>

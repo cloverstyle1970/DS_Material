@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { api } from "@/lib/api-client";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { visibleUserIds } from "@/lib/crew";
+import { insertNotification } from "@/lib/notify";
 
 const DEFAULT_ROW_COUNT = 1;
 
@@ -270,6 +271,33 @@ export default function ClaimEntryClient() {
         );
         if (e2) throw e2;
         setMessage({ type: "success", text: `견적요청이 접수되었습니다. (${request_no})` });
+        // 견적 담당자(권한그룹에서 /claim/quote-requests:read 또는 admin 보유자)에게 알림
+        // 신청자 본인은 제외. 실패는 silent — 알림 누락이 등록 흐름을 막지 않도록.
+        void (async () => {
+          try {
+            const { data: allAccts } = await supabase.from("accounts").select("id, permissions");
+            const managerIds = (allAccts ?? [])
+              .filter(a => {
+                const perms = (a.permissions ?? []) as string[];
+                return perms.includes("admin") || perms.includes("menu:/claim/quote-requests:read");
+              })
+              .map(a => a.id as number)
+              .filter(id => id !== user.id);
+            const firstName = validItems[0]?.material_name ?? "";
+            const summary = validItems.length <= 1 ? firstName : `${firstName} 외 ${validItems.length - 1}건`;
+            await Promise.all(managerIds.map(uid =>
+              insertNotification({
+                userId:  uid,
+                type:    "quote_request",
+                title:   "새 견적요청이 접수되었습니다",
+                message: `[${siteName}${headerElev ? ` · ${headerElev}` : ""}] ${workTitle ? `${workTitle} — ` : ""}${summary}`,
+                link:    "/claim/quote-requests",
+                refType: "quote_request",
+                refId:   hdr.id,
+              })
+            ));
+          } catch (e) { console.warn("[notify] 견적요청 알림 실패:", e); }
+        })();
       } else {
         // 무상신청 / 당직선출고 — material_requests 사용
         const items = validItems.map(r => ({

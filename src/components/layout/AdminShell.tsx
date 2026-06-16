@@ -79,7 +79,7 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
     prevTabsRef.current = tabs;
     if (wasJustClosed) return;
     // me/dashboard/settings/profile/manual는 메뉴 외 공통 페이지 — 권한 체크 우회
-    const isAlwaysAllowed = pathname === "/me" || pathname === "/dashboard" || pathname === "/settings" || pathname === "/data/profile" || pathname === "/manual";
+    const isAlwaysAllowed = pathname === "/me" || pathname === "/me/notifications" || pathname === "/dashboard" || pathname === "/settings" || pathname === "/data/profile" || pathname === "/manual";
     const allowed = isAlwaysAllowed || isAdmin(user) || hasMenuPermission(user, pathname, "read");
     if (!allowed) return;
     if (isLimitReached) {

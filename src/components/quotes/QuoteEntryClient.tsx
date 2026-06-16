@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { api } from "@/lib/api-client";
 import { fmtNum, parseNum } from "@/lib/format";
 import { MaterialRecord } from "@/lib/mock-materials";
+import { insertNotification } from "@/lib/notify";
 import QuotePrintPaper, { QuotePrintCompany } from "@/components/quotes/QuotePrintPaper";
 
 const MENU_HREF = "/quotes/new";
@@ -894,11 +895,33 @@ function QuoteEntryInner() {
         if (e2c) throw e2c;
       }
 
-      // 견적요청으로부터 진입한 경우 → quote_request.quote_id 연결 + 상태 갱신
+      // 견적요청으로부터 진입한 경우 → quote_request.quote_id 연결 + 상태 갱신 + 신청자 알림
       if (sourceRequestId && header.id) {
         await supabase.from("quote_requests")
           .update({ quote_id: header.id, status: "견적발행" })
           .eq("id", sourceRequestId);
+        // 견적요청자에게 발행 알림 (본인이 자기 견적 발행한 경우 제외). 실패 silent.
+        void (async () => {
+          try {
+            const { data: qr } = await supabase.from("quote_requests")
+              .select("requester_id, site_name, work_title")
+              .eq("id", sourceRequestId).maybeSingle();
+            const requesterId = qr?.requester_id as number | null | undefined;
+            if (requesterId && requesterId !== user.id) {
+              const site = qr?.site_name ?? siteName;
+              const work = qr?.work_title ?? null;
+              await insertNotification({
+                userId:  requesterId,
+                type:    "quote_published",
+                title:   "요청하신 견적이 발행되었습니다",
+                message: `[${site}]${work ? ` ${work}` : ""} — 견적번호 ${quote_no}`,
+                link:    `/quotes/detail?id=${header.id}`,
+                refType: "quote",
+                refId:   header.id,
+              });
+            }
+          } catch (e) { console.warn("[notify] 견적발행 알림 실패:", e); }
+        })();
       }
 
       setMessage({

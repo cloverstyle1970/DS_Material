@@ -1229,9 +1229,31 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
     const numId = Number(reqId);
     const { action, processorId, processorName } = body;
     if (action === "처리중") {
+      const { data: existing } = await supabase.from("material_requests")
+        .select("requester_id, site_name, items").eq("id", numId).maybeSingle();
       const { data, error } = await supabase.from("material_requests")
         .update({ status: "처리중" }).eq("id", numId).select().single();
       if (error) throw new MockApiError(error.message, 500);
+      // 신청자에게 처리중 알림 (처리자 본인 제외)
+      const requesterId = (existing as { requester_id?: number } | null)?.requester_id;
+      if (requesterId && requesterId !== Number(processorId)) {
+        const items = (((existing as { items?: unknown }) ?? {}).items as Array<{ materialName?: string }>) ?? [];
+        const first = items[0];
+        const summary = !first?.materialName ? "" : items.length === 1
+          ? first.materialName
+          : `${first.materialName} 외 ${items.length - 1}건`;
+        const siteName = (existing as { site_name?: string | null } | null)?.site_name ?? null;
+        const sitePart = siteName ? `${siteName} · ` : "";
+        await insertNotification({
+          userId:  requesterId,
+          type:    "request_status",
+          title:   "신청하신 자재가 처리중입니다",
+          message: `${sitePart}${summary}`,
+          link:    "/requests",
+          refType: "material_request",
+          refId:   numId,
+        });
+      }
       return dbToRequest(data);
     }
     if (action === "출고처리") {
@@ -1281,10 +1303,32 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
       return { request: dbToRequest(updated), transactions: records };
     }
     if (action === "취소") {
+      const { data: existing } = await supabase.from("material_requests")
+        .select("requester_id, site_name, items").eq("id", numId).maybeSingle();
       const { data, error } = await supabase.from("material_requests")
         .update({ status: "취소", processed_at: new Date().toISOString(), processor_id: processorId, processor_name: processorName })
         .eq("id", numId).select().single();
       if (error) throw new MockApiError(error.message, 500);
+      // 신청자에게 취소 알림 (처리자 본인 제외)
+      const requesterId = (existing as { requester_id?: number } | null)?.requester_id;
+      if (requesterId && requesterId !== Number(processorId)) {
+        const items = (((existing as { items?: unknown }) ?? {}).items as Array<{ materialName?: string }>) ?? [];
+        const first = items[0];
+        const summary = !first?.materialName ? "" : items.length === 1
+          ? first.materialName
+          : `${first.materialName} 외 ${items.length - 1}건`;
+        const siteName = (existing as { site_name?: string | null } | null)?.site_name ?? null;
+        const sitePart = siteName ? `${siteName} · ` : "";
+        await insertNotification({
+          userId:  requesterId,
+          type:    "request_status",
+          title:   "신청하신 자재가 취소되었습니다",
+          message: `${sitePart}${summary}`,
+          link:    "/requests",
+          refType: "material_request",
+          refId:   numId,
+        });
+      }
       return dbToRequest(data);
     }
     throw new MockApiError("unknown action", 400);
