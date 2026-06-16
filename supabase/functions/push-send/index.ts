@@ -4,13 +4,17 @@
 //   - push_subscriptions에서 account_id 일치하는 모든 endpoint로 발사
 //   - 410/404 응답 endpoint는 자동 정리
 //
-// 신DB 스키마: push_subscriptions(id, account_id, endpoint, subscription JSON, created_at)
-//             accounts.push_enabled (BOOLEAN)
-//             body의 userId는 외부 호환 위해 유지하되 DB에서는 account_id로 매핑.
+// 신DB 스키마 (확인 2026-06-16):
+//   push_subscriptions(id uuid, account_id text NOT NULL, username text NOT NULL,
+//                      endpoint text UNIQUE, subscription jsonb, is_mobile boolean, created_at)
+//   accounts.push_enabled BOOLEAN
+//   body의 userId는 외부 호환 위해 유지하되 account_id가 text 컬럼이라 String 캐스팅 필수.
+//   men.daesol.kr(유지보수)와 같은 테이블 공유.
 //
 // 배포: supabase functions deploy push-send
 // 환경변수: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (자동 주입)
-//          VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (수동 설정)
+//          MAT_VAPID_PUBLIC_KEY, MAT_VAPID_PRIVATE_KEY, VAPID_SUBJECT (수동 설정)
+//          ← MAT_ 접두사는 men.daesol.kr의 VAPID 키와 분리 위함. 기존 VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY는 fallback.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webpush from "npm:web-push";
@@ -34,9 +38,9 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST")    return jsonResponse({ error: "method not allowed" }, { status: 405 });
 
   // @ts-expect-error Deno
-  let VAPID_PUBLIC  = (Deno.env.get("VAPID_PUBLIC_KEY")  ?? Deno.env.get("VAPID_PUBLIC")  ?? "").trim();
+  let VAPID_PUBLIC  = (Deno.env.get("MAT_VAPID_PUBLIC_KEY")  ?? Deno.env.get("VAPID_PUBLIC_KEY")  ?? Deno.env.get("VAPID_PUBLIC")  ?? "").trim();
   // @ts-expect-error Deno
-  let VAPID_PRIVATE = (Deno.env.get("VAPID_PRIVATE_KEY") ?? Deno.env.get("VAPID_PRIVATE") ?? "").trim();
+  let VAPID_PRIVATE = (Deno.env.get("MAT_VAPID_PRIVATE_KEY") ?? Deno.env.get("VAPID_PRIVATE_KEY") ?? Deno.env.get("VAPID_PRIVATE") ?? "").trim();
   // URL-safe base64 정규화:
   //   1) +/ → -_ (standard → URL-safe)
   //   2) 끝의 = 패딩 제거
@@ -51,7 +55,7 @@ Deno.serve(async (req: Request) => {
   }
 
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
-    return jsonResponse({ error: "VAPID 키 미설정 (Function 환경변수 VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY)" }, { status: 500 });
+    return jsonResponse({ error: "VAPID 키 미설정 (Function 환경변수 MAT_VAPID_PUBLIC_KEY/MAT_VAPID_PRIVATE_KEY)" }, { status: 500 });
   }
 
   try {
@@ -80,7 +84,7 @@ Deno.serve(async (req: Request) => {
     const { data: subs, error: subErr } = await db
       .from("push_subscriptions")
       .select("id, endpoint, subscription")
-      .eq("account_id", userId);
+      .eq("account_id", String(userId));  // text 컬럼 명시 캐스팅
     if (subErr) return jsonResponse({ error: subErr.message }, { status: 500 });
     if (!subs?.length) return jsonResponse({ sent: 0, reason: "no_subscription" });
 

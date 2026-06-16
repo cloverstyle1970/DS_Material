@@ -2,13 +2,15 @@
 -- Supabase Dashboard > SQL Editor 에서 1회 실행 (idempotent)
 --
 -- mock-router.ts 의 /api/notifications (GET/POST/PATCH read, read-all) 가 사용.
--- 전역 수신 토글은 users.notifications_enabled (migration-add-notifications-enabled.sql),
+-- 전역 수신 토글은 accounts.notifications_enabled (push 마이그레이션에서 함께 추가),
 -- 푸시 구독은 push_subscriptions (migration-add-push-subscriptions.sql) 로 분리됨.
+--
+-- 신DB 전용 — 사용자 테이블은 accounts 만 존재 (users 없음).
 
 -- 1) notifications 테이블
 CREATE TABLE IF NOT EXISTS notifications (
   id          BIGSERIAL    PRIMARY KEY,
-  user_id     BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id     BIGINT       NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   type        TEXT         NOT NULL DEFAULT 'info',
   title       TEXT         NOT NULL DEFAULT '',
   message     TEXT         NOT NULL DEFAULT '',

@@ -1,13 +1,20 @@
 // Supabase Edge Function: push-subscribe
-// POST   body { userId, subscription: { endpoint, keys: { p256dh, auth } }, userAgent? }
+// POST   body { userId, username, isMobile?, subscription: { endpoint, keys: { p256dh, auth } }, userAgent? }
 //        push_subscriptions에 upsert (endpoint UNIQUE)
 // DELETE body { userId, endpoint }
 //        해당 endpoint 행 삭제
 //
-// 신DB 스키마: push_subscriptions(id, account_id, endpoint, subscription JSON, created_at)
-//   subscription 컬럼에 PushSubscription JSON({endpoint, keys:{p256dh,auth}})을 그대로 보관.
-//   클라이언트와의 호환을 위해 body 이름은 userId로 유지하되 DB에는 account_id로 매핑.
-//   p256dh/auth/user_agent 컬럼은 신DB에 없음 → subscription JSON에 통합.
+// 신DB 스키마 (확인 2026-06-16):
+//   push_subscriptions(
+//     id uuid PK,
+//     account_id text NOT NULL,         ← bigint 아니라 text. 명시적 String 캐스팅 필수
+//     username text NOT NULL,           ← NOT NULL — 클라이언트가 전달
+//     endpoint text NOT NULL UNIQUE,
+//     subscription jsonb NOT NULL,      ← {endpoint, keys:{p256dh,auth}} 통째 보관
+//     is_mobile boolean NOT NULL,       ← NOT NULL — 클라이언트가 전달
+//     created_at timestamptz
+//   )
+//   men.daesol.kr(유지보수)와 공유 — 스키마 변경 금지, 우리 코드를 맞춤.
 //
 // 배포: supabase functions deploy push-subscribe
 // 환경변수: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (Supabase가 자동 주입)
@@ -41,13 +48,24 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
 
     if (req.method === "POST") {
-      const { userId, subscription, userAgent: _userAgent } = body ?? {};
+      const { userId, username, isMobile, subscription, userAgent: _userAgent } = body ?? {};
       if (!userId || !subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
         return jsonResponse({ error: "userId, subscription 필수" }, { status: 400 });
       }
+
+      // username/is_mobile NOT NULL — 클라이언트 누락 시 accounts에서 username 보충, is_mobile은 false 기본
+      let finalUsername: string | null = (typeof username === "string" && username.trim()) ? username.trim() : null;
+      if (!finalUsername) {
+        const { data: acc } = await db.from("accounts").select("username").eq("id", userId).maybeSingle();
+        finalUsername = acc?.username ?? `user-${userId}`;
+      }
+      const finalIsMobile = isMobile === true;
+
       const { error } = await db.from("push_subscriptions").upsert(
         {
-          account_id:   userId,
+          account_id:   String(userId),       // text 컬럼
+          username:     finalUsername,
+          is_mobile:    finalIsMobile,
           endpoint:     subscription.endpoint,
           subscription: {
             endpoint: subscription.endpoint,

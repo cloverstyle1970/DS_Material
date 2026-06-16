@@ -112,8 +112,12 @@ export default function PushNotificationToggle() {
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
       });
       const json = sub.toJSON();
+      // 신DB push_subscriptions: username/is_mobile NOT NULL. men.daesol.kr과 공유 컬럼.
+      const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
       await callPushFn("push-subscribe", "POST", {
-        userId: user.id,
+        userId:    user.id,
+        username:  user.name,
+        isMobile,
         subscription: { endpoint: json.endpoint, keys: json.keys },
         userAgent: navigator.userAgent,
       });
