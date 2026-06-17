@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "./supabase";
 
 export interface NotifyParams {
   userId: number;
@@ -33,15 +33,12 @@ export async function insertNotification(params: NotifyParams): Promise<void> {
 }
 
 function sendWebPush(params: NotifyParams): Promise<void> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return Promise.resolve();
-  return fetch(`${url}/functions/v1/push-send`, {
+  return fetch(`${SUPABASE_URL}/functions/v1/push-send`, {
     method: "POST",
     headers: {
       "Content-Type":  "application/json",
-      "apikey":        key,
-      "Authorization": `Bearer ${key}`,
+      "apikey":        SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
     },
     body: JSON.stringify({
       userId:  params.userId,

@@ -2,22 +2,22 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { getErrorMessage } from "@/lib/api-client";
-import { supabase } from "@/lib/supabase";
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 
 // Supabase Edge Function 호출 (output: export 모드라 Next API Route 불가).
+// URL/KEY는 supabase.ts 하드코딩 상수 재사용 (배포 Secret 누락/손상 영향 차단).
 async function callPushFn<T = unknown>(
   fnName: "push-subscribe" | "push-send",
   method: "POST" | "DELETE",
   body: unknown
 ): Promise<T> {
-  if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error("Supabase 환경변수 미설정");
   const res = await fetch(`${SUPABASE_URL}/functions/v1/${fnName}`, {
     method,
     headers: {
       "Content-Type":  "application/json",
-      "apikey":        SUPABASE_KEY,
-      "Authorization": `Bearer ${SUPABASE_KEY}`,
+      "apikey":        SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
     },
     body: JSON.stringify(body),
   });
@@ -26,9 +26,7 @@ async function callPushFn<T = unknown>(
   return data as T;
 }
 
-const VAPID_PUBLIC   = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
-const SUPABASE_URL   = process.env.NEXT_PUBLIC_SUPABASE_URL    || "";
-const SUPABASE_KEY   = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+const VAPID_PUBLIC = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
 
 function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
