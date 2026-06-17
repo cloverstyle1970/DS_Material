@@ -85,9 +85,10 @@ interface Props {
   onReceiverChange: (patch: Partial<DNReceiver>) => void;
   vendors:          DNVendor[];
   stampUrl?:        string;       // 공급자(대솔) 인감도장
+  recipientName?:   string;       // 인수자(수령인) 자동기입 — 출고전표 첫 행 수령인
 }
 
-export default function OutboundDeliveryNotePaper({ outboundDate, items, receiver, onReceiverChange, vendors, stampUrl }: Props) {
+export default function OutboundDeliveryNotePaper({ outboundDate, items, receiver, onReceiverChange, vendors, stampUrl, recipientName }: Props) {
   const valid     = items.filter(it => it.materialId || it.materialName.trim());
   const supplySum = valid.reduce((s, it) => s + it.qty * it.unitPrice, 0);
   const vatSum    = valid.reduce((s, it) => s + Math.round(it.qty * it.unitPrice * 0.1), 0);
@@ -223,7 +224,7 @@ export default function OutboundDeliveryNotePaper({ outboundDate, items, receive
             <td className={`border ${bd} bg-gray-100 text-center px-2 py-1.5 w-20 ${lc}`}>인 수 자</td>
             <td className={`border ${bd} px-2 py-1.5 text-black`}>　　　　　　　 (인)</td>
             <td className={`border ${bd} bg-gray-100 text-center px-2 py-1.5 w-20 ${lc}`}>납 품 자</td>
-            <td className={`border ${bd} px-2 py-1.5 text-black`}>　　　　　　　　　　</td>
+            <td className={`border ${bd} px-2 py-1.5 text-black`}>{recipientName || "　　　　　　　　　　"}</td>
             <td className={`border ${bd} bg-gray-100 text-center px-2 py-1.5 w-16 ${lc}`}>미수금</td>
             <td className={`border ${bd} px-2 py-1.5 text-right tabular-nums w-24 text-black`}>￦ {fmtNum(totalSum)}</td>
           </tr>

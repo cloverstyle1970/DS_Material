@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { ElevatorRecord } from "@/lib/mock-elevators";
 import { TransactionRecord } from "@/lib/mock-transactions";
+import { UserRecord } from "@/lib/mock-users";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
 import { fmtNum, parseNum } from "@/lib/format";
@@ -40,6 +41,28 @@ function newRow(seed: Partial<Row> = {}): Row {
   return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, buyPrice: 0, stockQty: 0, storageLoc: "", elevatorName: "", requiresReturn: false, remark: "", inboundRef: null, serialNos: [], ...seed };
 }
 
+// note 표준: "입고 #M 출고완료[ / 수령인: XXX][ / 사용자메모]"
+// 수정 모드 진입 시 inboundRef·수령인·사용자메모를 분리 복원.
+function parseOutboundNote(note: string | null | undefined): { inboundRef: number | null; receiverName: string; memo: string } {
+  if (!note) return { inboundRef: null, receiverName: "", memo: "" };
+  const m = note.match(/^입고 #(\d+) 출고완료(.*)$/);
+  if (!m) {
+    const recMatch = note.match(/^수령인:\s*([^/]+?)(?:\s*\/\s*(.*))?$/);
+    if (recMatch) return { inboundRef: null, receiverName: recMatch[1].trim(), memo: (recMatch[2] ?? "").trim() };
+    return { inboundRef: null, receiverName: "", memo: note };
+  }
+  const inboundRef = Number(m[1]);
+  const segments = (m[2] ?? "").split(/\s*\/\s*/).map(s => s.trim()).filter(Boolean);
+  let receiverName = "";
+  const memoParts: string[] = [];
+  for (const seg of segments) {
+    const rm = seg.match(/^수령인:\s*(.+)$/);
+    if (rm && !receiverName) receiverName = rm[1].trim();
+    else memoParts.push(seg);
+  }
+  return { inboundRef, receiverName, memo: memoParts.join(" / ") };
+}
+
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
 export default function OutboundEntry({ editId }: { editId?: number } = {}) {
@@ -52,6 +75,8 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
   const [elevators,    setElevators]    = useState<ElevatorRecord[]>([]);
   const [sites,        setSites]        = useState<SiteOption[]>([]);
   const [reference,    setReference]    = useState("");
+  const [receiverName, setReceiverName] = useState("");
+  const [users,        setUsers]        = useState<UserRecord[]>([]);
   const [matType,      setMatType]      = useState<"전체" | "DS" | "TK">("전체");
 
   const [saving, setSaving] = useState(false);
@@ -81,9 +106,12 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
         setSiteName(target.siteName || "");
         setReference(target.note || "");
         setEditBatchId(target.batchId || null);
-        
+
         const loaded: Row[] = [];
+        let firstReceiver = "";
         for (const t of siblings) {
+          const parsed = parseOutboundNote(t.note);
+          if (!firstReceiver && parsed.receiverName) firstReceiver = parsed.receiverName;
           loaded.push({
             id: crypto.randomUUID(),
             existingId: t.id,
@@ -96,12 +124,13 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
             stockQty: 0,
             storageLoc: "",
             elevatorName: t.elevatorName || "",
-            remark: t.note || "",
-            inboundRef: null,
+            remark: parsed.memo,
+            inboundRef: parsed.inboundRef,
             serialNos: t.serialNo ? [t.serialNo] : [],
             requiresReturn: !!t.requiresReturn,
           });
         }
+        if (firstReceiver) setReceiverName(firstReceiver);
         
         while (loaded.length < 5) loaded.push(newRow());
         setRows(loaded);
@@ -122,6 +151,7 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
 
   useEffect(() => {
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
+    api.get<UserRecord[]>("/api/users").then(setUsers).catch(() => {});
     api.get<{ name: string; bizNo: string | null; address: string | null; phone: string | null }[]>("/api/vendors")
       .then(data => setDnVendors(data.map(v => ({ name: v.name, bizNo: v.bizNo ?? "", address: v.address ?? "", phone: v.phone ?? "" }))))
       .catch(() => {});
@@ -175,7 +205,7 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
   }
   function clearAll() {
     setRows([newRow(), newRow(), newRow(), newRow(), newRow()]);
-    setSiteName(""); setReference("");
+    setSiteName(""); setReference(""); setReceiverName("");
   }
 
   function applyMultipleMaterials(startRowId: string, materials: MaterialRecord[]) {
@@ -200,9 +230,10 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
     });
   }
 
-  function applyInbound(t: TransactionRecord) {
+  async function applyInbound(t: TransactionRecord) {
     // remark는 사용자 메모 자리이므로 비워둠. 입고 식별은 inboundRef로,
     // transaction note의 '입고 #N 출고완료' 패턴은 save() 단에서 자동 prepend.
+    // 수령인(=자재신청자)는 t.note의 '발주 #N 입고완료' 패턴 → purchase_orders.requester_name 으로 역추적.
     const row = newRow({
       materialId: t.materialId, materialName: t.materialName,
       qty: t.qty, inboundRef: t.id, remark: "",
@@ -215,6 +246,15 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
     });
     setPopup(null);
     if (t.materialId) refreshRowStock(row.id, t.materialId);
+    // 수령인 자동 채움: 입고 transaction의 note '발주 #N' → purchase_orders.requester_name 역추적.
+    // 채워진 후에도 사용자가 헤더 입력란에서 직접 수정 가능.
+    const orderMatch = t.note?.match(/발주\s*#(\d+)/);
+    if (orderMatch) {
+      const orderId = Number(orderMatch[1]);
+      const { data } = await supabase.from("purchase_orders")
+        .select("requester_name").eq("id", orderId).maybeSingle();
+      if (data?.requester_name) setReceiverName(data.requester_name);
+    }
   }
 
   const totals = useMemo(() => {
@@ -245,17 +285,15 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
       
       const batchId = isEdit && editBatchId ? editBatchId : crypto.randomUUID();
       for (const r of valid) {
-        // note 형식 표준: r.inboundRef가 있으면 '입고 #N 출고완료' 패턴 강제 포함.
-        // 사용자 메모는 ' / ' 구분자로 뒤에 append. 이 패턴이 InboundRefPopup
-        // 안전장치의 매칭 정규식에서 활용됨.
+        // note 형식 표준: "입고 #N 출고완료[ / 수령인: XXX][ / 사용자메모]"
+        // inboundRef 가 없으면 base 생략. 이 패턴이 InboundRefPopup 안전장치의
+        // 매칭 정규식 + 수정 모드 parseOutboundNote 양쪽에서 활용됨.
         const userMemo = (r.remark || reference || "").trim();
-        let note: string | null;
-        if (r.inboundRef != null) {
-          const tag = `입고 #${r.inboundRef} 출고완료`;
-          note = userMemo ? `${tag} / ${userMemo}` : tag;
-        } else {
-          note = userMemo || null;
-        }
+        const parts: string[] = [];
+        if (r.inboundRef != null) parts.push(`입고 #${r.inboundRef} 출고완료`);
+        if (receiverName) parts.push(`수령인: ${receiverName}`);
+        if (userMemo) parts.push(userMemo);
+        const note: string | null = parts.length > 0 ? parts.join(" / ") : null;
         await api.post("/api/transactions", {
           type: "출고", materialId: r.materialId, materialName: r.materialName,
           qty: r.qty, siteName: siteName || null,
@@ -314,8 +352,8 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
           <FormField label="담당자">
             <input type="text" value={user?.name ?? ""} readOnly className={inputCls + " bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 cursor-not-allowed"} />
           </FormField>
-          <FormField label="부서">
-            <input type="text" value={user?.dept ?? ""} readOnly className={inputCls + " bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 cursor-not-allowed"} />
+          <FormField label="수령인">
+            <ReceiverInlineSearch value={receiverName} onChange={setReceiverName} users={users} />
           </FormField>
           <FormField label="참조" wide>
             <div className="flex items-center gap-2">
@@ -535,6 +573,7 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
               onReceiverChange={patch => setDnReceiver(s => ({ ...s, ...patch }))}
               vendors={dnVendors}
               stampUrl={dnStampUrl}
+              recipientName={receiverName}
             />
           </div>
 
@@ -765,6 +804,79 @@ function SiteInlineSearch({ value, onChange, sites }: { value: string; onChange:
               <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => { onChange(s.name); setOpen(false); }}
                 className={`w-full text-left px-3 py-2 text-xs text-gray-800 dark:text-gray-200 border-b border-gray-50 dark:border-gray-700 last:border-0 ${focusedIndex === idx ? "bg-orange-100 dark:bg-orange-900/50" : "hover:bg-orange-50 dark:hover:bg-orange-900/20"}`}>
                 {s.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ── 수령인(사원) 인라인 자동완성 ─────────────────────────────────
+// 직접 입력 가능. 입력값으로 이름·부서·직급에서 부분일치 → 드롭다운, 클릭/Enter 로 선택.
+function ReceiverInlineSearch({ value, onChange, users }: {
+  value: string; onChange: (v: string) => void; users: UserRecord[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const ref = useRef<HTMLDivElement>(null);
+  const ulRef = useRef<HTMLUListElement>(null);
+  const q = value.trim().toLowerCase();
+  const suggestions = q
+    ? users.filter(u =>
+        u.name.toLowerCase().includes(q) ||
+        (u.dept?.toLowerCase().includes(q) ?? false) ||
+        (u.rank?.toLowerCase().includes(q) ?? false)
+      ).slice(0, 10)
+    : [];
+
+  useEffect(() => { setFocusedIndex(-1); }, [value]);
+  useEffect(() => {
+    if (focusedIndex >= 0 && ulRef.current) {
+      const el = ulRef.current.children[focusedIndex] as HTMLElement;
+      if (el) el.scrollIntoView({ block: "nearest" });
+    }
+  }, [focusedIndex]);
+  useEffect(() => {
+    function h(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!open || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setFocusedIndex(i => (i < suggestions.length - 1 ? i + 1 : i)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setFocusedIndex(i => (i > 0 ? i - 1 : 0)); }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      if (focusedIndex >= 0) { onChange(suggestions[focusedIndex].name); setOpen(false); }
+      else if (suggestions.length === 1) { onChange(suggestions[0].name); setOpen(false); }
+    }
+    else if (e.key === "Escape") setOpen(false);
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <input type="text" lang="ko" value={value}
+        onChange={e => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => value.trim() && setOpen(true)}
+        onKeyDown={handleKeyDown}
+        placeholder="이름·부서로 검색 또는 직접 입력"
+        className={inputCls} />
+      {open && suggestions.length > 0 && (
+        <ul ref={ulRef} className="absolute z-50 top-full left-0 mt-0.5 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-52 overflow-y-auto">
+          {suggestions.map((u, idx) => (
+            <li key={u.id}>
+              <button type="button" onMouseDown={e => e.preventDefault()}
+                onClick={() => { onChange(u.name); setOpen(false); }}
+                className={`w-full text-left px-3 py-2 text-xs border-b border-gray-50 dark:border-gray-700 last:border-0 ${focusedIndex === idx ? "bg-orange-100 dark:bg-orange-900/50" : "hover:bg-orange-50 dark:hover:bg-orange-900/20"}`}>
+                <span className="font-medium text-gray-800 dark:text-gray-200">{u.name}</span>
+                {(u.dept || u.rank) && (
+                  <span className="ml-2 text-[10px] text-gray-500 dark:text-gray-400">
+                    {[u.dept, u.rank].filter(Boolean).join(" · ")}
+                  </span>
+                )}
               </button>
             </li>
           ))}
