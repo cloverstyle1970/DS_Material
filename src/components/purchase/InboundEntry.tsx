@@ -26,12 +26,13 @@ interface Row {
   siteName: string;
   remark: string;
   orderId: number | null;
+  requesterName: string;
   serialNos: string[];
   existingId?: number;
 }
 
 function newRow(seed: Partial<Row> = {}): Row {
-  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, siteName: "", remark: "", orderId: null, serialNos: [], ...seed };
+  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, siteName: "", remark: "", orderId: null, requesterName: "", serialNos: [], ...seed };
 }
 
 // note 표준: "발주 #N 입고완료" 또는 "발주 #N 입고완료 / 사용자메모".
@@ -108,6 +109,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
             siteName: t.siteName || "",
             remark: parsed.memo,
             orderId: parsed.orderId,
+            requesterName: "",
             serialNos: t.serialNo ? [t.serialNo] : [],
           });
         }
@@ -188,6 +190,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
           spec,
           qty: o.qty, unitPrice: o.unitPrice ?? 0,
           siteName: o.siteName ?? "", remark: "", orderId: o.id,
+          requesterName: o.requesterName ?? "",
           serialNos: [] as string[],
         };
         
@@ -327,6 +330,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
               <Th w="100">단가</Th>
               <Th w="110">공급가액</Th>
               <Th w="140">현장</Th>
+              <Th w="100">신청자</Th>
               <Th w="140">적요</Th>
               <Th w="36"></Th>
             </tr>
@@ -396,6 +400,9 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
                   <SiteInlineSearch value={r.siteName} onChange={v => patchRow(r.id, { siteName: v })} sites={sites} cls={cellInput} />
                 </Td>
                 <Td>
+                  <input type="text" value={r.requesterName} onChange={e => patchRow(r.id, { requesterName: e.target.value })} className={cellInput} />
+                </Td>
+                <Td>
                   <input type="text" value={r.remark} onChange={e => patchRow(r.id, { remark: e.target.value })} className={cellInput} />
                 </Td>
                 <Td center>
@@ -411,7 +418,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
               <Td></Td>
               <Td></Td>
               <Td right className="tabular-nums text-blue-700">{fmtNum(totals.supply)}</Td>
-              <Td colSpan={3}></Td>
+              <Td colSpan={4}></Td>
             </tr>
           </tfoot>
         </table>
@@ -785,6 +792,7 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
       o.materialId.toLowerCase().includes(ql) ||
       (o.vendorName?.toLowerCase().includes(ql) ?? false) ||
       (o.siteName?.toLowerCase().includes(ql) ?? false) ||
+      (o.requesterName?.toLowerCase().includes(ql) ?? false) ||
       (o.note?.toLowerCase().includes(ql) ?? false) ||
       refNo.toLowerCase().includes(ql)
     );
@@ -825,7 +833,7 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
     >
         <div className="p-3">
           <input type="text" value={q} onChange={e => { setQ(e.target.value); setChecked(new Set()); }} autoFocus
-            placeholder="자재명, 코드, 거래처, 현장, 주문참조번호 검색"
+            placeholder="자재명, 코드, 거래처, 현장, 신청자, 주문참조번호 검색"
             className="w-full px-3 py-2 text-sm font-medium text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-500 placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:font-normal" />
         </div>
         <div className="flex-1 overflow-y-auto">
@@ -835,7 +843,7 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
                 <th className="px-2 py-1.5 border-b border-gray-200 dark:border-gray-600 text-center w-10">
                   <input type="checkbox" checked={filtered.length > 0 && checked.size === filtered.length} onChange={toggleAll} className="accent-blue-600" />
                 </th>
-                {["주문참조번호","발주일","자재코드","품목명","규격","수량","단가","거래처","현장"].map(h =>
+                {["주문참조번호","발주일","자재코드","품목명","규격","수량","단가","거래처","현장","신청자"].map(h =>
                 <th key={h} className="px-2 py-1.5 text-left border-b border-gray-200 dark:border-gray-600 font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">{h}</th>)}
               </tr>
             </thead>
@@ -854,6 +862,7 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
                   <td className="px-2 py-1.5 text-right tabular-nums dark:text-gray-300 whitespace-nowrap">{o.unitPrice ? fmtNum(o.unitPrice) : "-"}</td>
                   <td className="px-2 py-1.5 dark:text-gray-300 whitespace-nowrap">{o.vendorName ?? "-"}</td>
                   <td className="px-2 py-1.5 dark:text-gray-300 whitespace-nowrap">{o.siteName ?? "-"}</td>
+                  <td className="px-2 py-1.5 dark:text-gray-300 whitespace-nowrap">{o.requesterName ?? "-"}</td>
                 </tr>
               ))}
             </tbody>
