@@ -52,7 +52,7 @@ export default function UniformSafetyAdminClient() {
 
   const [rows, setRows] = useState<ReqRow[]>([]);
   const [users, setUsers] = useState<UserMini[]>([]);
-  const [materials, setMaterials] = useState<MaterialOption[]>([]); // 직접 불출용 자재 풀 (D9902 + D9903)
+  const [materials, setMaterials] = useState<MaterialOption[]>([]); // 직접 출고용 자재 풀 (D9902 + D9903)
   const [subLabels, setSubLabels] = useState<{ uniform: Map<string, string>; safety: Map<string, string> }>(
     { uniform: new Map(), safety: new Map() }
   );
@@ -293,14 +293,14 @@ export default function UniformSafetyAdminClient() {
     <div className="min-h-full bg-gray-50 dark:bg-gray-900">
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
         <h1 className="text-base font-bold text-gray-900 dark:text-white">근무복 · 안전장구 관리</h1>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">신청 처리 및 불출이력 조회</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">신청 처리 및 출고이력 조회</p>
       </div>
 
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 flex gap-1">
         {([
           ["manage",  `📋 신청 처리 (${counts.신청 + counts.처리중})`],
-          ["history", `📊 불출이력`],
-          ["issue",   `➕ 직접 불출`],
+          ["history", `📊 출고이력`],
+          ["issue",   `➕ 직접 출고`],
         ] as [Tab, string][]).map(([t, label]) => (
           <button key={t} type="button" onClick={() => setTab(t)}
             className={`py-2.5 px-4 text-sm font-semibold border-b-2 transition-colors ${
@@ -437,7 +437,7 @@ export default function UniformSafetyAdminClient() {
             {/* 자재별 집계 */}
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
               <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200">자재별 불출 집계</h3>
+                <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200">자재별 출고 집계</h3>
                 <span className="text-[11px] text-gray-400">{materialAgg.length}종</span>
               </div>
               <div className="max-h-[60vh] overflow-y-auto">
@@ -445,7 +445,7 @@ export default function UniformSafetyAdminClient() {
                   <thead className="bg-gray-50 dark:bg-gray-700/50 sticky top-0">
                     <tr className="text-center text-[11px] font-bold text-gray-600 dark:text-gray-300">
                       <th className="px-3 py-2.5">자재</th>
-                      <th className="px-3 py-2.5">불출수량</th>
+                      <th className="px-3 py-2.5">출고수량</th>
                       <th className="px-3 py-2.5">수령자수</th>
                       <th className="px-3 py-2.5">최종일</th>
                     </tr>
@@ -502,7 +502,7 @@ export default function UniformSafetyAdminClient() {
         </>
       )}
 
-      {/* 직접 불출 탭 */}
+      {/* 직접 출고 탭 */}
       {tab === "issue" && (
         <UniformSafetyDirectIssueTab
           users={users}

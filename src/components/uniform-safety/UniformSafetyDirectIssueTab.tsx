@@ -1,7 +1,7 @@
 "use client";
 
 // ============================================================
-// 근무복·안전장구 — 관리자 직접 불출 등록 탭
+// 근무복·안전장구 — 관리자 직접 출고 등록 탭
 // ------------------------------------------------------------
 // · 신청 절차 없이 바로 지급 (uniform_safety_requests status='수령완료' 로 1단계 생성)
 // · 출고 트랜잭션(add_transaction RPC) 라인별 호출 → 재고 차감 + 출고이력 반영
@@ -183,7 +183,7 @@ export default function UniformSafetyDirectIssueTab({
     const siteName = `[지급] ${target.name}`;
     for (const it of items) {
       const noteParts = [
-        `${request_type} 직접불출 #${header.id}`,
+        `${request_type} 직접출고 #${header.id}`,
         target.dept ? `부서 ${target.dept}` : null,
         it.category_label ? `구분 ${it.category_label}` : null,
         it.size ? `사이즈 ${it.size}` : null,
@@ -262,7 +262,7 @@ export default function UniformSafetyDirectIssueTab({
         note: note.trim() || null,
         items,
       });
-      setMessage({ type: "success", text: `${target.name} (${target.dept ?? ""}) 에게 ${items.length}건 직접 불출 완료. 재고 차감·이력 반영됨.` });
+      setMessage({ type: "success", text: `${target.name} (${target.dept ?? ""}) 에게 ${items.length}건 직접 출고 완료. 재고 차감·이력 반영됨.` });
       setLines([{ key: crypto.randomUUID(), sub_code: "", material_id: "", size: "", qty: 1 }]);
       setNote("");
       await onCompleted();
@@ -287,8 +287,8 @@ export default function UniformSafetyDirectIssueTab({
     const ws = XLSX.utils.aoa_to_sheet(data);
     ws["!cols"] = [{ wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 18 }, { wch: 8 }, { wch: 6 }, { wch: 20 }];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "불출등록");
-    XLSX.writeFile(wb, "직접불출_템플릿.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "출고등록");
+    XLSX.writeFile(wb, "직접출고_템플릿.xlsx");
   }
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -479,7 +479,7 @@ export default function UniformSafetyDirectIssueTab({
       {/* ───── 단일 등록 폼 ───── */}
       <div className={cardCls}>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">단일 직접 불출</h2>
+          <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">단일 직접 출고</h2>
           <span className="text-[11px] text-gray-500 dark:text-gray-400">신청 절차 없이 즉시 출고 + 수령완료 처리</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
@@ -574,7 +574,7 @@ export default function UniformSafetyDirectIssueTab({
         <div className="flex justify-end">
           <button type="button" onClick={submitSingle} disabled={submitting || !canUpdate}
             className="px-5 py-2 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-50">
-            {submitting ? "처리 중..." : "✓ 직접 불출 등록"}
+            {submitting ? "처리 중..." : "✓ 직접 출고 등록"}
           </button>
         </div>
       </div>

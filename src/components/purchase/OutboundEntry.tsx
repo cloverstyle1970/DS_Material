@@ -337,7 +337,7 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
 
       <div className="flex items-center justify-between px-5 py-2.5 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0">
         <h1 className="text-sm font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-          <span className="text-orange-400">▲</span> 불출등록입력
+          <span className="text-orange-400">▲</span> 출고등록입력
         </h1>
       </div>
 

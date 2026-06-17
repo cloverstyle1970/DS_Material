@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { PurchaseOrderRecord } from "@/lib/mock-purchase-orders";
 import { TransactionRecord } from "@/lib/mock-transactions";
+import { UserRecord } from "@/lib/mock-users";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
 import { fmtNum, parseNum } from "@/lib/format";
@@ -23,16 +24,15 @@ interface Row {
   spec: string;
   qty: number;
   unitPrice: number;
-  siteName: string;
+  elevatorName: string;
   remark: string;
   orderId: number | null;
-  requesterName: string;
   serialNos: string[];
   existingId?: number;
 }
 
 function newRow(seed: Partial<Row> = {}): Row {
-  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, siteName: "", remark: "", orderId: null, requesterName: "", serialNos: [], ...seed };
+  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, elevatorName: "", remark: "", orderId: null, serialNos: [], ...seed };
 }
 
 // note 표준: "발주 #N 입고완료" 또는 "발주 #N 입고완료 / 사용자메모".
@@ -51,12 +51,15 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
   const { user } = useAuth();
   const isEdit = editId != null && editId > 0;
 
-  const [inboundDate, setInboundDate] = useState(todayISO());
-  const [vendorName,  setVendorName]  = useState("");
-  const [reference,   setReference]   = useState("");
-  const [matType,     setMatType]     = useState<"전체" | "DS" | "TK">("전체");
-  const [sites,       setSites]       = useState<SiteOption[]>([]);
-  const [vendors,     setVendors]     = useState<VendorOption[]>([]);
+  const [inboundDate,   setInboundDate]   = useState(todayISO());
+  const [vendorName,    setVendorName]    = useState("");
+  const [siteName,      setSiteName]      = useState("");
+  const [reference,     setReference]     = useState("");
+  const [requesterName, setRequesterName] = useState("");
+  const [matType,       setMatType]       = useState<"전체" | "DS" | "TK">("전체");
+  const [sites,         setSites]         = useState<SiteOption[]>([]);
+  const [vendors,       setVendors]       = useState<VendorOption[]>([]);
+  const [accounts,      setAccounts]      = useState<UserRecord[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -69,6 +72,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
   useEffect(() => {
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
     api.get<VendorOption[]>("/api/vendors?type=매입").then(setVendors).catch(() => {});
+    api.get<UserRecord[]>("/api/users").then(setAccounts).catch(() => {});
   }, []);
   const [rows,  setRows]  = useState<Row[]>([newRow(), newRow(), newRow(), newRow(), newRow()]);
   const [saving, setSaving] = useState(false);
@@ -94,6 +98,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
         setInboundDate(target.createdAt.slice(0, 10));
         setReference(parseNote(target.note).memo);
         setEditBatchId(target.batchId || null);
+        if (target.siteName) setSiteName(target.siteName);
 
         const loaded: Row[] = [];
         for (const t of siblings) {
@@ -106,10 +111,9 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
             spec: "",
             qty: t.qty,
             unitPrice: t.unitPrice ?? 0,
-            siteName: t.siteName || "",
+            elevatorName: t.elevatorName || "",
             remark: parsed.memo,
             orderId: parsed.orderId,
-            requesterName: "",
             serialNos: t.serialNo ? [t.serialNo] : [],
           });
         }
@@ -142,7 +146,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
   }
   function clearAll() {
     setRows([newRow(), newRow(), newRow(), newRow(), newRow()]);
-    setVendorName(""); setReference("");
+    setVendorName(""); setReference(""); setRequesterName(""); setSiteName("");
   }
 
   function applyMultipleMaterials(startRowId: string, materials: MaterialRecord[]) {
@@ -170,6 +174,12 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
     const firstVendor = orders.find(o => o.vendorName)?.vendorName;
     if (firstVendor) setVendorName(firstVendor);
 
+    const firstSite = orders.find(o => o.siteName)?.siteName;
+    if (firstSite) setSiteName(firstSite);
+
+    const firstRequester = orders.find(o => o.requesterName)?.requesterName;
+    if (firstRequester) setRequesterName(firstRequester);
+
     const firstOrderDate = orders[0]?.orderedAt?.slice(0, 10);
     if (firstOrderDate) setInboundDate(firstOrderDate);
 
@@ -189,8 +199,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
           materialId: o.materialId, materialName: o.materialName,
           spec,
           qty: o.qty, unitPrice: o.unitPrice ?? 0,
-          siteName: o.siteName ?? "", remark: "", orderId: o.id,
-          requesterName: o.requesterName ?? "",
+          elevatorName: o.elevatorName ?? "", remark: "", orderId: o.id,
           serialNos: [] as string[],
         };
         
@@ -247,7 +256,8 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
         }
         await api.post("/api/transactions", {
           type: "입고", materialId: r.materialId, materialName: r.materialName,
-          qty: r.qty, siteName: r.siteName || null,
+          qty: r.qty, siteName: siteName || null,
+          elevatorName: r.elevatorName || null,
           serialNos: r.serialNos.length > 0 ? r.serialNos : null,
           note, userId: user.id, userName: user.name,
           batchId,
@@ -299,6 +309,12 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
           <FormField label="담당자">
             <input type="text" value={user?.name ?? ""} readOnly className={inputCls + " bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 cursor-not-allowed"} />
           </FormField>
+          <FormField label="신청자">
+            <RequesterInlineSearch value={requesterName} onChange={setRequesterName} users={accounts} />
+          </FormField>
+          <FormField label="현장">
+            <SiteInlineSearch value={siteName} onChange={setSiteName} sites={sites} cls={inputCls} />
+          </FormField>
           <FormField label="참조" wide>
             <div className="flex items-center gap-2">
               <input type="text" value={reference} onChange={e => setReference(e.target.value)} className={`${inputCls} flex-1`} />
@@ -329,8 +345,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
               <Th w="120">S/N</Th>
               <Th w="100">단가</Th>
               <Th w="110">공급가액</Th>
-              <Th w="140">현장</Th>
-              <Th w="100">신청자</Th>
+              <Th w="110">호기</Th>
               <Th w="140">적요</Th>
               <Th w="36"></Th>
             </tr>
@@ -397,10 +412,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
                 </Td>
                 <Td right className="text-gray-700 dark:text-gray-300 tabular-nums">{fmtNum(r.qty * r.unitPrice)}</Td>
                 <Td>
-                  <SiteInlineSearch value={r.siteName} onChange={v => patchRow(r.id, { siteName: v })} sites={sites} cls={cellInput} />
-                </Td>
-                <Td>
-                  <input type="text" value={r.requesterName} onChange={e => patchRow(r.id, { requesterName: e.target.value })} className={cellInput} />
+                  <input type="text" value={r.elevatorName} onChange={e => patchRow(r.id, { elevatorName: e.target.value })} className={cellInput} />
                 </Td>
                 <Td>
                   <input type="text" value={r.remark} onChange={e => patchRow(r.id, { remark: e.target.value })} className={cellInput} />
@@ -418,7 +430,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
               <Td></Td>
               <Td></Td>
               <Td right className="tabular-nums text-blue-700">{fmtNum(totals.supply)}</Td>
-              <Td colSpan={4}></Td>
+              <Td colSpan={3}></Td>
             </tr>
           </tfoot>
         </table>
@@ -671,6 +683,78 @@ function SiteInlineSearch({ value, onChange, sites, cls }: {
               <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => { onChange(s.name); setOpen(false); }}
                 className={`w-full text-left px-3 py-2 text-xs text-gray-800 dark:text-gray-200 border-b border-gray-50 dark:border-gray-700 last:border-0 ${focusedIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-blue-50 dark:hover:bg-blue-900/20"}`}>
                 {s.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// 신청자(사원) 인라인 자동완성 — 직접 입력 + 이름·부서·직급 부분일치 검색
+function RequesterInlineSearch({ value, onChange, users }: {
+  value: string; onChange: (v: string) => void; users: UserRecord[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const ref = useRef<HTMLDivElement>(null);
+  const ulRef = useRef<HTMLUListElement>(null);
+  const q = value.trim().toLowerCase();
+  const suggestions = q
+    ? users.filter(u =>
+        u.name.toLowerCase().includes(q) ||
+        (u.dept?.toLowerCase().includes(q) ?? false) ||
+        (u.rank?.toLowerCase().includes(q) ?? false)
+      ).slice(0, 10)
+    : [];
+
+  useEffect(() => { setFocusedIndex(-1); }, [value]);
+  useEffect(() => {
+    if (focusedIndex >= 0 && ulRef.current) {
+      const el = ulRef.current.children[focusedIndex] as HTMLElement;
+      if (el) el.scrollIntoView({ block: "nearest" });
+    }
+  }, [focusedIndex]);
+  useEffect(() => {
+    function h(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!open || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setFocusedIndex(i => (i < suggestions.length - 1 ? i + 1 : i)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setFocusedIndex(i => (i > 0 ? i - 1 : 0)); }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      if (focusedIndex >= 0) { onChange(suggestions[focusedIndex].name); setOpen(false); }
+      else if (suggestions.length === 1) { onChange(suggestions[0].name); setOpen(false); }
+    }
+    else if (e.key === "Escape") setOpen(false);
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <input type="text" lang="ko" value={value}
+        onChange={e => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => value.trim() && setOpen(true)}
+        onKeyDown={handleKeyDown}
+        placeholder="이름·부서로 검색 또는 직접 입력"
+        className={inputCls} />
+      {open && suggestions.length > 0 && (
+        <ul ref={ulRef} className="absolute z-50 top-full left-0 mt-0.5 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-52 overflow-y-auto">
+          {suggestions.map((u, idx) => (
+            <li key={u.id}>
+              <button type="button" onMouseDown={e => e.preventDefault()}
+                onClick={() => { onChange(u.name); setOpen(false); }}
+                className={`w-full text-left px-3 py-2 text-xs border-b border-gray-50 dark:border-gray-700 last:border-0 ${focusedIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-blue-50 dark:hover:bg-blue-900/20"}`}>
+                <span className="font-medium text-gray-800 dark:text-gray-200">{u.name}</span>
+                {(u.dept || u.rank) && (
+                  <span className="ml-2 text-[10px] text-gray-500 dark:text-gray-400">
+                    {[u.dept, u.rank].filter(Boolean).join(" · ")}
+                  </span>
+                )}
               </button>
             </li>
           ))}

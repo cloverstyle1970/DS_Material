@@ -8,6 +8,7 @@ import { TransactionRecord } from "@/lib/mock-transactions";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { useAuth, isViewOnly, isNonManager } from "@/context/AuthContext";
 import { api, getErrorMessage } from "@/lib/api-client";
+import { supabase } from "@/lib/supabase";
 import { fmtNum } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 import DraggableModal from "@/components/common/DraggableModal";
@@ -27,7 +28,7 @@ interface Search { dateFrom: string; dateTo: string; siteName: string; userName:
 type SortKey = "createdAt" | "materialName" | "materialId" | "qty" | "siteName" | "userName" | "unitPrice";
 type SortDir = "asc" | "desc";
 
-type ColDef = { key: SortKey | null; label: string; sortable: boolean; outboundOnly?: boolean };
+type ColDef = { key: SortKey | null; label: string; sortable: boolean; outboundOnly?: boolean; inboundOnly?: boolean; optional?: "note" | "processor" | "stock" };
 
 function today() { return new Date().toISOString().substring(0, 10); }
 function defaultSearch(): Search {
@@ -67,6 +68,11 @@ export default function StockHistoryClient({ mode, initial }: Props) {
   const [sites, setSites] = useState<SiteOption[]>([]);
   const [userNames, setUserNames] = useState<string[]>([]);
   const [matMap, setMatMap] = useState<Map<string, string>>(new Map()); // materialId → modelNo(규격)
+  // 입고 모드 한정: transactionId → 신청자명. transaction.note 의 '발주 #N' 패턴을 모아
+  // purchase_orders 를 한 번에 조회해 매핑한다.
+  const [requesterMap, setRequesterMap] = useState<Map<number, string>>(new Map());
+  // 출고 모드 한정: transactionId → 수령인명. transaction.note 의 '수령인: XXX' 패턴을 직접 파싱.
+  const [receiverMap, setReceiverMap] = useState<Map<number, string>>(new Map());
 
   useEffect(() => {
     api.get<TransactionRecord[]>(`/api/transactions?type=${encodeURIComponent(mode)}`)
@@ -102,6 +108,47 @@ export default function StockHistoryClient({ mode, initial }: Props) {
       })
       .catch(() => {});
   }, []);
+
+  // 출고 모드: note '수령인: XXX' 패턴 직접 파싱
+  useEffect(() => {
+    if (mode !== "출고" || transactions.length === 0) { setReceiverMap(new Map()); return; }
+    const next = new Map<number, string>();
+    for (const t of transactions) {
+      if (!t.note) continue;
+      const m = t.note.match(/수령인:\s*([^/]+?)(?:\s*\/|$)/);
+      if (m) next.set(t.id, m[1].trim());
+    }
+    setReceiverMap(next);
+  }, [mode, transactions]);
+
+  // 입고 모드: note '발주 #N' 패턴 → purchase_orders.requester_name 매핑
+  useEffect(() => {
+    if (mode !== "입고" || transactions.length === 0) { setRequesterMap(new Map()); return; }
+    const txOrderPairs: { txId: number; orderId: number }[] = [];
+    for (const t of transactions) {
+      const m = t.note?.match(/발주\s*#(\d+)/);
+      if (m) txOrderPairs.push({ txId: t.id, orderId: Number(m[1]) });
+    }
+    if (txOrderPairs.length === 0) { setRequesterMap(new Map()); return; }
+    const orderIds = Array.from(new Set(txOrderPairs.map(p => p.orderId)));
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.from("purchase_orders")
+        .select("id, requester_name").in("id", orderIds);
+      if (cancelled || !data) return;
+      const orderToRequester = new Map<number, string>();
+      for (const row of data as { id: number; requester_name: string | null }[]) {
+        if (row.requester_name) orderToRequester.set(row.id, row.requester_name);
+      }
+      const next = new Map<number, string>();
+      for (const { txId, orderId } of txOrderPairs) {
+        const name = orderToRequester.get(orderId);
+        if (name) next.set(txId, name);
+      }
+      setRequesterMap(next);
+    })();
+    return () => { cancelled = true; };
+  }, [mode, transactions]);
   const [search, setSearch] = useState<Search>(defaultSearch);
   const [companyFilter, setCompanyFilter] = useState<"전체" | "TK" | "DS">("전체");
   const [sortKey, setSortKey] = useState<SortKey>("createdAt");
@@ -112,6 +159,9 @@ export default function StockHistoryClient({ mode, initial }: Props) {
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [bulkOutboundOpen, setBulkOutboundOpen] = useState(false);
   const [bulkOutboundLoading, setBulkOutboundLoading] = useState(false);
+  const [showNote, setShowNote] = useState(false);
+  const [showProcessor, setShowProcessor] = useState(false);
+  const [showStock, setShowStock] = useState(false);
   const { user } = useAuth();
   const admin = user ? !isViewOnly(user) : false;
   // 단가·금액은 비관리자(보수일반/공사일반)에게만 숨김. 그 외 관리자급은 노출.
@@ -125,15 +175,17 @@ export default function StockHistoryClient({ mode, initial }: Props) {
     { key: "materialId",   label: "자재코드", sortable: true  },
     { key: "materialName", label: "자재명",   sortable: true  },
     { key: null,           label: "규격",     sortable: false },
+    { key: null,           label: "S/N",      sortable: false },
     { key: "qty",          label: "수량",     sortable: true  },
     { key: "unitPrice",    label: isInbound ? "입고단가" : "출고단가", sortable: true },
     { key: null,           label: isInbound ? "입고금액" : "출고금액", sortable: false },
-    { key: null,           label: "재고변동", sortable: false },
-    { key: "siteName",     label: "현장",     sortable: true  },
-    { key: null,           label: "S/N",      sortable: false, outboundOnly: true },
+    { key: null,           label: "재고변동", sortable: false, optional: "stock" },
+    { key: "siteName",     label: "현장 / 호기", sortable: true  },
+    { key: null,           label: "신청자",   sortable: false, inboundOnly: true },
+    { key: null,           label: "수령인",   sortable: false, outboundOnly: true },
     { key: null,           label: "회수",     sortable: false, outboundOnly: true },
-    { key: "userName",     label: "처리자",   sortable: true  },
-    { key: null,           label: "비고",     sortable: false },
+    { key: "userName",     label: "처리자",   sortable: true,  optional: "processor" },
+    { key: null,           label: "비고",     sortable: false, optional: "note" },
   ], [isInbound]);
 
   const filtered = transactions.filter(t => {
@@ -269,20 +321,26 @@ export default function StockHistoryClient({ mode, initial }: Props) {
         자재코드: t.materialId,
         자재명: t.materialName,
         규격: matMap.get(t.materialId) ?? "",
+        "S/N": t.serialNo ?? "",
         수량: t.qty,
         [isInbound ? "입고단가" : "출고단가"]: showFin ? (t.unitPrice ?? 0) : "",
         [isInbound ? "입고금액" : "출고금액"]: showFin ? (t.unitPrice ?? 0) * t.qty : "",
-        이전재고: t.prevStock,
-        이후재고: t.afterStock,
-        현장: t.siteName ?? "",
       };
+      if (showStock) {
+        base["이전재고"] = t.prevStock;
+        base["이후재고"] = t.afterStock;
+      }
+      base["현장"] = t.siteName ?? "";
+      base["호기"] = t.elevatorName ?? "";
+      if (isInbound) {
+        base["신청자"] = requesterMap.get(t.id) ?? "";
+      }
       if (!isInbound) {
-        base["호기"] = t.elevatorName ?? "";
-        base["S/N"] = t.serialNo ?? "";
+        base["수령인"] = receiverMap.get(t.id) ?? "";
         base["회수"] = !t.requiresReturn ? "" : t.returnStatus === "returned" ? "반납완료" : "대기";
       }
-      base["처리자"] = t.userName;
-      base["비고"]   = t.note ?? "";
+      if (showProcessor) base["처리자"] = t.userName;
+      if (showNote) base["비고"] = t.note ?? "";
       return base;
     });
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -350,6 +408,21 @@ export default function StockHistoryClient({ mode, initial }: Props) {
             <button type="button" onClick={() => setSearch(defaultSearch())}
               className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 underline">초기화</button>
           )}
+          <label className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 shrink-0 cursor-pointer select-none">
+            <input type="checkbox" checked={showStock} onChange={e => setShowStock(e.target.checked)}
+              className="h-3.5 w-3.5 rounded cursor-pointer" />
+            재고변동
+          </label>
+          <label className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 shrink-0 cursor-pointer select-none">
+            <input type="checkbox" checked={showProcessor} onChange={e => setShowProcessor(e.target.checked)}
+              className="h-3.5 w-3.5 rounded cursor-pointer" />
+            처리자
+          </label>
+          <label className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 shrink-0 cursor-pointer select-none">
+            <input type="checkbox" checked={showNote} onChange={e => setShowNote(e.target.checked)}
+              className="h-3.5 w-3.5 rounded cursor-pointer" />
+            비고
+          </label>
           <span className="ml-auto text-xs text-gray-400 dark:text-gray-500 shrink-0">{fmtNum(sorted.length)}건</span>
         </div>
 
@@ -398,13 +471,19 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                   <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-gray-600 dark:text-gray-300 mt-1">
                     <div><span className="text-gray-400">규격 </span>{matMap.get(t.materialId) || "-"}</div>
                     <div><span className="text-gray-400">수량 </span>{fmtNum(t.qty)}</div>
-                    <div><span className="text-gray-400">재고 </span>{fmtNum(t.prevStock)} → {fmtNum(t.afterStock)}</div>
+                    {showStock && <div><span className="text-gray-400">재고 </span>{fmtNum(t.prevStock)} → {fmtNum(t.afterStock)}</div>}
                     <div className="truncate"><span className="text-gray-400">현장 </span>{t.siteName ?? "-"}{t.elevatorName ? ` (${t.elevatorName})` : ""}</div>
+                    {isInbound && requesterMap.get(t.id) && (
+                      <div className="truncate"><span className="text-gray-400">신청자 </span>{requesterMap.get(t.id)}</div>
+                    )}
+                    {!isInbound && receiverMap.get(t.id) && (
+                      <div className="truncate"><span className="text-gray-400">수령인 </span>{receiverMap.get(t.id)}</div>
+                    )}
                     {showFin && <div><span className="text-gray-400">단가 </span>₩{fmtNum(t.unitPrice ?? 0)}</div>}
                     {showFin && <div><span className="text-gray-400">금액 </span>₩{fmtNum((t.unitPrice ?? 0) * t.qty)}</div>}
-                    {!isInbound && t.serialNo && <div className="col-span-2"><span className="text-gray-400">S/N </span><span className="font-mono">{t.serialNo}</span></div>}
-                    <div><span className="text-gray-400">담당 </span>{t.userName}</div>
-                    {t.note && <div className="col-span-2"><span className="text-gray-400">비고 </span>{t.note}</div>}
+                    {t.serialNo && <div className="col-span-2"><span className="text-gray-400">S/N </span><span className="font-mono">{t.serialNo}</span></div>}
+                    {showProcessor && <div><span className="text-gray-400">담당 </span>{t.userName}</div>}
+                    {showNote && t.note && <div className="col-span-2"><span className="text-gray-400">비고 </span>{t.note}</div>}
                   </div>
                   {!isInbound && (
                     <div className="mt-2 text-xs">
@@ -457,7 +536,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                   className="h-3.5 w-3.5 rounded cursor-pointer"
                 />
               </th>
-              {columns.filter(c => !c.outboundOnly || !isInbound).map(c => {
+              {columns.filter(c => (!c.outboundOnly || !isInbound) && (!c.inboundOnly || isInbound) && (c.optional === "note" ? showNote : c.optional === "processor" ? showProcessor : c.optional === "stock" ? showStock : true)).map(c => {
                 const active = c.sortable && c.key === sortKey;
                 const padCls = c.label === "일자" ? "pl-2 pr-0" : c.label === "자재코드" ? "pl-1 pr-2" : "px-2";
                 return (
@@ -503,6 +582,9 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                 <td className={`pl-1 pr-2 py-3 text-left font-mono whitespace-nowrap ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>{t.materialId}</td>
                 <td className={`px-2 py-3 text-left font-medium max-w-[200px] truncate ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>{t.materialName}</td>
                 <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{matMap.get(t.materialId) || "-"}</td>
+                <td className="px-2 py-3 text-left font-mono text-black dark:text-white whitespace-nowrap max-w-[140px] truncate">
+                  {t.serialNo || "-"}
+                </td>
                 <td className="px-2 py-3 text-center tabular-nums text-black dark:text-white">
                   {fmtNum(t.qty)}
                 </td>
@@ -512,15 +594,22 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                 <td className={`px-2 py-3 text-right tabular-nums font-semibold whitespace-nowrap ${isInbound ? "text-blue-600 dark:text-blue-400" : "text-orange-500 dark:text-orange-400"}`}>
                   {showFin ? `₩${fmtNum((t.unitPrice ?? 0) * t.qty)}` : ""}
                 </td>
-                <td className="px-2 py-3 text-center tabular-nums text-black dark:text-white whitespace-nowrap">
-                  {fmtNum(t.prevStock)} → <span className="font-medium">{fmtNum(t.afterStock)}</span>
-                </td>
+                {showStock && (
+                  <td className="px-2 py-3 text-center tabular-nums text-black dark:text-white whitespace-nowrap">
+                    {fmtNum(t.prevStock)} → <span className="font-medium">{fmtNum(t.afterStock)}</span>
+                  </td>
+                )}
                 <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">
                   {t.siteName ?? "-"}{t.elevatorName ? <span className="ml-1 opacity-70">({t.elevatorName})</span> : null}
                 </td>
+                {isInbound && (
+                  <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">
+                    {requesterMap.get(t.id) || "-"}
+                  </td>
+                )}
                 {!isInbound && (
-                  <td className="px-2 py-3 text-left font-mono text-black dark:text-white whitespace-nowrap max-w-[140px] truncate">
-                    {t.serialNo || "-"}
+                  <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">
+                    {receiverMap.get(t.id) || "-"}
                   </td>
                 )}
                 {!isInbound && (
@@ -554,8 +643,12 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                     )}
                   </td>
                 )}
-                <td className="px-2 py-3 text-center text-black dark:text-white whitespace-nowrap">{t.userName}</td>
-                <td className="px-2 py-3 text-center text-black dark:text-white max-w-[140px] truncate">{t.note ?? "-"}</td>
+                {showProcessor && (
+                  <td className="px-2 py-3 text-center text-black dark:text-white whitespace-nowrap">{t.userName}</td>
+                )}
+                {showNote && (
+                  <td className="px-2 py-3 text-center text-black dark:text-white max-w-[140px] truncate">{t.note ?? "-"}</td>
+                )}
                 {admin && (
                   <td className="px-2 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                     <div className="flex gap-1 items-center">
