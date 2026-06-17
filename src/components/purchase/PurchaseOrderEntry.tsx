@@ -434,7 +434,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
 
       <div className="flex-1 overflow-auto bg-white dark:bg-gray-800">
         <table className="w-full text-xs border-collapse">
-          <thead className="sticky top-0 z-10">
+          <thead className="sticky top-0 z-10 bg-[#e9ecef] dark:bg-gray-700">
             <tr className="bg-[#e9ecef] dark:bg-gray-700 text-gray-700 dark:text-gray-300">
               <Th w="32">No</Th>
               <Th w="120">품목코드</Th>
