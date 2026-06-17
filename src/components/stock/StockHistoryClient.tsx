@@ -523,7 +523,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
         ) : (
         <div className="overflow-auto max-h-[calc(100vh-250px)]">
         <table className="w-full min-w-[640px] text-sm">
-          <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
+          <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700 border-b border-gray-100 dark:border-gray-700">
             <tr>
               <th className="px-3 py-3 w-8">
                 <input type="checkbox"
@@ -665,7 +665,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
             ))}
             {/* 합계 요약 행 */}
             {sorted.length > 0 && (
-              <tr className="bg-gray-50 dark:bg-gray-700/50 font-semibold border-t border-gray-200 dark:border-gray-700">
+              <tr className="bg-gray-50 dark:bg-gray-700 font-semibold border-t border-gray-200 dark:border-gray-700">
                 <td className="px-3 py-3"></td>
                 <td className="pl-2 pr-0 py-3 text-left text-black dark:text-white font-bold">합계</td>
                 <td colSpan={3}></td>
@@ -887,7 +887,7 @@ function BulkOutboundModal({
           </label>
           <div className="max-h-64 overflow-auto rounded-lg border border-gray-200 dark:border-gray-700">
             <table className="w-full text-xs">
-              <thead className="bg-gray-50 dark:bg-gray-700/50 sticky top-0">
+              <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>
                   <th className="px-3 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">자재코드</th>
                   <th className="px-3 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">자재명</th>
