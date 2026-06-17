@@ -538,7 +538,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
               </th>
               {columns.filter(c => (!c.outboundOnly || !isInbound) && (!c.inboundOnly || isInbound) && (c.optional === "note" ? showNote : c.optional === "processor" ? showProcessor : c.optional === "stock" ? showStock : true)).map(c => {
                 const active = c.sortable && c.key === sortKey;
-                const padCls = c.label === "일자" ? "pl-2 pr-0" : c.label === "자재코드" ? "pl-1 pr-2" : "px-2";
+                const padCls = c.label === "일자" ? "pl-2 pr-0" : "px-2";
                 return (
                   <th key={c.label} className={`${padCls} py-3 text-center font-bold text-black dark:text-white whitespace-nowrap`}>
                     {c.sortable && c.key ? (
@@ -579,7 +579,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                   />
                 </td>
                 <td className="pl-2 pr-0 py-3 text-left text-black dark:text-white whitespace-nowrap">{fmtDateOnly(t.createdAt)}</td>
-                <td className={`pl-1 pr-2 py-3 text-left font-mono whitespace-nowrap ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>{t.materialId}</td>
+                <td className={`px-2 py-3 text-left font-mono whitespace-nowrap ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>{t.materialId}</td>
                 <td className={`px-2 py-3 text-left font-medium max-w-[200px] truncate ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>{t.materialName}</td>
                 <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{matMap.get(t.materialId) || "-"}</td>
                 <td className="px-2 py-3 text-left font-mono text-black dark:text-white whitespace-nowrap max-w-[140px] truncate">
