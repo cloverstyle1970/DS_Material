@@ -34,6 +34,15 @@ function newRow(seed: Partial<Row> = {}): Row {
   return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, siteName: "", remark: "", orderId: null, serialNos: [], ...seed };
 }
 
+// note 표준: "발주 #N 입고완료" 또는 "발주 #N 입고완료 / 사용자메모".
+// 수정 모드 진입 시 orderId·사용자메모 복원에 사용. 미일치 시 전체 문자열을 memo로 취급.
+function parseNote(note: string | null | undefined): { orderId: number | null; memo: string } {
+  if (!note) return { orderId: null, memo: "" };
+  const m = note.match(/^발주 #(\d+) 입고완료(?:\s*\/\s*(.*))?$/);
+  if (m) return { orderId: Number(m[1]), memo: (m[2] ?? "").trim() };
+  return { orderId: null, memo: note };
+}
+
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
 export default function InboundEntry({ editId }: { editId?: number } = {}) {
@@ -82,11 +91,12 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
         if (cancelled) return;
         
         setInboundDate(target.createdAt.slice(0, 10));
-        setReference(target.note || "");
+        setReference(parseNote(target.note).memo);
         setEditBatchId(target.batchId || null);
-        
+
         const loaded: Row[] = [];
         for (const t of siblings) {
+          const parsed = parseNote(t.note);
           loaded.push({
             id: crypto.randomUUID(),
             existingId: t.id,
@@ -94,10 +104,10 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
             materialName: t.materialName,
             spec: "",
             qty: t.qty,
-            unitPrice: 0,
+            unitPrice: t.unitPrice ?? 0,
             siteName: t.siteName || "",
-            remark: t.note || "",
-            orderId: null,
+            remark: parsed.memo,
+            orderId: parsed.orderId,
             serialNos: t.serialNo ? [t.serialNo] : [],
           });
         }
@@ -238,6 +248,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
           serialNos: r.serialNos.length > 0 ? r.serialNos : null,
           note, userId: user.id, userName: user.name,
           batchId,
+          unitPrice: r.unitPrice || 0,
           createdAt: isEdit ? inboundDate : undefined,
         });
       }

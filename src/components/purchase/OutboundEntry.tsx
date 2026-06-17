@@ -91,7 +91,7 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
             materialName: t.materialName,
             spec: "",
             qty: t.qty,
-            unitPrice: 0,
+            unitPrice: t.unitPrice ?? 0,
             buyPrice: 0,
             stockQty: 0,
             storageLoc: "",
@@ -264,6 +264,7 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
           requiresReturn: r.requiresReturn,
           note, userId: user.id, userName: user.name,
           batchId,
+          unitPrice: r.unitPrice || 0,
           createdAt: isEdit ? outboundDate : undefined,
         });
       }

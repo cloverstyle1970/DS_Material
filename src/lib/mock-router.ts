@@ -397,6 +397,7 @@ async function supabaseAddTransaction(data: {
   serialNos?: string[] | null;
   requiresReturn?: boolean;
   batchId?: string | null;
+  unitPrice?: number | null;
 }): Promise<{ records?: TransactionRecord[]; error?: string }> {
   const { data: result, error } = await supabase.rpc("add_transaction", {
     p_type:            data.type,
@@ -416,6 +417,13 @@ async function supabaseAddTransaction(data: {
   if (result?.error) return { error: result.error };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const records: TransactionRecord[] = (result?.records ?? []).map((r: any) => dbToTransaction(r));
+  // RPC가 unit_price 인자를 받지 않으므로(서명 변경 회피), 생성 직후 별도 UPDATE.
+  // 입력 단가가 양수일 때만 덮어써, 0/미지정 시 RPC가 채운 기본값(자재 마스터)을 보존.
+  if (data.unitPrice && data.unitPrice > 0 && records.length > 0) {
+    const ids = records.map(r => r.id);
+    await supabase.from("transactions").update({ unit_price: data.unitPrice }).in("id", ids);
+    records.forEach(r => { r.unitPrice = data.unitPrice as number; });
+  }
   return { records };
 }
 
