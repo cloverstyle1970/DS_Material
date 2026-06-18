@@ -112,7 +112,7 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
   // 항목표·총액표 컬럼 정렬 공유 (절사금액↔공급가액 사이 여백 분리용)
   const colGroup = (
     <colgroup>
-      <col style={{ width: "2.5rem" }} />{/* NO */}
+      <col style={{ width: "3rem" }} />{/* NO */}
       <col />{/* 품목 */}
       <col style={{ width: "3.5rem" }} />{/* 단위 */}
       <col style={{ width: "4rem" }} />{/* 수량 */}
@@ -130,16 +130,13 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
           </div>
         )}
 
-        {/* 제목 + 회사 정보 */}
-        <div className="border-b-2 border-black grid grid-cols-3 items-stretch">
-          <div className="text-xs px-3 py-2 border-r border-black flex items-center">
+        {/* 제목 */}
+        <div className="border-b-2 border-black grid grid-cols-[200px_1fr_200px] items-stretch">
+          <div className="text-xs px-3 py-2 flex items-center">
             NO. {header.quote_no}
           </div>
-          <div className="text-3xl font-bold text-center py-3 tracking-[0.3em]">見&nbsp;積&nbsp;書</div>
-          <div className="text-xs px-3 py-2 border-l border-black flex flex-col justify-center">
-            <div className="font-bold text-sm">{company?.company_name ?? "주식회사 대솔이엘"}</div>
-            <div className="font-mono mt-0.5">{company?.company_biz_no ?? ""}</div>
-          </div>
+          <div className="text-3xl font-bold text-center py-3 tracking-[0.3em]">견&nbsp;적&nbsp;서</div>
+          <div></div>
         </div>
 
         {/* 견적 메타 + 회사 상세 */}
@@ -162,10 +159,14 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
               <td className="border border-black px-2 py-1.5">
                 {header.site_name ?? "-"}
                 {header.elevator_name && <span className="text-gray-600 ml-2">({header.elevator_name})</span>}
-                <span className="text-gray-500 ml-3 text-[10px]">귀중</span>
+                <span className="ml-3 text-xs font-bold text-gray-800">귀중</span>
               </td>
               <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">본사</td>
-              <td className="border border-black px-2 py-1.5">{company?.company_address ?? ""}</td>
+              <td className="border border-black px-2 py-1.5">
+                <div className="font-bold">{company?.company_name ?? "주식회사 대솔이엘"}</div>
+                <div className="font-mono text-[10px] text-gray-600">{company?.company_biz_no ?? ""}</div>
+                <div className="mt-0.5">{company?.company_address ?? ""}</div>
+              </td>
             </tr>
             <tr>
               <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">합계금액</td>
@@ -186,7 +187,9 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
         <div className="border border-t-0 border-black px-3 py-2 text-sm">
           <span className="text-xs text-gray-600 mr-3">작 업 명</span>
           <span className="font-bold">※ {header.work_title ?? ""}</span>
-          <span className="block text-[11px] text-gray-600 mt-1">아래와 같이 見積 합니다.</span>
+          <div className="mt-1 text-center text-[12.8px] font-bold tracking-wider text-black">
+            아래와 같이 견적합니다.
+          </div>
         </div>
 
         {/* 메인 테이블 (항목부: 자재비~절사금액) */}
@@ -194,7 +197,7 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
           {colGroup}
           <thead>
             <tr className="bg-gray-100 text-center font-bold">
-              <th className="border border-black px-1 py-1.5 w-10">NO</th>
+              <th className="border border-black px-1 py-1.5 w-12">NO</th>
               <th className="border border-black px-2 py-1.5">품&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;목</th>
               <th className="border border-black px-2 py-1.5 w-14">단위</th>
               <th className="border border-black px-2 py-1.5 w-16">수량</th>
@@ -374,11 +377,11 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
           <tbody>
             <tr>
               <td className="border border-black bg-gray-100 px-2 py-1.5 w-28 font-semibold text-center">※ 특기사항</td>
-              <td className="border border-black px-2 py-1.5 align-top" rowSpan={4} colSpan={1}>
+              <td className="border border-black px-2 py-1.5 align-top" rowSpan={4}>
                 <div className="whitespace-pre-wrap min-h-[60px]">{header.note ?? ""}</div>
               </td>
               <td className="border border-black bg-gray-100 px-2 py-1.5 w-28 font-semibold text-center">&lt;고객승인&gt;</td>
-              <td className="border border-black px-2 py-1.5">▣ 상기 부품 보안 작업 승인함을 확인합니다.</td>
+              <td className="border border-black px-2 py-1.5">▣ 상기 부품 보완 작업 승인함을 확인합니다.</td>
             </tr>
             <tr>
               <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">승인일</td>
