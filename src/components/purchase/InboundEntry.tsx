@@ -9,6 +9,7 @@ import { TransactionRecord } from "@/lib/mock-transactions";
 import { UserRecord } from "@/lib/mock-users";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
+import { generateDocNo } from "@/lib/document-no";
 import { fmtNum, parseNum } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS, isRepairMaterial } from "@/lib/material-style";
 import DraggableModal from "@/components/common/DraggableModal";
@@ -79,6 +80,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
   const [popup,  setPopup]  = useState<null | "order">(null);
   const [serialEditRowId, setSerialEditRowId] = useState<string | null>(null);
   const [editBatchId, setEditBatchId] = useState<string | null>(null);
+  const [editTransactionNo, setEditTransactionNo] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isEdit || !editId) return;
@@ -98,6 +100,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
         setInboundDate(target.createdAt.slice(0, 10));
         setReference(parseNote(target.note).memo);
         setEditBatchId(target.batchId || null);
+        setEditTransactionNo(target.transactionNo || null);
         if (target.siteName) setSiteName(target.siteName);
 
         const loaded: Row[] = [];
@@ -241,6 +244,11 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
       }
       
       const batchId = isEdit && editBatchId ? editBatchId : crypto.randomUUID();
+      // 입고번호 채번 (수정 모드에서는 기존 transaction_no를 그대로 재사용하기 위해 첫 행에서 가져옴)
+      const transactionNo = isEdit && editTransactionNo
+        ? editTransactionNo
+        : await generateDocNo("I", inboundDate);
+      if (!isEdit) setEditTransactionNo(transactionNo);
       for (const r of valid) {
         // note 형식 표준: r.orderId가 있으면 '발주 #N 입고완료' 패턴 강제 포함.
         // 사용자 메모는 ' / ' 구분자로 뒤에 append. 이 패턴이 (a) OrderPopup 안전장치의
@@ -261,6 +269,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
           serialNos: r.serialNos.length > 0 ? r.serialNos : null,
           note, userId: user.id, userName: user.name,
           batchId,
+          transactionNo,
           unitPrice: r.unitPrice || 0,
           createdAt: isEdit ? inboundDate : undefined,
         });

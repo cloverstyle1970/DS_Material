@@ -172,6 +172,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
 
   const columns: ColDef[] = useMemo(() => [
     { key: "createdAt",    label: "일자",     sortable: true  },
+    { key: null,           label: isInbound ? "입고번호" : "출고번호", sortable: false },
     { key: "materialId",   label: "자재코드", sortable: true  },
     { key: "materialName", label: "자재명",   sortable: true  },
     { key: null,           label: "규격",     sortable: false },
@@ -579,6 +580,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                   />
                 </td>
                 <td className="pl-2 pr-0 py-3 text-left text-black dark:text-white whitespace-nowrap">{fmtDateOnly(t.createdAt)}</td>
+                <td className="px-2 py-3 text-left font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">{t.transactionNo ?? "-"}</td>
                 <td className={`px-2 py-3 text-left font-mono whitespace-nowrap ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>{t.materialId}</td>
                 <td className={`px-2 py-3 text-left font-medium max-w-[200px] truncate ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>{t.materialName}</td>
                 <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{matMap.get(t.materialId) || "-"}</td>

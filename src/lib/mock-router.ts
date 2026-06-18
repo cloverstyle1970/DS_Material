@@ -363,6 +363,7 @@ function materialToDb(d: any): Record<string, unknown> {
 function dbToTransaction(r: any): TransactionRecord {
   return {
     id:                 r.id,
+    transactionNo:      r.transaction_no         ?? null,
     type:               r.type,
     materialId:         r.material_id,
     materialName:       r.material_name,
@@ -398,6 +399,7 @@ async function supabaseAddTransaction(data: {
   requiresReturn?: boolean;
   batchId?: string | null;
   unitPrice?: number | null;
+  transactionNo?: string | null;
 }): Promise<{ records?: TransactionRecord[]; error?: string }> {
   const { data: result, error } = await supabase.rpc("add_transaction", {
     p_type:            data.type,
@@ -417,12 +419,15 @@ async function supabaseAddTransaction(data: {
   if (result?.error) return { error: result.error };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const records: TransactionRecord[] = (result?.records ?? []).map((r: any) => dbToTransaction(r));
-  // RPC가 unit_price 인자를 받지 않으므로(서명 변경 회피), 생성 직후 별도 UPDATE.
-  // 입력 단가가 양수일 때만 덮어써, 0/미지정 시 RPC가 채운 기본값(자재 마스터)을 보존.
+  // RPC가 unit_price·transaction_no 인자를 받지 않으므로(서명 변경 회피), 생성 직후 별도 UPDATE.
+  const ids = records.map(r => r.id);
   if (data.unitPrice && data.unitPrice > 0 && records.length > 0) {
-    const ids = records.map(r => r.id);
     await supabase.from("transactions").update({ unit_price: data.unitPrice }).in("id", ids);
     records.forEach(r => { r.unitPrice = data.unitPrice as number; });
+  }
+  if (data.transactionNo && records.length > 0) {
+    await supabase.from("transactions").update({ transaction_no: data.transactionNo }).in("id", ids);
+    records.forEach(r => { r.transactionNo = data.transactionNo as string; });
   }
   return { records };
 }
@@ -450,6 +455,7 @@ function dbToRequest(r: any): MaterialRequestRecord {
 function dbToOrder(r: any): PurchaseOrderRecord {
   return {
     id:            r.id,
+    orderNo:       r.order_no       ?? null,
     status:        r.status,
     materialId:    r.material_id,
     materialName:  r.material_name,
@@ -478,6 +484,7 @@ function dbToOrder(r: any): PurchaseOrderRecord {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function orderToDb(d: any): Record<string, unknown> {
   const obj: Record<string, unknown> = {};
+  if (d.orderNo       !== undefined) obj.order_no       = d.orderNo;
   if (d.materialId    !== undefined) obj.material_id    = d.materialId;
   if (d.materialName  !== undefined) obj.material_name  = d.materialName;
   if (d.qty           !== undefined) obj.qty            = d.qty;

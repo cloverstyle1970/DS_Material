@@ -11,6 +11,7 @@ import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNum, parseNum } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS, isRepairMaterial } from "@/lib/material-style";
 import { supabase } from "@/lib/supabase";
+import { generateDocNo } from "@/lib/document-no";
 import DraggableModal from "@/components/common/DraggableModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 import PurchaseOrderPrintPaper, { POPrintCompany, POShipInfo, POShipPlace } from "./PurchaseOrderPrintPaper";
@@ -37,21 +38,20 @@ function newRow(seed: Partial<Row> = {}): Row {
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
-// note → orderRefNo + formType + remark 역파싱
-function parseNoteForEdit(note: string | null): { orderRefNo: string; formType: "기본" | "긴급" | "수리"; remark: string } {
-  if (!note) return { orderRefNo: "", formType: "기본", remark: "" };
+// note → formType + remark 역파싱 (발주번호는 order_no 컬럼으로 분리되었음)
+function parseNoteForEdit(note: string | null): { formType: "기본" | "긴급" | "수리"; remark: string } {
+  if (!note) return { formType: "기본", remark: "" };
   let s = note.trim();
-  let orderRefNo = "";
   let formType: "기본" | "긴급" | "수리" = "기본";
   while (true) {
     const m = s.match(/^\[([^\]]+)\]\s*/);
     if (!m) break;
     const tag = m[1];
     if (tag === "긴급" || tag === "수리") formType = tag;
-    else if (!orderRefNo) orderRefNo = tag;
+    // 그 외 태그는 무시 (과거 데이터의 발주참조번호 등은 더 이상 표시 안 함)
     s = s.slice(m[0].length);
   }
-  return { orderRefNo, formType, remark: s };
+  return { formType, remark: s };
 }
 
 // 발주서 발송지 지정 장소 (고정 목록 — 화물사/택배 안내문)
@@ -116,7 +116,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
     })();
   }, []);
 
-  const [orderRefNo,  setOrderRefNo]  = useState("");
+  const [orderNo,     setOrderNo]     = useState<string>("");  // 자동 채번 결과 (수정 진입 시 기존 값, 저장 시 신규 발급)
   const [freeOfCharge, setFreeOfCharge] = useState(false);  // 무상: 체크 시 구매단가 0원
   const [files,       setFiles]       = useState<File[]>([]);
   const [popup,       setPopup]       = useState<null | "request">(null);
@@ -155,7 +155,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
         setVendorName(head.vendorName ?? "");
         setSiteName(head.siteName ?? "");
         setManagerName(head.requesterName ?? "");
-        setOrderRefNo(noteHead.orderRefNo);
+        setOrderNo(head.orderNo ?? "");
         setFormType(noteHead.formType);
         setOrderDate(head.orderedAt.slice(0, 10));
         setBatchId(target.batchId ?? null);
@@ -221,7 +221,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
   function clearAll() {
     if (isEdit) return;
     setRows([newRow(), newRow(), newRow(), newRow(), newRow()]);
-    setVendorName(""); setSiteName(""); setReference(""); setOrderRefNo(""); setFiles([]);
+    setVendorName(""); setSiteName(""); setReference(""); setOrderNo(""); setFiles([]);
   }
 
   function applyMultipleMaterials(startRowId: string, materials: MaterialRecord[]) {
@@ -282,8 +282,11 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
       // 신규 모드: 매 저장마다 새 batch_id
       const effectiveBatchId = isEdit ? (batchId ?? crypto.randomUUID()) : crypto.randomUUID();
 
+      // 발주번호 — 신규는 채번, 수정은 기존 값 유지
+      const effectiveOrderNo = isEdit && orderNo ? orderNo : await generateDocNo("B", orderDate);
+      if (!isEdit) setOrderNo(effectiveOrderNo);
+
       const buildNote = (rowRemark: string) => [
-        orderRefNo ? `[${orderRefNo}]` : "",
         formType !== "기본" ? `[${formType}]` : "",
         rowRemark || reference || "",
       ].filter(Boolean).join(" ") || null;
@@ -312,6 +315,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
             note: buildNote(r.remark),
             orderedAt: orderedAtIso,
             batchId: effectiveBatchId,
+            orderNo: effectiveOrderNo,
             ...shipPayload,
           });
         } else {
@@ -325,6 +329,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
             userId: user.id, userName: user.name,
             orderedAt: orderedAtIso,
             batchId: effectiveBatchId,
+            orderNo: effectiveOrderNo,
             ...shipPayload,
           });
         }
@@ -406,8 +411,9 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
           <FormField label="현장" className="w-80 flex-1 min-w-[280px]">
             <SiteInlineSearch value={siteName} onChange={setSiteName} sites={sites} />
           </FormField>
-          <FormField label="주문참조번호" className="w-56">
-            <input type="text" value={orderRefNo} onChange={e => setOrderRefNo(e.target.value)} className={inputCls} />
+          <FormField label="발주번호" className="w-56">
+            <input type="text" value={orderNo} readOnly placeholder="저장 시 자동 채번 (B-YY-MM-NNN)"
+              className={`${inputCls} bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 cursor-not-allowed`} />
           </FormField>
           <FormField label="참조" className="flex-1 min-w-[280px]">
             <input type="text" value={reference} onChange={e => setReference(e.target.value)} className={`${inputCls} w-full`} />
@@ -582,7 +588,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
               managerPhone={requesterPhones[managerName] ?? ""}
               ordererName={user?.name ?? ""}
               siteName={siteName}
-              orderRefNo={orderRefNo}
+              orderNo={orderNo}
               formType={formType}
               reference={reference}
               items={rows.map(r => ({

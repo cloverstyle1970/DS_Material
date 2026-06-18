@@ -2,6 +2,7 @@ export type OrderStatus = "발주" | "입고완료" | "취소";
 
 export interface PurchaseOrderRecord {
   id: number;
+  orderNo: string | null;  // 발주번호 (B-YY-MM-NNN) — 같은 batch 행에 동일값
   status: OrderStatus;
   materialId: string;
   materialName: string;

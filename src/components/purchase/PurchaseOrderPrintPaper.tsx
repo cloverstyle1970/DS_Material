@@ -92,7 +92,7 @@ interface Props {
   managerPhone: string;            // 신청자(담당자) 연락처
   ordererName:  string;            // 발주자 (발주서 작성자)
   siteName:     string;
-  orderRefNo:   string;
+  orderNo:      string;
   formType:     "기본" | "긴급" | "수리";
   reference:    string;
   items:        POPrintItem[];
@@ -109,7 +109,7 @@ function fmtDate(iso: string): string {
 }
 
 export default function PurchaseOrderPrintPaper({
-  orderDate, vendorName, managerName, managerPhone, ordererName, siteName, orderRefNo, formType, reference, items, company, shipInfo, onShipInfoChange, shipPlaces,
+  orderDate, vendorName, managerName, managerPhone, ordererName, siteName, orderNo, formType, reference, items, company, shipInfo, onShipInfoChange, shipPlaces,
 }: Props) {
   const validItems = items.filter(it => it.materialId || it.materialName.trim());
   const totalQty = validItems.reduce((s, it) => s + it.qty, 0);
@@ -124,7 +124,7 @@ export default function PurchaseOrderPrintPaper({
         {/* 제목 */}
         <div className="border-b-2 border-black grid grid-cols-[200px_1fr_200px] items-stretch">
           <div className="text-xs px-3 py-2 flex items-center gap-2">
-            <span>NO. {orderRefNo || "-"}</span>
+            <span>NO. {orderNo || "-"}</span>
             {formType !== "기본" && <span className="font-bold text-red-600">[{formType}]</span>}
           </div>
           <div className="text-3xl font-bold text-center py-3 tracking-[0.3em]">발&nbsp;주&nbsp;서</div>

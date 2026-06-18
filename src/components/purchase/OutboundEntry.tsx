@@ -9,6 +9,7 @@ import { TransactionRecord } from "@/lib/mock-transactions";
 import { UserRecord } from "@/lib/mock-users";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
+import { generateDocNo } from "@/lib/document-no";
 import { fmtNum, parseNum } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS, isRepairMaterial } from "@/lib/material-style";
 import DraggableModal from "@/components/common/DraggableModal";
@@ -82,6 +83,7 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
   const [saving, setSaving] = useState(false);
   const [serialEditRowId, setSerialEditRowId] = useState<string | null>(null);
   const [editBatchId, setEditBatchId] = useState<string | null>(null);
+  const [editTransactionNo, setEditTransactionNo] = useState<string | null>(null);
   const [previewDN, setPreviewDN] = useState(false);
   const [dnReceiver, setDnReceiver] = useState<DNReceiver>({ name: "", bizNo: "", address: "", phone: "" });
   const [dnVendors, setDnVendors] = useState<DNVendor[]>([]);
@@ -106,6 +108,7 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
         setSiteName(target.siteName || "");
         setReference(target.note || "");
         setEditBatchId(target.batchId || null);
+        setEditTransactionNo(target.transactionNo || null);
 
         const loaded: Row[] = [];
         let firstReceiver = "";
@@ -285,6 +288,10 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
       }
       
       const batchId = isEdit && editBatchId ? editBatchId : crypto.randomUUID();
+      const transactionNo = isEdit && editTransactionNo
+        ? editTransactionNo
+        : await generateDocNo("O", outboundDate);
+      if (!isEdit) setEditTransactionNo(transactionNo);
       for (const r of valid) {
         // note 형식 표준: "입고 #N 출고완료[ / 수령인: XXX][ / 사용자메모]"
         // inboundRef 가 없으면 base 생략. 이 패턴이 InboundRefPopup 안전장치의
@@ -303,6 +310,7 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
           requiresReturn: r.requiresReturn,
           note, userId: user.id, userName: user.name,
           batchId,
+          transactionNo,
           unitPrice: r.unitPrice || 0,
           createdAt: isEdit ? outboundDate : undefined,
         });

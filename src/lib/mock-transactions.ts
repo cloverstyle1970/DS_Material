@@ -2,6 +2,7 @@ import { adjustStock, getMaterials } from "./mock-materials";
 
 export interface TransactionRecord {
   id: number;
+  transactionNo: string | null;  // 입고: I-YY-MM-NNN / 출고: O-YY-MM-NNN
   type: "입고" | "출고";
   materialId: string;
   materialName: string;
@@ -67,6 +68,7 @@ export function addTransaction(data: AddTransactionInput): { record?: Transactio
 
   const record: TransactionRecord = {
     id: nextId++,
+    transactionNo:      null,  // mock data 경로에서는 채번 안 함 (실제는 Supabase 직접 호출)
     type:               data.type,
     materialId:         data.materialId,
     materialName:       data.materialName,
