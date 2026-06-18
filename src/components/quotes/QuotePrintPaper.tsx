@@ -95,6 +95,13 @@ function fmtDate(iso: string): string {
   return `${m[1]}년 ${m[2]}월 ${m[3]}일`;
 }
 
+// 견적서 표기 전용: DB의 "... 702(풍동 신성프라자)" → 화면에는 "... 702호" 로 표시
+// (DB 데이터 자체는 보존)
+function formatAddressForPrint(address: string | null | undefined): string {
+  if (!address) return "";
+  return address.replace(/\s*\([^)]*\)\s*$/, "호");
+}
+
 export default function QuotePrintPaper({ header, items, company, laborLines, revisionNotes, onOpenOpinion, preview, footerExtra }: Props) {
   const showRevisions = !!header.show_revisions && !!revisionNotes && revisionNotes.length > 0;
   const hasLaborLines = !!laborLines && laborLines.length > 0;
@@ -145,39 +152,39 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
             <tr>
               <td className="border border-black bg-gray-100 px-2 py-1.5 w-24 font-semibold text-center">견적년월일</td>
               <td className="border border-black px-2 py-1.5">{fmtDate(header.quote_date)}</td>
-              <td className="border border-black bg-gray-100 px-2 py-1.5 w-24 font-semibold text-center">대표이사</td>
-              <td className="border border-black px-2 py-1.5 relative">
-                {company?.company_ceo ?? ""}
-                {company?.company_stamp_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={company.company_stamp_url} alt="인" className="inline-block h-9 align-middle ml-1" />
-                ) : <span className="text-gray-400 ml-2">[인]</span>}
-              </td>
+              <td className="border border-black bg-gray-100 px-2 py-1.5 w-24 font-semibold text-center">회사명</td>
+              <td className="border border-black px-2 py-1.5 font-bold">{company?.company_name ?? "주식회사 대솔이엘"}</td>
             </tr>
             <tr>
               <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">현장명</td>
               <td className="border border-black px-2 py-1.5">
                 {header.site_name ?? "-"}
-                {header.elevator_name && <span className="text-gray-600 ml-2">({header.elevator_name})</span>}
                 <span className="ml-3 text-xs font-bold text-gray-800">귀중</span>
               </td>
-              <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">본사</td>
-              <td className="border border-black px-2 py-1.5">
-                <div className="font-bold">{company?.company_name ?? "주식회사 대솔이엘"}</div>
-                <div className="font-mono text-[10px] text-gray-600">{company?.company_biz_no ?? ""}</div>
-                <div className="mt-0.5">{company?.company_address ?? ""}</div>
+              <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">대표이사</td>
+              <td className="border border-black px-2 py-1.5 relative">
+                {company?.company_ceo ?? ""}
+                {company?.company_stamp_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={company.company_stamp_url} alt="인" className="inline-block h-[54px] align-middle ml-1 -my-3 -mr-3 relative z-10" />
+                ) : <span className="text-gray-400 ml-2">[인]</span>}
               </td>
             </tr>
             <tr>
-              <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">합계금액</td>
-              <td className="border border-black px-2 py-1.5 font-bold">
-                ￦ {fmtNum(header.total_amount)} 원정
+              <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center" rowSpan={2}>합계금액</td>
+              <td className="border border-black px-2 py-1.5 font-bold align-middle text-right" rowSpan={2}>
+                <span className="text-[16.57px]">￦ {fmtNum(header.total_amount)} 원정</span>
                 <div className="text-[10px] text-gray-500 mt-0.5">위 금액은 부가세 별도 금액임.</div>
               </td>
+              <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">회사주소</td>
+              <td className="border border-black px-2 py-1.5">{formatAddressForPrint(company?.company_address)}</td>
+            </tr>
+            <tr>
               <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">전화 / E-mail</td>
               <td className="border border-black px-2 py-1.5">
-                <div>{company?.company_phone ?? ""}</div>
-                <div className="font-mono text-[10px]">{company?.company_email ?? ""}</div>
+                <span>{company?.company_phone ?? ""}</span>
+                {company?.company_phone && company?.company_email && <span className="mx-1.5 text-gray-400">/</span>}
+                <span className="font-mono text-[10px]">{company?.company_email ?? ""}</span>
               </td>
             </tr>
           </tbody>
@@ -185,11 +192,8 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
 
         {/* 작업명 */}
         <div className="border border-t-0 border-black px-3 py-2 text-sm">
-          <span className="text-xs text-gray-600 mr-3">작 업 명</span>
-          <span className="font-bold">※ {header.work_title ?? ""}</span>
-          <div className="mt-1 text-center text-[12.8px] font-bold tracking-wider text-black">
-            아래와 같이 견적합니다.
-          </div>
+          <span className="font-bold mr-2">작 업 명 :</span>
+          <span className="font-bold">{header.work_title ?? ""}</span>
         </div>
 
         {/* 메인 테이블 (항목부: 자재비~절사금액) */}
@@ -350,7 +354,7 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
               </tr>
             )}
             {/* 공급가액 (별도 모드면 대표 강조) */}
-            <tr className={`font-bold ${!vatIncluded ? "bg-yellow-50 print:bg-gray-100 text-base" : ""}`}>
+            <tr className={`font-bold ${!vatIncluded ? "bg-yellow-50 print:bg-gray-100" : ""}`}>
               <td colSpan={5} className="border border-black px-2 py-2 text-right">
                 공 급 가 액{!vatIncluded && <span className="text-[10px] font-normal text-gray-500 ml-1">(부가세 별도)</span>}
               </td>
@@ -376,15 +380,17 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
         <table className="w-full text-xs border-collapse mt-2">
           <tbody>
             <tr>
-              <td className="border border-black bg-gray-100 px-2 py-1.5 w-28 font-semibold text-center">※ 특기사항</td>
-              <td className="border border-black px-2 py-1.5 align-top" rowSpan={4}>
+              <td className="border border-black bg-gray-100 px-2 py-1.5 w-28 font-semibold text-center" rowSpan={5}>※ 특기사항</td>
+              <td className="border border-black px-2 py-1.5 align-top" rowSpan={5} style={{ width: "46.66%" }}>
                 <div className="whitespace-pre-wrap min-h-[60px]">{header.note ?? ""}</div>
               </td>
-              <td className="border border-black bg-gray-100 px-2 py-1.5 w-28 font-semibold text-center">&lt;고객승인&gt;</td>
-              <td className="border border-black px-2 py-1.5">▣ 상기 부품 보완 작업 승인함을 확인합니다.</td>
+              <td colSpan={2} className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">&lt;고객승인&gt;</td>
             </tr>
             <tr>
-              <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">승인일</td>
+              <td colSpan={2} className="border border-black px-2 py-1.5">▣ 상기 부품 보완 작업 승인함을 확인합니다.</td>
+            </tr>
+            <tr>
+              <td className="border border-black bg-gray-100 px-2 py-1.5 w-28 font-semibold text-center">승인일</td>
               <td className="border border-black px-2 py-1.5">　　　년　　　월　　　일</td>
             </tr>
             <tr>
@@ -416,7 +422,7 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
         )}
 
         {/* 푸터 */}
-        <div className="text-center text-[10px] text-gray-500 mt-3">2025년 승강기안전 국무총리상 수상기업 (주)대솔이엘</div>
+        <div className="text-right text-[10px] text-blue-600 mt-3">2025년 승강기안전 국무총리상 수상기업 (주)대솔이엘</div>
         {footerExtra}
       </div>
 
