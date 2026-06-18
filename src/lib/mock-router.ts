@@ -146,7 +146,7 @@ function dbToSite(r: any): SiteRecord {
     name:              r.site_name,   // managed_sites.site_name
     alias:             r.alias              ?? null,
     ledgerNo:          r.ledger_no          ?? null,
-    siteKind:          r.site_kind          ?? null,
+    siteType:          r.site_type          ?? r.site_kind ?? null,
     companyType:       r.company_type       ?? null,
     contractType:      r.contract_type      ?? null,
     contractDate:      r.contract_date      ?? null,
@@ -181,7 +181,7 @@ function siteToDb(d: any): Record<string, unknown> {
   if (d.name              !== undefined) obj.site_name          = d.name;   // managed_sites.site_name
   if (d.alias             !== undefined) obj.alias              = d.alias;
   if (d.ledgerNo          !== undefined) obj.ledger_no          = d.ledgerNo;
-  if (d.siteKind          !== undefined) obj.site_kind          = d.siteKind;
+  if (d.siteType          !== undefined) obj.site_type          = d.siteType;
   if (d.companyType       !== undefined) obj.company_type       = d.companyType;
   if (d.contractType      !== undefined) obj.contract_type      = d.contractType;
   if (d.contractDate      !== undefined) obj.contract_date      = d.contractDate;

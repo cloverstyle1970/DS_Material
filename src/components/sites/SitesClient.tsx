@@ -704,7 +704,7 @@ export default function SitesClient({ initial, elevators }: Props) {
           주점검자: s.primaryInspector ?? "",
           보조점검자1: s.subInspector ?? "",
           보조점검자2: s.subInspector2 ?? "",
-          현장유형: s.siteKind ?? "",
+          현장유형: s.siteType ?? "",
           계약구분: s.contractType ?? "",
           계약일자: s.contractDate ?? "",
           계약시작: s.contractStart ?? "",
@@ -940,6 +940,15 @@ export default function SitesClient({ initial, elevators }: Props) {
                         <div className="min-w-0 flex-1">
                           <p className={`text-sm font-medium truncate ${isSelected ? isDark ? "text-white" : "text-blue-700" : isDark ? "text-gray-200" : "text-gray-800"}`}>
                             {site.name}
+                            {site.siteType && (
+                              <span className={`ml-1.5 inline-block text-[10px] px-1.5 py-0.5 rounded font-semibold align-middle ${
+                                site.siteType === "무상"
+                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300"
+                                  : site.siteType === "상실"
+                                    ? "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300"
+                                    : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                              }`}>{site.siteType}</span>
+                            )}
                           </p>
                           {site.alias && (
                             <p className={`text-xs truncate ${isDark ? "text-gray-400" : "text-gray-500"}`}>
@@ -1023,6 +1032,15 @@ export default function SitesClient({ initial, elevators }: Props) {
                     <div className="flex items-center gap-2.5 flex-wrap">
                       <h2 className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>{selected.name}</h2>
                       {companyBadge(selected.companyType, isDark)}
+                      {selected.siteType && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                          selected.siteType === "무상"
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300"
+                            : selected.siteType === "상실"
+                              ? "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300"
+                              : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                        }`}>{selected.siteType}</span>
+                      )}
                       {selected.contractType && (
                         <span className={`text-xs px-2 py-0.5 rounded-full border ${
                           selected.contractType.includes("FM")

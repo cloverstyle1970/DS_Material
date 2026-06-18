@@ -5,7 +5,7 @@ export interface SiteRecord {
   name: string;
   alias: string | null;
   ledgerNo: string | null;
-  siteKind: string | null;
+  siteType: string | null;
   companyType: string | null;
   contractType: string | null;
   contractDate: string | null;
@@ -33,7 +33,7 @@ export interface SiteRecord {
   warrantyEnd: string | null;
 }
 
-let sites: SiteRecord[] = sitesJson as SiteRecord[];
+let sites: SiteRecord[] = sitesJson as unknown as SiteRecord[];
 
 export function getSites(query?: string): SiteRecord[] {
   if (!query) return sites;
