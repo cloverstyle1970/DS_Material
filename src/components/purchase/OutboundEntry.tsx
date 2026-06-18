@@ -237,6 +237,7 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
     const row = newRow({
       materialId: t.materialId, materialName: t.materialName,
       qty: t.qty, inboundRef: t.id, remark: "",
+      elevatorName: t.elevatorName || "",
     });
     if (t.siteName && !siteName) setSiteName(t.siteName);
     setRows(prev => {
@@ -936,7 +937,7 @@ function InboundRefPopup({ onSelect, onClose }: { onSelect: (t: TransactionRecor
         <div className="flex-1 overflow-y-auto">
           <table className="w-full text-xs">
             <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
-              <tr>{["입고일","자재명","코드","수량","현재재고","현장"].map(h =>
+              <tr>{["입고일","자재명","코드","수량","현재재고","현장","호기"].map(h =>
                 <th key={h} className="px-2 py-1.5 text-left border-b border-gray-200 dark:border-gray-600 font-medium text-gray-700 dark:text-gray-300">{h}</th>)}
               </tr>
             </thead>
@@ -949,6 +950,7 @@ function InboundRefPopup({ onSelect, onClose }: { onSelect: (t: TransactionRecor
                   <td className="px-2 py-1.5 text-right tabular-nums text-blue-600">{fmtNum(t.qty)}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums font-semibold dark:text-gray-300">{fmtNum(t.afterStock)}</td>
                   <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400">{t.siteName ?? "—"}</td>
+                  <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400">{t.elevatorName ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
