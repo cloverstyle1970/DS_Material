@@ -252,7 +252,7 @@ export default function PurchaseOrderPrintPaper({
               <td className="border border-black px-2 py-1.5">{managerName || "-"}</td>
             </tr>
             <tr>
-              <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center align-top">특기사항</td>
+              <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center align-middle">특기사항</td>
               <td className="border border-black px-1 py-0.5" colSpan={3}>
                 {reference && (
                   <div className="px-1 pt-0.5 text-xs font-bold">※ {reference}</div>
