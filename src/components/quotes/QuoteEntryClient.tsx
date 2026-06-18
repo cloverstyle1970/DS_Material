@@ -267,6 +267,8 @@ function QuoteEntryInner() {
 
   // 인건비/요율 적용 여부 (체크 해제 시 인건비·일반관리비·이윤 모두 0)
   const [laborEnabled, setLaborEnabled] = useState<boolean>(true);
+  // 직접인건비만 적용 (체크 시 간접인건비·일반관리비·이윤은 0)
+  const [directLaborOnly, setDirectLaborOnly] = useState<boolean>(false);
 
   const [indirectRate, setIndirectRate] = useState<number>(8);
   const [overheadRate, setOverheadRate] = useState<number>(10);
@@ -464,12 +466,15 @@ function QuoteEntryInner() {
       setIndirectRate(Number(h.indirect_labor_rate ?? 8));
       setOverheadRate(Number(h.overhead_rate ?? 10));
       setProfitRate(Number(h.profit_rate ?? 8));
-      // 저장 시점에 인건비/요율이 모두 0이었으면 미적용 상태로 복원
-      const savedLaborTotal = Number(h.direct_labor ?? 0)
-        + Number(h.indirect_labor ?? 0)
-        + Number(h.overhead ?? 0)
-        + Number(h.profit ?? 0);
-      setLaborEnabled(savedLaborTotal > 0);
+      // 두 체크박스 독립 추론:
+      //  - 직접인건비 적용: direct_labor 가 양수면 ON
+      //  - 간접인건비/요율 적용: indirect/overhead/profit 중 하나라도 양수면 ON
+      const savedDirect   = Number(h.direct_labor ?? 0);
+      const savedIndirect = Number(h.indirect_labor ?? 0);
+      const savedOverhead = Number(h.overhead ?? 0);
+      const savedProfit   = Number(h.profit ?? 0);
+      setDirectLaborOnly(savedDirect > 0);
+      setLaborEnabled(savedIndirect > 0 || savedOverhead > 0 || savedProfit > 0);
       // 저장된 절사금액 보존(수동 모드로 처리) — 자동 재계산이 덮어쓰지 않도록
       setTruncateAmount(Number(h.truncate_amount ?? 0));
       setTruncateManual(true);
@@ -572,12 +577,14 @@ function QuoteEntryInner() {
   const effectiveManhours  = hasLaborLines ? laborLinesManhours : laborManhours;
   // 공모드: direct = unit_price * manhours
   // 식모드: 식수=1 이지만 입력된 공수합 × 단가 로 동일하게 계산
-  // laborEnabled=false 면 인건비·요율 모두 미적용 (자재비만 합계에 반영)
-  const directLabor      = laborEnabled ? Math.round(laborUnitPrice * effectiveManhours) : 0;
-  const indirectLabor    = laborEnabled ? Math.round(directLabor * indirectRate / 100) : 0;
+  // 두 체크박스는 독립적:
+  //  - directLaborOnly  = 직접인건비 적용 여부 (체크 시 직접인건비 계산)
+  //  - laborEnabled     = 간접인건비/요율 적용 여부 (체크 시 간접·일관·이윤 계산)
+  const directLabor      = directLaborOnly ? Math.round(laborUnitPrice * effectiveManhours) : 0;
+  const indirectLabor    = laborEnabled    ? Math.round(directLabor * indirectRate / 100) : 0;
   const laborSubtotal    = directLabor + indirectLabor;
-  const overhead         = laborEnabled ? Math.round((materialSubtotal + laborSubtotal) * overheadRate / 100) : 0;
-  const profit           = laborEnabled ? Math.round((laborSubtotal + overhead) * profitRate / 100) : 0;
+  const overhead         = laborEnabled    ? Math.round((materialSubtotal + laborSubtotal) * overheadRate / 100) : 0;
+  const profit           = laborEnabled    ? Math.round((laborSubtotal + overhead) * profitRate / 100) : 0;
 
   const subBeforeTrunc = materialSubtotal + laborSubtotal + overhead + profit;
   const isMaterialOnly = laborSubtotal === 0 && overhead === 0 && profit === 0;
@@ -1206,10 +1213,16 @@ function QuoteEntryInner() {
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                <input type="checkbox" checked={directLaborOnly}
+                  onChange={e => setDirectLaborOnly(e.target.checked)}
+                  className="w-4 h-4 accent-blue-600" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">직접인건비 적용</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer select-none">
                 <input type="checkbox" checked={laborEnabled}
                   onChange={e => setLaborEnabled(e.target.checked)}
                   className="w-4 h-4 accent-blue-600" />
-                <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">👷 인건비 / 요율 적용</h2>
+                <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">👷 요율 적용</h2>
               </label>
               {!laborEnabled && (
                 <span className="text-[11px] text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">

@@ -108,6 +108,11 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
   const laborAsSik = hasLaborLines && header.labor_mode === "식";
   const vatIncluded = !!header.vat_included;
   const showSpec = header.show_spec !== false;  // 기본 표시
+  // 인건비/요율 적용 여부 — 직접인건비가 0이면 미적용으로 보고 인건비 행 공란
+  // (직접만 적용 케이스는 direct>0 이고 나머지(indirect/overhead/profit)는 0 → 행별로 개별 공란 처리)
+  const laborApplied = header.direct_labor > 0;
+  const fmtOrBlank = (n: number) => (n > 0 ? fmtNum(n) : "");
+  const rateOrBlank = (n: number) => (n > 0 ? `${n}%` : "");
   // Nego 확정가가 있으면 부가세·합계는 그 금액 기준
   const negoAmount = header.nego_amount ?? 0;
   const negoActive = negoAmount > 0;
@@ -257,10 +262,10 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
               <tr>
                 <td className="border border-black"></td>
                 <td className="border border-black px-2 py-1">직접인건비</td>
-                <td className="border border-black px-2 py-1 text-center">공</td>
-                <td className="border border-black px-2 py-1 text-right tabular-nums">1</td>
-                <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(header.direct_labor)}</td>
-                <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(header.direct_labor)}</td>
+                <td className="border border-black px-2 py-1 text-center">{laborApplied ? "공" : ""}</td>
+                <td className="border border-black px-2 py-1 text-right tabular-nums">{laborApplied ? "1" : ""}</td>
+                <td className="border border-black px-2 py-1 text-right tabular-nums">{laborApplied ? fmtNum(header.direct_labor) : ""}</td>
+                <td className="border border-black px-2 py-1 text-right tabular-nums">{laborApplied ? fmtNum(header.direct_labor) : ""}</td>
                 <td className="border border-black"></td>
               </tr>
             )}
@@ -269,10 +274,10 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
               <tr>
                 <td className="border border-black"></td>
                 <td className="border border-black px-2 py-1">직접인건비</td>
-                <td className="border border-black px-2 py-1 text-center">식</td>
-                <td className="border border-black px-2 py-1 text-right tabular-nums">1</td>
-                <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(header.direct_labor)}</td>
-                <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(header.direct_labor)}</td>
+                <td className="border border-black px-2 py-1 text-center">{laborApplied ? "식" : ""}</td>
+                <td className="border border-black px-2 py-1 text-right tabular-nums">{laborApplied ? "1" : ""}</td>
+                <td className="border border-black px-2 py-1 text-right tabular-nums">{laborApplied ? fmtNum(header.direct_labor) : ""}</td>
+                <td className="border border-black px-2 py-1 text-right tabular-nums">{laborApplied ? fmtNum(header.direct_labor) : ""}</td>
                 <td className="border border-black"></td>
               </tr>
             )}
@@ -281,25 +286,25 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
               <tr key={i}>
                 <td className="border border-black"></td>
                 <td className="border border-black px-2 py-1">직접인건비({l.work_name.split(" · ")[0]} 작업 및 조정비용)</td>
-                <td className="border border-black px-2 py-1 text-center">공</td>
-                <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(l.man_days)}</td>
-                <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(l.unit_price)}</td>
-                <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(l.amount)}</td>
+                <td className="border border-black px-2 py-1 text-center">{laborApplied ? "공" : ""}</td>
+                <td className="border border-black px-2 py-1 text-right tabular-nums">{laborApplied ? fmtNum(l.man_days) : ""}</td>
+                <td className="border border-black px-2 py-1 text-right tabular-nums">{laborApplied ? fmtNum(l.unit_price) : ""}</td>
+                <td className="border border-black px-2 py-1 text-right tabular-nums">{laborApplied ? fmtNum(l.amount) : ""}</td>
                 <td className="border border-black"></td>
               </tr>
             ))}
             <tr>
               <td className="border border-black"></td>
               <td className="border border-black px-2 py-1">간접인건비 (직접인건비의 {header.indirect_labor_rate}%)</td>
-              <td className="border border-black px-2 py-1 text-center">{header.indirect_labor_rate}%</td>
+              <td className="border border-black px-2 py-1 text-center">{header.indirect_labor > 0 ? rateOrBlank(header.indirect_labor_rate) : ""}</td>
               <td className="border border-black"></td>
               <td className="border border-black"></td>
-              <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(header.indirect_labor)}</td>
+              <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtOrBlank(header.indirect_labor)}</td>
               <td className="border border-black"></td>
             </tr>
             <tr className="bg-gray-50 font-bold">
               <td colSpan={5} className="border border-black px-2 py-1.5 text-right">소 계</td>
-              <td className="border border-black px-2 py-1.5 text-right tabular-nums">{fmtNum(header.direct_labor + header.indirect_labor)}</td>
+              <td className="border border-black px-2 py-1.5 text-right tabular-nums">{fmtOrBlank(header.direct_labor + header.indirect_labor)}</td>
               <td className="border border-black px-2 py-1.5"></td>
             </tr>
 
@@ -307,10 +312,10 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
             <tr>
               <td className="border border-black bg-gray-50 px-2 py-1 font-bold text-center">3</td>
               <td className="border border-black px-2 py-1">일반관리비 및 제경비 (1+2항)</td>
-              <td className="border border-black px-2 py-1 text-center">{header.overhead_rate}%</td>
+              <td className="border border-black px-2 py-1 text-center">{header.overhead > 0 ? rateOrBlank(header.overhead_rate) : ""}</td>
               <td className="border border-black"></td>
               <td className="border border-black"></td>
-              <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(header.overhead)}</td>
+              <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtOrBlank(header.overhead)}</td>
               <td className="border border-black"></td>
             </tr>
 
@@ -318,10 +323,10 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
             <tr>
               <td className="border border-black bg-gray-50 px-2 py-1 font-bold text-center">4</td>
               <td className="border border-black px-2 py-1">이윤 (2+3항)</td>
-              <td className="border border-black px-2 py-1 text-center">{header.profit_rate}%</td>
+              <td className="border border-black px-2 py-1 text-center">{header.profit > 0 ? rateOrBlank(header.profit_rate) : ""}</td>
               <td className="border border-black"></td>
               <td className="border border-black"></td>
-              <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(header.profit)}</td>
+              <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtOrBlank(header.profit)}</td>
               <td className="border border-black"></td>
             </tr>
 
