@@ -384,7 +384,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
             <VendorInlineSearch value={vendorName} onChange={setVendorName} vendors={vendors} />
           </FormField>
           <FormField label="신청자" className="w-48">
-            <input type="text" value={managerName} onChange={e => setManagerName(e.target.value)}
+            <input type="text" lang="ko" value={managerName} onChange={e => setManagerName(e.target.value)}
               list="po-requester-names" placeholder="입력 또는 선택" className={inputCls} />
             <datalist id="po-requester-names">
               {requesterNames.map(n => <option key={n} value={n} />)}
