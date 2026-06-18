@@ -121,37 +121,28 @@ export default function PurchaseOrderPrintPaper({
     <>
       <div className="po-paper bg-white text-black mx-auto shadow-lg print:shadow-none">
 
-        {/* 제목 + 회사 정보 */}
-        <div className="border-b-2 border-black grid grid-cols-3 items-stretch">
-          <div className="text-xs px-3 py-2 border-r border-black flex items-center gap-2">
+        {/* 제목 */}
+        <div className="border-b-2 border-black grid grid-cols-[200px_1fr_200px] items-stretch">
+          <div className="text-xs px-3 py-2 flex items-center gap-2">
             <span>NO. {orderRefNo || "-"}</span>
             {formType !== "기본" && <span className="font-bold text-red-600">[{formType}]</span>}
           </div>
-          <div className="text-3xl font-bold text-center py-3 tracking-[0.3em]">發&nbsp;注&nbsp;書</div>
-          <div className="text-xs px-3 py-2 border-l border-black flex flex-col justify-center">
-            <div className="font-bold text-sm">{company?.company_name ?? "주식회사 대솔이엘"}</div>
-            <div className="font-mono mt-0.5">{company?.company_biz_no ?? ""}</div>
-          </div>
+          <div className="text-3xl font-bold text-center py-3 tracking-[0.3em]">발&nbsp;주&nbsp;서</div>
+          <div></div>
         </div>
 
         {/* 메타 */}
-        <table className="w-full text-xs border-collapse">
+        <table className="w-full text-xs border-collapse [&_tr]:h-[33px]">
           <tbody>
             <tr>
               <td className="border border-black bg-gray-100 px-2 py-1.5 w-24 font-semibold text-center">발주일자</td>
-              <td className="border border-black px-2 py-1.5">{fmtDate(orderDate)}</td>
-              <td className="border border-black bg-gray-100 px-2 py-1.5 w-24 font-semibold text-center">대표이사</td>
-              <td className="border border-black px-2 py-1.5">
-                {company?.company_ceo ?? ""}
-                {company?.company_stamp_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={company.company_stamp_url} alt="인" className="inline-block h-9 align-middle ml-1" />
-                ) : <span className="text-gray-400 ml-2">[인]</span>}
-              </td>
+              <td className="border border-black px-2 py-1.5 pr-[15px] text-center w-[209px]">{fmtDate(orderDate)}</td>
+              <td className="border border-black bg-gray-100 px-2 py-1.5 w-24 font-semibold text-center">회사명</td>
+              <td className="border border-black px-2 py-1.5">{company?.company_name ?? "주식회사 대솔이엘"}</td>
             </tr>
             <tr>
               <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">거래처</td>
-              <td className="border border-black px-2 py-1.5">
+              <td className="border border-black px-2 py-1.5 pr-[15px] text-center">
                 {vendorName || "-"}
                 <span className="text-gray-500 ml-3 text-[10px]">귀중</span>
               </td>
@@ -160,27 +151,32 @@ export default function PurchaseOrderPrintPaper({
             </tr>
             <tr>
               <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">현장명</td>
-              <td className="border border-black px-2 py-1.5">{siteName || "-"}</td>
-              <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">전화 / E-mail</td>
+              <td className="border border-black px-2 py-1.5 pr-[15px] text-center">{siteName || "-"}</td>
+              <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">대표이사</td>
               <td className="border border-black px-2 py-1.5">
-                <div>{company?.company_phone ?? ""}</div>
-                <div className="font-mono text-[10px]">{company?.company_email ?? ""}</div>
+                {company?.company_ceo ?? ""}
+                {company?.company_stamp_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={company.company_stamp_url} alt="인" className="inline-block h-[54px] align-middle ml-1 -my-3 -mr-3 relative z-10" />
+                ) : <span className="text-gray-400 ml-2">[인]</span>}
               </td>
             </tr>
             <tr>
               <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">발주자</td>
-              <td className="border border-black px-2 py-1.5">{ordererName || "-"}</td>
-              <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">합계금액</td>
-              <td className="border border-black px-2 py-1.5">&nbsp;</td>
+              <td className="border border-black px-2 py-1.5 pr-[15px] text-center">{ordererName || "-"}</td>
+              <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">전화 / E-mail</td>
+              <td className="border border-black px-2 py-1.5">
+                <span>{company?.company_phone ?? ""}</span>
+                {company?.company_phone && company?.company_email && <span className="mx-1.5 text-gray-400">/</span>}
+                <span className="font-mono text-[10px]">{company?.company_email ?? ""}</span>
+              </td>
             </tr>
           </tbody>
         </table>
 
-        {/* 참조 */}
-        <div className="border border-t-0 border-black px-3 py-2 text-sm">
-          <span className="text-xs text-gray-600 mr-3">참&nbsp;&nbsp;&nbsp;조</span>
-          <span className="font-bold">※ {reference || "-"}</span>
-          <span className="block text-[11px] text-gray-600 mt-1">아래와 같이 발주합니다.</span>
+        {/* 안내 문구 */}
+        <div className="border border-t-0 border-black px-3 py-2 text-center text-[12.8px] font-bold tracking-wider text-black">
+          아래와 같이 발주합니다.
         </div>
 
         {/* 품목 테이블 */}
@@ -258,6 +254,9 @@ export default function PurchaseOrderPrintPaper({
             <tr>
               <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center align-top">특기사항</td>
               <td className="border border-black px-1 py-0.5" colSpan={3}>
+                {reference && (
+                  <div className="px-1 pt-0.5 text-xs font-bold">※ {reference}</div>
+                )}
                 <textarea lang="ko" value={shipInfo.note} rows={3}
                   onChange={e => onShipInfoChange({ note: e.target.value })}
                   className="w-full bg-transparent text-black px-1 py-0.5 text-xs resize-none focus:outline-none focus:bg-yellow-50 print:!bg-transparent min-h-[64px]" />
