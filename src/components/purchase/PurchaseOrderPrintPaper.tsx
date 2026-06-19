@@ -229,7 +229,7 @@ export default function PurchaseOrderPrintPaper({
         </table>
 
         {/* 발주자 · 발송지 정보 */}
-        <table className="w-full text-xs border-collapse mt-2">
+        <table className="po-ship w-full text-xs border-collapse mt-2">
           <tbody>
             <tr>
               <td className="border border-black bg-gray-100 px-2 py-1.5 w-28 font-semibold text-center">발송지</td>
@@ -272,9 +272,15 @@ export default function PurchaseOrderPrintPaper({
         .po-paper {
           width: 210mm;
           min-height: 297mm;
-          padding: 22mm 10mm 12mm;
+          padding: 18mm 8mm 8mm;
           box-sizing: border-box;
+          print-color-adjust: exact;
+          -webkit-print-color-adjust: exact;
         }
+        /* 행이 페이지 경계에서 잘리지 않도록 */
+        .po-paper tr { break-inside: avoid; page-break-inside: avoid; }
+        /* 하단 발송지 표는 통째로 한 페이지에 — 합계와 분리되지 않도록 */
+        .po-paper .po-ship { break-inside: avoid; page-break-inside: avoid; }
         @media print {
           @page { size: A4 portrait; margin: 18mm 8mm 8mm; }
           body, html { background: white !important; }
