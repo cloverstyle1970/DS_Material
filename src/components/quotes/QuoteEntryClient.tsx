@@ -8,6 +8,7 @@ import { api } from "@/lib/api-client";
 import { fmtNum, parseNum } from "@/lib/format";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { insertNotification } from "@/lib/notify";
+import { generateDocNo } from "@/lib/document-no";
 import QuotePrintPaper, { QuotePrintCompany } from "@/components/quotes/QuotePrintPaper";
 
 const MENU_HREF = "/quotes/new";
@@ -731,23 +732,6 @@ function QuoteEntryInner() {
   // 저장
   // ============================================================
 
-  async function generateQuoteNo(): Promise<string> {
-    const year = new Date(quoteDate).getFullYear();
-    const prefix = `Q-${year}-`;
-    const { data } = await supabase
-      .from("quotes")
-      .select("quote_no")
-      .like("quote_no", `${prefix}%`)
-      .order("quote_no", { ascending: false })
-      .limit(1);
-    let nextSeq = 1;
-    if (data && data.length > 0) {
-      const last = (data[0] as { quote_no: string }).quote_no;
-      const match = last.match(/-(\d+)$/);
-      if (match) nextSeq = parseInt(match[1], 10) + 1;
-    }
-    return `${prefix}${String(nextSeq).padStart(4, "0")}`;
-  }
 
   async function save() {
     setMessage(null);
@@ -881,7 +865,7 @@ function QuoteEntryInner() {
       }
 
       // ─────────── 신규 작성 모드 ───────────
-      const quote_no = await generateQuoteNo();
+      const quote_no = await generateDocNo("Q", quoteDate);
       const { data: header, error: e1 } = await supabase.from("quotes").insert({
         quote_no,
         ...headerPayload,
