@@ -179,7 +179,7 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
               <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center" rowSpan={2}>합계금액</td>
               <td className="border border-black px-2 py-1.5 font-bold align-middle text-right" rowSpan={2}>
                 <span className="text-[16.57px]">￦ {fmtNum(header.total_amount)} 원정</span>
-                <div className="text-[10px] text-gray-500 mt-0.5">위 금액은 부가세 별도 금액임.</div>
+                <div className="text-[10px] text-gray-500 mt-0.5">위 금액은 부가세 {vatIncluded ? "포함" : "별도"} 금액임.</div>
               </td>
               <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">회사주소</td>
               <td className="border border-black px-2 py-1.5">{formatAddressForPrint(company?.company_address)}</td>
@@ -366,18 +366,22 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
               <td className="border border-black px-2 py-2 text-right tabular-nums">￦ {fmtNum(supplyAmount)}</td>
               <td className="border border-black"></td>
             </tr>
-            {/* 부가가치세 */}
-            <tr className="font-bold">
-              <td colSpan={5} className="border border-black px-2 py-1.5 text-right">부 가 가 치 세 (10%)</td>
-              <td className="border border-black px-2 py-1.5 text-right tabular-nums">￦ {fmtNum(vatAmount)}</td>
-              <td className="border border-black"></td>
-            </tr>
-            {/* 합계 (포함 모드면 대표 강조) */}
-            <tr className={`font-bold ${vatIncluded ? "bg-yellow-50 print:bg-gray-100 text-base" : ""}`}>
-              <td colSpan={5} className="border border-black px-2 py-2 text-right">합 계 (부가세 포함)</td>
-              <td className="border border-black px-2 py-2 text-right tabular-nums">￦ {fmtNum(grandTotal)}</td>
-              <td className="border border-black"></td>
-            </tr>
+            {/* 부가가치세 — 부가세 포함 모드에서만 표시 (별도 모드는 부가세 미적용·미표시) */}
+            {vatIncluded && (
+              <tr className="font-bold">
+                <td colSpan={5} className="border border-black px-2 py-1.5 text-right">부 가 가 치 세 (10%)</td>
+                <td className="border border-black px-2 py-1.5 text-right tabular-nums">￦ {fmtNum(vatAmount)}</td>
+                <td className="border border-black"></td>
+              </tr>
+            )}
+            {/* 합계 (부가세 포함 모드에서만 표시) */}
+            {vatIncluded && (
+              <tr className="font-bold bg-yellow-50 print:bg-gray-100 text-base">
+                <td colSpan={5} className="border border-black px-2 py-2 text-right">합 계 (부가세 포함)</td>
+                <td className="border border-black px-2 py-2 text-right tabular-nums">￦ {fmtNum(grandTotal)}</td>
+                <td className="border border-black"></td>
+              </tr>
+            )}
           </tbody>
         </table>
 
@@ -385,8 +389,8 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
         <table className="w-full text-xs border-collapse mt-2">
           <tbody>
             <tr>
-              <td className="border border-black bg-gray-100 px-2 py-1.5 w-28 font-semibold text-center" rowSpan={5}>※ 특기사항</td>
-              <td className="border border-black px-2 py-1.5 align-top" rowSpan={5} style={{ width: "46.66%" }}>
+              <td className="border border-black bg-gray-100 px-2 py-1.5 w-28 font-semibold text-center" rowSpan={4}>※ 특기사항</td>
+              <td className="border border-black px-2 py-1.5 align-top" rowSpan={4} style={{ width: "46.66%" }}>
                 <div className="whitespace-pre-wrap min-h-[60px]">{header.note ?? ""}</div>
               </td>
               <td colSpan={2} className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">&lt;고객승인&gt;</td>
@@ -399,12 +403,8 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
               <td className="border border-black px-2 py-1.5">　　　년　　　월　　　일</td>
             </tr>
             <tr>
-              <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">고객명</td>
-              <td className="border border-black px-2 py-1.5">{header.customer_name ?? ""} &nbsp;&nbsp; 연락처: {header.customer_phone ?? ""}</td>
-            </tr>
-            <tr>
-              <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">승인자</td>
-              <td className="border border-black px-2 py-1.5">　　　　　　　　 (인)　　직위:</td>
+              <td className="border border-black bg-gray-100 px-2 py-1.5 h-[72px] font-semibold text-center">승인자</td>
+              <td className="border border-black px-2 py-1.5 h-[72px]">　　　　　　　　 (인)　　직위:</td>
             </tr>
           </tbody>
         </table>

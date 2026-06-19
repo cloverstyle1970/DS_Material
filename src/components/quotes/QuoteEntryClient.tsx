@@ -254,8 +254,8 @@ function QuoteEntryInner() {
   const [laborCats, setLaborCats]   = useState<LaborCat[]>([]);
   const [laborLines, setLaborLines] = useState<LaborLine[]>([]);
 
-  // 부가세 표시 모드 (false=별도 기본, true=포함)
-  const [vatIncluded, setVatIncluded] = useState<boolean>(false);
+  // 부가세 표시 모드 (true=포함 기본, false=별도)
+  const [vatIncluded, setVatIncluded] = useState<boolean>(true);
   // 견적서 규격(spec) 표기 여부 (기본 표시)
   const [showSpec, setShowSpec] = useState<boolean>(true);
   // 견적신청자 사원 검색 후보 + 수정모드 작성자명
@@ -931,7 +931,7 @@ function QuoteEntryInner() {
       setLaborMode("공");
       setLaborManhours(1);
       setLaborLines([]);
-      setVatIncluded(false);
+      setVatIncluded(true);
       setShowSpec(true);
       setRevisionNotes([]);
       setShowRevisions(false);
@@ -1215,7 +1215,7 @@ function QuoteEntryInner() {
                 </span>
               )}
             </div>
-            <div className={`flex gap-0.5 bg-gray-100 dark:bg-gray-700 p-0.5 rounded ${!laborEnabled ? "opacity-50 pointer-events-none" : ""}`}>
+            <div className={`flex gap-0.5 bg-gray-100 dark:bg-gray-700 p-0.5 rounded ${!(directLaborOnly || laborEnabled) ? "opacity-50 pointer-events-none" : ""}`}>
               {(["공", "식"] as const).map(m => (
                 <button key={m} type="button" onClick={() => {
                   setLaborMode(m);
@@ -1231,7 +1231,7 @@ function QuoteEntryInner() {
               ))}
             </div>
           </div>
-          <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 ${!laborEnabled ? "opacity-50 pointer-events-none" : ""}`}>
+          <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 ${!(directLaborOnly || laborEnabled) ? "opacity-50 pointer-events-none" : ""}`}>
             <div>
               <label className={labelCls}>1공 단가 <span className="text-[10px] text-gray-400">(기본값 자동)</span></label>
               <input type="text" inputMode="numeric" value={laborUnitPrice === 0 ? "" : fmtNum(laborUnitPrice)}
@@ -1257,7 +1257,7 @@ function QuoteEntryInner() {
                   : `1식 (${effectiveManhours}공 통합) × ${fmtNum(laborUnitPrice)}원 = ${fmtNum(directLabor)}원`}
               </div>
             </div>
-            <div>
+            <div className={!laborEnabled ? "opacity-50 pointer-events-none" : ""}>
               <label className={labelCls}>간접인건비율 (%)</label>
               <input type="text" inputMode="decimal" value={indirectRate}
                 onChange={e => {
@@ -1267,7 +1267,7 @@ function QuoteEntryInner() {
                 className={inputCls + " text-right tabular-nums"} />
               <div className="text-[11px] text-gray-500 mt-1">= {fmtNum(indirectLabor)}원</div>
             </div>
-            <div>
+            <div className={!laborEnabled ? "opacity-50 pointer-events-none" : ""}>
               <label className={labelCls}>일반관리비율 (%) <span className="text-[10px] text-gray-400">(자재+인건)</span></label>
               <input type="text" inputMode="decimal" value={overheadRate}
                 onChange={e => {
@@ -1277,7 +1277,7 @@ function QuoteEntryInner() {
                 className={inputCls + " text-right tabular-nums"} />
               <div className="text-[11px] text-gray-500 mt-1">= {fmtNum(overhead)}원</div>
             </div>
-            <div>
+            <div className={!laborEnabled ? "opacity-50 pointer-events-none" : ""}>
               <label className={labelCls}>이윤율 (%) <span className="text-[10px] text-gray-400">(인건+일반관리)</span></label>
               <input type="text" inputMode="decimal" value={profitRate}
                 onChange={e => {
@@ -1290,7 +1290,7 @@ function QuoteEntryInner() {
           </div>
 
           {/* 교체공사 작업 라인 (표준 공수 연동) */}
-          <div className={`mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 ${!laborEnabled ? "opacity-50 pointer-events-none" : ""}`}>
+          <div className={`mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 ${!(directLaborOnly || laborEnabled) ? "opacity-50 pointer-events-none" : ""}`}>
             <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
               <h3 className="text-xs font-bold text-gray-700 dark:text-gray-200">
                 🔧 교체공사 작업 라인 <span className="text-[10px] font-normal text-gray-400">(표준 선택 시 공수 자동 · 합계가 위 공수에 반영)</span>
@@ -1462,14 +1462,18 @@ function QuoteEntryInner() {
                   <td className={`py-2 ${!vatIncluded ? "font-bold text-base text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-300"}`}>공급가액</td>
                   <td className={`py-2 text-right tabular-nums ${!vatIncluded ? "font-bold text-lg text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-200"}`}>{fmtNum(totalAmount)} 원</td>
                 </tr>
-                <tr>
-                  <td className="py-1 text-gray-600 dark:text-gray-300">부가가치세 (10%)</td>
-                  <td className="py-1 text-right tabular-nums text-gray-700 dark:text-gray-200">{fmtNum(vatAmount)} 원</td>
-                </tr>
-                <tr>
-                  <td className={`py-2 ${vatIncluded ? "font-bold text-base text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-300"}`}>합계 (부가세 포함)</td>
-                  <td className={`py-2 text-right tabular-nums ${vatIncluded ? "font-bold text-lg text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-200"}`}>{fmtNum(grandTotal)} 원</td>
-                </tr>
+                {vatIncluded && (
+                  <tr>
+                    <td className="py-1 text-gray-600 dark:text-gray-300">부가가치세 (10%)</td>
+                    <td className="py-1 text-right tabular-nums text-gray-700 dark:text-gray-200">{fmtNum(vatAmount)} 원</td>
+                  </tr>
+                )}
+                {vatIncluded && (
+                  <tr>
+                    <td className="py-2 font-bold text-base text-gray-900 dark:text-white">합계 (부가세 포함)</td>
+                    <td className="py-2 text-right tabular-nums font-bold text-lg text-blue-600 dark:text-blue-400">{fmtNum(grandTotal)} 원</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
