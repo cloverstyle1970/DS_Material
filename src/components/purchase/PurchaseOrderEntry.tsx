@@ -39,20 +39,23 @@ function newRow(seed: Partial<Row> = {}): Row {
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
-// note → formType + remark 역파싱 (발주번호는 order_no 컬럼으로 분리되었음)
-function parseNoteForEdit(note: string | null): { formType: "기본" | "긴급" | "수리"; remark: string } {
-  if (!note) return { formType: "기본", remark: "" };
+// note → formType + orderRefNo + remark 역파싱
+// 자동채번 발주번호(`order_no`)와는 별개로 사용자가 발주서에 적는 외부 참조번호는
+// `note`의 첫 `[...]` 태그(긴급/수리 형식 태그가 아닌 것)에 보존된다.
+function parseNoteForEdit(note: string | null): { formType: "기본" | "긴급" | "수리"; orderRefNo: string; remark: string } {
+  if (!note) return { formType: "기본", orderRefNo: "", remark: "" };
   let s = note.trim();
   let formType: "기본" | "긴급" | "수리" = "기본";
+  let orderRefNo = "";
   while (true) {
     const m = s.match(/^\[([^\]]+)\]\s*/);
     if (!m) break;
     const tag = m[1];
     if (tag === "긴급" || tag === "수리") formType = tag;
-    // 그 외 태그는 무시 (과거 데이터의 발주참조번호 등은 더 이상 표시 안 함)
+    else if (!orderRefNo) orderRefNo = tag;
     s = s.slice(m[0].length);
   }
-  return { formType, remark: s };
+  return { formType, orderRefNo, remark: s };
 }
 
 // 발주서 발송지 지정 장소 (고정 목록 — 화물사/택배 안내문)
@@ -78,6 +81,9 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
   const [siteName,    setSiteName]    = useState("");
   const [elevators,   setElevators]   = useState<ElevatorRecord[]>([]);
   const [reference,   setReference]   = useState("");
+  // 발주참조번호 — 사용자가 발주서에 직접 적는 외부 시스템 참조번호 (예: MNG2026MMNNN).
+  // note 첫 [태그]에 저장되어 자동채번 order_no 와 별개로 관리됨.
+  const [orderRefNo,  setOrderRefNo]  = useState("");
   const [matType,     setMatType]     = useState<"전체" | "DS" | "TK">("전체");
   const [formType,    setFormType]    = useState<"기본" | "긴급" | "수리">("기본");
   const [requesterNames, setRequesterNames] = useState<string[]>([]);
@@ -157,6 +163,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
         setSiteName(head.siteName ?? "");
         setManagerName(head.requesterName ?? "");
         setOrderNo(head.orderNo ?? "");
+        setOrderRefNo(noteHead.orderRefNo);
         setFormType(noteHead.formType);
         setOrderDate(head.orderedAt.slice(0, 10));
         setBatchId(target.batchId ?? null);
@@ -222,7 +229,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
   function clearAll() {
     if (isEdit) return;
     setRows([newRow(), newRow(), newRow(), newRow(), newRow()]);
-    setVendorName(""); setSiteName(""); setReference(""); setOrderNo(""); setFiles([]);
+    setVendorName(""); setSiteName(""); setReference(""); setOrderNo(""); setOrderRefNo(""); setFiles([]);
   }
 
   function applyMultipleMaterials(startRowId: string, materials: MaterialRecord[]) {
@@ -288,6 +295,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
       if (!isEdit) setOrderNo(effectiveOrderNo);
 
       const buildNote = (rowRemark: string) => [
+        orderRefNo ? `[${orderRefNo}]` : "",
         formType !== "기본" ? `[${formType}]` : "",
         rowRemark || reference || "",
       ].filter(Boolean).join(" ") || null;
@@ -412,9 +420,10 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
           <FormField label="현장" className="w-80 flex-1 min-w-[280px]">
             <SiteInlineSearch value={siteName} onChange={setSiteName} sites={sites} />
           </FormField>
-          <FormField label="발주번호" className="w-56">
-            <input type="text" value={orderNo} readOnly placeholder="저장 시 자동 채번 (B-YY-MM-NNN)"
-              className={`${inputCls} bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 cursor-not-allowed`} />
+          <FormField label="발주참조번호" className="w-56">
+            <input type="text" value={orderRefNo} onChange={e => setOrderRefNo(e.target.value)}
+              placeholder="예: MNG2026060450"
+              className={`${inputCls} w-full`} />
           </FormField>
           <FormField label="참조" className="flex-1 min-w-[280px]">
             <input type="text" value={reference} onChange={e => setReference(e.target.value)} className={`${inputCls} w-full`} />

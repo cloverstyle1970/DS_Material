@@ -15,6 +15,7 @@ import PurchaseOrderBulkUploadModal from "@/components/purchase/PurchaseOrderBul
 import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNum, fmtNumOr } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
+import { extractOrderRef } from "@/lib/order-ref";
 import DraggableModal from "@/components/common/DraggableModal";
 import Autocomplete from "@/components/common/Autocomplete";
 
@@ -193,9 +194,11 @@ const REQ_TYPE_CLS: Record<RequestType, string> = {
   "유상견적":   "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
 };
 
-const ORD_COLS: { key: OrdSortKey | null; label: string; sortable: boolean }[] = [
+type OrdColToggle = "ref" | "no";  // 참조번호 / 발주번호 표시 여부 토글 대상
+const ORD_COLS: { key: OrdSortKey | null; label: string; sortable: boolean; toggle?: OrdColToggle }[] = [
   { key: "orderedAt",     label: "발주일자",      sortable: true  },
-  { key: null,            label: "발주번호",     sortable: false },
+  { key: null,            label: "참조번호",     sortable: false, toggle: "ref" },
+  { key: null,            label: "발주번호",     sortable: false, toggle: "no"  },
   { key: "materialId",    label: "코드",          sortable: true  },
   { key: "materialName",  label: "자재명",        sortable: true  },
   { key: null,            label: "규격",          sortable: false },
@@ -297,6 +300,20 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
   const [ordSortDir, setOrdSortDir] = useState<SortDir>("desc");
   const [selectedReqIds, setSelectedReqIds] = useState<Set<number>>(new Set());
   const [selectedOrdIds, setSelectedOrdIds] = useState<Set<number>>(new Set());
+
+  // 발주 리스트 컬럼 표시 토글 (참조번호 / 발주번호) — localStorage에 마지막 선택 보존
+  // 기본: 참조번호 ON, 발주번호 OFF
+  const [showOrderRefCol, setShowOrderRefCol] = useState<boolean>(true);
+  const [showOrderNoCol,  setShowOrderNoCol]  = useState<boolean>(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const ref = localStorage.getItem("ds_ord_col_ref");
+    const no  = localStorage.getItem("ds_ord_col_no");
+    if (ref !== null) setShowOrderRefCol(ref === "1");
+    if (no  !== null) setShowOrderNoCol(no === "1");
+  }, []);
+  useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("ds_ord_col_ref", showOrderRefCol ? "1" : "0"); }, [showOrderRefCol]);
+  useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("ds_ord_col_no",  showOrderNoCol  ? "1" : "0"); }, [showOrderNoCol]);
 
   function toggleReqSort(key: ReqSortKey) {
     if (key === reqSortKey) setReqSortDir(d => d === "asc" ? "desc" : "asc");
@@ -517,7 +534,8 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
     const label = selectedOrdIds.size > 0 ? `선택${selectedOrdIds.size}건` : "전체";
     const rows = list.map(o => ({
       발주일자: fmtDateOnly(o.orderedAt),
-      발주번호: o.orderNo ?? "",
+      참조번호: extractOrderRef(o.note) || "",
+      발주번호: o.orderNo || "",
       자재코드: o.materialId,
       자재명: o.materialName,
       규격: matModelMap.get(o.materialId) ?? "",
@@ -913,6 +931,20 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                 엑셀 업로드
               </button>
             )}
+            {/* 발주번호 컬럼 표시 토글 */}
+            <div className="ml-2 flex items-center gap-3 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">컬럼:</span>
+              <label className="flex items-center gap-1 cursor-pointer select-none text-xs font-medium text-blue-700 dark:text-blue-300">
+                <input type="checkbox" checked={showOrderRefCol} onChange={e => setShowOrderRefCol(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-blue-600" />
+                참조번호
+              </label>
+              <label className="flex items-center gap-1 cursor-pointer select-none text-xs font-medium text-gray-700 dark:text-gray-300">
+                <input type="checkbox" checked={showOrderNoCol} onChange={e => setShowOrderNoCol(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-gray-600" />
+                발주번호
+              </label>
+            </div>
           </div>
 
           {/* 검색 필터 */}
@@ -977,12 +1009,17 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
               ) : (
                 <div className="divide-y divide-gray-100 dark:divide-gray-700">
                   {sortedOrds.map(o => {
-                    const ordTag = o.orderNo || "-";
+                    const refTag = extractOrderRef(o.note);
+                    const noTag  = o.orderNo;
                     const noteText = (o.note ?? "").replace(/^\[[^\]]*\]\s*/, "").trim();
                     return (
                       <div key={o.id} className="p-4">
                         <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <span className="text-sm font-medium text-blue-600 dark:text-blue-400">{ordTag}</span>
+                          <span className="flex items-center gap-2 text-sm font-medium">
+                            {showOrderRefCol && <span className="text-blue-600 dark:text-blue-400">{refTag || "-"}</span>}
+                            {showOrderRefCol && showOrderNoCol && <span className="text-gray-300 dark:text-gray-600">·</span>}
+                            {showOrderNoCol  && <span className="text-gray-800 dark:text-gray-100">{noTag  || "-"}</span>}
+                          </span>
                           <span className="text-xs text-gray-400 dark:text-gray-500">{fmtDateOnly(o.orderedAt)}</span>
                         </div>
                         <p className={`font-medium mt-1.5 ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-100"}`}>
@@ -1028,7 +1065,10 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                       className="h-3.5 w-3.5 rounded cursor-pointer"
                     />
                   </th>
-                  {ORD_COLS.map((c, idx) => {
+                  {ORD_COLS.filter(c =>
+                    (c.toggle !== "ref" || showOrderRefCol) &&
+                    (c.toggle !== "no"  || showOrderNoCol)
+                  ).map((c, idx) => {
                     const active = c.sortable && c.key === ordSortKey;
                     return (
                       <th key={idx} className="px-2 py-3 text-center font-bold text-black dark:text-white whitespace-nowrap">
@@ -1049,7 +1089,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                 {sortedOrds.length === 0 ? (
-                  <tr><td colSpan={admin ? 14 : 13} className="text-center py-16 text-gray-400 dark:text-gray-500">
+                  <tr><td colSpan={1 + ORD_COLS.filter(c => (c.toggle !== "ref" || showOrderRefCol) && (c.toggle !== "no" || showOrderNoCol)).length + (admin ? 1 : 0)} className="text-center py-16 text-gray-400 dark:text-gray-500">
                     {orders.length === 0 ? "발주 내역이 없습니다." : "조건에 맞는 내역이 없습니다."}
                   </td></tr>
                 ) : sortedOrds.map(o => (
@@ -1066,9 +1106,16 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                       />
                     </td>
                     <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{fmtDateOnly(o.orderedAt)}</td>
-                    <td className="px-2 py-3 text-left text-blue-600 dark:text-blue-400 font-mono text-xs whitespace-nowrap">
-                      {o.orderNo || "-"}
-                    </td>
+                    {showOrderRefCol && (
+                      <td className="px-2 py-3 text-left text-blue-600 dark:text-blue-400 font-mono text-xs whitespace-nowrap">
+                        {extractOrderRef(o.note) || "-"}
+                      </td>
+                    )}
+                    {showOrderNoCol && (
+                      <td className="px-2 py-3 text-left text-black dark:text-white font-mono text-xs whitespace-nowrap">
+                        {o.orderNo || "-"}
+                      </td>
+                    )}
                     <td className={`px-2 py-3 text-left font-mono whitespace-nowrap ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>{o.materialId}</td>
                     <td className={`px-2 py-3 text-left font-medium max-w-[160px] truncate ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>{o.materialName}</td>
                     <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{matModelMap.get(o.materialId) || "-"}</td>

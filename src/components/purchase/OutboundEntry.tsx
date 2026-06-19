@@ -9,6 +9,7 @@ import { TransactionRecord } from "@/lib/mock-transactions";
 import { UserRecord } from "@/lib/mock-users";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
+import { extractOrderRef } from "@/lib/order-ref";
 import { generateDocNo } from "@/lib/document-no";
 import { fmtNum, parseNum } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS, isRepairMaterial } from "@/lib/material-style";
@@ -898,6 +899,8 @@ function ReceiverInlineSearch({ value, onChange, users }: {
 // ── 입고내역 참조 팝업 ──────────────────────────────────────────
 function InboundRefPopup({ onSelect, onClose }: { onSelect: (t: TransactionRecord) => void; onClose: () => void }) {
   const [records, setRecords] = useState<TransactionRecord[]>([]);
+  // 입고 note의 "발주 #N" → 그 발주의 참조번호 (purchase_orders.note 첫 [태그]) 매핑
+  const [orderRefMap, setOrderRefMap] = useState<Map<number, string>>(new Map());
   const [q, setQ] = useState("");
   useEffect(() => {
     // 안전장치: type='입고' 후보 중에서 이미 출고에 참조된 입고는 제외.
@@ -905,7 +908,7 @@ function InboundRefPopup({ onSelect, onClose }: { onSelect: (t: TransactionRecor
     Promise.all([
       api.get<TransactionRecord[]>("/api/transactions?type=입고"),
       supabase.from("transactions").select("note").eq("type", "출고").ilike("note", "%입고%"),
-    ]).then(([inboundRecords, txRes]) => {
+    ]).then(async ([inboundRecords, txRes]) => {
       const matchedIds = new Set<number>();
       const re = /입고\s*#(\d+)/g;
       for (const t of (txRes.data ?? []) as { note: string | null }[]) {
@@ -916,14 +919,40 @@ function InboundRefPopup({ onSelect, onClose }: { onSelect: (t: TransactionRecor
           if (id) matchedIds.add(id);
         }
       }
-      const remaining = inboundRecords.filter(r => !matchedIds.has(r.id));
-      setRecords(remaining.slice(0, 200));
+      const remaining = inboundRecords.filter(r => !matchedIds.has(r.id)).slice(0, 200);
+      setRecords(remaining);
+
+      // 남은 입고들의 note에서 "발주 #N" → orderId 추출 → purchase_orders 일괄 조회
+      const orderIds = new Set<number>();
+      const orderRe = /발주\s*#(\d+)/;
+      for (const r of remaining) {
+        const m = r.note?.match(orderRe);
+        if (m) orderIds.add(Number(m[1]));
+      }
+      if (orderIds.size > 0) {
+        const { data } = await supabase
+          .from("purchase_orders")
+          .select("id, note")
+          .in("id", Array.from(orderIds));
+        const map = new Map<number, string>();
+        for (const row of (data ?? []) as { id: number; note: string | null }[]) {
+          const ref = extractOrderRef(row.note);
+          if (ref) map.set(row.id, ref);
+        }
+        setOrderRefMap(map);
+      }
     }).catch(() => setRecords([]));
   }, []);
+  function refForRecord(t: TransactionRecord): string {
+    const m = t.note?.match(/발주\s*#(\d+)/);
+    if (!m) return "";
+    return orderRefMap.get(Number(m[1])) ?? "";
+  }
   const filtered = records.filter(t =>
     !q || t.materialName.toLowerCase().includes(q.toLowerCase()) ||
     t.materialId.toLowerCase().includes(q.toLowerCase()) ||
-    (t.siteName?.toLowerCase().includes(q.toLowerCase()) ?? false)
+    (t.siteName?.toLowerCase().includes(q.toLowerCase()) ?? false) ||
+    refForRecord(t).toLowerCase().includes(q.toLowerCase())
   );
   return (
     <DraggableModal
@@ -939,19 +968,20 @@ function InboundRefPopup({ onSelect, onClose }: { onSelect: (t: TransactionRecor
     >
         <div className="p-3">
           <input type="text" value={q} onChange={e => setQ(e.target.value)} autoFocus
-            placeholder="자재명, 코드, 현장 검색"
+            placeholder="자재명, 코드, 현장, 발주참조번호 검색"
             className="w-full px-3 py-2 text-sm font-medium text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-700 focus:outline-none focus:border-orange-400 placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:font-normal" />
         </div>
         <div className="flex-1 overflow-y-auto">
           <table className="w-full text-xs">
             <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
-              <tr>{["입고일","자재명","코드","수량","현재재고","현장","호기"].map(h =>
-                <th key={h} className="px-2 py-1.5 text-left border-b border-gray-200 dark:border-gray-600 font-medium text-gray-700 dark:text-gray-300">{h}</th>)}
+              <tr>{["발주참조번호","입고일","자재명","코드","수량","현재재고","현장","호기"].map(h =>
+                <th key={h} className="px-2 py-1.5 text-left border-b border-gray-200 dark:border-gray-600 font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">{h}</th>)}
               </tr>
             </thead>
             <tbody>
               {filtered.map(t => (
                 <tr key={t.id} onClick={() => onSelect(t)} className="hover:bg-orange-50 dark:hover:bg-orange-900/10 cursor-pointer border-b border-gray-50 dark:border-gray-700">
+                  <td className="px-2 py-1.5 text-blue-600 dark:text-blue-400 font-medium whitespace-nowrap">{refForRecord(t) || "—"}</td>
                   <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400">{t.createdAt.slice(0, 10)}</td>
                   <td className={`px-2 py-1.5 font-medium ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "dark:text-gray-200"}`}>{t.materialName}</td>
                   <td className={`px-2 py-1.5 font-mono ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-slate-500 dark:text-slate-400"}`}>{t.materialId}</td>

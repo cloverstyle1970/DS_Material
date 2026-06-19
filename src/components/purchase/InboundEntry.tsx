@@ -10,6 +10,7 @@ import { UserRecord } from "@/lib/mock-users";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
 import { generateDocNo } from "@/lib/document-no";
+import { extractOrderRef } from "@/lib/order-ref";
 import { fmtNum, parseNum } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS, isRepairMaterial } from "@/lib/material-style";
 import DraggableModal from "@/components/common/DraggableModal";
@@ -879,7 +880,7 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
   const filtered = orders.filter(o => {
     if (!q) return true;
     const ql = q.toLowerCase();
-    const refNo = o.note?.match(/^\[(.*?)\]/)?.[1] ?? "";
+    const refNo = extractOrderRef(o.note);
     return (
       o.materialName.toLowerCase().includes(ql) ||
       o.materialId.toLowerCase().includes(ql) ||
@@ -926,7 +927,7 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
     >
         <div className="p-3">
           <input type="text" value={q} onChange={e => { setQ(e.target.value); setChecked(new Set()); }} autoFocus
-            placeholder="자재명, 코드, 거래처, 현장, 신청자, 주문참조번호 검색"
+            placeholder="자재명, 코드, 거래처, 현장, 신청자, 발주참조번호 검색"
             className="w-full px-3 py-2 text-sm font-medium text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-500 placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:font-normal" />
         </div>
         <div className="flex-1 overflow-y-auto">
@@ -936,7 +937,7 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
                 <th className="px-2 py-1.5 border-b border-gray-200 dark:border-gray-600 text-center w-10">
                   <input type="checkbox" checked={filtered.length > 0 && checked.size === filtered.length} onChange={toggleAll} className="accent-blue-600" />
                 </th>
-                {["주문참조번호","발주일","자재코드","품목명","규격","수량","단가","거래처","현장","신청자"].map(h =>
+                {["발주참조번호","발주일","자재코드","품목명","규격","수량","단가","거래처","현장","신청자"].map(h =>
                 <th key={h} className="px-2 py-1.5 text-left border-b border-gray-200 dark:border-gray-600 font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">{h}</th>)}
               </tr>
             </thead>
@@ -946,7 +947,7 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
                   <td className="px-2 py-1.5 text-center" onClick={e => e.stopPropagation()}>
                     <input type="checkbox" checked={checked.has(o.id)} onChange={() => toggle(o.id)} className="accent-blue-600" />
                   </td>
-                  <td className="px-2 py-1.5 text-blue-600 dark:text-blue-400 font-medium whitespace-nowrap">{o.note?.match(/^\[(.*?)\]/)?.[1] || "-"}</td>
+                  <td className="px-2 py-1.5 text-blue-600 dark:text-blue-400 font-medium whitespace-nowrap">{extractOrderRef(o.note) || "-"}</td>
                   <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400 whitespace-nowrap">{o.orderedAt.slice(0,10)}</td>
                   <td className={`px-2 py-1.5 font-mono whitespace-nowrap ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-slate-500 dark:text-slate-400"}`}>{o.materialId}</td>
                   <td className={`px-2 py-1.5 font-medium whitespace-nowrap ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "dark:text-gray-200"}`}>{o.materialName}</td>
