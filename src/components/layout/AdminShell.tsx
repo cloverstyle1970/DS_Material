@@ -120,7 +120,7 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarContext.Provider value={{ openSidebar: () => setSidebarOpen(true) }}>
-      <div className="flex h-full bg-gray-50 dark:bg-gray-900">
+      <div className="ds-admin-shell flex h-full bg-gray-50 dark:bg-gray-900">
         {showShell && (
           <Sidebar
             open={sidebarOpen}
@@ -131,7 +131,7 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
         )}
         <div
           className={[
-            "flex-1 flex flex-col min-h-0 overflow-hidden",
+            "ds-admin-main flex-1 flex flex-col min-h-0 overflow-hidden",
             // 모바일 모드: 콘텐츠를 모바일 폭 프레임으로 제한해 모바일 화면을 강제 재현
             isPc ? "" : "mx-auto w-full max-w-md border-x border-gray-200 dark:border-gray-700 shadow-sm",
           ].join(" ")}
@@ -141,7 +141,7 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
               <TabBar />
               {/* 탭 페이지: 등록된 모든 탭을 마운트하고 현재 pathname에 매칭되는 탭만 표시.
                   서브 라우트(예: /inbound/new)면 모든 탭을 숨기고 children 표시. */}
-              <div className="flex-1 min-h-0 relative">
+              <div className="ds-admin-tabs flex-1 min-h-0 relative">
                 {tabs.map(tab => {
                   const entry = PAGE_REGISTRY[tab.href];
                   if (!entry) return null;
@@ -168,6 +168,38 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
           )}
         </div>
       </div>
+
+      {/* 글로벌 인쇄 격리 — 페이지 자체 인쇄(예: 견적서 상세) 시 사이드바·탭바를 숨기고,
+          본문의 absolute 탭 컨테이너를 페이지 흐름으로 풀어 콘텐츠가 종이 박스에 자연 배치되게 한다.
+          모달에서 portal로 띄우는 인쇄(발주서·견적 입력)와는 무관 — portal은 body 직접 자식이라
+          여기 셀렉터 적용 대상이 아님. */}
+      <style jsx global>{`
+        @media print {
+          html, body { background: white !important; margin: 0 !important; padding: 0 !important; }
+          /* 사이드바 등 chrome 숨김 (.ds-admin-main이 아닌 외곽 자식) */
+          .ds-admin-shell > *:not(.ds-admin-main) { display: none !important; }
+          /* TabBar 등 본문 외 chrome 숨김 (.ds-admin-tabs가 아닌 메인 자식) */
+          .ds-admin-main > *:not(.ds-admin-tabs) { display: none !important; }
+          /* flex 컨테이너 풀어 페이지 흐름으로 */
+          .ds-admin-shell, .ds-admin-main {
+            display: block !important;
+            height: auto !important;
+            overflow: visible !important;
+          }
+          .ds-admin-tabs {
+            position: static !important;
+            min-height: 0 !important;
+            overflow: visible !important;
+          }
+          /* 활성 탭(absolute + inline style display:flex) 만 페이지 흐름으로 풀기 */
+          .ds-admin-tabs > div[style*="display: flex"],
+          .ds-admin-tabs > div[style*="display:flex"] {
+            position: static !important;
+            inset: auto !important;
+            overflow: visible !important;
+          }
+        }
+      `}</style>
     </SidebarContext.Provider>
   );
 }

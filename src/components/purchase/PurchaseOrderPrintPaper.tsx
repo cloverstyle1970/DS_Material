@@ -122,7 +122,7 @@ export default function PurchaseOrderPrintPaper({
       <div className="po-paper bg-white text-black mx-auto shadow-lg print:shadow-none">
 
         {/* 제목 */}
-        <div className="border-b-2 border-black grid grid-cols-[200px_1fr_200px] items-stretch">
+        <div className="border-b border-black grid grid-cols-[200px_1fr_200px] items-stretch">
           <div className="text-xs px-3 py-2 flex items-center gap-2">
             <span>NO. {orderNo || "-"}</span>
             {formType !== "기본" && <span className="font-bold text-red-600">[{formType}]</span>}

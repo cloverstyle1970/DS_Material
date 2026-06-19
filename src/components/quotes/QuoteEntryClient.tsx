@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, Suspense } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth, hasMenuPermission, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -1559,8 +1560,8 @@ function QuoteEntryInner() {
         </div>
       </div>
 
-      {/* 미리보기 오버레이 (출력물) */}
-      {previewOpen && (
+      {/* 미리보기 오버레이 (출력물) — body 직접 자식으로 띄워야 AdminShell의 absolute 탭 컨테이너에 갇히지 않음 */}
+      {previewOpen && typeof window !== "undefined" && createPortal(
         <div className="fixed inset-0 z-50 bg-gray-100 dark:bg-gray-900 overflow-auto quote-preview-overlay">
           {/* 상단 툴바 — 인쇄 시 숨김 */}
           <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm px-4 py-2 flex items-center gap-2 print:hidden">
@@ -1644,20 +1645,21 @@ function QuoteEntryInner() {
             />
           </div>
 
-          {/* 인쇄 시 미리보기만 출력되도록 격리 */}
+          {/* 인쇄 시 미리보기만 출력되도록 격리 — portal로 body 직접 자식이 됐으므로 display 방식으로 깔끔히 격리 */}
           <style jsx global>{`
             @media print {
-              body * { visibility: hidden !important; }
-              .quote-preview-overlay, .quote-preview-overlay * { visibility: visible !important; }
+              html, body { margin: 0 !important; padding: 0 !important; background: white !important; }
+              body > *:not(.quote-preview-overlay) { display: none !important; }
               .quote-preview-overlay {
-                position: absolute !important;
-                left: 0; top: 0; right: 0;
+                position: static !important;
                 background: white !important;
                 overflow: visible !important;
+                inset: auto !important;
               }
             }
           `}</style>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

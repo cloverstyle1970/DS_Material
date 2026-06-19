@@ -143,7 +143,7 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
         )}
 
         {/* 제목 */}
-        <div className="border-b-2 border-black grid grid-cols-[200px_1fr_200px] items-stretch">
+        <div className="border-b border-black grid grid-cols-[200px_1fr_200px] items-stretch">
           <div className="text-xs px-3 py-2 flex items-center">
             NO. {header.quote_no}
           </div>
@@ -440,7 +440,11 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
           box-sizing: border-box;
           display: flex;
           flex-direction: column;
+          print-color-adjust: exact;
+          -webkit-print-color-adjust: exact;
         }
+        /* 행이 페이지 경계에서 잘리지 않도록 */
+        .quote-paper tr { break-inside: avoid; page-break-inside: avoid; }
         @media print {
           @page { size: A4; margin: 8mm; }
           body, html { background: white !important; }
