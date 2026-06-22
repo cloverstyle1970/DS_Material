@@ -241,10 +241,24 @@ export default function ClaimEntryClient() {
 
     setSaving(true);
     try {
+      // 호기 헤더 — 견적요청/자재청구 알림 메시지 공용
+      const elevSet = Array.from(new Set(validItems.map(r => r.elevator_name.trim()).filter(Boolean)));
+      const headerElev = elevSet.length === 0 ? null : elevSet.join(", ");
+      const firstName = validItems[0]?.material_name ?? "";
+      const summary = validItems.length <= 1 ? firstName : `${firstName} 외 ${validItems.length - 1}건`;
+      // 자재청구 알림 고정 수신자 — 자재관리 담당(코드 곳곳에 동일하게 하드코딩됨)
+      const NOTIFY_RECIPIENTS = ["박은숙", "황진한"] as const;
+      async function notifyRecipients(payload: {
+        type: string; title: string; message: string; link: string; refType: string; refId: number | null;
+      }) {
+        const { data: targets } = await supabase.from("accounts")
+          .select("id").in("name", NOTIFY_RECIPIENTS as unknown as string[]);
+        const targetIds = (targets ?? []).map(a => a.id as number);
+        await Promise.all(targetIds.map(uid => insertNotification({ userId: uid, ...payload })));
+      }
+
       if (mode === "유상견적요청") {
         const request_no = await generateRequestNo();
-        const elevSet = Array.from(new Set(validItems.map(r => r.elevator_name.trim()).filter(Boolean)));
-        const headerElev = elevSet.length === 0 ? null : elevSet.join(", ");
         const { data: hdr, error: e1 } = await supabase.from("quote_requests").insert({
           request_no,
           site_name:      siteName,
@@ -271,33 +285,15 @@ export default function ClaimEntryClient() {
         );
         if (e2) throw e2;
         setMessage({ type: "success", text: `견적요청이 접수되었습니다. (${request_no})` });
-        // 견적 담당자(권한그룹에서 /claim/quote-requests:read 또는 admin 보유자)에게 알림
-        // 신청자 본인은 제외. 실패는 silent — 알림 누락이 등록 흐름을 막지 않도록.
-        void (async () => {
-          try {
-            const { data: allAccts } = await supabase.from("accounts").select("id, permissions");
-            const managerIds = (allAccts ?? [])
-              .filter(a => {
-                const perms = (a.permissions ?? []) as string[];
-                return perms.includes("admin") || perms.includes("menu:/claim/quote-requests:read");
-              })
-              .map(a => a.id as number)
-              .filter(id => id !== user.id);
-            const firstName = validItems[0]?.material_name ?? "";
-            const summary = validItems.length <= 1 ? firstName : `${firstName} 외 ${validItems.length - 1}건`;
-            await Promise.all(managerIds.map(uid =>
-              insertNotification({
-                userId:  uid,
-                type:    "quote_request",
-                title:   "새 견적요청이 접수되었습니다",
-                message: `[${siteName}${headerElev ? ` · ${headerElev}` : ""}] ${workTitle ? `${workTitle} — ` : ""}${summary}`,
-                link:    "/claim/quote-requests",
-                refType: "quote_request",
-                refId:   hdr.id,
-              })
-            ));
-          } catch (e) { console.warn("[notify] 견적요청 알림 실패:", e); }
-        })();
+        // 자재관리 담당(박은숙·황진한)에게 알림 — 본인 포함. 실패는 silent.
+        void notifyRecipients({
+          type:    "quote_request",
+          title:   "새 견적요청이 접수되었습니다",
+          message: `[${siteName}${headerElev ? ` · ${headerElev}` : ""}] ${workTitle ? `${workTitle} — ` : ""}${summary}`,
+          link:    "/claim/quote-requests",
+          refType: "quote_request",
+          refId:   hdr.id,
+        }).catch(e => console.warn("[notify] 견적요청 알림 실패:", e));
       } else {
         // 무상신청 / 당직선출고 — material_requests 사용
         const items = validItems.map(r => ({
@@ -306,7 +302,7 @@ export default function ClaimEntryClient() {
           qty:           r.qty,
           elevatorName:  r.elevator_name || null,
         }));
-        const { error } = await supabase.from("material_requests").insert({
+        const { data: inserted, error } = await supabase.from("material_requests").insert({
           status:         "신청",
           site_name:      siteName,
           items,
@@ -315,12 +311,25 @@ export default function ClaimEntryClient() {
           requester_name: user.name,
           requester_dept: user.dept ?? "",
           request_type:   mode,    // '무상신청' | '당직선출고'
-        });
+        }).select("id").single();
         if (error) throw error;
         const msg = mode === "당직선출고"
           ? "당직 선출고 신청이 접수되었습니다. 관리자가 즉시 출고 처리합니다."
           : "무상 자재신청이 접수되었습니다.";
         setMessage({ type: "success", text: msg });
+        // 자재관리 담당(박은숙·황진한)에게 알림 — 본인 포함. 실패는 silent.
+        const requestId = (inserted as { id?: number } | null)?.id ?? null;
+        const notifyTitle = mode === "당직선출고"
+          ? "새 당직선출고 신청이 접수되었습니다"
+          : "새 무상자재신청이 접수되었습니다";
+        void notifyRecipients({
+          type:    "material_request",
+          title:   notifyTitle,
+          message: `[${siteName}${headerElev ? ` · ${headerElev}` : ""}] ${workTitle ? `${workTitle} — ` : ""}${summary}`,
+          link:    "/requests",
+          refType: "material_request",
+          refId:   requestId,
+        }).catch(e => console.warn("[notify] 자재청구 알림 실패:", e));
       }
       // 폼 리셋
       setRows(Array.from({ length: DEFAULT_ROW_COUNT }, () => newRow()));
