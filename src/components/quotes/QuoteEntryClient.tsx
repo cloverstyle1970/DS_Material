@@ -859,6 +859,7 @@ function QuoteEntryInner() {
           type: "success",
           text: `견적서가 수정되었습니다. (${editQuoteNo ?? `#${editId}`})`,
         });
+        window.dispatchEvent(new CustomEvent("ds:quotes_changed"));
         setSaving(false);
         // 잠시 메시지 표시 후 상세로 이동
         setTimeout(() => router.push(`/quotes/detail?id=${editId}`), 600);
@@ -922,6 +923,7 @@ function QuoteEntryInner() {
           ? `견적서가 등록되었습니다. (${quote_no}) — 견적요청 ${sourceRequestNo} 연결 완료`
           : `견적서가 등록되었습니다. (${quote_no})`,
       });
+      window.dispatchEvent(new CustomEvent("ds:quotes_changed"));
       // 폼 리셋
       setRows(Array.from({ length: DEFAULT_ROW_COUNT }, () => newRow()));
       setSiteName(""); setCustomerName("");

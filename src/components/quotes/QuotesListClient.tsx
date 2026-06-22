@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 import { fmtNum } from "@/lib/format";
 
@@ -39,7 +40,7 @@ export default function QuotesListClient() {
   // 처리 중
   const [actionId, setActionId] = useState<number | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase
       .from("quotes")
@@ -49,8 +50,14 @@ export default function QuotesListClient() {
       .limit(500);
     setRows((data ?? []) as QuoteRow[]);
     setLoading(false);
-  }
-  useEffect(() => { load(); }, []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useReloadOnActivate(load);
+  useEffect(() => {
+    const onChanged = () => { load(); };
+    window.addEventListener("ds:quotes_changed", onChanged);
+    return () => window.removeEventListener("ds:quotes_changed", onChanged);
+  }, [load]);
 
   if (!user) return <div className="p-8 text-center text-sm text-gray-500">로그인이 필요합니다.</div>;
   const admin = isAdmin(user);
