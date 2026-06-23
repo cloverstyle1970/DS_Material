@@ -931,37 +931,37 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
             className="w-full px-3 py-2 text-sm font-medium text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-500 placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:font-normal" />
         </div>
         <div className="flex-1 overflow-y-auto">
-          <table className="w-full text-xs">
-            <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-100 dark:bg-gray-700 sticky top-0 z-10">
               <tr>
-                <th className="px-2 py-1.5 border-b border-gray-200 dark:border-gray-600 text-center w-10">
-                  <input type="checkbox" checked={filtered.length > 0 && checked.size === filtered.length} onChange={toggleAll} className="accent-blue-600" />
+                <th className="px-2 py-2 border-b-2 border-gray-300 dark:border-gray-600 text-center w-10">
+                  <input type="checkbox" checked={filtered.length > 0 && checked.size === filtered.length} onChange={toggleAll} className="accent-blue-600 w-4 h-4" />
                 </th>
                 {["발주참조번호","발주일","자재코드","품목명","규격","수량","단가","거래처","현장","신청자"].map(h =>
-                <th key={h} className="px-2 py-1.5 text-left border-b border-gray-200 dark:border-gray-600 font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">{h}</th>)}
+                <th key={h} className="px-2 py-2 text-left border-b-2 border-gray-300 dark:border-gray-600 font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap">{h}</th>)}
               </tr>
             </thead>
             <tbody>
               {filtered.map(o => (
-                <tr key={o.id} onClick={() => toggle(o.id)} className={`cursor-pointer border-b border-gray-50 dark:border-gray-700 ${checked.has(o.id) ? "bg-blue-50 dark:bg-blue-900/30" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
-                  <td className="px-2 py-1.5 text-center" onClick={e => e.stopPropagation()}>
-                    <input type="checkbox" checked={checked.has(o.id)} onChange={() => toggle(o.id)} className="accent-blue-600" />
+                <tr key={o.id} onClick={() => toggle(o.id)} className={`cursor-pointer border-b border-gray-200 dark:border-gray-700 ${checked.has(o.id) ? "bg-blue-50 dark:bg-blue-900/30" : "hover:bg-blue-50/40 dark:hover:bg-gray-700/60"}`}>
+                  <td className="px-2 py-2 text-center" onClick={e => e.stopPropagation()}>
+                    <input type="checkbox" checked={checked.has(o.id)} onChange={() => toggle(o.id)} className="accent-blue-600 w-4 h-4" />
                   </td>
-                  <td className="px-2 py-1.5 text-blue-600 dark:text-blue-400 font-medium whitespace-nowrap">{extractOrderRef(o.note) || "-"}</td>
-                  <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400 whitespace-nowrap">{o.orderedAt.slice(0,10)}</td>
-                  <td className={`px-2 py-1.5 font-mono whitespace-nowrap ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-slate-500 dark:text-slate-400"}`}>{o.materialId}</td>
-                  <td className={`px-2 py-1.5 font-medium whitespace-nowrap ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "dark:text-gray-200"}`}>{o.materialName}</td>
-                  <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400 whitespace-nowrap">{mats[o.materialId] || "-"}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums dark:text-gray-300 whitespace-nowrap">{fmtNum(o.qty)}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums dark:text-gray-300 whitespace-nowrap">{o.unitPrice ? fmtNum(o.unitPrice) : "-"}</td>
-                  <td className="px-2 py-1.5 dark:text-gray-300 whitespace-nowrap">{o.vendorName ?? "-"}</td>
-                  <td className="px-2 py-1.5 dark:text-gray-300 whitespace-nowrap">{o.siteName ?? "-"}</td>
-                  <td className="px-2 py-1.5 dark:text-gray-300 whitespace-nowrap">{o.requesterName ?? "-"}</td>
+                  <td className="px-2 py-2 text-blue-700 dark:text-blue-300 font-bold whitespace-nowrap">{extractOrderRef(o.note) || "-"}</td>
+                  <td className="px-2 py-2 text-gray-700 dark:text-gray-200 font-medium whitespace-nowrap">{o.orderedAt.slice(0,10)}</td>
+                  <td className={`px-2 py-2 font-mono font-semibold whitespace-nowrap ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-slate-700 dark:text-slate-200"}`}>{o.materialId}</td>
+                  <td className={`px-2 py-2 font-semibold whitespace-nowrap ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-gray-900 dark:text-gray-100"}`}>{o.materialName}</td>
+                  <td className="px-2 py-2 text-gray-700 dark:text-gray-200 font-medium whitespace-nowrap">{mats[o.materialId] || "-"}</td>
+                  <td className="px-2 py-2 text-right tabular-nums font-semibold text-gray-900 dark:text-gray-100 whitespace-nowrap">{fmtNum(o.qty)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums font-medium text-gray-800 dark:text-gray-100 whitespace-nowrap">{o.unitPrice ? fmtNum(o.unitPrice) : "-"}</td>
+                  <td className="px-2 py-2 text-gray-800 dark:text-gray-100 font-medium whitespace-nowrap">{o.vendorName ?? "-"}</td>
+                  <td className="px-2 py-2 text-gray-800 dark:text-gray-100 font-medium whitespace-nowrap">{o.siteName ?? "-"}</td>
+                  <td className="px-2 py-2 text-gray-800 dark:text-gray-100 font-medium whitespace-nowrap">{o.requesterName ?? "-"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {filtered.length === 0 && <p className="text-center py-8 text-xs text-gray-400 dark:text-gray-500">미입고 발주서 없음</p>}
+          {filtered.length === 0 && <p className="text-center py-8 text-sm text-gray-500 dark:text-gray-400 font-medium">미입고 발주서 없음</p>}
         </div>
         <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-b-lg shrink-0">
           <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
