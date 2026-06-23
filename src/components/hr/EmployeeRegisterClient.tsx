@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, FormEvent } from "react";
 import { useAuth, hasMenuPermission } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 import { createAuthUser } from "@/lib/auth-ops";
 import { formatDate, formatPhone, formatSsn, genderFromSsn } from "@/lib/input-format";
@@ -177,20 +178,22 @@ export default function EmployeeRegisterClient() {
   const [crews, setCrews] = useState<{ id: number; department_id: number; name: string; is_active: boolean }[]>([]);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
+  const loadRefData = async () => {
+    const [d, r, p, c] = await Promise.all([
+      supabase.from("departments").select("id, name").eq("is_active", true).order("sort_order"),
+      supabase.from("ranks").select("id, name").eq("is_active", true).order("sort_order"),
+      supabase.from("permission_groups").select("id, name, permissions").order("sort_order"),
+      supabase.from("crews").select("id, department_id, name, is_active").eq("is_active", true).order("sort_order"),
+    ]);
+    if (d.data) setDepartments(d.data as { id: number; name: string }[]);
+    if (r.data) setRanks(r.data as { id: number; name: string }[]);
+    if (p.data) setPermGroups(p.data as { id: number; name: string; permissions: string[] }[]);
+    if (c.data) setCrews(c.data as { id: number; department_id: number; name: string; is_active: boolean }[]);
+  };
   useEffect(() => {
-    (async () => {
-      const [d, r, p, c] = await Promise.all([
-        supabase.from("departments").select("id, name").eq("is_active", true).order("sort_order"),
-        supabase.from("ranks").select("id, name").eq("is_active", true).order("sort_order"),
-        supabase.from("permission_groups").select("id, name, permissions").order("sort_order"),
-        supabase.from("crews").select("id, department_id, name, is_active").eq("is_active", true).order("sort_order"),
-      ]);
-      if (d.data) setDepartments(d.data as { id: number; name: string }[]);
-      if (r.data) setRanks(r.data as { id: number; name: string }[]);
-      if (p.data) setPermGroups(p.data as { id: number; name: string; permissions: string[] }[]);
-      if (c.data) setCrews(c.data as { id: number; department_id: number; name: string; is_active: boolean }[]);
-    })();
+    void loadRefData();
   }, []);
+  useReloadOnActivate(() => { void loadRefData(); });
 
   useEffect(() => {
     if (window.daum?.Postcode) { setDaumReady(true); return; }

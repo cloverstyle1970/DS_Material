@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAuth, isAdmin } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 import { fmtNum } from "@/lib/format";
 
@@ -119,6 +120,7 @@ function Inner() {
   }
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [quoteId]);
+  useReloadOnActivate(() => { void load(); });
 
   const rows: RowStatus[] = useMemo(() => {
     if (!req) return [];

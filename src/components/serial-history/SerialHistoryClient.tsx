@@ -6,6 +6,7 @@ import { api, getErrorMessage } from "@/lib/api-client";
 import { MaterialUnitRecord, MaterialUnitStatus } from "@/lib/mock-material-units";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { useViewMode } from "@/context/ViewModeContext";
 import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 import { fmtNum } from "@/lib/format";
@@ -62,6 +63,17 @@ export default function SerialHistoryClient() {
   const [history,  setHistory]  = useState<Record<number, TransactionRecord[]>>({});
   const [historyLoading, setHistoryLoading] = useState<number | null>(null);
 
+  const reloadUnits = () => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (status !== "전체") params.set("status", status);
+    if (snQuery.trim()) params.set("serialNo", snQuery.trim());
+    if (matQuery.trim()) params.set("matQuery", matQuery.trim());
+    return api.get<MaterialUnitRecord[]>(`/api/material-units?${params.toString()}`)
+      .then(rows => { setUnits(rows); })
+      .catch(e => { alert(getErrorMessage(e)); })
+      .finally(() => { setLoading(false); });
+  };
   useEffect(() => {
     let cancelled = false;
     const t = setTimeout(() => {
@@ -77,6 +89,7 @@ export default function SerialHistoryClient() {
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
   }, [status, snQuery, matQuery]);
+  useReloadOnActivate(() => { void reloadUnits(); });
 
   function downloadExcel() {
     const stamp = new Date().toISOString().slice(0,10).replace(/-/g, "");

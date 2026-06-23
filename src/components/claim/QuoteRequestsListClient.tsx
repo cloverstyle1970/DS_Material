@@ -4,9 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { useTabs, MAX_TABS } from "@/context/TabsContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 import { visibleUserIds } from "@/lib/crew";
 import { fmtNum } from "@/lib/format";
+import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 
 interface QuoteRequest {
   id: number;
@@ -67,6 +69,13 @@ export default function QuoteRequestsListClient() {
   const [filter, setFilter] = useState<StatusFilter>("신청");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedItems, setSelectedItems] = useState<QuoteRequestItem[]>([]);
+  // quote_requests 자체에는 DS/TK 구분이 없어, items 의 material_id 첫 글자(D=DS / 그 외=TK)로 판정.
+  // 한 요청에 TK 자재가 한 건이라도 포함되면 행 텍스트를 파란색으로 표시한다.
+  const [tkRequestIds, setTkRequestIds] = useState<Set<number>>(new Set());
+  // 통합 검색: 요청번호·현장·호기·작업명·신청자·부서 부분일치
+  const [query, setQuery] = useState("");
+  // DS/TK 토글: "DS" = 순수 DS(TK 자재 없음), "TK" = TK 한 건이라도 포함, "전체" = 무조건
+  const [matType, setMatType] = useState<"전체" | "DS" | "TK">("전체");
 
   async function load() {
     if (!user) return;
@@ -77,15 +86,48 @@ export default function QuoteRequestsListClient() {
     const ids = await visibleUserIds(user, "/claim/quote-requests");
     if (ids) query = query.in("requester_id", ids);
     const { data } = await query;
-    setList((data ?? []) as QuoteRequest[]);
+    const requests = (data ?? []) as QuoteRequest[];
+    setList(requests);
     setLoading(false);
+
+    // TK 여부 일괄 조회 (요청 ID 단위로 묶음)
+    const reqIds = requests.map(r => r.id);
+    if (reqIds.length === 0) { setTkRequestIds(new Set()); return; }
+    const { data: items } = await supabase.from("quote_request_items")
+      .select("quote_request_id, material_id")
+      .in("quote_request_id", reqIds);
+    const tkSet = new Set<number>();
+    for (const it of (items ?? []) as { quote_request_id: number; material_id: string | null }[]) {
+      if (isTkMaterial(it.material_id)) tkSet.add(it.quote_request_id);
+    }
+    setTkRequestIds(tkSet);
   }
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [user?.id, canViewAll]);
+  // 탭 비활성 → 활성 전환 시점에 목록 새로고침 (상태·검색 입력은 보존)
+  useReloadOnActivate(() => { void load(); });
 
+  // 1단계: 검색어 + TK/DS 토글 적용 (상태 필터는 별개)
+  const searchFiltered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return list.filter(r => {
+      if (matType === "TK" && !tkRequestIds.has(r.id)) return false;
+      if (matType === "DS" && tkRequestIds.has(r.id)) return false;
+      if (q) {
+        const hay = [
+          r.request_no, r.site_name, r.elevator_name, r.work_title,
+          r.requester_name, r.requester_dept,
+        ].filter(Boolean).join(" ").toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [list, query, matType, tkRequestIds]);
+
+  // 2단계: 상태 필터 — 상태별 카운트는 searchFiltered 기준
   const filtered = useMemo(
-    () => filter === "전체" ? list : list.filter(r => r.status === filter),
-    [list, filter],
+    () => filter === "전체" ? searchFiltered : searchFiltered.filter(r => r.status === filter),
+    [searchFiltered, filter],
   );
 
   async function openDetail(r: QuoteRequest) {
@@ -145,6 +187,25 @@ export default function QuoteRequestsListClient() {
               : "내가 등록한 유상 견적요청 — 견적서 발행 여부를 확인할 수 있습니다."}
           </p>
         </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <input type="text" value={query} onChange={e => setQuery(e.target.value)}
+            placeholder="현장·신청자·작업명·요청번호 검색"
+            className="px-3 py-1.5 text-xs font-medium text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:font-normal w-56" />
+          <div className="flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
+            {(["전체", "DS", "TK"] as const).map(t => (
+              <button key={t} type="button" onClick={() => setMatType(t)}
+                className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                  matType === t
+                    ? t === "DS" ? "bg-red-500 text-white"
+                    : t === "TK" ? "bg-blue-600 text-white"
+                    : "bg-slate-600 text-white"
+                    : "bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600"
+                }`}>
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="flex gap-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-xl">
           {STATUS_OPTIONS.map(s => {
             const active = filter === s;
@@ -161,7 +222,7 @@ export default function QuoteRequestsListClient() {
                     ? activeCls
                     : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                 }`}>
-                {s} <span className="opacity-60 ml-1">{s === "전체" ? list.length : list.filter(r => r.status === s).length}</span>
+                {s} <span className="opacity-60 ml-1">{s === "전체" ? searchFiltered.length : searchFiltered.filter(r => r.status === s).length}</span>
               </button>
             );
           })}
@@ -190,25 +251,30 @@ export default function QuoteRequestsListClient() {
                   <tr><td colSpan={8} className="text-center py-10 text-gray-500">로딩 중...</td></tr>
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={8} className="text-center py-10 text-gray-400">데이터가 없습니다.</td></tr>
-                ) : filtered.map(r => (
+                ) : filtered.map(r => {
+                  const isTk = tkRequestIds.has(r.id);
+                  // TK 요청은 일반 텍스트 셀(접수일시·현장·호기·작업명·신청자)을 파란색으로 표시.
+                  // 요청번호는 이미 파란 강조라 그대로 두고, 상태 배지는 의미가 달라 그대로 둠.
+                  return (
                   <tr key={r.id} onClick={() => openDetail(r)}
                     className={`cursor-pointer transition-colors ${selectedId === r.id ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-gray-50 dark:hover:bg-gray-800/50"}`}>
                     <td className="px-3 py-2 font-mono text-xs font-bold text-blue-600 dark:text-blue-400">{r.request_no}</td>
-                    <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-300 font-mono">{fmtDT(r.requested_at)}</td>
+                    <td className={`px-3 py-2 text-xs font-mono ${isTk ? TK_TEXT_CLASS : "text-gray-600 dark:text-gray-300"}`}>{fmtDT(r.requested_at)}</td>
                     <td className="px-3 py-2 text-center">
                       <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                        유상견적요청
+                        {isTk ? "TK 견적요청" : "유상견적요청"}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-xs font-medium text-gray-800 dark:text-gray-100">{r.site_name ?? "-"}</td>
-                    <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-300">{r.elevator_name ?? "-"}</td>
-                    <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-200 truncate max-w-[200px]">{r.work_title ?? "-"}</td>
-                    <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-300">{r.requester_name ?? "-"}{r.requester_dept && <span className="ml-1 text-gray-400">({r.requester_dept})</span>}</td>
+                    <td className={`px-3 py-2 text-xs font-medium ${isTk ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-100"}`}>{r.site_name ?? "-"}</td>
+                    <td className={`px-3 py-2 text-xs ${isTk ? TK_TEXT_CLASS : "text-gray-600 dark:text-gray-300"}`}>{r.elevator_name ?? "-"}</td>
+                    <td className={`px-3 py-2 text-xs truncate max-w-[200px] ${isTk ? TK_TEXT_CLASS : "text-gray-700 dark:text-gray-200"}`}>{r.work_title ?? "-"}</td>
+                    <td className={`px-3 py-2 text-xs ${isTk ? TK_TEXT_CLASS : "text-gray-600 dark:text-gray-300"}`}>{r.requester_name ?? "-"}{r.requester_dept && <span className={`ml-1 ${isTk ? TK_TEXT_CLASS : "text-gray-400"}`}>({r.requester_dept})</span>}</td>
                     <td className="px-3 py-2 text-center">
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${statusBadge(r.status)}`}>{r.status}</span>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

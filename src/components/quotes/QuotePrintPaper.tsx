@@ -23,6 +23,7 @@ export interface QuotePrintItem {
   qty: number;
   unit_price: number;
   amount: number;
+  elevator_name?: string | null;   // 비고란 앞에 [호기명] 으로 함께 표시
   remark?: string | null;
   opinion_text?: string | null;
   opinion_image_url?: string | null;
@@ -237,7 +238,13 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
                 <td className="border border-black px-2 py-1 text-right tabular-nums">{fmtNum(it.amount)}</td>
                 <td className="border border-black px-2 py-1">
                   <div className="flex items-center gap-2">
-                    <span className="flex-1">{it.remark ?? ""}</span>
+                    <span className="flex-1">
+                      {/* 호기 정보 + 비고 — 호기가 있으면 같은 셀에 "#호기 " 형태로 먼저 표시 */}
+                      {it.elevator_name && (
+                        <span className="font-semibold">#{it.elevator_name} </span>
+                      )}
+                      {it.remark ?? ""}
+                    </span>
                     {(it.opinion_text || it.opinion_image_url) && onOpenOpinion && it.id !== undefined && (
                       <button type="button" onClick={() => onOpenOpinion(it.id!)}
                         className="text-[10px] text-blue-600 underline print:hidden">소견</button>
@@ -391,7 +398,7 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
             <tr>
               <td className="border border-black bg-gray-100 px-2 py-1.5 w-28 font-semibold text-center" rowSpan={4}>※ 특기사항</td>
               <td className="border border-black px-2 py-1.5 align-top" rowSpan={4} style={{ width: "46.66%" }}>
-                <div className="whitespace-pre-wrap min-h-[60px]">{header.note ?? ""}</div>
+                <div className="whitespace-pre-wrap min-h-[60px] text-blue-700">{header.note ?? ""}</div>
               </td>
               <td colSpan={2} className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">&lt;고객승인&gt;</td>
             </tr>

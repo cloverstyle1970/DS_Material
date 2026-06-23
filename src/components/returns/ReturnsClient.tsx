@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TransactionRecord } from "@/lib/mock-transactions";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { useViewMode } from "@/context/ViewModeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNum } from "@/lib/format";
@@ -58,6 +59,7 @@ export default function ReturnsClient() {
     const t = setTimeout(() => { reload(); }, 0);
     return () => clearTimeout(t);
   }, [reload]);
+  useReloadOnActivate(() => { void reload(); });
 
   function toggleOne(id: number) {
     setSelected(prev => {

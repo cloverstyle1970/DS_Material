@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 import Combobox from "@/components/tbm/Combobox";
 import DraggableModal from "@/components/common/DraggableModal";
@@ -93,6 +94,7 @@ export default function CompanyVehiclesClient() {
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
+  useReloadOnActivate(() => { void load(); });
 
   if (!user) return <div className="p-8 text-center text-sm text-gray-500">로그인이 필요합니다.</div>;
   const admin = isAdmin(user);

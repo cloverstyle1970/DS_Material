@@ -7,6 +7,7 @@ import AddMaterialModal from "./AddMaterialModal";
 import EditMaterialModal from "./EditMaterialModal";
 import BulkUploadModal from "./BulkUploadModal";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useViewMode } from "@/context/ViewModeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
@@ -244,6 +245,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
       setShowModal(false);
     }
   }, []);
+  useReloadOnActivate(() => { void reload(); });
 
   type ColDef = { key: SortKey | null; label: string; align?: "left" | "right" };
   const COLUMNS: ColDef[] = viewOnly

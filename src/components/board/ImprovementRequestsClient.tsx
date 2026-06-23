@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { insertNotification } from "@/lib/notify";
 import Header from "@/components/layout/Header";
 
@@ -66,6 +67,7 @@ export default function ImprovementRequestsClient() {
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
+  useReloadOnActivate(() => { void refresh(); });
 
   const filtered = useMemo(() =>
     filter === "전체" ? rows : rows.filter(r => r.status === filter), [rows, filter]);

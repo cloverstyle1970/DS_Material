@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef, Fragment, DragEvent, ChangeEvent } from "react";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { useViewMode } from "@/context/ViewModeContext";
 import { supabase } from "@/lib/supabase";
 
@@ -102,6 +103,7 @@ export default function LegacyQuotesClient() {
   useEffect(() => {
     if (canRead) void load();
   }, [canRead, load]);
+  useReloadOnActivate(() => { if (canRead) void load(); });
 
   const filtered = useMemo(() => {
     let list = rows;

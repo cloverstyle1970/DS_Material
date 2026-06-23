@@ -111,29 +111,42 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
         setEditBatchId(target.batchId || null);
         setEditTransactionNo(target.transactionNo || null);
 
-        const loaded: Row[] = [];
+        // siblings 는 add_transaction RPC 가 한 화면 Row 를 S/N 1건당 + 잔여 비추적분 1행 으로
+        // 분할 저장한 결과다. 수정 모드에서는 원래 입력 단위(자재/호기/단가/회수/입고참조/메모)로
+        // 다시 합쳐서 한 행으로 보여줘야 S/N 모달이 입력 당시 상태를 그대로 노출한다.
+        const groupKey = (t: TransactionRecord, inboundRef: number | null, memo: string) =>
+          `${t.materialId}|${t.elevatorName ?? ""}|${t.unitPrice ?? 0}|${!!t.requiresReturn}|${inboundRef ?? ""}|${memo}`;
+        const groups = new Map<string, Row>();
         let firstReceiver = "";
         for (const t of siblings) {
           const parsed = parseOutboundNote(t.note);
           if (!firstReceiver && parsed.receiverName) firstReceiver = parsed.receiverName;
-          loaded.push({
-            id: crypto.randomUUID(),
-            existingId: t.id,
-            materialId: t.materialId,
-            materialName: t.materialName,
-            spec: "",
-            qty: t.qty,
-            unitPrice: t.unitPrice ?? 0,
-            buyPrice: 0,
-            stockQty: 0,
-            storageLoc: "",
-            elevatorName: t.elevatorName || "",
-            remark: parsed.memo,
-            inboundRef: parsed.inboundRef,
-            serialNos: t.serialNo ? [t.serialNo] : [],
-            requiresReturn: !!t.requiresReturn,
-          });
+          const key = groupKey(t, parsed.inboundRef, parsed.memo);
+          const existing = groups.get(key);
+          if (existing) {
+            existing.qty += t.qty;
+            if (t.serialNo) existing.serialNos.push(t.serialNo);
+          } else {
+            groups.set(key, {
+              id: crypto.randomUUID(),
+              existingId: t.id,
+              materialId: t.materialId,
+              materialName: t.materialName,
+              spec: "",
+              qty: t.qty,
+              unitPrice: t.unitPrice ?? 0,
+              buyPrice: 0,
+              stockQty: 0,
+              storageLoc: "",
+              elevatorName: t.elevatorName || "",
+              remark: parsed.memo,
+              inboundRef: parsed.inboundRef,
+              serialNos: t.serialNo ? [t.serialNo] : [],
+              requiresReturn: !!t.requiresReturn,
+            });
+          }
         }
+        const loaded: Row[] = Array.from(groups.values());
         if (firstReceiver) setReceiverName(firstReceiver);
         
         while (loaded.length < 5) loaded.push(newRow());

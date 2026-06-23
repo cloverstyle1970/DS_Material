@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { SiteRecord } from "@/lib/mock-sites";
 import { ElevatorRecord } from "@/lib/mock-elevators";
 import { useAuth, isViewOnly, isAdmin } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useViewMode } from "@/context/ViewModeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
@@ -607,6 +608,10 @@ export default function SitesClient({ initial, elevators }: Props) {
 
     return () => { supabase.removeChannel(channel); };
   }, []);
+  useReloadOnActivate(() => {
+    api.get<SiteRecord[]>("/api/sites").then(setSites).catch(() => {});
+    api.get<ElevatorRecord[]>("/api/elevators").then(setAllElevators).catch(() => {});
+  });
 
   const q = query.trim().toLowerCase();
   const { theme } = useTheme();

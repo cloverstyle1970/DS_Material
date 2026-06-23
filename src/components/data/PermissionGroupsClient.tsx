@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useAuth, hasMenuPermission } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 
 // ============================================================
@@ -221,6 +222,7 @@ export default function PermissionGroupsClient() {
   }
 
   useEffect(() => { if (hasMenuPermission(user, "/data/permission-groups", "read")) void reload(); }, [user]);
+  useReloadOnActivate(() => { if (hasMenuPermission(user, "/data/permission-groups", "read")) void reload(); });
 
   useEffect(() => {
     if (selectedId == null && groups.length > 0) setSelectedId(groups[0].id);

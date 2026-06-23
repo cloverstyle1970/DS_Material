@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import Header from "@/components/layout/Header";
 import PushNotificationToggle from "@/components/me/PushNotificationToggle";
 import type { ConstructionRequest, ConstructionSchedule, NotificationItem } from "@/lib/mock-router";
@@ -110,6 +111,7 @@ export default function MyDashboardContent() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+  useReloadOnActivate(() => { void refresh(); });
 
   async function handleNotificationClick(n: NotificationItem) {
     try {

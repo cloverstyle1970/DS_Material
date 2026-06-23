@@ -10,10 +10,11 @@ import { fmtNum, parseNum } from "@/lib/format";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { insertNotification } from "@/lib/notify";
 import { generateDocNo } from "@/lib/document-no";
+import { isTkMaterial, isRepairMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 import QuotePrintPaper, { QuotePrintCompany } from "@/components/quotes/QuotePrintPaper";
 
 const MENU_HREF = "/quotes/new";
-const DEFAULT_ROW_COUNT = 5;
+const DEFAULT_ROW_COUNT = 3;
 const DEFAULT_MAT_TYPE: "DS" | "TK" = "DS";
 
 // 무상(FM) 현장 — 계약구분이 다음 중 하나면 견적 대신 자재신청 권유
@@ -284,6 +285,8 @@ function QuoteEntryInner() {
   // 견적요청 프리필 (fromRequest=N)
   const [sourceRequestId, setSourceRequestId] = useState<number | null>(null);
   const [sourceRequestNo, setSourceRequestNo] = useState<string | null>(null);
+  // 견적요청 시 입력된 '신청사유/고장 증상' — 견적정보 섹션 작업명 아래에 표시 (특기사항과 분리)
+  const [requestReason, setRequestReason] = useState("");
 
   // 미리보기 (출력물)
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -338,7 +341,7 @@ function QuoteEntryInner() {
       setSourceRequestNo(h.request_no);
       setSiteName(h.site_name ?? "");
       if (h.work_title) setWorkTitle(h.work_title);
-      if (h.reason) setNote(h.reason);
+      setRequestReason(h.reason ?? "");
       if (h.requester_name) setCustomerName(h.requester_name);
       // items
       const its = (items.data ?? []) as Array<{
@@ -517,6 +520,17 @@ function QuoteEntryInner() {
         remark:        l.remark ?? "",
         elevator_name: l.elevator_name ?? "",
       })));
+
+      // 견적요청에서 가져온 견적인 경우 reason 역조회 (작업명 아래 표시용)
+      const { data: qr } = await supabase.from("quote_requests")
+        .select("id, request_no, reason").eq("quote_id", editId).maybeSingle();
+      if (qr) {
+        const q = qr as { id: number; request_no: string; reason: string | null };
+        setSourceRequestId(q.id);
+        setSourceRequestNo(q.request_no);
+        setRequestReason(q.reason ?? "");
+      }
+
       setEditLoading(false);
     })();
     return () => { cancelled = true; };
@@ -889,9 +903,10 @@ function QuoteEntryInner() {
       }
 
       // 견적요청으로부터 진입한 경우 → quote_request.quote_id 연결 + 상태 갱신 + 신청자 알림
+      // 작성/수정 화면에서 신청사유(reason)를 다듬었으면 같은 update 에서 함께 반영
       if (sourceRequestId && header.id) {
         await supabase.from("quote_requests")
-          .update({ quote_id: header.id, status: "견적발행" })
+          .update({ quote_id: header.id, status: "견적발행", reason: requestReason.trim() || null })
           .eq("id", sourceRequestId);
         // 견적요청자에게 발행 알림 (본인이 자기 견적 발행한 경우 제외). 실패 silent.
         void (async () => {
@@ -944,6 +959,7 @@ function QuoteEntryInner() {
       setTruncateAmount(0);
       setSourceRequestId(null);
       setSourceRequestNo(null);
+      setRequestReason("");
     } catch (e) {
       console.error("[quote-save] 실패", e);
       setMessage({ type: "error", text: formatError(e) });
@@ -999,7 +1015,7 @@ function QuoteEntryInner() {
         {elevatorOptions.map(e => <option key={e} value={e} />)}
       </datalist>
 
-      <div className="p-6 space-y-4 max-w-6xl">
+      <div className="p-6 space-y-4 max-w-[1600px]">
         {/* 견적 정보 */}
         <div className={sectionCls}>
           <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3">📋 견적 정보</h2>
@@ -1035,6 +1051,18 @@ function QuoteEntryInner() {
               <input type="text" readOnly value={isEditMode ? editCreatedBy : (user?.name ?? "")}
                 className={inputCls + " bg-gray-100 dark:bg-gray-600 cursor-not-allowed"} />
             </div>
+            {/* 견적요청에서 가져온 '신청사유/고장 증상' — 견적서 특기사항과 분리해 견적정보에 그대로 노출 */}
+            <div className="sm:col-span-2 lg:col-span-3">
+              <label className={labelCls}>
+                신청사유 / 고장 증상
+                {sourceRequestNo && (
+                  <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(견적요청 {sourceRequestNo})</span>
+                )}
+              </label>
+              <textarea value={requestReason} onChange={e => setRequestReason(e.target.value)} rows={2} lang="ko"
+                placeholder={sourceRequestId ? "" : "견적요청에서 가져온 신청사유가 여기에 표시됩니다."}
+                className={inputCls + " resize-none"} />
+            </div>
           </div>
         </div>
 
@@ -1068,21 +1096,22 @@ function QuoteEntryInner() {
                 className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700">+ 행 추가</button>
             </div>
           </div>
-          <div className="overflow-x-auto">
+          {/* overflow-x-auto 를 두지 않는다 — 그 박스가 sticky 의 containing block 이 되어 thead 가 페이지 viewport 에 붙지 못함. */}
+          <div>
             <table className="w-full text-xs border-collapse">
-              <thead>
-                <tr className="bg-gray-50 dark:bg-gray-700/50 border-y border-gray-200 dark:border-gray-600 text-center text-[11px] font-bold text-gray-600 dark:text-gray-300">
-                  <th className="px-2 py-2 w-10">NO</th>
-                  <th className="px-2 py-2 w-20">호기</th>
-                  <th className="px-2 py-2">품      목</th>
-                  <th className="px-2 py-2">규  격</th>
-                  <th className="px-2 py-2 w-14">단위</th>
-                  <th className="px-2 py-2 w-16">수량</th>
-                  <th className="px-2 py-2 w-24">단    가</th>
-                  <th className="px-2 py-2 w-28">금    액</th>
-                  <th className="px-2 py-2">비  고</th>
-                  <th className="px-2 py-2 w-12">소견</th>
-                  <th className="px-2 py-2 w-10"></th>
+              <thead className="sticky top-0 z-20">
+                <tr className="bg-gray-50 dark:bg-gray-700 border-y border-gray-200 dark:border-gray-600 text-center text-[11px] font-bold text-gray-600 dark:text-gray-300 shadow-sm">
+                  <th className="px-2 py-2 w-10 bg-gray-50 dark:bg-gray-700">NO</th>
+                  <th className="px-2 py-2 w-20 bg-gray-50 dark:bg-gray-700">호기</th>
+                  <th className="px-2 py-2 bg-gray-50 dark:bg-gray-700">품      목</th>
+                  <th className="px-2 py-2 bg-gray-50 dark:bg-gray-700">규  격</th>
+                  <th className="px-2 py-2 w-14 bg-gray-50 dark:bg-gray-700">단위</th>
+                  <th className="px-2 py-2 w-16 bg-gray-50 dark:bg-gray-700">수량</th>
+                  <th className="px-2 py-2 w-24 bg-gray-50 dark:bg-gray-700">단    가</th>
+                  <th className="px-2 py-2 w-28 bg-gray-50 dark:bg-gray-700">금    액</th>
+                  <th className="px-2 py-2 bg-gray-50 dark:bg-gray-700">비  고</th>
+                  <th className="px-2 py-2 w-12 bg-gray-50 dark:bg-gray-700">소견</th>
+                  <th className="px-2 py-2 w-10 bg-gray-50 dark:bg-gray-700"></th>
                 </tr>
               </thead>
               <tbody>
@@ -1131,21 +1160,36 @@ function QuoteEntryInner() {
                           )}
                         </div>
                         {r.searchOpen && r.searchResults.length > 0 && (
-                          <div className="absolute z-50 top-full left-0 mt-0.5 w-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl">
-                            <ul className="max-h-52 overflow-y-auto">
-                              {r.searchResults.map((m, idx) => (
+                          <div className="absolute z-50 top-full left-0 mt-0.5 w-[32rem] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl">
+                            {/* 5건만 보이고 나머지는 스크롤 — 한 항목 약 50px × 5 ≈ 16rem */}
+                            <ul className="max-h-[16rem] overflow-y-auto">
+                              {r.searchResults.map((m, idx) => {
+                                // 색상 우선순위: 수리품(녹색) > TK(파란색) > 기본(다크 회색)
+                                const repair = isRepairMaterial(m.id);
+                                const tk = !repair && isTkMaterial(m.id);
+                                const nameCls = repair
+                                  ? "text-green-600 dark:text-green-400"
+                                  : tk ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-200";
+                                const codeCls = repair
+                                  ? "text-green-600 dark:text-green-400"
+                                  : tk ? TK_TEXT_CLASS : "text-slate-400";
+                                return (
                                 <li key={m.id}>
                                   <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => applyMaterial(r.key, m)}
                                     className={`w-full text-left px-3 py-2 border-b border-gray-50 dark:border-gray-700 last:border-0 ${r.searchFocusIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
-                                    <div className="text-xs font-medium text-gray-800 dark:text-gray-200">{m.name}</div>
+                                    <div className={`text-xs font-medium ${nameCls}`}>
+                                      {repair && <span className="mr-1 text-[9px] px-1 rounded bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300 font-bold align-middle">RE</span>}
+                                      {m.name}
+                                    </div>
                                     <div className="flex items-center gap-2 mt-0.5">
-                                      <span className="text-[10px] font-mono text-slate-400">{m.id}</span>
+                                      <span className={`text-[10px] font-mono ${codeCls}`}>{m.id}</span>
                                       {m.modelNo && <span className="text-[10px] text-gray-500">{m.modelNo}</span>}
                                       <span className="text-[10px] ml-auto text-gray-400">{fmtNum(m.sellPrice ?? 0)}원</span>
                                     </div>
                                   </button>
                                 </li>
-                              ))}
+                                );
+                              })}
                             </ul>
                           </div>
                         )}
@@ -1481,9 +1525,7 @@ function QuoteEntryInner() {
           </div>
 
           <div className="mt-4">
-            <label className={labelCls}>특기사항</label>
-            <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} lang="ko"
-              className={inputCls + " resize-none"} />
+            <NoteWithPresetToggles note={note} setNote={setNote} labelCls={labelCls} inputCls={inputCls} />
           </div>
 
           {/* Nego 확정가 (VAT 별도) */}
@@ -1642,6 +1684,7 @@ function QuoteEntryInner() {
                   qty: r.qty,
                   unit_price: r.unit_price,
                   amount: r.qty * r.unit_price,
+                  elevator_name: r.elevator_name || null,
                   remark: r.remark || null,
                   opinion_text: r.opinion_text || null,
                   opinion_image_url: r.opinion_image_url || null,
@@ -1668,6 +1711,60 @@ function QuoteEntryInner() {
         document.body
       )}
     </div>
+  );
+}
+
+// ============================================================
+// 특기사항 textarea + 자주 쓰는 문구 토글(배터리·수리품)
+//   체크 시 해당 문구를 note 끝에 추가, 해제 시 정확 일치로 제거.
+//   체크박스 상태는 별도 저장 없이 note 텍스트 안에 문구 포함 여부로 판정.
+// ============================================================
+
+const BATTERY_PRESET = "배터리는 소모성 자재로 제조사 보증기간 6개월.";
+const REPAIR_PRESET  = "Repair제품은 신품가의 50% 적용.\n폐자재 반납 조건. (폐자재 미반납시 신품가의 65%적용)\nRepair제품의 보증기간은 12개월.";
+
+function NoteWithPresetToggles({
+  note, setNote, labelCls, inputCls,
+}: {
+  note: string; setNote: (v: string) => void;
+  labelCls: string; inputCls: string;
+}) {
+  const batteryChecked = note.includes(BATTERY_PRESET);
+  const repairChecked  = note.includes(REPAIR_PRESET);
+
+  function togglePreset(preset: string, checked: boolean) {
+    if (checked) {
+      // 정확 일치로 제거 + 양쪽 빈 줄 정리
+      const next = note.replace(preset, "").replace(/\n{3,}/g, "\n\n").trim();
+      setNote(next);
+    } else {
+      const trimmed = note.trim();
+      setNote(trimmed ? `${trimmed}\n${preset}` : preset);
+    }
+  }
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
+        <label className={labelCls + " mb-0"}>특기사항</label>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+            <input type="checkbox" checked={batteryChecked}
+              onChange={() => togglePreset(BATTERY_PRESET, batteryChecked)}
+              className="accent-blue-500" />
+            <span className="text-gray-700 dark:text-gray-300 font-medium">배터리</span>
+          </label>
+          <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+            <input type="checkbox" checked={repairChecked}
+              onChange={() => togglePreset(REPAIR_PRESET, repairChecked)}
+              className="accent-blue-500" />
+            <span className="text-gray-700 dark:text-gray-300 font-medium">수리품</span>
+          </label>
+        </div>
+      </div>
+      <textarea value={note} onChange={e => setNote(e.target.value)} rows={4} lang="ko"
+        className={inputCls + " resize-none !text-blue-600 dark:!text-blue-400"} />
+    </>
   );
 }
 

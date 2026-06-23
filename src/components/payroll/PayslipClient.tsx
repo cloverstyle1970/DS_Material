@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment, ChangeEvent, DragEvent } from "react";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 import { parsePayrollExcel, type ParsedPayslip, type ParseResult, type PayrollCalcInfo } from "@/lib/payroll-excel";
 import PayslipPrintPaper, { PayslipCard } from "@/components/payroll/PayslipPrintPaper";
@@ -164,6 +165,12 @@ export default function PayslipClient() {
       void loadPayslips();
     }
   }, [canRead, loadAccounts, loadPayslips]);
+  useReloadOnActivate(() => {
+    if (canRead) {
+      void loadAccounts();
+      void loadPayslips();
+    }
+  });
 
   // 파일 처리
   async function handleFile(file: File) {

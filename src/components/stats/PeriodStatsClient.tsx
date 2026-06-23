@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { api } from "@/lib/api-client";
 import { fmtNum } from "@/lib/format";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { isTkMaterial } from "@/lib/material-style";
 
 interface Transaction {
@@ -67,13 +68,17 @@ export default function PeriodStatsClient() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const loadTx = () => {
     setLoading(true);
     api.get<Transaction[]>("/api/transactions")
       .then(data => setTransactions(data))
       .catch(() => {})
       .finally(() => setLoading(false));
+  };
+  useEffect(() => {
+    loadTx();
   }, []);
+  useReloadOnActivate(() => { loadTx(); });
 
   const periods = useMemo(() => generatePeriodLabels(year, viewMode), [year, viewMode]);
 

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 
 export interface InvoiceRow {
   id: number;
@@ -63,29 +64,30 @@ export function useInvoiceData(invoiceId: number) {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!Number.isFinite(invoiceId)) { setError("잘못된 ID"); setLoading(false); return; }
-    (async () => {
-      setLoading(true);
-      const inv = await supabase.from("invoices").select("*").eq("id", invoiceId).maybeSingle();
-      if (inv.error || !inv.data) { setError(`발행 정보 로드 실패: ${inv.error?.message ?? "not found"}`); setLoading(false); return; }
-      const i = inv.data as InvoiceRow;
-      setInvoice(i);
-      const [q, it, c] = await Promise.all([
-        supabase.from("quotes")
-          .select("id, quote_no, quote_date, site_name, elevator_name, work_title, customer_name, customer_phone, total_amount")
-          .eq("id", i.quote_id).maybeSingle(),
-        supabase.from("quote_items").select("*").eq("quote_id", i.quote_id).order("sort_order"),
-        supabase.from("quote_settings")
-          .select("company_name, company_biz_no, company_address, company_phone, company_email, company_ceo, company_stamp_url")
-          .eq("id", 1).maybeSingle(),
-      ]);
-      setQuote((q.data ?? null) as QuoteForInvoice | null);
-      setItems((it.data ?? []) as QuoteItemForInvoice[]);
-      setCompany((c.data ?? null) as CompanyInfo | null);
-      setLoading(false);
-    })();
+    setLoading(true);
+    const inv = await supabase.from("invoices").select("*").eq("id", invoiceId).maybeSingle();
+    if (inv.error || !inv.data) { setError(`발행 정보 로드 실패: ${inv.error?.message ?? "not found"}`); setLoading(false); return; }
+    const i = inv.data as InvoiceRow;
+    setInvoice(i);
+    const [q, it, c] = await Promise.all([
+      supabase.from("quotes")
+        .select("id, quote_no, quote_date, site_name, elevator_name, work_title, customer_name, customer_phone, total_amount")
+        .eq("id", i.quote_id).maybeSingle(),
+      supabase.from("quote_items").select("*").eq("quote_id", i.quote_id).order("sort_order"),
+      supabase.from("quote_settings")
+        .select("company_name, company_biz_no, company_address, company_phone, company_email, company_ceo, company_stamp_url")
+        .eq("id", 1).maybeSingle(),
+    ]);
+    setQuote((q.data ?? null) as QuoteForInvoice | null);
+    setItems((it.data ?? []) as QuoteItemForInvoice[]);
+    setCompany((c.data ?? null) as CompanyInfo | null);
+    setLoading(false);
   }, [invoiceId]);
+
+  useEffect(() => { void load(); }, [load]);
+  useReloadOnActivate(() => { void load(); });
 
   return { invoice, quote, items, company, loading, error };
 }

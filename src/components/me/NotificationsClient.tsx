@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 
 // 알림 한 행 (DB 컬럼 그대로 — mock-router를 거치지 않고 직접 supabase 호출).
@@ -78,6 +79,7 @@ export default function NotificationsClient() {
   }, [user]);
 
   useEffect(() => { void loadFirstPage(); }, [loadFirstPage]);
+  useReloadOnActivate(() => { void loadFirstPage(); });
 
   async function loadMore() {
     if (!user || busy || !hasMore) return;

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { fmtNum } from "@/lib/format";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 
 // ============================================================
 // 타입
@@ -97,26 +98,26 @@ export default function PerformanceStatsClient() {
 
   const range = useMemo(() => periodRange(period, anchor), [period, anchor]);
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      const { data: qs } = await supabase.from("quotes")
-        .select("id, quote_no, quote_date, total_amount, status, progress_state, charge_type, created_by_id, created_by_name")
-        .gte("quote_date", range.from)
-        .lte("quote_date", range.to)
-        .order("quote_date", { ascending: false });
-      const qList = (qs ?? []) as QuoteRow[];
-      setQuotes(qList);
+  const loadPerf = useCallback(async () => {
+    setLoading(true);
+    const { data: qs } = await supabase.from("quotes")
+      .select("id, quote_no, quote_date, total_amount, status, progress_state, charge_type, created_by_id, created_by_name")
+      .gte("quote_date", range.from)
+      .lte("quote_date", range.to)
+      .order("quote_date", { ascending: false });
+    const qList = (qs ?? []) as QuoteRow[];
+    setQuotes(qList);
 
-      const quoteIds = qList.map(q => q.id);
-      if (quoteIds.length === 0) { setPayments([]); setLoading(false); return; }
-      const { data: ps } = await supabase.from("payments")
-        .select("quote_id, amount, status")
-        .in("quote_id", quoteIds);
-      setPayments((ps ?? []) as PaymentRow[]);
-      setLoading(false);
-    })();
+    const quoteIds = qList.map(q => q.id);
+    if (quoteIds.length === 0) { setPayments([]); setLoading(false); return; }
+    const { data: ps } = await supabase.from("payments")
+      .select("quote_id, amount, status")
+      .in("quote_id", quoteIds);
+    setPayments((ps ?? []) as PaymentRow[]);
+    setLoading(false);
   }, [range.from, range.to]);
+  useEffect(() => { void loadPerf(); }, [loadPerf]);
+  useReloadOnActivate(() => { void loadPerf(); });
 
   // 사원별 집계
   const aggs: Agg[] = useMemo(() => {

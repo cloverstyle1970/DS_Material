@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth, isAdmin } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 import {
   TBMRecord, TBMParticipant, TBMRecordSafetyRule, TBMChecklistResult, TBMPhoto,
@@ -98,6 +99,7 @@ export default function TBMMyList() {
   }
 
   useEffect(() => { setPage(0); load(0, false); /* eslint-disable-next-line */ }, [user, filter]);
+  useReloadOnActivate(() => { setPage(0); void load(0, false); });
 
   async function loadDetail(id: number) {
     if (openId === id) {

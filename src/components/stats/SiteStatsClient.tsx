@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { api } from "@/lib/api-client";
 import { fmtNum } from "@/lib/format";
 import { useAuth, isViewOnly, isNonManager } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { useViewMode } from "@/context/ViewModeContext";
 import { isTkMaterial } from "@/lib/material-style";
 
@@ -77,6 +78,14 @@ export default function SiteStatsClient() {
   const [sites, setSites] = useState<SiteOption[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const loadStats = () => {
+    setLoading(true);
+    api.get<Transaction[]>("/api/transactions")
+      .then(data => setTransactions(data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+    api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
+  };
   useEffect(() => {
     setLoading(true);
     api.get<Transaction[]>("/api/transactions")
@@ -87,6 +96,7 @@ export default function SiteStatsClient() {
   useEffect(() => {
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
   }, []);
+  useReloadOnActivate(() => { loadStats(); });
 
   function setThisMonth() {
     const now = new Date();

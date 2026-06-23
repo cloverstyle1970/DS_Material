@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useAuth, hasMenuPermission } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
 
@@ -105,6 +106,7 @@ export default function TransferClient() {
   useEffect(() => {
     loadAll(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, []);
+  useReloadOnActivate(() => { void loadAll(); });
 
   const filtered = useMemo(() => {
     const kw = search.trim();

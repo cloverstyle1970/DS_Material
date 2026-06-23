@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth, hasMenuPermission } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
 import {
@@ -104,6 +105,7 @@ export default function TBMAdminClient() {
   }
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [modeFilter, fromDate, toDate, page]);
+  useReloadOnActivate(() => { void load(); });
 
   async function loadDetail(rec: TBMRecord) {
     setOpenDetail(rec);

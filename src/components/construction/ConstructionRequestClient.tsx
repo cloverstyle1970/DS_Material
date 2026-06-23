@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 import DraggableModal from "@/components/common/DraggableModal";
 import { useViewMode } from "@/context/ViewModeContext";
@@ -74,6 +75,10 @@ export default function ConstructionRequestClient() {
     fetchRequests();
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
   }, []);
+  useReloadOnActivate(() => {
+    void fetchRequests();
+    api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
+  });
 
   useEffect(() => {
     if (siteName && sites.find(s => s.name === siteName)) {

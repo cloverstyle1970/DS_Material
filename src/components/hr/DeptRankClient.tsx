@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth, hasMenuPermission } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
 
@@ -77,6 +78,7 @@ function OrgEditor({ table, title, canWrite }: { table: "departments" | "ranks";
     setItems((data ?? []) as OrgItem[]);
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [table]);
+  useReloadOnActivate(() => { void load(); });
 
   async function toggleActive(id: number, v: boolean) {
     await supabase.from(table).update({ is_active: v }).eq("id", id);

@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { VendorRecord, VendorType } from "@/lib/mock-vendors";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useViewMode } from "@/context/ViewModeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
@@ -242,6 +243,9 @@ export default function VendorsClient({ initial }: Props) {
   useEffect(() => {
     api.get<VendorRecord[]>("/api/vendors").then(setVendors).catch(() => {});
   }, []);
+  useReloadOnActivate(() => {
+    api.get<VendorRecord[]>("/api/vendors").then(setVendors).catch(() => {});
+  });
 
   const { user } = useAuth();
   const admin = user ? !isViewOnly(user) : false;

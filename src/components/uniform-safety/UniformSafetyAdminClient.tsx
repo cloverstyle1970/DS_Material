@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 import { fmtNum } from "@/lib/format";
 import UniformSafetyDirectIssueTab, { type MaterialOption } from "./UniformSafetyDirectIssueTab";
@@ -104,6 +105,7 @@ export default function UniformSafetyAdminClient() {
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
+  useReloadOnActivate(() => { void load(); });
 
   if (!user) return <div className="p-8 text-center text-sm text-gray-500">로그인이 필요합니다.</div>;
   const admin = isAdmin(user);

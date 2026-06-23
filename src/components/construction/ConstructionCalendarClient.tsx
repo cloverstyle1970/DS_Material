@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 import DraggableModal from "@/components/common/DraggableModal";
 import { useViewMode } from "@/context/ViewModeContext";
@@ -118,6 +119,11 @@ function CalendarContent() {
     fetchSchedules();
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
   }, []);
+  useReloadOnActivate(() => {
+    void fetchSchedules();
+    api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
+    void fetchAnnualEvents(year);
+  });
 
   useEffect(() => {
     fetchAnnualEvents(year);

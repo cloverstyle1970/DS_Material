@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { MaterialUnitRecord } from "@/lib/mock-material-units";
 import { useAuth, hasMenuPermission } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
@@ -54,6 +55,10 @@ export default function InventoryCheckClient() {
   useEffect(() => {
     fetchMaterials();
   }, []);
+  useReloadOnActivate(() => {
+    void fetchMaterials();
+    if (mode === "sn") void fetchUnits();
+  });
 
   async function fetchMaterials() {
     setLoading(true);

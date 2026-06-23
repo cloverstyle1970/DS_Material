@@ -7,6 +7,7 @@ import StatCard from "@/components/dashboard/StatCard";
 import { DashboardStats } from "@/lib/types";
 import { fmtNum } from "@/lib/format";
 import { useViewMode } from "@/context/ViewModeContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 
 const EMPTY_STATS: DashboardStats = {
   todayRequests: 0,
@@ -27,11 +28,15 @@ export default function DashboardContent() {
   const isMobile = viewMode === "mobile";
   const [stats, setStats] = useState<DashboardStats>(EMPTY_STATS);
 
-  useEffect(() => {
+  const loadStats = () => {
     api.get<{ stats: DashboardStats }>("/api/dashboard")
       .then(d => setStats(d.stats))
       .catch(() => {});
+  };
+  useEffect(() => {
+    loadStats();
   }, []);
+  useReloadOnActivate(loadStats);
 
   return (
     <>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth, hasMenuPermission } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
 
@@ -33,6 +34,7 @@ export default function TeamCrewClient() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+  useReloadOnActivate(() => { void load(); });
 
   // 부서 열림 상태: 첫 로드 후 모든 부서 펼치기 (1회만)
   // ref 가드 없이 openDeptIds.size===0 만 보면, 사용자가 마지막 부서를 접어 set이

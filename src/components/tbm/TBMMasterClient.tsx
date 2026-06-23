@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth, hasMenuPermission } from "@/context/AuthContext";
+import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
 import {
@@ -115,6 +116,7 @@ function SafetyRulesEditor({ canWrite }: { canWrite: boolean }) {
     setItems((data ?? []) as SafetyRule[]);
   }
   useEffect(() => { load(); }, []);
+  useReloadOnActivate(() => { void load(); });
 
   async function toggleActive(id: number, v: boolean) {
     await supabase.from("tbm_safety_rules_master").update({ is_active: v }).eq("id", id);
@@ -277,6 +279,7 @@ function SimpleTypeEditor({
     setItems((data ?? []) as (RepairType | FaultType)[]);
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [table]);
+  useReloadOnActivate(() => { void load(); });
 
   async function toggleActive(id: number, v: boolean) {
     await supabase.from(table).update({ is_active: v }).eq("id", id);
@@ -425,6 +428,7 @@ function ChecklistEditor({ canWrite }: { canWrite: boolean }) {
     setItems((data ?? []) as ChecklistItem[]);
   }
   useEffect(() => { load(); }, []);
+  useReloadOnActivate(() => { void load(); });
 
   const filtered = filterType === "all" ? items : items.filter(i => i.list_type === filterType);
 
