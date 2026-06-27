@@ -45,6 +45,14 @@ function fmtDateOnly(iso: string) {
 
 function today() { return new Date().toISOString().substring(0, 10); }
 
+// 호기 목록을 실제 호기명으로 요약 표시 (개수가 아닌 이름). 다수면 첫 호기 + 외 N
+function fmtElevators(elevators: (string | null)[]): string {
+  const names = elevators.filter((e): e is string => !!e);
+  if (names.length === 0) return "";
+  if (names.length === 1) return names[0];
+  return `${names[0]} 외 ${names.length - 1}`;
+}
+
 interface ReqSearch { dateFrom: string; dateTo: string; siteName: string; elevatorName: string; userName: string; material: string }
 interface OrdSearch { dateFrom: string; dateTo: string; siteName: string; vendorName: string; userName: string; requesterName: string; material: string }
 
@@ -689,7 +697,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                             </div>
                             <span className="text-xs text-gray-400 dark:text-gray-500">{fmtDate(r.requestedAt)}</span>
                           </div>
-                          <p className="font-medium text-gray-800 dark:text-gray-100 mt-1.5">{r.siteName ?? "-"}{elevators.length > 0 && <span className="text-gray-400 dark:text-gray-500"> ({elevators.length}호기)</span>}</p>
+                          <p className="font-medium text-gray-800 dark:text-gray-100 mt-1.5">{r.siteName ?? "-"}{elevators.length > 0 && <span className="text-gray-400 dark:text-gray-500"> ({fmtElevators(elevators)})</span>}</p>
                           <p className="text-sm text-gray-600 dark:text-gray-300 mt-0.5">{r.items[0]?.materialName ?? "-"}{r.items.length > 1 ? ` 외 ${r.items.length - 1}건` : ""} · 수량 {totalQty}</p>
                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{r.requesterName} ({r.requesterDept}){r.note ? ` · ${r.note}` : ""}</p>
                         </div>
@@ -802,7 +810,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                         <td className="px-2 py-3 text-center text-gray-700 dark:text-gray-300 text-xs whitespace-nowrap">
                           {r.siteName ?? "-"}
                           {elevators.length > 0 && (
-                            <span className="ml-1 text-gray-400 dark:text-gray-500">({elevators.length}호기)</span>
+                            <span className="ml-1 text-gray-400 dark:text-gray-500">({fmtElevators(elevators)})</span>
                           )}
                         </td>
                         <td className="px-2 py-3 text-center text-gray-700 dark:text-gray-300 text-xs">

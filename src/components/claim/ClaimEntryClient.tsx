@@ -30,6 +30,7 @@ interface HistoryRow {
   date: string;                 // ISO
   siteName: string | null;
   workTitle: string | null;
+  requesterName: string | null;
   itemFirstName: string;
   itemCount: number;
   kind: HistoryKind;
@@ -95,7 +96,9 @@ export default function ClaimEntryClient() {
   // 자재 라인
   const [rows, setRows] = useState<ItemRow[]>(() => Array.from({ length: DEFAULT_ROW_COUNT }, () => newRow()));
 
-  // 자재 검색 매터타입 (기본 DS)
+  // 청구정보의 기본 자재구분 — 변경 시 자재목록 필터에 기본 적용 (자재목록에서 개별 변경 가능)
+  const [claimMatType, setClaimMatType] = useState<"DS" | "TK" | "ALL">("DS");
+  // 자재 검색 매터타입 (청구정보 기본값에서 시작, 자재목록에서 변경 가능)
   const [matTypeFilter, setMatTypeFilter] = useState<"DS" | "TK" | "ALL">("DS");
 
   // 사이트/호기 마스터
@@ -121,11 +124,11 @@ export default function ClaimEntryClient() {
     setHistLoading(true);
     const ids = await visibleUserIds(user, "/claim/new");
     let qrQ = supabase.from("quote_requests")
-      .select("id, request_no, requested_at, site_name, work_title, status, quote_id, quote_request_items(material_name)")
+      .select("id, request_no, requested_at, site_name, work_title, requester_name, status, quote_id, quote_request_items(material_name)")
       .order("requested_at", { ascending: false })
       .limit(20);
     let mrQ = supabase.from("material_requests")
-      .select("id, requested_at, site_name, items, note, request_type, status")
+      .select("id, requested_at, site_name, items, note, requester_name, request_type, status")
       .in("request_type", ["무상신청", "당직선출고"])  // 유상견적 자동생성분은 quote_requests 측에서 보임
       .order("requested_at", { ascending: false })
       .limit(20);
@@ -135,6 +138,7 @@ export default function ClaimEntryClient() {
     for (const r of (qr.data ?? []) as Array<{
       id: number; request_no: string; requested_at: string;
       site_name: string | null; work_title: string | null;
+      requester_name: string | null;
       status: string; quote_id: number | null;
       quote_request_items: { material_name: string }[] | null;
     }>) {
@@ -142,6 +146,7 @@ export default function ClaimEntryClient() {
       rows.push({
         source: "quote_request", rowId: r.id, no: r.request_no,
         date: r.requested_at, siteName: r.site_name, workTitle: r.work_title,
+        requesterName: r.requester_name,
         itemFirstName: items[0]?.material_name ?? "-",
         itemCount: items.length,
         kind: "유상견적요청", status: r.status, quoteId: r.quote_id,
@@ -150,13 +155,14 @@ export default function ClaimEntryClient() {
     for (const r of (mr.data ?? []) as Array<{
       id: number; requested_at: string; site_name: string | null;
       items: { materialName?: string }[] | null;
-      note: string | null; request_type: string; status: string;
+      note: string | null; requester_name: string | null; request_type: string; status: string;
     }>) {
       const items = r.items ?? [];
       const kind = r.request_type === "당직선출고" ? "당직선출고" : "무상신청";
       rows.push({
         source: "material_request", rowId: r.id, no: null,
         date: r.requested_at, siteName: r.site_name, workTitle: r.note,
+        requesterName: r.requester_name,
         itemFirstName: items[0]?.materialName ?? "-",
         itemCount: items.length,
         kind, status: r.status, quoteId: null,
@@ -181,10 +187,15 @@ export default function ClaimEntryClient() {
         ? await supabase.from("site_elevators")
             .select("installation_place, unit_name").eq("site_id", (ms as { id: number }).id).order("installation_place")
         : { data: [] as { installation_place: string | null; unit_name: string | null }[] };
-      setElevatorOptions((elev.data ?? []).map(e => {
+      const opts = (elev.data ?? []).map(e => {
         const r = e as { installation_place: string | null; unit_name: string | null };
         return r.installation_place ?? r.unit_name ?? "";
-      }).filter(Boolean));
+      }).filter(Boolean);
+      setElevatorOptions(opts);
+      // 단독호기(호기 1개) 현장이면 호기 자동 입력 → 바로 품목 검색 가능
+      if (opts.length === 1) {
+        setRows(prev => prev.map(r => r.elevator_name.trim() ? r : { ...r, elevator_name: opts[0] }));
+      }
       const ct = (ms as { contract_type: string | null } | null)?.contract_type;
       if (ct && (ct === "TK-FM" || ct === "대솔FM" || ct === "DS-FM")) {
         setMode("무상신청");
@@ -195,7 +206,11 @@ export default function ClaimEntryClient() {
   function patchRow(key: string, patch: Partial<ItemRow>) {
     setRows(prev => prev.map(r => r.key === key ? { ...r, ...patch } : r));
   }
-  function addRow() { setRows(prev => [...prev, newRow()]); }
+  function addRow() {
+    // 단독호기 현장이면 새 행에도 호기 자동 입력
+    const autoElev = elevatorOptions.length === 1 ? elevatorOptions[0] : "";
+    setRows(prev => [...prev, { ...newRow(), elevator_name: autoElev }]);
+  }
   function removeRow(key: string) { setRows(prev => prev.length === 1 ? prev : prev.filter(r => r.key !== key)); }
 
   async function searchMaterial(key: string, q: string) {
@@ -216,6 +231,18 @@ export default function ClaimEntryClient() {
       searchResults: [], searchOpen: false, searchFocusIndex: -1,
     });
   }
+
+  // matTypeFilter(DS/TK/전체) 변경 시, 현재 검색 중인 행을 입력값 그대로 재검색
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const matTypeInited = useRef(false);
+  useEffect(() => {
+    if (!matTypeInited.current) { matTypeInited.current = true; return; }
+    rowsRef.current.forEach(r => {
+      if (r.searchOpen && r.material_name.trim()) searchMaterial(r.key, r.material_name);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matTypeFilter]);
 
   async function generateRequestNo(): Promise<string> {
     const year = new Date().getFullYear();
@@ -351,6 +378,22 @@ export default function ClaimEntryClient() {
   const inputCls   = "w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100";
   const cellInput  = "w-full px-2 py-1 text-xs text-gray-900 dark:text-gray-100 border-0 bg-transparent focus:outline-none focus:bg-yellow-50 dark:focus:bg-yellow-900/20 focus:ring-1 focus:ring-blue-300";
 
+  // DS / TK / 전체 자재구분 스위치 (청구정보·자재목록 공용)
+  const renderMatTypeSwitch = (value: "DS" | "TK" | "ALL", onSelect: (t: "DS" | "TK" | "ALL") => void) => (
+    <div className="flex gap-0.5 bg-gray-100 dark:bg-gray-700 p-0.5 rounded">
+      {(["DS", "TK", "ALL"] as const).map(t => (
+        <button key={t} type="button" onMouseDown={e => e.preventDefault()} onClick={() => onSelect(t)}
+          className={`px-2.5 py-1 text-[11px] font-semibold rounded transition-colors ${
+            value === t
+              ? t === "DS" ? "bg-red-500 text-white shadow-sm"
+                : t === "TK" ? "bg-blue-600 text-white shadow-sm"
+                : "bg-gray-900 text-white shadow-sm"
+              : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+          }`}>{t === "ALL" ? "전체" : t}</button>
+      ))}
+    </div>
+  );
+
   return (
     <div className="min-h-full bg-gray-50 dark:bg-gray-900">
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
@@ -389,7 +432,13 @@ export default function ClaimEntryClient() {
 
         {/* 헤더 */}
         <div className={sectionCls}>
-          <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3">📋 청구 정보</h2>
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">📋 청구 정보</h2>
+            <div className="flex items-center gap-1.5 ml-auto">
+              <span className="text-[11px] text-gray-500 dark:text-gray-400">기본 자재구분</span>
+              {renderMatTypeSwitch(claimMatType, t => { setClaimMatType(t); setMatTypeFilter(t); })}
+            </div>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>현장명 <span className="text-red-500">*</span></label>
@@ -411,18 +460,7 @@ export default function ClaimEntryClient() {
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">📦 자재 목록</h2>
             <div className="flex items-center gap-2 ml-auto">
-              <div className="flex gap-0.5 bg-gray-100 dark:bg-gray-700 p-0.5 rounded">
-                {(["DS", "TK", "ALL"] as const).map(t => (
-                  <button key={t} type="button" onClick={() => setMatTypeFilter(t)}
-                    className={`px-2.5 py-1 text-[11px] font-semibold rounded transition-colors ${
-                      matTypeFilter === t
-                        ? t === "DS" ? "bg-red-500 text-white shadow-sm"
-                          : t === "TK" ? "bg-blue-600 text-white shadow-sm"
-                          : "bg-gray-900 text-white shadow-sm"
-                        : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-                    }`}>{t === "ALL" ? "전체" : t}</button>
-                ))}
-              </div>
+              {renderMatTypeSwitch(matTypeFilter, setMatTypeFilter)}
               <button type="button" onClick={addRow}
                 className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700">+ 행 추가</button>
             </div>
@@ -435,10 +473,17 @@ export default function ClaimEntryClient() {
                   <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400">#{i + 1}</span>
                   <button type="button" onClick={() => removeRow(r.key)} className="text-red-500 text-xs">삭제</button>
                 </div>
-                {/* 품목 검색 — 전체폭 입력 + 전체폭 드롭다운 */}
+                {/* 호기 먼저 입력 → 품목 검색 활성화 */}
+                <div>
+                  <label className={labelCls}>호기 <span className="text-red-500">*</span></label>
+                  <input type="text" lang="ko" value={r.elevator_name} list={elevatorDatalistId}
+                    onChange={e => patchRow(r.key, { elevator_name: e.target.value })} placeholder="호기 (예: 1호기)" className={fieldCls} />
+                </div>
+                {/* 품목 검색 — 전체폭 입력 + 전체폭 드롭다운 (호기 입력 후 활성화) */}
                 <div className="relative">
                   <label className={labelCls}>품목 <span className="text-red-500">*</span></label>
                   <input type="text" lang="ko" value={r.material_name}
+                    disabled={!r.elevator_name.trim()}
                     onChange={e => { patchRow(r.key, { material_name: e.target.value }); searchMaterial(r.key, e.target.value); }}
                     onKeyDown={e => {
                       if (!r.searchOpen || r.searchResults.length === 0) return;
@@ -448,8 +493,8 @@ export default function ClaimEntryClient() {
                       else if (e.key === "Escape") patchRow(r.key, { searchOpen: false });
                     }}
                     onBlur={() => setTimeout(() => patchRow(r.key, { searchOpen: false }), 150)}
-                    placeholder={`자재명·코드 (${matTypeFilter === "ALL" ? "전체" : matTypeFilter})`}
-                    className={fieldCls} />
+                    placeholder={r.elevator_name.trim() ? `자재명·코드 (${matTypeFilter === "ALL" ? "전체" : matTypeFilter})` : "호기를 먼저 입력하세요"}
+                    className={fieldCls + (r.elevator_name.trim() ? "" : " bg-gray-100 dark:bg-gray-800 cursor-not-allowed")} />
                   {r.searchOpen && r.searchResults.length > 0 && (
                     <div className="absolute z-50 top-full left-0 mt-0.5 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl">
                       <ul className="max-h-60 overflow-y-auto">
@@ -470,11 +515,6 @@ export default function ClaimEntryClient() {
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className={labelCls}>호기</label>
-                    <input type="text" lang="ko" value={r.elevator_name} list={elevatorDatalistId}
-                      onChange={e => patchRow(r.key, { elevator_name: e.target.value })} placeholder="호기" className={fieldCls} />
-                  </div>
                   <div>
                     <label className={labelCls}>규격</label>
                     <input type="text" lang="ko" value={r.spec} onChange={e => patchRow(r.key, { spec: e.target.value })} className={fieldCls} />
@@ -525,6 +565,7 @@ export default function ClaimEntryClient() {
                     </td>
                     <td className="px-1 py-0.5 relative">
                       <input type="text" lang="ko" value={r.material_name}
+                        disabled={!r.elevator_name.trim()}
                         onChange={e => { patchRow(r.key, { material_name: e.target.value }); searchMaterial(r.key, e.target.value); }}
                         onKeyDown={e => {
                           if (!r.searchOpen || r.searchResults.length === 0) return;
@@ -538,8 +579,8 @@ export default function ClaimEntryClient() {
                           else if (e.key === "Escape") patchRow(r.key, { searchOpen: false });
                         }}
                         onBlur={() => setTimeout(() => patchRow(r.key, { searchOpen: false }), 150)}
-                        placeholder={`자재명·코드 (${matTypeFilter === "ALL" ? "전체" : matTypeFilter})`}
-                        className={cellInput} />
+                        placeholder={r.elevator_name.trim() ? `자재명·코드 (${matTypeFilter === "ALL" ? "전체" : matTypeFilter})` : "← 호기 먼저 입력"}
+                        className={cellInput + (r.elevator_name.trim() ? "" : " bg-gray-100 dark:bg-gray-800 cursor-not-allowed")} />
                       {r.searchOpen && r.searchResults.length > 0 && (
                         <div className="absolute z-50 top-full left-0 mt-0.5 w-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl">
                           <ul className="max-h-52 overflow-y-auto">
@@ -634,6 +675,7 @@ export default function ClaimEntryClient() {
                 <tr>
                   <th className="px-2 py-2 text-center w-36">접수일시</th>
                   <th className="px-2 py-2 text-center w-24">구분</th>
+                  <th className="px-2 py-2 text-center w-20">신청자</th>
                   <th className="px-2 py-2 text-left">현장</th>
                   <th className="px-2 py-2 text-left">자재 요약</th>
                   <th className="px-2 py-2 text-center w-28">상태</th>
@@ -644,10 +686,10 @@ export default function ClaimEntryClient() {
                 {(() => {
                   const filtered = histKindFilter === "전체" ? history : history.filter(h => h.kind === histKindFilter);
                   if (histLoading && history.length === 0) {
-                    return <tr><td colSpan={6} className="px-2 py-6 text-center text-gray-400">로딩 중...</td></tr>;
+                    return <tr><td colSpan={7} className="px-2 py-6 text-center text-gray-400">로딩 중...</td></tr>;
                   }
                   if (filtered.length === 0) {
-                    return <tr><td colSpan={6} className="px-2 py-6 text-center text-gray-400">
+                    return <tr><td colSpan={7} className="px-2 py-6 text-center text-gray-400">
                       {history.length === 0 ? "아직 청구 이력이 없습니다." : "선택한 구분에 해당하는 이력이 없습니다."}
                     </td></tr>;
                   }
@@ -660,6 +702,9 @@ export default function ClaimEntryClient() {
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${HIST_KIND_CLS[h.kind]}`}>
                           {h.kind}
                         </span>
+                      </td>
+                      <td className="px-2 py-1.5 text-center text-gray-700 dark:text-gray-200 whitespace-nowrap">
+                        {h.requesterName ?? "-"}
                       </td>
                       <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200 truncate max-w-[180px]">
                         {h.siteName ?? "-"}
