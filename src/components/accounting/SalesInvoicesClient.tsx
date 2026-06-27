@@ -152,6 +152,8 @@ export default function SalesInvoicesClient() {
   const [from, setFrom] = useState(() => currentQuarter().from);            // 기본: 해당 분기
   const [to, setTo] = useState(() => currentQuarter().to);
   const [page, setPage] = useState(0);
+  const [sortKey, setSortKey] = useState<string>("issue_date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const [result, setResult] = useState<SearchResult>({ total_count: 0, total_amount: 0, unpaid_amount: 0, rows: [] });
   const [loading, setLoading] = useState(false);
@@ -164,6 +166,8 @@ export default function SalesInvoicesClient() {
   const [overdueTaxDiv, setOverdueTaxDiv] = useState<"" | "T" | "D">("");
   const [overdue, setOverdue] = useState<OverdueResult>({ site_count: 0, total_count: 0, total_amount: 0, rows: [] });
   const [overdueLoading, setOverdueLoading] = useState(false);
+  const [overdueSortKey, setOverdueSortKey] = useState<keyof OverdueRow>("overdue_days");
+  const [overdueSortDir, setOverdueSortDir] = useState<"asc" | "desc">("desc");
   // 현장 행 펼침 + 상세 캐시
   const [expandedSite, setExpandedSite] = useState<string | null>(null);
   const [detailMap, setDetailMap] = useState<Record<string, OverdueDetailRow[]>>({});
@@ -187,6 +191,8 @@ export default function SalesInvoicesClient() {
         p_limit: PAGE_SIZE,
         p_offset: page * PAGE_SIZE,
         p_tax_div: taxDiv || null,
+        p_sort: sortKey,
+        p_dir: sortDir,
       });
       if (error) throw error;
       setResult(data as SearchResult);
@@ -196,10 +202,10 @@ export default function SalesInvoicesClient() {
     } finally {
       setLoading(false);
     }
-  }, [q, category, taxDiv, status, from, to, page]);
+  }, [q, category, taxDiv, status, from, to, page, sortKey, sortDir]);
 
-  // 필터 변경 시 1페이지로 리셋 후 조회 (검색어는 디바운스)
-  useEffect(() => { setPage(0); }, [q, category, taxDiv, status, from, to]);
+  // 필터·정렬 변경 시 1페이지로 리셋 후 조회 (검색어는 디바운스)
+  useEffect(() => { setPage(0); }, [q, category, taxDiv, status, from, to, sortKey, sortDir]);
   useEffect(() => {
     const t = setTimeout(() => { void load(); }, 250);
     return () => clearTimeout(t);
@@ -319,6 +325,42 @@ export default function SalesInvoicesClient() {
   const inputCls = "px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-400";
   const cardCls = "bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700";
 
+  // 컬럼 정렬 클릭 — 같은 컬럼이면 방향 토글, 다른 컬럼이면 그 컬럼 기본 desc
+  function clickSort(key: string) {
+    if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("desc"); }
+  }
+  // 정렬 가능한 헤더 (th 내용) — 라벨 + 방향 화살표
+  const sortTh = (key: string, label: string, align: "left" | "center" | "right" = "left", extra = "") => (
+    <th className={`px-3 py-2 text-${align} cursor-pointer select-none hover:text-indigo-600 dark:hover:text-indigo-300 ${extra}`}
+        onClick={() => clickSort(key)}>
+      <span className={`inline-flex items-center gap-0.5 ${align === "right" ? "flex-row-reverse" : ""}`}>
+        {label}<span className="text-[9px] text-indigo-500">{sortKey === key ? (sortDir === "asc" ? "▲" : "▼") : "↕"}</span>
+      </span>
+    </th>
+  );
+
+  // 장기미수 현장 클라이언트 정렬
+  function clickOverdueSort(key: keyof OverdueRow) {
+    if (overdueSortKey === key) setOverdueSortDir(d => (d === "asc" ? "desc" : "asc"));
+    else { setOverdueSortKey(key); setOverdueSortDir("desc"); }
+  }
+  const overdueSortTh = (key: keyof OverdueRow, label: string, align: "left" | "center" | "right" = "left", extra = "") => (
+    <th className={`px-3 py-2 text-${align} cursor-pointer select-none hover:text-indigo-600 dark:hover:text-indigo-300 ${extra}`}
+        onClick={() => clickOverdueSort(key)}>
+      <span className={`inline-flex items-center gap-0.5 ${align === "right" ? "flex-row-reverse" : ""}`}>
+        {label}<span className="text-[9px] text-indigo-500">{overdueSortKey === key ? (overdueSortDir === "asc" ? "▲" : "▼") : "↕"}</span>
+      </span>
+    </th>
+  );
+  const sortedOverdueRows = [...overdue.rows].sort((a, b) => {
+    const av = a[overdueSortKey], bv = b[overdueSortKey];
+    let cmp: number;
+    if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
+    else cmp = String(av ?? "").localeCompare(String(bv ?? ""), "ko");
+    return overdueSortDir === "asc" ? cmp : -cmp;
+  });
+
   // 현장 미수 상세 (펼침 영역 공용)
   const renderOverdueDetail = (site: string) => {
     if (detailLoadingSite === site) return <div className="px-4 py-3 text-xs text-gray-400">상세 조회 중...</div>;
@@ -355,7 +397,7 @@ export default function SalesInvoicesClient() {
   };
 
   return (
-    <div className="min-h-full bg-gray-50 dark:bg-gray-900">
+    <div className="h-full flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900">
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">🧾 계산서 발행내역</h1>
@@ -385,7 +427,7 @@ export default function SalesInvoicesClient() {
         </div>
       </div>
 
-      <div className="p-6 pt-4 space-y-4 max-w-[1600px]">
+      <div className="flex-1 min-h-0 flex flex-col gap-4 p-6 pt-4 max-w-[1600px] w-full">
         {uploadMsg && (
           <div className={`px-4 py-2.5 rounded-lg text-sm ${
             uploadMsg.type === "success" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
@@ -464,7 +506,25 @@ export default function SalesInvoicesClient() {
         </div>
 
         {/* 목록 */}
-        <div className={`${cardCls} overflow-hidden`}>
+        <div className={`${cardCls} flex-1 min-h-0 flex flex-col overflow-hidden`}>
+          {isMobile && (
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-gray-700">
+              <span className="text-[11px] text-gray-500 dark:text-gray-400">정렬</span>
+              <select value={sortKey} onChange={e => setSortKey(e.target.value)} className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                <option value="issue_date">발행일</option>
+                <option value="amount">청구금액</option>
+                <option value="deposit_date">입금일</option>
+                <option value="pay_status">결제상태</option>
+                <option value="site_name">현장명</option>
+                <option value="vendor_name">상호</option>
+              </select>
+              <button type="button" onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
+                className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300">
+                {sortDir === "asc" ? "오름차순 ▲" : "내림차순 ▼"}
+              </button>
+            </div>
+          )}
+          <div className="flex-1 min-h-0 overflow-auto">
           {isMobile ? (
             <div className="divide-y divide-gray-100 dark:divide-gray-700">
               {result.rows.map(r => (
@@ -489,19 +549,18 @@ export default function SalesInvoicesClient() {
               {result.rows.length === 0 && !loading && <div className="p-8 text-center text-sm text-gray-400">결과가 없습니다.</div>}
             </div>
           ) : (
-            <div className="overflow-x-auto">
               <table className="w-full text-xs">
-                <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-600 text-[11px] font-bold text-gray-600 dark:text-gray-300">
+                <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 text-[11px] font-bold text-gray-600 dark:text-gray-300">
                   <tr>
-                    <th className="px-3 py-2 text-center w-24">발행일</th>
-                    <th className="px-3 py-2 text-center w-16">TK/DS</th>
-                    <th className="px-3 py-2 text-center w-20">구분</th>
-                    <th className="px-3 py-2 text-left">현장명</th>
-                    <th className="px-3 py-2 text-left">상호</th>
+                    {sortTh("issue_date", "발행일", "center", "w-24")}
+                    {sortTh("tax_div", "TK/DS", "center", "w-16")}
+                    {sortTh("category", "구분", "center", "w-20")}
+                    {sortTh("site_name", "현장명", "left")}
+                    {sortTh("vendor_name", "상호", "left")}
                     <th className="px-3 py-2 text-left">적요</th>
-                    <th className="px-3 py-2 text-right w-28">청구금액</th>
-                    <th className="px-3 py-2 text-center w-24">입금일</th>
-                    <th className="px-3 py-2 text-center w-20">결제상태</th>
+                    {sortTh("amount", "청구금액", "right", "w-28")}
+                    {sortTh("deposit_date", "입금일", "center", "w-24")}
+                    {sortTh("pay_status", "결제상태", "center", "w-20")}
                     <th className="px-3 py-2 text-center w-20">결제방식</th>
                     <th className="px-3 py-2 text-left w-24">원장번호</th>
                   </tr>
@@ -529,8 +588,8 @@ export default function SalesInvoicesClient() {
                   )}
                 </tbody>
               </table>
-            </div>
           )}
+          </div>
 
           {/* 페이지네이션 */}
           <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-700">
@@ -615,10 +674,28 @@ export default function SalesInvoicesClient() {
           </div>
 
           {/* 현장 목록 */}
-          <div className={`${cardCls} overflow-hidden`}>
+          <div className={`${cardCls} flex-1 min-h-0 flex flex-col overflow-hidden`}>
+            {isMobile && (
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-gray-700">
+                <span className="text-[11px] text-gray-500 dark:text-gray-400">정렬</span>
+                <select value={overdueSortKey} onChange={e => setOverdueSortKey(e.target.value as keyof OverdueRow)} className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                  <option value="overdue_days">경과일</option>
+                  <option value="unpaid_amount">미수합계</option>
+                  <option value="unpaid_count">미수건</option>
+                  <option value="oldest_issue">최초 발행일</option>
+                  <option value="site_name">현장명</option>
+                  <option value="vendor_name">거래처</option>
+                </select>
+                <button type="button" onClick={() => setOverdueSortDir(d => d === "asc" ? "desc" : "asc")}
+                  className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300">
+                  {overdueSortDir === "asc" ? "오름차순 ▲" : "내림차순 ▼"}
+                </button>
+              </div>
+            )}
+            <div className="flex-1 min-h-0 overflow-auto">
             {isMobile ? (
               <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                {overdue.rows.map((r, i) => {
+                {sortedOverdueRows.map((r, i) => {
                   const open = expandedSite === r.site_name;
                   return (
                   <div key={i} className="p-3 space-y-1">
@@ -644,21 +721,20 @@ export default function SalesInvoicesClient() {
                 {overdue.rows.length === 0 && !overdueLoading && <div className="p-8 text-center text-sm text-gray-400">해당 기준의 장기미수 현장이 없습니다.</div>}
               </div>
             ) : (
-              <div className="overflow-x-auto">
                 <table className="w-full text-xs">
-                  <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-600 text-[11px] font-bold text-gray-600 dark:text-gray-300">
+                  <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 text-[11px] font-bold text-gray-600 dark:text-gray-300">
                     <tr>
-                      <th className="px-3 py-2 text-left">현장명</th>
-                      <th className="px-3 py-2 text-left">거래처(상호)</th>
-                      <th className="px-3 py-2 text-center w-20">미수건</th>
-                      <th className="px-3 py-2 text-right w-28">미수합계</th>
-                      <th className="px-3 py-2 text-center w-24">최초 발행일</th>
-                      <th className="px-3 py-2 text-center w-24">경과일</th>
+                      {overdueSortTh("site_name", "현장명", "left")}
+                      {overdueSortTh("vendor_name", "거래처(상호)", "left")}
+                      {overdueSortTh("unpaid_count", "미수건", "center", "w-20")}
+                      {overdueSortTh("unpaid_amount", "미수합계", "right", "w-28")}
+                      {overdueSortTh("oldest_issue", "최초 발행일", "center", "w-24")}
+                      {overdueSortTh("overdue_days", "경과일", "center", "w-24")}
                       <th className="px-3 py-2 text-left w-32">연락처</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {overdue.rows.map((r, i) => {
+                    {sortedOverdueRows.map((r, i) => {
                       const open = expandedSite === r.site_name;
                       return (
                       <React.Fragment key={i}>
@@ -695,10 +771,10 @@ export default function SalesInvoicesClient() {
                     )}
                   </tbody>
                 </table>
-              </div>
             )}
+            </div>
             <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
-              {overdueLoading ? "조회 중..." : `장기미수 현장 ${fmtNum(overdue.site_count)}곳 · 경과일 내림차순 정렬`}
+              {overdueLoading ? "조회 중..." : `장기미수 현장 ${fmtNum(overdue.site_count)}곳`}
             </div>
           </div>
         </>)}

@@ -41,8 +41,9 @@ DROP POLICY IF EXISTS allow_all_sales_invoices ON sales_invoices;
 CREATE POLICY allow_all_sales_invoices ON sales_invoices FOR ALL USING (TRUE) WITH CHECK (TRUE);
 
 -- 검색 + 집계 RPC (필터 로직 단일화: 목록 페이지 + 합계/미수합계를 한 번에 반환)
--- 이전 시그니처(8인자) 제거 — 오버로드 충돌 방지
+-- 이전 시그니처 제거 — 오버로드 충돌 방지
 DROP FUNCTION IF EXISTS sales_invoices_search(text,text,text,date,date,boolean,int,int);
+DROP FUNCTION IF EXISTS sales_invoices_search(text,text,text,date,date,boolean,int,int,text);
 CREATE OR REPLACE FUNCTION sales_invoices_search(
   p_q           text    DEFAULT NULL,
   p_category    text    DEFAULT NULL,
@@ -52,7 +53,9 @@ CREATE OR REPLACE FUNCTION sales_invoices_search(
   p_unpaid_only boolean DEFAULT false,
   p_limit       int     DEFAULT 50,
   p_offset      int     DEFAULT 0,
-  p_tax_div     text    DEFAULT NULL   -- T(TK) / D(DS)
+  p_tax_div     text    DEFAULT NULL,   -- T(TK) / D(DS)
+  p_sort        text    DEFAULT 'issue_date',  -- 정렬 컬럼
+  p_dir         text    DEFAULT 'desc'         -- asc / desc
 ) RETURNS json
 LANGUAGE sql STABLE AS $$
   WITH filtered AS (
@@ -75,7 +78,24 @@ LANGUAGE sql STABLE AS $$
     'unpaid_amount', (SELECT COALESCE(sum(amount),0) FROM filtered WHERE pay_status = '미'),
     'rows', COALESCE((SELECT json_agg(t) FROM (
         SELECT * FROM filtered
-        ORDER BY issue_date DESC NULLS LAST, row_no DESC
+        ORDER BY
+          CASE WHEN p_sort='issue_date'   AND p_dir='asc'  THEN issue_date   END ASC  NULLS LAST,
+          CASE WHEN p_sort='issue_date'   AND p_dir='desc' THEN issue_date   END DESC NULLS LAST,
+          CASE WHEN p_sort='amount'       AND p_dir='asc'  THEN amount       END ASC  NULLS LAST,
+          CASE WHEN p_sort='amount'       AND p_dir='desc' THEN amount       END DESC NULLS LAST,
+          CASE WHEN p_sort='deposit_date' AND p_dir='asc'  THEN deposit_date END ASC  NULLS LAST,
+          CASE WHEN p_sort='deposit_date' AND p_dir='desc' THEN deposit_date END DESC NULLS LAST,
+          CASE WHEN p_sort='pay_status'   AND p_dir='asc'  THEN pay_status   END ASC  NULLS LAST,
+          CASE WHEN p_sort='pay_status'   AND p_dir='desc' THEN pay_status   END DESC NULLS LAST,
+          CASE WHEN p_sort='site_name'    AND p_dir='asc'  THEN site_name    END ASC  NULLS LAST,
+          CASE WHEN p_sort='site_name'    AND p_dir='desc' THEN site_name    END DESC NULLS LAST,
+          CASE WHEN p_sort='vendor_name'  AND p_dir='asc'  THEN vendor_name  END ASC  NULLS LAST,
+          CASE WHEN p_sort='vendor_name'  AND p_dir='desc' THEN vendor_name  END DESC NULLS LAST,
+          CASE WHEN p_sort='category'     AND p_dir='asc'  THEN category     END ASC  NULLS LAST,
+          CASE WHEN p_sort='category'     AND p_dir='desc' THEN category     END DESC NULLS LAST,
+          CASE WHEN p_sort='tax_div'      AND p_dir='asc'  THEN tax_div      END ASC  NULLS LAST,
+          CASE WHEN p_sort='tax_div'      AND p_dir='desc' THEN tax_div      END DESC NULLS LAST,
+          issue_date DESC NULLS LAST, row_no DESC
         LIMIT p_limit OFFSET p_offset
     ) t), '[]'::json)
   );
