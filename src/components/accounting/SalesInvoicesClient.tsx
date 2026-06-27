@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { useViewMode } from "@/context/ViewModeContext";
@@ -38,6 +38,37 @@ interface SearchResult {
   unpaid_amount: number;
   rows: InvoiceRow[];
 }
+
+interface OverdueRow {
+  site_name: string | null;
+  vendor_name: string | null;
+  contact: string | null;
+  unpaid_count: number;
+  unpaid_amount: number;
+  oldest_issue: string | null;
+  newest_issue: string | null;
+  overdue_days: number;
+}
+interface OverdueResult {
+  site_count: number;
+  total_count: number;
+  total_amount: number;
+  rows: OverdueRow[];
+}
+interface OverdueDetailRow {
+  id: number;
+  issue_date: string | null;
+  overdue_days: number;
+  tax_div: string | null;
+  category: string | null;
+  summary: string | null;
+  amount: number | null;
+  deposit_raw: string | null;
+  pay_method: string | null;
+  ledger_no: string | null;
+  remark: string | null;
+}
+const OVERDUE_DAYS_OPTS = [90, 180, 365] as const;
 
 // 결제상태 코드 → 라벨·색상
 const STATUS_META: Record<string, { label: string; cls: string }> = {
@@ -125,6 +156,19 @@ export default function SalesInvoicesClient() {
   const [result, setResult] = useState<SearchResult>({ total_count: 0, total_amount: 0, unpaid_amount: 0, rows: [] });
   const [loading, setLoading] = useState(false);
 
+  // 뷰 전환 + 장기미수 현장
+  const [view, setView] = useState<"list" | "overdue">("list");
+  const [overdueDays, setOverdueDays] = useState<number>(90);
+  const [overdueQ, setOverdueQ] = useState("");
+  const [overdueCategory, setOverdueCategory] = useState<"" | "보수" | "부품">("");
+  const [overdueTaxDiv, setOverdueTaxDiv] = useState<"" | "T" | "D">("");
+  const [overdue, setOverdue] = useState<OverdueResult>({ site_count: 0, total_count: 0, total_amount: 0, rows: [] });
+  const [overdueLoading, setOverdueLoading] = useState(false);
+  // 현장 행 펼침 + 상세 캐시
+  const [expandedSite, setExpandedSite] = useState<string | null>(null);
+  const [detailMap, setDetailMap] = useState<Record<string, OverdueDetailRow[]>>({});
+  const [detailLoadingSite, setDetailLoadingSite] = useState<string | null>(null);
+
   // 업로드 상태
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploadMsg, setUploadMsg] = useState<{ type: "info" | "success" | "error"; text: string } | null>(null);
@@ -161,6 +205,54 @@ export default function SalesInvoicesClient() {
     return () => clearTimeout(t);
   }, [load]);
   useReloadOnActivate(load);
+
+  const loadOverdue = useCallback(async () => {
+    setOverdueLoading(true);
+    try {
+      const { data, error } = await supabase.rpc("sales_invoices_overdue_sites", {
+        p_days: overdueDays,
+        p_q: overdueQ.trim() || null,
+        p_category: overdueCategory || null,
+        p_tax_div: overdueTaxDiv || null,
+      });
+      if (error) throw error;
+      setOverdue(data as OverdueResult);
+    } catch (e) {
+      console.error("[sales-invoices] 장기미수 조회 실패:", e);
+      setOverdue({ site_count: 0, total_count: 0, total_amount: 0, rows: [] });
+    } finally {
+      setOverdueLoading(false);
+    }
+  }, [overdueDays, overdueQ, overdueCategory, overdueTaxDiv]);
+
+  // 장기미수 탭 활성 시 + 기준 변경 시 조회 (검색어 디바운스). 필터 변경 시 펼침·캐시 초기화
+  useEffect(() => {
+    if (view !== "overdue") return;
+    setExpandedSite(null); setDetailMap({});
+    const t = setTimeout(() => { void loadOverdue(); }, 250);
+    return () => clearTimeout(t);
+  }, [view, loadOverdue]);
+
+  async function toggleSite(site: string | null) {
+    if (!site) return;
+    if (expandedSite === site) { setExpandedSite(null); return; }
+    setExpandedSite(site);
+    if (detailMap[site]) return;   // 캐시 사용
+    setDetailLoadingSite(site);
+    try {
+      const { data, error } = await supabase.rpc("sales_invoices_overdue_detail", {
+        p_site: site, p_days: overdueDays,
+        p_category: overdueCategory || null, p_tax_div: overdueTaxDiv || null,
+      });
+      if (error) throw error;
+      setDetailMap(prev => ({ ...prev, [site]: (data as OverdueDetailRow[]) ?? [] }));
+    } catch (e) {
+      console.error("[sales-invoices] 장기미수 상세 실패:", e);
+      setDetailMap(prev => ({ ...prev, [site]: [] }));
+    } finally {
+      setDetailLoadingSite(null);
+    }
+  }
 
   const totalPages = Math.max(1, Math.ceil(result.total_count / PAGE_SIZE));
 
@@ -227,6 +319,41 @@ export default function SalesInvoicesClient() {
   const inputCls = "px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-400";
   const cardCls = "bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700";
 
+  // 현장 미수 상세 (펼침 영역 공용)
+  const renderOverdueDetail = (site: string) => {
+    if (detailLoadingSite === site) return <div className="px-4 py-3 text-xs text-gray-400">상세 조회 중...</div>;
+    const rows = detailMap[site] ?? [];
+    if (rows.length === 0) return <div className="px-4 py-3 text-xs text-gray-400">상세 내역이 없습니다.</div>;
+    return (
+      <table className="w-full text-[11px]">
+        <thead className="text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-600">
+          <tr>
+            <th className="px-2 py-1.5 text-center w-20">발행일</th>
+            <th className="px-2 py-1.5 text-center w-16">경과</th>
+            <th className="px-2 py-1.5 text-center w-12">TK/DS</th>
+            <th className="px-2 py-1.5 text-left">적요</th>
+            <th className="px-2 py-1.5 text-right w-24">금액</th>
+            <th className="px-2 py-1.5 text-left w-24">원장번호</th>
+            <th className="px-2 py-1.5 text-left">비고</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(d => (
+            <tr key={d.id} className="border-b border-gray-100 dark:border-gray-700/60 last:border-0">
+              <td className="px-2 py-1.5 text-center font-mono tabular-nums whitespace-nowrap text-gray-600 dark:text-gray-300">{fmtDate(d.issue_date)}</td>
+              <td className="px-2 py-1.5 text-center tabular-nums text-red-600 dark:text-red-400">{fmtNum(d.overdue_days)}일</td>
+              <td className="px-2 py-1.5 text-center">{taxBadge(d.tax_div)}</td>
+              <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200">{d.summary ?? "-"}</td>
+              <td className="px-2 py-1.5 text-right font-semibold tabular-nums text-gray-900 dark:text-white whitespace-nowrap">{fmtNum(d.amount)}</td>
+              <td className="px-2 py-1.5 font-mono text-gray-500 dark:text-gray-400 whitespace-nowrap">{d.ledger_no ?? "-"}</td>
+              <td className="px-2 py-1.5 text-gray-500 dark:text-gray-400">{d.remark ?? "-"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  };
+
   return (
     <div className="min-h-full bg-gray-50 dark:bg-gray-900">
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between flex-wrap gap-2">
@@ -245,7 +372,20 @@ export default function SalesInvoicesClient() {
         )}
       </div>
 
-      <div className="p-6 space-y-4 max-w-[1600px]">
+      {/* 뷰 탭 */}
+      <div className="px-6 pt-4 max-w-[1600px]">
+        <div className="inline-flex gap-0.5 bg-gray-100 dark:bg-gray-700 p-0.5 rounded-lg">
+          {([["list", "발행내역"], ["overdue", "장기미수 현장"]] as const).map(([v, label]) => (
+            <button key={v} type="button" onClick={() => setView(v)}
+              className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${
+                view === v ? "bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-300 shadow-sm" : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="p-6 pt-4 space-y-4 max-w-[1600px]">
         {uploadMsg && (
           <div className={`px-4 py-2.5 rounded-lg text-sm ${
             uploadMsg.type === "success" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
@@ -255,6 +395,7 @@ export default function SalesInvoicesClient() {
           </div>
         )}
 
+        {view === "list" && (<>
         {/* 필터 */}
         <div className={`${cardCls} p-4 flex flex-wrap items-end gap-3`}>
           <div className="flex-1 min-w-[220px]">
@@ -409,6 +550,158 @@ export default function SalesInvoicesClient() {
             </div>
           </div>
         </div>
+        </>)}
+
+        {view === "overdue" && (<>
+          {/* 장기미수 필터 */}
+          <div className={`${cardCls} p-4 flex flex-wrap items-end gap-3`}>
+            <div className="flex-1 min-w-[220px]">
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">현장·상호 검색</label>
+              <input type="text" value={overdueQ} onChange={e => setOverdueQ(e.target.value)} placeholder="검색어 입력" className={inputCls + " w-full"} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">TK/DS</label>
+              <div className="flex gap-0.5 bg-gray-100 dark:bg-gray-700 p-0.5 rounded-lg">
+                {([["", "전체", "bg-gray-900 text-white"], ["D", "DS", "bg-red-500 text-white"], ["T", "TK", "bg-blue-600 text-white"]] as const).map(([v, label, activeCls]) => (
+                  <button key={v} type="button" onClick={() => setOverdueTaxDiv(v as "" | "T" | "D")}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                      overdueTaxDiv === v ? `${activeCls} shadow-sm` : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">구분</label>
+              <div className="flex gap-0.5 bg-gray-100 dark:bg-gray-700 p-0.5 rounded-lg">
+                {([["", "전체"], ["보수", "보수료"], ["부품", "부품교체"]] as const).map(([v, label]) => (
+                  <button key={v} type="button" onClick={() => setOverdueCategory(v as "" | "보수" | "부품")}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                      overdueCategory === v ? "bg-indigo-600 text-white shadow-sm" : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">장기미수 기준 (발행경과)</label>
+              <div className="flex gap-0.5 bg-gray-100 dark:bg-gray-700 p-0.5 rounded-lg">
+                {OVERDUE_DAYS_OPTS.map(d => (
+                  <button key={d} type="button" onClick={() => setOverdueDays(d)}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                      overdueDays === d ? "bg-red-500 text-white shadow-sm" : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"}`}>
+                    {d}일 초과
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 ml-auto">미수(미) + 발행 후 {overdueDays}일 초과 건을 현장별로 집계</p>
+          </div>
+
+          {/* 요약 */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className={`${cardCls} px-4 py-3`}>
+              <div className="text-xs text-gray-500 dark:text-gray-400">장기미수 현장수</div>
+              <div className="text-lg font-bold text-gray-900 dark:text-white tabular-nums">{fmtNum(overdue.site_count)}곳</div>
+            </div>
+            <div className={`${cardCls} px-4 py-3`}>
+              <div className="text-xs text-gray-500 dark:text-gray-400">미수 건수</div>
+              <div className="text-lg font-bold text-gray-900 dark:text-white tabular-nums">{fmtNum(overdue.total_count)}건</div>
+            </div>
+            <div className={`${cardCls} px-4 py-3`}>
+              <div className="text-xs text-gray-500 dark:text-gray-400">미수 합계</div>
+              <div className="text-lg font-bold text-red-600 dark:text-red-400 tabular-nums">{fmtNum(overdue.total_amount)}원</div>
+            </div>
+          </div>
+
+          {/* 현장 목록 */}
+          <div className={`${cardCls} overflow-hidden`}>
+            {isMobile ? (
+              <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                {overdue.rows.map((r, i) => {
+                  const open = expandedSite === r.site_name;
+                  return (
+                  <div key={i} className="p-3 space-y-1">
+                    <div onClick={() => toggleSite(r.site_name)} className="space-y-1 cursor-pointer">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-gray-800 dark:text-gray-100"><span className="text-gray-400 mr-1">{open ? "▾" : "▸"}</span>{r.site_name ?? "-"}</span>
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 whitespace-nowrap">경과 {fmtNum(r.overdue_days)}일</span>
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">{r.vendor_name ?? "-"}{r.contact ? ` · ☎ ${r.contact}` : ""}</div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-300"><span className="text-indigo-600 dark:text-indigo-300 font-semibold underline underline-offset-2">{r.unpaid_count}건</span> · 최초 {fmtDate(r.oldest_issue)}</span>
+                        <span className="font-bold tabular-nums text-red-600 dark:text-red-400">{fmtNum(r.unpaid_amount)}원</span>
+                      </div>
+                    </div>
+                    {open && r.site_name && (
+                      <div className="mt-2 rounded-lg border border-gray-200 dark:border-gray-600 overflow-x-auto">
+                        {renderOverdueDetail(r.site_name)}
+                      </div>
+                    )}
+                  </div>
+                  );
+                })}
+                {overdue.rows.length === 0 && !overdueLoading && <div className="p-8 text-center text-sm text-gray-400">해당 기준의 장기미수 현장이 없습니다.</div>}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-600 text-[11px] font-bold text-gray-600 dark:text-gray-300">
+                    <tr>
+                      <th className="px-3 py-2 text-left">현장명</th>
+                      <th className="px-3 py-2 text-left">거래처(상호)</th>
+                      <th className="px-3 py-2 text-center w-20">미수건</th>
+                      <th className="px-3 py-2 text-right w-28">미수합계</th>
+                      <th className="px-3 py-2 text-center w-24">최초 발행일</th>
+                      <th className="px-3 py-2 text-center w-24">경과일</th>
+                      <th className="px-3 py-2 text-left w-32">연락처</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overdue.rows.map((r, i) => {
+                      const open = expandedSite === r.site_name;
+                      return (
+                      <React.Fragment key={i}>
+                      <tr onClick={() => toggleSite(r.site_name)}
+                        className={`border-b border-gray-100 dark:border-gray-700 cursor-pointer ${open ? "bg-indigo-50/50 dark:bg-indigo-900/20" : "hover:bg-gray-50 dark:hover:bg-gray-800/50"}`}>
+                        <td className="px-3 py-2 font-medium text-gray-800 dark:text-gray-100 max-w-[220px] truncate" title={r.site_name ?? ""}>
+                          <span className="text-gray-400 mr-1">{open ? "▾" : "▸"}</span>{r.site_name ?? "-"}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600 dark:text-gray-300 max-w-[200px] truncate" title={r.vendor_name ?? ""}>{r.vendor_name ?? "-"}</td>
+                        <td className="px-3 py-2 text-center tabular-nums">
+                          <span className="text-indigo-600 dark:text-indigo-300 font-semibold underline underline-offset-2">{r.unpaid_count}건</span>
+                        </td>
+                        <td className="px-3 py-2 text-right font-bold tabular-nums text-red-600 dark:text-red-400 whitespace-nowrap">{fmtNum(r.unpaid_amount)}</td>
+                        <td className="px-3 py-2 text-center font-mono tabular-nums whitespace-nowrap text-gray-600 dark:text-gray-300">{fmtDate(r.oldest_issue)}</td>
+                        <td className="px-3 py-2 text-center">
+                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 tabular-nums whitespace-nowrap">{fmtNum(r.overdue_days)}일</span>
+                        </td>
+                        <td className="px-3 py-2 text-gray-500 dark:text-gray-400 whitespace-nowrap">{r.contact ?? "-"}</td>
+                      </tr>
+                      {open && r.site_name && (
+                        <tr className="bg-gray-50/60 dark:bg-gray-900/30">
+                          <td colSpan={7} className="px-3 py-2">
+                            <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 overflow-hidden">
+                              {renderOverdueDetail(r.site_name)}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      </React.Fragment>
+                      );
+                    })}
+                    {overdue.rows.length === 0 && !overdueLoading && (
+                      <tr><td colSpan={7} className="px-3 py-8 text-center text-sm text-gray-400">해당 기준의 장기미수 현장이 없습니다.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
+              {overdueLoading ? "조회 중..." : `장기미수 현장 ${fmtNum(overdue.site_count)}곳 · 경과일 내림차순 정렬`}
+            </div>
+          </div>
+        </>)}
       </div>
     </div>
   );

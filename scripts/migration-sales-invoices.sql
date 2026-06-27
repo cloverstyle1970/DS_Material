@@ -81,6 +81,74 @@ LANGUAGE sql STABLE AS $$
   );
 $$;
 
+-- 장기미수 현장 집계 RPC — 미수(미) + 발행 후 p_days 초과 건을 현장별로 묶어 반환
+DROP FUNCTION IF EXISTS sales_invoices_overdue_sites(int,text);
+DROP FUNCTION IF EXISTS sales_invoices_overdue_sites(int,text,text,text);
+CREATE OR REPLACE FUNCTION sales_invoices_overdue_sites(
+  p_days     int  DEFAULT 90,    -- 발행경과 기준일 (이 일수 초과 미수)
+  p_q        text DEFAULT NULL,  -- 현장명·상호 검색
+  p_category text DEFAULT NULL,  -- 보수 / 부품
+  p_tax_div  text DEFAULT NULL   -- T(TK) / D(DS)
+) RETURNS json
+LANGUAGE sql STABLE AS $$
+  WITH overdue AS (
+    SELECT * FROM sales_invoices si
+    WHERE si.pay_status = '미'
+      AND si.issue_date IS NOT NULL
+      AND si.issue_date <= current_date - make_interval(days => p_days)
+      AND (p_q IS NULL OR p_q = '' OR
+           si.site_name   ILIKE '%'||p_q||'%' OR
+           si.vendor_name ILIKE '%'||p_q||'%')
+      AND (p_category IS NULL OR p_category = '' OR si.category = p_category)
+      AND (p_tax_div  IS NULL OR p_tax_div  = '' OR si.tax_div  = p_tax_div)
+  ),
+  grouped AS (
+    SELECT
+      site_name,
+      (array_agg(vendor_name ORDER BY issue_date DESC))[1] AS vendor_name,
+      (array_agg(contact ORDER BY issue_date DESC) FILTER (WHERE contact IS NOT NULL))[1] AS contact,
+      count(*)              AS unpaid_count,
+      sum(amount)           AS unpaid_amount,
+      min(issue_date)       AS oldest_issue,
+      max(issue_date)       AS newest_issue,
+      (current_date - min(issue_date)) AS overdue_days
+    FROM overdue
+    GROUP BY site_name
+  )
+  SELECT json_build_object(
+    'site_count',   (SELECT count(*)                   FROM grouped),
+    'total_count',  (SELECT COALESCE(sum(unpaid_count),0)  FROM grouped),
+    'total_amount', (SELECT COALESCE(sum(unpaid_amount),0) FROM grouped),
+    'rows', COALESCE((SELECT json_agg(t) FROM (
+        SELECT * FROM grouped
+        ORDER BY overdue_days DESC, unpaid_amount DESC NULLS LAST
+    ) t), '[]'::json)
+  );
+$$;
+
+-- 장기미수 현장 상세 — 특정 현장의 미수(미)+경과초과 개별 건 (집계와 동일 필터)
+DROP FUNCTION IF EXISTS sales_invoices_overdue_detail(text,int,text,text);
+CREATE OR REPLACE FUNCTION sales_invoices_overdue_detail(
+  p_site     text,
+  p_days     int  DEFAULT 90,
+  p_category text DEFAULT NULL,
+  p_tax_div  text DEFAULT NULL
+) RETURNS json
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(json_agg(t), '[]'::json) FROM (
+    SELECT id, issue_date, (current_date - issue_date) AS overdue_days,
+           tax_div, category, summary, amount,
+           deposit_raw, pay_method, ledger_no, remark
+    FROM sales_invoices si
+    WHERE si.pay_status = '미' AND si.issue_date IS NOT NULL
+      AND si.issue_date <= current_date - make_interval(days => p_days)
+      AND si.site_name = p_site
+      AND (p_category IS NULL OR p_category = '' OR si.category = p_category)
+      AND (p_tax_div  IS NULL OR p_tax_div  = '' OR si.tax_div  = p_tax_div)
+    ORDER BY issue_date
+  ) t;
+$$;
+
 -- 검증
 SELECT
   (SELECT count(*) FROM sales_invoices) AS row_count,
