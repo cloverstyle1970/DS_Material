@@ -95,6 +95,18 @@ function parseAmount(raw: unknown): number | null {
 }
 const TX = (v: unknown): string | null => { const s = (v ?? "").toString().trim(); return s === "" ? null : s; };
 
+// 현재 분기 시작·종료일 (YYYY-MM-DD)
+function currentQuarter(): { from: string; to: string } {
+  const now = new Date();
+  const y = now.getFullYear();
+  const startMonth = Math.floor(now.getMonth() / 3) * 3;   // 0,3,6,9
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const from = `${y}-${pad(startMonth + 1)}-01`;
+  const lastDay = new Date(y, startMonth + 3, 0).getDate();
+  const to = `${y}-${pad(startMonth + 3)}-${pad(lastDay)}`;
+  return { from, to };
+}
+
 export default function SalesInvoicesClient() {
   const { user } = useAuth();
   const { viewMode } = useViewMode();
@@ -103,11 +115,11 @@ export default function SalesInvoicesClient() {
 
   // 필터
   const [q, setQ] = useState("");
-  const [category, setCategory] = useState<"" | "보수" | "부품">("");
-  const [taxDiv, setTaxDiv] = useState<"" | "T" | "D">("");  // T=TK, D=DS
-  const [status, setStatus] = useState<string>("");        // 결제상태 코드
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [category, setCategory] = useState<"" | "보수" | "부품">("부품");   // 기본: 부품교체
+  const [taxDiv, setTaxDiv] = useState<"" | "T" | "D">("D");                // 기본: DS
+  const [status, setStatus] = useState<string>("완");                       // 기본: 입금완료
+  const [from, setFrom] = useState(() => currentQuarter().from);            // 기본: 해당 분기
+  const [to, setTo] = useState(() => currentQuarter().to);
   const [unpaidOnly, setUnpaidOnly] = useState(false);
   const [page, setPage] = useState(0);
 
