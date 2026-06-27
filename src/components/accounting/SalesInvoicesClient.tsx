@@ -120,7 +120,6 @@ export default function SalesInvoicesClient() {
   const [status, setStatus] = useState<string>("완");                       // 기본: 입금완료
   const [from, setFrom] = useState(() => currentQuarter().from);            // 기본: 해당 분기
   const [to, setTo] = useState(() => currentQuarter().to);
-  const [unpaidOnly, setUnpaidOnly] = useState(false);
   const [page, setPage] = useState(0);
 
   const [result, setResult] = useState<SearchResult>({ total_count: 0, total_amount: 0, unpaid_amount: 0, rows: [] });
@@ -140,7 +139,7 @@ export default function SalesInvoicesClient() {
         p_status: status || null,
         p_from: from || null,
         p_to: to || null,
-        p_unpaid_only: unpaidOnly,
+        p_unpaid_only: false,
         p_limit: PAGE_SIZE,
         p_offset: page * PAGE_SIZE,
         p_tax_div: taxDiv || null,
@@ -153,10 +152,10 @@ export default function SalesInvoicesClient() {
     } finally {
       setLoading(false);
     }
-  }, [q, category, taxDiv, status, from, to, unpaidOnly, page]);
+  }, [q, category, taxDiv, status, from, to, page]);
 
   // 필터 변경 시 1페이지로 리셋 후 조회 (검색어는 디바운스)
-  useEffect(() => { setPage(0); }, [q, category, taxDiv, status, from, to, unpaidOnly]);
+  useEffect(() => { setPage(0); }, [q, category, taxDiv, status, from, to]);
   useEffect(() => {
     const t = setTimeout(() => { void load(); }, 250);
     return () => clearTimeout(t);
@@ -301,12 +300,8 @@ export default function SalesInvoicesClient() {
             <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">발행일 (종료)</label>
             <input type="date" value={to} onChange={e => setTo(e.target.value)} className={inputCls} />
           </div>
-          <label className="flex items-center gap-1.5 cursor-pointer select-none px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600">
-            <input type="checkbox" checked={unpaidOnly} onChange={e => setUnpaidOnly(e.target.checked)} className="accent-red-500" />
-            <span className="text-xs font-semibold text-red-600 dark:text-red-300">미수만</span>
-          </label>
-          {(q || category || taxDiv || status || from || to || unpaidOnly) && (
-            <button type="button" onClick={() => { setQ(""); setCategory(""); setTaxDiv(""); setStatus(""); setFrom(""); setTo(""); setUnpaidOnly(false); }}
+          {(q || category || taxDiv || status || from || to) && (
+            <button type="button" onClick={() => { setQ(""); setCategory(""); setTaxDiv(""); setStatus(""); setFrom(""); setTo(""); }}
               className="px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">초기화</button>
           )}
         </div>
