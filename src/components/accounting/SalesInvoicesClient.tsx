@@ -169,7 +169,7 @@ export default function SalesInvoicesClient() {
     const file = e.target.files?.[0];
     if (fileRef.current) fileRef.current.value = "";
     if (!file) return;
-    if (!confirm(`"${file.name}" 의 전체 내용으로 발행내역을 교체합니다.\n기존 데이터는 모두 삭제됩니다. 진행할까요?`)) return;
+    if (!confirm(`"${file.name}" 의 데이터를 기존 발행내역에 추가합니다.\n기존 데이터는 그대로 보존됩니다. 진행할까요?`)) return;
 
     setUploading(true);
     setUploadMsg({ type: "info", text: "엑셀을 읽는 중..." });
@@ -180,6 +180,11 @@ export default function SalesInvoicesClient() {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: false, defval: "" });
 
+      // 추가되는 행이 정렬에서 기존 데이터 뒤로 이어지도록 현재 최대 row_no 뒤부터 채움
+      const { data: maxRow } = await supabase.from("sales_invoices")
+        .select("row_no").order("row_no", { ascending: false }).limit(1).maybeSingle();
+      let nextRowNo = ((maxRow?.row_no as number | null) ?? 0) + 1;
+
       const records: Record<string, unknown>[] = [];
       for (let i = 3; i < rows.length; i++) {
         const r = rows[i];
@@ -187,7 +192,7 @@ export default function SalesInvoicesClient() {
         if (!(TX(r[4]) || TX(r[6]) || TX(r[8]) || TX(r[5]))) continue;
         const dep = parseDeposit(r[9]);
         records.push({
-          row_no: i,
+          row_no: nextRowNo++,
           year_label: TX(r[0]), month_label: TX(r[1]),
           category: TX(r[2]), tax_div: TX(r[3]),
           issue_date: parseYmd(r[4]), issue_raw: TX(r[4]),
@@ -201,18 +206,15 @@ export default function SalesInvoicesClient() {
       }
       if (records.length === 0) { setUploadMsg({ type: "error", text: "유효한 데이터 행이 없습니다. 시트 형식을 확인하세요." }); setUploading(false); return; }
 
-      setUploadMsg({ type: "info", text: `${records.length}건 파싱 완료. 기존 데이터 삭제 중...` });
-      const del = await supabase.from("sales_invoices").delete().gte("id", 0);
-      if (del.error) throw del.error;
-
+      setUploadMsg({ type: "info", text: `${records.length}건 파싱 완료. 추가 중...` });
       const BATCH = 500;
       for (let i = 0; i < records.length; i += BATCH) {
         const slice = records.slice(i, i + BATCH);
         const { error } = await supabase.from("sales_invoices").insert(slice);
         if (error) throw error;
-        setUploadMsg({ type: "info", text: `적재 중... ${Math.min(i + BATCH, records.length)}/${records.length}` });
+        setUploadMsg({ type: "info", text: `추가 중... ${Math.min(i + BATCH, records.length)}/${records.length}` });
       }
-      setUploadMsg({ type: "success", text: `업로드 완료: ${records.length}건으로 교체되었습니다.` });
+      setUploadMsg({ type: "success", text: `업로드 완료: ${records.length}건이 추가되었습니다.` });
       setPage(0);
       await load();
     } catch (err) {
@@ -238,7 +240,7 @@ export default function SalesInvoicesClient() {
             <input ref={fileRef} type="file" accept=".xls,.xlsx" onChange={handleFile} className="hidden" />
             <button type="button" disabled={uploading} onClick={() => fileRef.current?.click()}
               className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50">
-              {uploading ? "업로드 중..." : "⬆ 엑셀 재업로드"}
+              {uploading ? "업로드 중..." : "⬆ 엑셀 업로드"}
             </button>
           </div>
         )}
