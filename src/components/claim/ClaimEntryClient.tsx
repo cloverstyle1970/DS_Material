@@ -55,7 +55,7 @@ function fmtDT(iso: string): string {
   if (!iso) return "-";
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
 }
 
 interface ItemRow {
@@ -673,7 +673,7 @@ export default function ClaimEntryClient() {
             <table className="w-full text-xs">
               <thead className="bg-gray-50 dark:bg-gray-700/50 border-y border-gray-200 dark:border-gray-600 text-[11px] font-bold text-gray-600 dark:text-gray-300">
                 <tr>
-                  <th className="px-2 py-2 text-center w-36">접수일시</th>
+                  <th className="px-2 py-2 text-center w-24">접수일자</th>
                   <th className="px-2 py-2 text-center w-24">구분</th>
                   <th className="px-2 py-2 text-center w-20">신청자</th>
                   <th className="px-2 py-2 text-left">현장</th>

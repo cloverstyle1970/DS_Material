@@ -46,6 +46,7 @@ import LaborRatesClient from "@/components/quotes/LaborRatesClient";
 import QuoteDetailClient from "@/components/quotes/QuoteDetailClient";
 import LegacyQuotesClient from "@/components/quotes/LegacyQuotesClient";
 import PayslipClient from "@/components/payroll/PayslipClient";
+import SalesInvoicesClient from "@/components/accounting/SalesInvoicesClient";
 import ManualCenterClient from "@/components/manual/ManualCenterClient";
 import ImprovementRequestsClient from "@/components/board/ImprovementRequestsClient";
 
@@ -154,6 +155,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/payroll/payslip": {
     label: "급여명세표",
     render: () => <PayslipClient />,
+  },
+  "/accounting/sales-invoices": {
+    label: "계산서 발행내역",
+    render: () => <SalesInvoicesClient />,
   },
   "/data/profile": {
     label: "개인정보수정",

@@ -132,6 +132,7 @@ const NAV_GROUPS: NavGroup[] = [
     color: "text-indigo-400",
     items: [
       { href: "/payroll/payslip", label: "급여명세표", icon: "💵" },
+      { href: "/accounting/sales-invoices", label: "계산서 발행내역", icon: "🧾" },
     ],
   },
   {

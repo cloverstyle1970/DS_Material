@@ -103,6 +103,7 @@ const PERMISSION_TREE: MenuSection[] = [
     id: "accounting", label: "회계/세무", color: "text-indigo-500",
     items: [
       { href: "/payroll/payslip", label: "급여명세표" },
+      { href: "/accounting/sales-invoices", label: "계산서 발행내역" },
     ],
   },
   {
