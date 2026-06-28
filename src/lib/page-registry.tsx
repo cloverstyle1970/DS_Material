@@ -21,6 +21,11 @@ import ConstructionRequestClient from "@/components/construction/ConstructionReq
 import TBMClient from "@/components/tbm/TBMClient";
 import TBMAdminClient from "@/components/tbm/TBMAdminClient";
 import TBMMasterClient from "@/components/tbm/TBMMasterClient";
+import HazardSurveyClient from "@/components/safety/HazardSurveyClient";
+import HazardMasterClient from "@/components/safety/HazardMasterClient";
+import HazardRegisterClient from "@/components/safety/HazardRegisterClient";
+import RiskRegisterClient from "@/components/safety/RiskRegisterClient";
+import RiskAssessmentClient from "@/components/safety/RiskAssessmentClient";
 import EmployeeRegisterClient from "@/components/hr/EmployeeRegisterClient";
 import ClaimEntryClient from "@/components/claim/ClaimEntryClient";
 import QuoteRequestsListClient from "@/components/claim/QuoteRequestsListClient";
@@ -79,6 +84,26 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/safety/tbm/master": {
     label: "TBM 마스터",
     render: () => <TBMMasterClient />,
+  },
+  "/safety/hazard-survey": {
+    label: "유해요인조사표 등록",
+    render: () => <HazardSurveyClient />,
+  },
+  "/safety/hazard-master": {
+    label: "유해요인조사 마스터",
+    render: () => <HazardMasterClient />,
+  },
+  "/safety/hazard-register": {
+    label: "유해요인조사대장",
+    render: () => <HazardRegisterClient />,
+  },
+  "/safety/risk-register": {
+    label: "위험성평가대장",
+    render: () => <RiskRegisterClient />,
+  },
+  "/safety/risk-assessment": {
+    label: "위험성평가 등록",
+    render: () => <RiskAssessmentClient />,
   },
   "/hr/employee-register": {
     label: "사원등록",
