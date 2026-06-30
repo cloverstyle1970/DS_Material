@@ -37,10 +37,14 @@ interface Row {
   inboundRef: number | null;
   serialNos: string[];
   existingId?: number;
+  // 무상 토글 시 사용자가 직접 입력한 단가는 보존하기 위한 플래그. 셀에서 직접 수정 → true.
+  pricedManually: boolean;
+  // 자재 자동 채움 단가(sellPrice) 캐시. 무상 해제 시 이 값으로 복원.
+  autoUnitPrice: number;
 }
 
 function newRow(seed: Partial<Row> = {}): Row {
-  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, buyPrice: 0, stockQty: 0, storageLoc: "", elevatorName: "", requiresReturn: false, remark: "", inboundRef: null, serialNos: [], ...seed };
+  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, buyPrice: 0, stockQty: 0, storageLoc: "", elevatorName: "", requiresReturn: false, remark: "", inboundRef: null, serialNos: [], pricedManually: false, autoUnitPrice: 0, ...seed };
 }
 
 // note 표준: "입고 #M 출고완료[ / 수령인: XXX][ / 사용자메모]"
@@ -74,6 +78,7 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
 
   const [outboundDate, setOutboundDate] = useState(todayISO());
   const [siteName,     setSiteName]     = useState("");
+  const [freeOfCharge, setFreeOfCharge] = useState(false);
   const [elevators,    setElevators]    = useState<ElevatorRecord[]>([]);
   const [sites,        setSites]        = useState<SiteOption[]>([]);
   const [reference,    setReference]    = useState("");
@@ -143,6 +148,8 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
               inboundRef: parsed.inboundRef,
               serialNos: t.serialNo ? [t.serialNo] : [],
               requiresReturn: !!t.requiresReturn,
+              pricedManually: true,
+              autoUnitPrice: t.unitPrice ?? 0,
             });
           }
         }
@@ -185,12 +192,16 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
   async function refreshRowStock(rowId: string, materialId: string) {
     try {
       const m = await api.get<MaterialRecord>(`/api/materials/${encodeURIComponent(materialId)}`);
+      const auto = m.sellPrice ?? 0;
+      // 자재가 새로 선택된 시점이므로 pricedManually 초기화. 무상 ON 이면 단가 0으로 자동 채움.
       patchRow(rowId, {
         spec: m.modelNo ?? "",
         stockQty: m.stockQty ?? 0,
         storageLoc: m.storageLoc ?? "",
         buyPrice: m.buyPrice ?? 0,
-        unitPrice: m.sellPrice ?? 0,
+        autoUnitPrice: auto,
+        unitPrice: freeOfCharge ? 0 : auto,
+        pricedManually: false,
       });
     } catch { /* ignore */ }
   }
@@ -222,7 +233,7 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
   }
   function clearAll() {
     setRows([newRow(), newRow(), newRow(), newRow(), newRow()]);
-    setSiteName(""); setReference(""); setReceiverName("");
+    setSiteName(""); setReference(""); setReceiverName(""); setFreeOfCharge(false);
   }
 
   function applyMultipleMaterials(startRowId: string, materials: MaterialRecord[]) {
@@ -231,20 +242,32 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
       const startIdx = next.findIndex(r => r.id === startRowId);
       materials.forEach((m, i) => {
         const idx = startIdx + i;
+        const auto = m.sellPrice ?? 0;
         const patch = {
           materialId: m.id, materialName: m.name, spec: m.modelNo ?? "",
           qty: 1,
-          unitPrice: m.sellPrice ?? 0,
+          unitPrice: freeOfCharge ? 0 : auto,
           buyPrice: m.buyPrice ?? 0,
           stockQty: m.stockQty ?? 0,
           storageLoc: m.storageLoc ?? "",
           serialNos: [] as string[],
+          autoUnitPrice: auto,
+          pricedManually: false,
         };
         if (idx < next.length) next[idx] = { ...next[idx], ...patch };
         else next.push(newRow(patch));
       });
       return next;
     });
+  }
+
+  // 무상 체크 토글: 사용자가 단가를 직접 입력하지 않은 행만 일괄 변경 (수동입력 단가는 보존).
+  function toggleFreeOfCharge(next: boolean) {
+    setFreeOfCharge(next);
+    setRows(prev => prev.map(r => {
+      if (r.pricedManually) return r;
+      return { ...r, unitPrice: next ? 0 : r.autoUnitPrice };
+    }));
   }
 
   async function applyInbound(t: TransactionRecord) {
@@ -370,7 +393,21 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
             <input type="date" value={outboundDate} onChange={e => setOutboundDate(e.target.value)} className={inputCls} />
           </FormField>
           <FormField label="현장" required>
-            <SiteInlineSearch value={siteName} onChange={setSiteName} sites={sites} />
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <SiteInlineSearch value={siteName} onChange={setSiteName} sites={sites} />
+              </div>
+              <label className="flex items-center gap-1 text-[11px] shrink-0 cursor-pointer select-none"
+                title="체크 시 자동 채워진 단가는 0으로 저장 (직접 입력한 단가는 그대로 보존)">
+                <input
+                  type="checkbox"
+                  checked={freeOfCharge}
+                  onChange={e => toggleFreeOfCharge(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-orange-500"
+                />
+                <span className={`font-medium ${freeOfCharge ? "text-orange-600" : "text-gray-700 dark:text-gray-300"}`}>무상</span>
+              </label>
+            </div>
           </FormField>
           <FormField label="담당자">
             <input type="text" value={user?.name ?? ""} readOnly className={inputCls + " bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 cursor-not-allowed"} />
@@ -465,7 +502,7 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
                 </Td>
                 <Td right>
                   <input type="text" inputMode="numeric" value={r.unitPrice === 0 ? "" : fmtNum(r.unitPrice)}
-                    onChange={e => patchRow(r.id, { unitPrice: parseNum(e.target.value) })}
+                    onChange={e => patchRow(r.id, { unitPrice: parseNum(e.target.value), pricedManually: true })}
                     className={cellInput + " text-right"} />
                 </Td>
                 <Td right className="text-gray-700 dark:text-gray-300 tabular-nums">{fmtNum(r.qty * r.unitPrice)}</Td>
