@@ -272,7 +272,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
           batchId,
           transactionNo,
           unitPrice: r.unitPrice || 0,
-          createdAt: isEdit ? inboundDate : undefined,
+          createdAt: inboundDate,
         });
       }
       // 발주서 참조로 가져온 row가 있으면 해당 발주 상태를 "입고완료"로 갱신.

@@ -326,7 +326,7 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
           batchId,
           transactionNo,
           unitPrice: r.unitPrice || 0,
-          createdAt: isEdit ? outboundDate : undefined,
+          createdAt: outboundDate,
         });
       }
       if (goList) router.push("/outbound");
