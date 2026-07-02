@@ -52,6 +52,7 @@ import QuoteDetailClient from "@/components/quotes/QuoteDetailClient";
 import LegacyQuotesClient from "@/components/quotes/LegacyQuotesClient";
 import PayslipClient from "@/components/payroll/PayslipClient";
 import SalesInvoicesClient from "@/components/accounting/SalesInvoicesClient";
+import IncentiveClient from "@/components/accounting/IncentiveClient";
 import ManualCenterClient from "@/components/manual/ManualCenterClient";
 import ImprovementRequestsClient from "@/components/board/ImprovementRequestsClient";
 
@@ -184,6 +185,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/accounting/sales-invoices": {
     label: "계산서 발행내역",
     render: () => <SalesInvoicesClient />,
+  },
+  "/accounting/incentive": {
+    label: "인센티브 관리",
+    render: () => <IncentiveClient />,
   },
   "/data/profile": {
     label: "개인정보수정",

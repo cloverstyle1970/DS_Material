@@ -88,6 +88,7 @@ export const PERMISSION_MENUS: PermissionMenuGroup[] = [
     items: [
       { href: "/payroll/payslip", label: "급여명세표" },
       { href: "/accounting/sales-invoices", label: "계산서 발행내역" },
+      { href: "/accounting/incentive", label: "인센티브 관리" },
     ],
   },
   {
