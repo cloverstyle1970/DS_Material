@@ -3,7 +3,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { fmtNum, parseNum } from "@/lib/format";
+
+const MENU_HREF = "/accounting/incentive";
 
 // 회사 × 지역 참조 매트릭스
 const COMPANY_REGIONS: Record<string, readonly string[]> = {
@@ -88,8 +91,21 @@ function fmtDate(d: string): string { return d ? d.replace(/-/g, ".") : "-"; }
 
 export default function IncentiveEntryClient() {
   const router = useRouter();
+  const { user } = useAuth();
+  const canCreate = !!user && (isAdmin(user) || hasMenuPermission(user, MENU_HREF, "create"));
+  const canUpdate = !!user && (isAdmin(user) || hasMenuPermission(user, MENU_HREF, "update"));
+
+  // 진입 가드: create/update 둘 다 없으면 목록으로 강제 이동
+  useEffect(() => {
+    if (user && !canCreate && !canUpdate) router.replace("/accounting/incentive");
+  }, [user, canCreate, canUpdate, router]);
 
   const [editMode, setEditMode] = useState<boolean>(false);
+
+  // update만 있고 create가 없으면 자동으로 수정 모드 진입 (신규 등록 불가)
+  useEffect(() => {
+    if (user && !canCreate && canUpdate) setEditMode(true);
+  }, [user, canCreate, canUpdate]);
 
   const [header, setHeader] = useState<Header>({
     issueDate: today(),
@@ -208,6 +224,7 @@ export default function IncentiveEntryClient() {
 
   async function deleteSelected() {
     if (!selectedHitId) return;
+    if (!canUpdate) { alert("삭제 권한이 없습니다."); return; }
     if (!confirm("이 인센티브 전표 1건을 완전히 삭제합니다. 계속하시겠습니까?")) return;
     const { error } = await supabase.from("incentive_records").delete().eq("id", selectedHitId);
     if (error) { alert(`삭제 실패: ${error.message}`); return; }
@@ -218,6 +235,11 @@ export default function IncentiveEntryClient() {
   }
 
   async function save() {
+    if (editMode) {
+      if (!canUpdate) { alert("수정 권한이 없습니다."); return; }
+    } else {
+      if (!canCreate) { alert("등록 권한이 없습니다."); return; }
+    }
     if (!header.issueDate) { alert("발행일을 입력하세요."); return; }
     if (!header.company)   { alert("회사를 선택하세요."); return; }
     if (!header.region)    { alert("지역을 선택하세요."); return; }
@@ -344,12 +366,18 @@ export default function IncentiveEntryClient() {
       <section className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
         <header className="px-4 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-wrap gap-2">
           <span className="text-[11px] font-bold tracking-widest text-blue-500 dark:text-blue-300 uppercase">전표 헤더</span>
-          <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-200 select-none cursor-pointer">
+          <label className={`flex items-center gap-2 text-xs text-gray-700 dark:text-gray-200 select-none ${(!canUpdate || !canCreate) ? "opacity-60" : "cursor-pointer"}`}>
             <input
               type="checkbox"
               checked={editMode}
               onChange={e => toggleEditMode(e.target.checked)}
-              className="w-4 h-4"
+              disabled={!canUpdate || !canCreate}
+              className="w-4 h-4 disabled:opacity-50"
+              title={
+                !canUpdate ? "수정 권한이 없습니다"
+                : !canCreate ? "등록 권한이 없어 수정 모드가 자동 적용됩니다"
+                : ""
+              }
             />
             <span className="font-semibold">수정모드</span>
             <span className="text-[10px] text-gray-500 dark:text-gray-400">(기존 전표 검색 후 선택 수정)</span>
@@ -390,7 +418,7 @@ export default function IncentiveEntryClient() {
         <section className="rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-gray-900 overflow-hidden">
           <header className="px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 flex items-center justify-between flex-wrap gap-2">
             <span className="text-[11px] font-bold tracking-widest text-amber-700 dark:text-amber-300 uppercase">기존 전표 검색</span>
-            {selectedHitId && (
+            {selectedHitId && canUpdate && (
               <button
                 type="button"
                 onClick={deleteSelected}
@@ -677,16 +705,23 @@ export default function IncentiveEntryClient() {
           >
             다시 작성
           </button>
-          <button
-            type="button"
-            onClick={save}
-            disabled={saving || (editMode && !selectedHitId)}
-            className={`h-10 px-6 rounded-md text-sm font-semibold text-white ${
-              saving || (editMode && !selectedHitId) ? "bg-blue-300 cursor-not-allowed" : editMode ? "bg-amber-600 hover:bg-amber-700" : "bg-blue-600 hover:bg-blue-700"
-            }`}
-          >
-            {saving ? "저장 중..." : editMode ? "수정 저장" : `저장 (${validLines.length}건)`}
-          </button>
+          {(() => {
+            const noRight = editMode ? !canUpdate : !canCreate;
+            const disabled = saving || (editMode && !selectedHitId) || noRight;
+            return (
+              <button
+                type="button"
+                onClick={save}
+                disabled={disabled}
+                title={noRight ? (editMode ? "수정 권한이 없습니다" : "등록 권한이 없습니다") : ""}
+                className={`h-10 px-6 rounded-md text-sm font-semibold text-white ${
+                  disabled ? "bg-blue-300 cursor-not-allowed" : editMode ? "bg-amber-600 hover:bg-amber-700" : "bg-blue-600 hover:bg-blue-700"
+                }`}
+              >
+                {saving ? "저장 중..." : editMode ? "수정 저장" : `저장 (${validLines.length}건)`}
+              </button>
+            );
+          })()}
         </div>
       </div>
     </div>

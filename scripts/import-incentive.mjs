@@ -144,19 +144,21 @@ for (const r of records) {
   else if (!list.includes(r.region)) console.warn(`  ⚠ 미지 지역: ${r.company}·${r.region} (row site=${r.site})`);
 }
 
-// 월별 그룹 → sort_order 부여
+// 월별 그룹 (sort_order 는 DB 기존 max 조회 후 부여 — APPEND 모드 대응)
 const byMonth = new Map();
 for (const r of records) {
   if (!byMonth.has(r.month)) byMonth.set(r.month, []);
   byMonth.get(r.month).push(r);
 }
-for (const list of byMonth.values()) {
-  list.forEach((r, idx) => { r.sort_order = idx; });
-}
 console.log(`▶ 대상 월: ${Array.from(byMonth.keys()).sort().join(", ")}`);
+console.log(`▶ 모드: ${process.env.APPEND === "1" ? "APPEND (기존 유지 + 뒤에 추가)" : "REPLACE (월 단위 교체)"}`);
 
 // 파싱만 확인하고 DB 적재는 건너뛰려면 DRY_RUN=1
 if (process.env.DRY_RUN === "1") {
+  // DRY_RUN 은 DB 조회 없이 sort_order 미리보기 (append 모드에서도 0-base 로 표시)
+  for (const list of byMonth.values()) {
+    list.forEach((r, idx) => { r.sort_order = idx; });
+  }
   console.log("▶ DRY_RUN=1 — DB 적재 건너뜀. 미리보기 상위 5건:");
   console.table(records.slice(0, 5));
   console.log(`▶ 하위 3건:`);
@@ -189,10 +191,25 @@ try {
     console.log("✅ 스키마 보장 완료 (migration-incentive.sql)");
   }
   await client.query("BEGIN");
-  // 대상 월들만 replace — 다른 월 데이터는 건들지 않는다
-  for (const m of byMonth.keys()) {
-    const del = await client.query("DELETE FROM incentive_records WHERE month = $1", [m]);
-    console.log(`  · ${m}: 기존 ${del.rowCount}건 삭제`);
+  const APPEND = process.env.APPEND === "1";
+  if (APPEND) {
+    // 각 월의 기존 max(sort_order) 뒤로 이어붙임
+    for (const [m, list] of byMonth.entries()) {
+      const q = await client.query(
+        "SELECT COALESCE(MAX(sort_order), -1) AS max_so FROM incentive_records WHERE month = $1",
+        [m]
+      );
+      const base = Number(q.rows[0].max_so) + 1;
+      list.forEach((r, idx) => { r.sort_order = base + idx; });
+      console.log(`  · ${m}: 기존 max sort_order=${base - 1} → 신규 ${list.length}건 (sort_order ${base}~${base + list.length - 1})`);
+    }
+  } else {
+    // 대상 월들만 replace — 다른 월 데이터는 건들지 않는다
+    for (const [m, list] of byMonth.entries()) {
+      const del = await client.query("DELETE FROM incentive_records WHERE month = $1", [m]);
+      list.forEach((r, idx) => { r.sort_order = idx; });
+      console.log(`  · ${m}: 기존 ${del.rowCount}건 삭제`);
+    }
   }
   const BATCH = 500;
   let done = 0;

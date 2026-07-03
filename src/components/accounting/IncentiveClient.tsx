@@ -3,8 +3,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { fmtNum } from "@/lib/format";
+
+const MENU_HREF = "/accounting/incentive";
 
 // 회사 × 지역 참조 매트릭스
 const COMPANY_REGIONS: Record<string, readonly string[]> = {
@@ -75,6 +78,8 @@ function fmtDate(d: string): string {
 }
 
 export default function IncentiveClient() {
+  const { user } = useAuth();
+  const canCreate = !!user && (isAdmin(user) || hasMenuPermission(user, MENU_HREF, "create"));
   const [fromDate, setFromDate] = useState<string>(() => firstOfMonth(currentMonth()));
   const [toDate, setToDate]     = useState<string>(() => lastOfMonth(currentMonth()));
   const [rows, setRows] = useState<Row[]>([]);
@@ -247,13 +252,15 @@ export default function IncentiveClient() {
             )}
           </div>
 
-          <Link
-            href="/accounting/incentive/new"
-            className="h-8 px-3 ml-2 inline-flex items-center rounded text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700"
-            title="전표 입력 화면으로 이동"
-          >
-            + 전표입력
-          </Link>
+          {canCreate && (
+            <Link
+              href="/accounting/incentive/new"
+              className="h-8 px-3 ml-2 inline-flex items-center rounded text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700"
+              title="전표 입력 화면으로 이동"
+            >
+              + 전표입력
+            </Link>
+          )}
         </div>
       </div>
 
@@ -300,7 +307,7 @@ export default function IncentiveClient() {
               {visibleRows.length === 0 && (
                 <tr>
                   <td colSpan={13} className="px-3 py-8 text-center text-gray-400 dark:text-gray-500">
-                    데이터가 없습니다. 상단 [+ 전표입력] 버튼으로 입력하세요.
+                    {canCreate ? "데이터가 없습니다. 상단 [+ 전표입력] 버튼으로 입력하세요." : "데이터가 없습니다."}
                   </td>
                 </tr>
               )}
