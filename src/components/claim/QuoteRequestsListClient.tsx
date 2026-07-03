@@ -258,10 +258,14 @@ export default function QuoteRequestsListClient() {
                   return (
                   <tr key={r.id} onClick={() => openDetail(r)}
                     className={`cursor-pointer transition-colors ${selectedId === r.id ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-gray-50 dark:hover:bg-gray-800/50"}`}>
-                    <td className="px-3 py-2 font-mono text-xs font-bold text-blue-600 dark:text-blue-400">{r.request_no}</td>
+                    <td className={`px-3 py-2 font-mono text-xs font-bold ${isTk ? "text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-200"}`}>{r.request_no}</td>
                     <td className={`px-3 py-2 text-xs font-mono ${isTk ? TK_TEXT_CLASS : "text-gray-600 dark:text-gray-300"}`}>{fmtDT(r.requested_at)}</td>
                     <td className="px-3 py-2 text-center">
-                      <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${
+                        isTk
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                          : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+                      }`}>
                         {isTk ? "TK 견적요청" : "유상견적요청"}
                       </span>
                     </td>
@@ -287,7 +291,7 @@ export default function QuoteRequestsListClient() {
           ) : (
             <>
               <div className="flex items-center gap-2 mb-3">
-                <span className="font-mono text-sm font-bold text-blue-600 dark:text-blue-400">{selected.request_no}</span>
+                <span className={`font-mono text-sm font-bold ${tkRequestIds.has(selected.id) ? "text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-200"}`}>{selected.request_no}</span>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${statusBadge(selected.status)}`}>{selected.status}</span>
                 {selected.quote_id && (
                   <button type="button" onClick={() => { router.push(`/quotes/detail?id=${selected.quote_id}`); }}
