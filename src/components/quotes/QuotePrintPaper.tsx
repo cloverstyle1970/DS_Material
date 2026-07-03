@@ -179,7 +179,7 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
             <tr>
               <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center" rowSpan={2}>합계금액</td>
               <td className="border border-black px-2 py-1.5 font-bold align-middle text-right" rowSpan={2}>
-                <span className="text-[16.57px]">￦ {fmtNum(header.total_amount)} 원정</span>
+                <span className="text-[16.57px]">￦ {fmtNum(vatIncluded ? grandTotal : effectiveSupply)} 원정</span>
                 <div className="text-[10px] text-gray-500 mt-0.5">위 금액은 부가세 {vatIncluded ? "포함" : "별도"} 금액임.</div>
               </td>
               <td className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center">회사주소</td>
@@ -407,11 +407,11 @@ export default function QuotePrintPaper({ header, items, company, laborLines, re
             </tr>
             <tr>
               <td className="border border-black bg-gray-100 px-2 py-1.5 w-28 font-semibold text-center">승인일</td>
-              <td className="border border-black px-2 py-1.5">　　　년　　　월　　　일</td>
+              <td className="border border-black px-2 py-1.5 whitespace-nowrap">　　　년　　　월　　　일</td>
             </tr>
             <tr>
               <td className="border border-black bg-gray-100 px-2 py-1.5 h-[72px] font-semibold text-center">승인자</td>
-              <td className="border border-black px-2 py-1.5 h-[72px]">　　　　　　　　 (인)　　직위:</td>
+              <td className="border border-black px-2 py-1.5 h-[72px] whitespace-nowrap">직위: 　　　　　　　 (인)</td>
             </tr>
           </tbody>
         </table>
