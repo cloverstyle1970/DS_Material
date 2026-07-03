@@ -298,6 +298,47 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
     }
   }
 
+  // 입고내역 참조에서 다수 항목을 한 번에 일괄 등록.
+  // - 첫 유효 항목에서만 현장/수령인 자동 채움 (기존 값이 있으면 보존)
+  // - 각 항목은 별도 행으로 추가되고, 자재 정보(재고·단가·규격)는 후속 refreshRowStock 로 채움
+  async function applyInboundMultiple(list: TransactionRecord[]) {
+    if (list.length === 0) return;
+    const newRows = list.map(t => newRow({
+      materialId: t.materialId, materialName: t.materialName,
+      qty: t.qty, inboundRef: t.id, remark: "",
+      elevatorName: t.elevatorName || "",
+    }));
+    const firstWithSite = list.find(t => t.siteName);
+    if (firstWithSite && !siteName) setSiteName(firstWithSite.siteName || "");
+
+    setRows(prev => {
+      const next = [...prev];
+      let cursor = 0;
+      for (const row of newRows) {
+        // 앞에서부터 비어있는 행을 채우고, 부족하면 뒤에 추가
+        const emptyIdx = next.findIndex((r, i) => i >= cursor && !r.materialId);
+        if (emptyIdx >= 0) { next[emptyIdx] = row; cursor = emptyIdx + 1; }
+        else { next.push(row); cursor = next.length; }
+      }
+      return next;
+    });
+    setPopup(null);
+
+    // 자재 정보 백필 (병렬)
+    await Promise.all(newRows.map(r => r.materialId ? refreshRowStock(r.id, r.materialId) : Promise.resolve()));
+
+    // 수령인 자동 채움: 첫 유효 항목의 발주 → requester_name
+    if (!receiverName) {
+      const firstWithOrder = list.map(t => ({ t, m: t.note?.match(/발주\s*#(\d+)/) })).find(x => !!x.m);
+      if (firstWithOrder?.m) {
+        const orderId = Number(firstWithOrder.m[1]);
+        const { data } = await supabase.from("purchase_orders")
+          .select("requester_name").eq("id", orderId).maybeSingle();
+        if (data?.requester_name) setReceiverName(data.requester_name);
+      }
+    }
+  }
+
   const totals = useMemo(() => {
     const valid = rows.filter(r => r.materialId);
     let qty = 0, supply = 0;
@@ -573,7 +614,11 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
       </div>
 
       {popup === "inbound" && (
-        <InboundRefPopup onClose={() => setPopup(null)} onSelect={applyInbound} />
+        <InboundRefPopup
+          onClose={() => setPopup(null)}
+          onSelect={applyInbound}
+          onSelectMultiple={applyInboundMultiple}
+        />
       )}
 
       {serialEditRowId && (() => {
@@ -947,11 +992,21 @@ function ReceiverInlineSearch({ value, onChange, users }: {
 }
 
 // ── 입고내역 참조 팝업 ──────────────────────────────────────────
-function InboundRefPopup({ onSelect, onClose }: { onSelect: (t: TransactionRecord) => void; onClose: () => void }) {
+function InboundRefPopup({
+  onSelect,
+  onSelectMultiple,
+  onClose,
+}: {
+  onSelect: (t: TransactionRecord) => void;
+  onSelectMultiple: (list: TransactionRecord[]) => void;
+  onClose: () => void;
+}) {
   const [records, setRecords] = useState<TransactionRecord[]>([]);
   // 입고 note의 "발주 #N" → 그 발주의 참조번호 (purchase_orders.note 첫 [태그]) 매핑
   const [orderRefMap, setOrderRefMap] = useState<Map<number, string>>(new Map());
   const [q, setQ] = useState("");
+  // 다수 선택된 입고 id 집합
+  const [checked, setChecked] = useState<Set<number>>(new Set());
   useEffect(() => {
     // 안전장치: type='입고' 후보 중에서 이미 출고에 참조된 입고는 제외.
     // 출고 transaction의 note에 '입고 #N' 또는 옛 형식 '입고#N' 패턴이 있으면 매칭.
@@ -1004,43 +1059,108 @@ function InboundRefPopup({ onSelect, onClose }: { onSelect: (t: TransactionRecor
     (t.siteName?.toLowerCase().includes(q.toLowerCase()) ?? false) ||
     refForRecord(t).toLowerCase().includes(q.toLowerCase())
   );
+
+  const allVisibleIds = filtered.map(t => t.id);
+  const allChecked = allVisibleIds.length > 0 && allVisibleIds.every(id => checked.has(id));
+  const someChecked = !allChecked && allVisibleIds.some(id => checked.has(id));
+
+  function toggleOne(id: number) {
+    setChecked(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  function toggleAll() {
+    setChecked(prev => {
+      const next = new Set(prev);
+      if (allChecked) allVisibleIds.forEach(id => next.delete(id));
+      else allVisibleIds.forEach(id => next.add(id));
+      return next;
+    });
+  }
+  function commitBulk() {
+    // 필터 결과 순서를 유지하도록 filtered 배열 기준으로 선택 항목 수집
+    const list = filtered.filter(t => checked.has(t.id));
+    if (list.length === 0) return;
+    onSelectMultiple(list);
+  }
+
   return (
     <DraggableModal
       open={true}
       onClose={onClose}
-      panelClassName="w-[700px] max-h-[70vh]"
+      panelClassName="w-[760px] max-h-[75vh]"
       header={
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-700">
-          <h3 className="text-sm font-semibold dark:text-gray-100">입고내역 참조 ({fmtNum(records.length)}건)</h3>
+          <h3 className="text-sm font-semibold dark:text-gray-100">
+            입고내역 참조 ({fmtNum(records.length)}건)
+            {checked.size > 0 && <span className="ml-2 text-orange-600 dark:text-orange-400">· 선택 {fmtNum(checked.size)}건</span>}
+          </h3>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none">×</button>
         </div>
       }
     >
-        <div className="p-3">
+        <div className="p-3 flex items-center gap-2">
           <input type="text" value={q} onChange={e => setQ(e.target.value)} autoFocus
             placeholder="자재명, 코드, 현장, 발주참조번호 검색"
-            className="w-full px-3 py-2 text-sm font-medium text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-700 focus:outline-none focus:border-orange-400 placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:font-normal" />
+            className="flex-1 px-3 py-2 text-sm font-medium text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-700 focus:outline-none focus:border-orange-400 placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:font-normal" />
+          {checked.size > 0 && (
+            <button type="button" onClick={() => setChecked(new Set())}
+              className="text-xs px-2.5 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 whitespace-nowrap">
+              선택 해제
+            </button>
+          )}
+          <button type="button" onClick={commitBulk} disabled={checked.size === 0}
+            className="text-xs px-3 py-1.5 rounded bg-orange-500 text-white font-semibold hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap">
+            선택 {checked.size > 0 ? checked.size : ""} 일괄 등록
+          </button>
+        </div>
+        <div className="px-3 pb-1 text-[11px] text-gray-500 dark:text-gray-400">
+          체크박스로 다수 선택 후 [일괄 등록], 또는 행을 더블클릭하여 즉시 1건 등록.
         </div>
         <div className="flex-1 overflow-y-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-100 dark:bg-gray-700 sticky top-0 z-10">
-              <tr>{["발주참조번호","입고일","자재명","코드","수량","현재재고","현장","호기"].map(h =>
-                <th key={h} className="px-2 py-2 text-left border-b-2 border-gray-300 dark:border-gray-600 font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap">{h}</th>)}
+              <tr>
+                <th className="px-2 py-2 border-b-2 border-gray-300 dark:border-gray-600 w-8">
+                  <input
+                    type="checkbox"
+                    checked={allChecked}
+                    ref={el => { if (el) el.indeterminate = someChecked; }}
+                    onChange={toggleAll}
+                    disabled={allVisibleIds.length === 0}
+                    className="w-4 h-4 accent-orange-500 cursor-pointer"
+                    title={allChecked ? "표시된 항목 전체 선택 해제" : "표시된 항목 전체 선택"}
+                  />
+                </th>
+                {["발주참조번호","입고일","자재명","코드","수량","현재재고","현장","호기"].map(h =>
+                  <th key={h} className="px-2 py-2 text-left border-b-2 border-gray-300 dark:border-gray-600 font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap">{h}</th>)}
               </tr>
             </thead>
             <tbody>
-              {filtered.map(t => (
-                <tr key={t.id} onClick={() => onSelect(t)} className="hover:bg-orange-50 dark:hover:bg-orange-900/20 cursor-pointer border-b border-gray-200 dark:border-gray-700">
-                  <td className="px-2 py-2 text-blue-700 dark:text-blue-300 font-bold whitespace-nowrap">{refForRecord(t) || "—"}</td>
-                  <td className="px-2 py-2 text-gray-700 dark:text-gray-200 font-medium whitespace-nowrap">{t.createdAt.slice(0, 10)}</td>
-                  <td className={`px-2 py-2 font-semibold whitespace-nowrap ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-gray-900 dark:text-gray-100"}`}>{t.materialName}</td>
-                  <td className={`px-2 py-2 font-mono font-semibold whitespace-nowrap ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-slate-700 dark:text-slate-200"}`}>{t.materialId}</td>
-                  <td className="px-2 py-2 text-right tabular-nums font-bold text-blue-700 dark:text-blue-300 whitespace-nowrap">{fmtNum(t.qty)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap">{fmtNum(t.afterStock)}</td>
-                  <td className="px-2 py-2 text-gray-800 dark:text-gray-100 font-medium whitespace-nowrap">{t.siteName ?? "—"}</td>
-                  <td className="px-2 py-2 text-gray-800 dark:text-gray-100 font-medium whitespace-nowrap">{t.elevatorName ?? "—"}</td>
-                </tr>
-              ))}
+              {filtered.map(t => {
+                const isChecked = checked.has(t.id);
+                return (
+                  <tr key={t.id}
+                      onClick={() => toggleOne(t.id)}
+                      onDoubleClick={() => onSelect(t)}
+                      className={`cursor-pointer border-b border-gray-200 dark:border-gray-700 ${isChecked ? "bg-orange-50 dark:bg-orange-900/30" : "hover:bg-orange-50/40 dark:hover:bg-orange-900/20"}`}>
+                    <td className="px-2 py-2 text-center" onClick={e => e.stopPropagation()}>
+                      <input type="checkbox" checked={isChecked} onChange={() => toggleOne(t.id)}
+                        className="w-4 h-4 accent-orange-500 cursor-pointer" />
+                    </td>
+                    <td className="px-2 py-2 text-blue-700 dark:text-blue-300 font-bold whitespace-nowrap">{refForRecord(t) || "—"}</td>
+                    <td className="px-2 py-2 text-gray-700 dark:text-gray-200 font-medium whitespace-nowrap">{t.createdAt.slice(0, 10)}</td>
+                    <td className={`px-2 py-2 font-semibold whitespace-nowrap ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-gray-900 dark:text-gray-100"}`}>{t.materialName}</td>
+                    <td className={`px-2 py-2 font-mono font-semibold whitespace-nowrap ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-slate-700 dark:text-slate-200"}`}>{t.materialId}</td>
+                    <td className="px-2 py-2 text-right tabular-nums font-bold text-blue-700 dark:text-blue-300 whitespace-nowrap">{fmtNum(t.qty)}</td>
+                    <td className="px-2 py-2 text-right tabular-nums font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap">{fmtNum(t.afterStock)}</td>
+                    <td className="px-2 py-2 text-gray-800 dark:text-gray-100 font-medium whitespace-nowrap">{t.siteName ?? "—"}</td>
+                    <td className="px-2 py-2 text-gray-800 dark:text-gray-100 font-medium whitespace-nowrap">{t.elevatorName ?? "—"}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           {filtered.length === 0 && <p className="text-center py-8 text-sm text-gray-500 dark:text-gray-400 font-medium">입고 내역 없음</p>}
