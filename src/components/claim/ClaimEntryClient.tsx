@@ -552,7 +552,7 @@ export default function ClaimEntryClient() {
             ))}
           </div>
           ) : (
-          <div className="max-h-[25rem] min-h-[17rem] overflow-auto">
+          <div className="max-h-[17.5rem] min-h-[12rem] overflow-auto">
             <table className="w-full text-xs border-collapse">
               <thead className="sticky top-0 z-10">
                 <tr className="border-y border-gray-200 dark:border-gray-600 text-center text-[11px] font-bold text-gray-600 dark:text-gray-300 shadow-sm">
