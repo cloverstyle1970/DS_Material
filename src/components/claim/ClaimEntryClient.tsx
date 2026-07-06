@@ -8,6 +8,7 @@ import { api } from "@/lib/api-client";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { visibleUserIds } from "@/lib/crew";
 import { insertNotification } from "@/lib/notify";
+import { isRepairMaterial, isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 
 const DEFAULT_ROW_COUNT = 1;
 
@@ -498,18 +499,31 @@ export default function ClaimEntryClient() {
                   {r.searchOpen && r.searchResults.length > 0 && (
                     <div className="absolute z-50 top-full left-0 mt-0.5 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl">
                       <ul className="max-h-60 overflow-y-auto">
-                        {r.searchResults.map((m, idx) => (
+                        {r.searchResults.map((m, idx) => {
+                          const repair = isRepairMaterial(m.id);
+                          const tk = !repair && isTkMaterial(m.id);
+                          const nameCls = repair
+                            ? "text-green-600 dark:text-green-400"
+                            : tk ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-200";
+                          const codeCls = repair
+                            ? "text-green-600 dark:text-green-400"
+                            : tk ? TK_TEXT_CLASS : "text-slate-400";
+                          return (
                           <li key={m.id}>
                             <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => applyMaterial(r.key, m)}
                               className={`w-full text-left px-3 py-2.5 border-b border-gray-50 dark:border-gray-700 last:border-0 ${r.searchFocusIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
-                              <div className="text-sm font-medium text-gray-800 dark:text-gray-200">{m.name}</div>
+                              <div className={`text-sm font-medium ${nameCls}`}>
+                                {repair && <span className="mr-1 text-[9px] px-1 rounded bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300 font-bold align-middle">RE</span>}
+                                {m.name}
+                              </div>
                               <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-[10px] font-mono text-slate-400">{m.id}</span>
+                                <span className={`text-[10px] font-mono ${codeCls}`}>{m.id}</span>
                                 {m.modelNo && <span className="text-[10px] text-gray-500">{m.modelNo}</span>}
                               </div>
                             </button>
                           </li>
-                        ))}
+                          );
+                        })}
                       </ul>
                     </div>
                   )}
@@ -584,18 +598,31 @@ export default function ClaimEntryClient() {
                       {r.searchOpen && r.searchResults.length > 0 && (
                         <div className="absolute z-50 top-full left-0 mt-0.5 w-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl">
                           <ul className="max-h-52 overflow-y-auto">
-                            {r.searchResults.map((m, idx) => (
+                            {r.searchResults.map((m, idx) => {
+                              const repair = isRepairMaterial(m.id);
+                              const tk = !repair && isTkMaterial(m.id);
+                              const nameCls = repair
+                                ? "text-green-600 dark:text-green-400"
+                                : tk ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-200";
+                              const codeCls = repair
+                                ? "text-green-600 dark:text-green-400"
+                                : tk ? TK_TEXT_CLASS : "text-slate-400";
+                              return (
                               <li key={m.id}>
                                 <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => applyMaterial(r.key, m)}
                                   className={`w-full text-left px-3 py-2 border-b border-gray-50 dark:border-gray-700 last:border-0 ${r.searchFocusIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
-                                  <div className="text-xs font-medium text-gray-800 dark:text-gray-200">{m.name}</div>
+                                  <div className={`text-xs font-medium ${nameCls}`}>
+                                    {repair && <span className="mr-1 text-[9px] px-1 rounded bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300 font-bold align-middle">RE</span>}
+                                    {m.name}
+                                  </div>
                                   <div className="flex items-center gap-2 mt-0.5">
-                                    <span className="text-[10px] font-mono text-slate-400">{m.id}</span>
+                                    <span className={`text-[10px] font-mono ${codeCls}`}>{m.id}</span>
                                     {m.modelNo && <span className="text-[10px] text-gray-500">{m.modelNo}</span>}
                                   </div>
                                 </button>
                               </li>
-                            ))}
+                              );
+                            })}
                           </ul>
                         </div>
                       )}

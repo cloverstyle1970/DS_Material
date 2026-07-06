@@ -13,7 +13,7 @@ import { useViewMode } from "@/context/ViewModeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNumOr, fmtNum } from "@/lib/format";
 import { useAutoPageSize } from "@/lib/useAutoPageSize";
-import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
+import { isTkMaterial, isRepairMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 
 const LOW_STOCK_THRESHOLD = 5;
 
@@ -457,10 +457,10 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
                   </td>
                   <td
                     onClick={e => { if (isMobile) { e.stopPropagation(); setDetailMaterial(m); } }}
-                    className={`px-4 py-3 text-center font-mono text-xs whitespace-nowrap ${isMobile ? "underline underline-offset-2 decoration-dotted" : ""} ${isTkMaterial(m.id) ? TK_TEXT_CLASS : isDark ? "text-gray-300" : "text-slate-600"}`}>{m.id}</td>
+                    className={`px-4 py-3 text-center font-mono text-xs whitespace-nowrap ${isMobile ? "underline underline-offset-2 decoration-dotted" : ""} ${isRepairMaterial(m.id) ? "text-green-600 dark:text-green-400" : isTkMaterial(m.id) ? TK_TEXT_CLASS : isDark ? "text-gray-300" : "text-slate-600"}`}>{m.id}</td>
                   <td
                     onClick={e => { if (isMobile) { e.stopPropagation(); setDetailMaterial(m); } }}
-                    className={`px-4 py-3 text-center font-medium ${isMobile ? "underline underline-offset-2 decoration-dotted" : ""} ${isTkMaterial(m.id) ? TK_TEXT_CLASS : isDark ? "text-white" : "text-gray-800"}`}>{m.name}</td>
+                    className={`px-4 py-3 text-center font-medium ${isMobile ? "underline underline-offset-2 decoration-dotted" : ""} ${isRepairMaterial(m.id) ? "text-green-600 dark:text-green-400" : isTkMaterial(m.id) ? TK_TEXT_CLASS : isDark ? "text-white" : "text-gray-800"}`}>{m.name}</td>
                   <td className={`px-4 py-3 text-center ${isDark ? "text-gray-300" : "text-gray-500"}`}>{m.modelNo ?? "-"}</td>
                   <td className={`px-4 py-3 text-center ${isDark ? "text-gray-300" : "text-gray-500"}`}>{m.unit ?? "-"}</td>
                   {!viewOnly && (

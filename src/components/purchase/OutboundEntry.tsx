@@ -830,18 +830,27 @@ function MatInlineSearch({ value, materialId, matType, onMultiSelect, onChange }
       {open && results.length > 0 && (
         <div className="absolute z-50 top-full left-0 mt-0.5 w-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl">
           <ul ref={ulRef} className="max-h-52 overflow-y-auto">
-            {results.map((m, idx) => (
+            {results.map((m, idx) => {
+              const repair = isRepairMaterial(m.id) || m.isRepair;
+              const tk = !repair && isTkMaterial(m.id);
+              const nameCls = repair
+                ? "text-green-600 dark:text-green-400"
+                : tk ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-200";
+              const codeCls = repair
+                ? "text-green-600 dark:text-green-400"
+                : tk ? TK_TEXT_CLASS : "text-slate-400 dark:text-slate-500";
+              return (
               <li key={m.id}>
                 <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => toggle(m.id)}
                   className={`w-full text-left px-3 py-2 border-b border-gray-50 dark:border-gray-700 last:border-0 flex items-center gap-2 ${checked.has(m.id) ? "bg-orange-50 dark:bg-orange-900/30" : focusedIndex === idx ? "bg-orange-100 dark:bg-orange-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
                   <input type="checkbox" readOnly checked={checked.has(m.id)} className="accent-orange-500 shrink-0" />
                   <div className="min-w-0">
-                    <div className={`text-xs font-medium ${isTkMaterial(m.id) ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-200"}`}>
-                      {m.isRepair && <span className="mr-1 text-[9px] px-1 rounded bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300 font-bold align-middle">RE</span>}
+                    <div className={`text-xs font-medium ${nameCls}`}>
+                      {repair && <span className="mr-1 text-[9px] px-1 rounded bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300 font-bold align-middle">RE</span>}
                       {m.name}
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`text-[10px] font-mono ${isTkMaterial(m.id) ? TK_TEXT_CLASS : "text-slate-400 dark:text-slate-500"}`}>{m.id}</span>
+                      <span className={`text-[10px] font-mono ${codeCls}`}>{m.id}</span>
                       {m.modelNo && <span className="text-[10px] text-gray-500 dark:text-gray-400 border-l border-gray-300 dark:border-gray-600 pl-2">{m.modelNo}</span>}
                       {m.alias && <span className="text-[10px] text-gray-400 dark:text-gray-500">{m.alias}</span>}
                       <span className={`text-[10px] ml-auto font-semibold ${m.stockQty === 0 ? "text-red-400" : "text-gray-400 dark:text-gray-500"}`}>재고 {fmtNum(m.stockQty)}</span>
@@ -849,7 +858,8 @@ function MatInlineSearch({ value, materialId, matType, onMultiSelect, onChange }
                   </div>
                 </button>
               </li>
-            ))}
+              );
+            })}
           </ul>
           <div className="px-3 py-2 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-b-lg">
             <span className="text-xs text-gray-500 dark:text-gray-400">{checked.size > 0 ? `${checked.size}개 선택됨` : "항목을 클릭하여 선택 (스페이스바로 체크)"}</span>

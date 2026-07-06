@@ -7,6 +7,7 @@ import { MaterialRecord } from "@/lib/mock-materials";
 import { ElevatorRecord } from "@/lib/mock-elevators";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNum } from "@/lib/format";
+import { isRepairMaterial, isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 import DraggableModal from "@/components/common/DraggableModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 
@@ -396,7 +397,16 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
       {open && results.length > 0 && (
         <div className="absolute z-50 top-full left-0 mt-0.5 w-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl">
           <ul ref={ulRef} className="max-h-52 overflow-y-auto">
-            {results.map((m, idx) => (
+            {results.map((m, idx) => {
+              const repair = isRepairMaterial(m.id);
+              const tk = !repair && isTkMaterial(m.id);
+              const nameCls = repair
+                ? "text-green-600 dark:text-green-400"
+                : tk ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-200";
+              const codeCls = repair
+                ? "text-green-600 dark:text-green-400"
+                : tk ? TK_TEXT_CLASS : "text-slate-400 dark:text-slate-500";
+              return (
               <li key={m.id}>
                 <button
                   type="button"
@@ -413,9 +423,12 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
                     className="accent-blue-600 shrink-0"
                   />
                   <div className="min-w-0">
-                    <div className="text-xs font-medium text-gray-800 dark:text-gray-200">{m.name}</div>
+                    <div className={`text-xs font-medium ${nameCls}`}>
+                      {repair && <span className="mr-1 text-[9px] px-1 rounded bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300 font-bold align-middle">RE</span>}
+                      {m.name}
+                    </div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{m.id}</span>
+                      <span className={`text-[10px] font-mono ${codeCls}`}>{m.id}</span>
                       {m.modelNo && <span className="text-[10px] text-gray-500 dark:text-gray-400 border-l border-gray-300 dark:border-gray-600 pl-2">{m.modelNo}</span>}
                       {m.alias && <span className="text-[10px] text-gray-400 dark:text-gray-500">{m.alias}</span>}
                       <span className="text-[10px] text-gray-300 dark:text-gray-500 ml-auto">재고 {fmtNum(m.stockQty)}</span>
@@ -423,7 +436,8 @@ function MatInlineSearch({ value, matType, onMultiSelect, onChange }: {
                   </div>
                 </button>
               </li>
-            ))}
+              );
+            })}
           </ul>
           {/* 다중선택 적용 버튼 */}
           <div className="px-3 py-2 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-b-lg">
@@ -594,14 +608,27 @@ function MaterialPopup({ onSelect, onClose }: { onSelect: (m: MaterialRecord) =>
               </tr>
             </thead>
             <tbody>
-              {results.map(m => (
+              {results.map(m => {
+                const repair = isRepairMaterial(m.id);
+                const tk = !repair && isTkMaterial(m.id);
+                const nameCls = repair
+                  ? "text-green-600 dark:text-green-400"
+                  : tk ? TK_TEXT_CLASS : "dark:text-gray-200";
+                const codeCls = repair
+                  ? "text-green-600 dark:text-green-400"
+                  : tk ? TK_TEXT_CLASS : "text-slate-500 dark:text-slate-400";
+                return (
                 <tr key={m.id} onClick={() => onSelect(m)} className="hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer border-b border-gray-50 dark:border-gray-700">
-                  <td className="px-2 py-1.5 font-mono text-slate-500 dark:text-slate-400">{m.id}</td>
-                  <td className="px-2 py-1.5 dark:text-gray-200">{m.name}</td>
+                  <td className={`px-2 py-1.5 font-mono ${codeCls}`}>{m.id}</td>
+                  <td className={`px-2 py-1.5 ${nameCls}`}>
+                    {repair && <span className="mr-1 text-[9px] px-1 rounded bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300 font-bold align-middle">RE</span>}
+                    {m.name}
+                  </td>
                   <td className="px-2 py-1.5 text-gray-700 dark:text-gray-300">{m.modelNo ?? "-"}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums dark:text-gray-300">{fmtNum(m.stockQty)}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
           {results.length === 0 && q && <p className="text-center py-8 text-xs text-gray-400 dark:text-gray-500">검색 결과 없음</p>}
