@@ -552,18 +552,18 @@ export default function ClaimEntryClient() {
             ))}
           </div>
           ) : (
-          <div className="overflow-x-auto">
+          <div className="max-h-[25rem] min-h-[17rem] overflow-auto">
             <table className="w-full text-xs border-collapse">
-              <thead>
-                <tr className="bg-gray-50 dark:bg-gray-700/50 border-y border-gray-200 dark:border-gray-600 text-center text-[11px] font-bold text-gray-600 dark:text-gray-300">
-                  <th className="px-2 py-2 w-10">NO</th>
-                  <th className="px-2 py-2 w-20">호기</th>
-                  <th className="px-2 py-2">품      목</th>
-                  <th className="px-2 py-2">규  격</th>
-                  <th className="px-2 py-2 w-14">단위</th>
-                  <th className="px-2 py-2 w-16">수량</th>
-                  <th className="px-2 py-2">비  고</th>
-                  <th className="px-2 py-2 w-10"></th>
+              <thead className="sticky top-0 z-10">
+                <tr className="border-y border-gray-200 dark:border-gray-600 text-center text-[11px] font-bold text-gray-600 dark:text-gray-300 shadow-sm">
+                  <th className="px-2 py-2 w-10 bg-gray-50 dark:bg-gray-700/95">NO</th>
+                  <th className="px-2 py-2 w-20 bg-gray-50 dark:bg-gray-700/95">호기</th>
+                  <th className="px-2 py-2 bg-gray-50 dark:bg-gray-700/95">품      목</th>
+                  <th className="px-2 py-2 bg-gray-50 dark:bg-gray-700/95">규  격</th>
+                  <th className="px-2 py-2 w-14 bg-gray-50 dark:bg-gray-700/95">단위</th>
+                  <th className="px-2 py-2 w-16 bg-gray-50 dark:bg-gray-700/95">수량</th>
+                  <th className="px-2 py-2 bg-gray-50 dark:bg-gray-700/95">비  고</th>
+                  <th className="px-2 py-2 w-10 bg-gray-50 dark:bg-gray-700/95"></th>
                 </tr>
               </thead>
               <tbody>
