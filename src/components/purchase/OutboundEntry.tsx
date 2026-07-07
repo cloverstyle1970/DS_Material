@@ -155,7 +155,13 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
         }
         const loaded: Row[] = Array.from(groups.values());
         if (firstReceiver) setReceiverName(firstReceiver);
-        
+
+        // 저장된 모든 행의 단가가 0 이면 무상 저장이었을 가능성이 크므로
+        // 무상 체크 상태로 복원. (품목이 최소 1건 있어야 판정)
+        if (loaded.length > 0 && loaded.every(r => (r.unitPrice ?? 0) === 0)) {
+          setFreeOfCharge(true);
+        }
+
         while (loaded.length < 5) loaded.push(newRow());
         setRows(loaded);
       } catch (e) {
@@ -261,13 +267,15 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
     });
   }
 
-  // 무상 체크 토글: 사용자가 단가를 직접 입력하지 않은 행만 일괄 변경 (수동입력 단가는 보존).
+  // 무상 체크 토글: 체크 시 모든 행의 단가를 0으로 강제 (수동입력 단가도 포함).
+  // 해제 시 자동 채움 단가(autoUnitPrice)로 복원. 수동 입력값은 복원 대상 아님.
   function toggleFreeOfCharge(next: boolean) {
     setFreeOfCharge(next);
-    setRows(prev => prev.map(r => {
-      if (r.pricedManually) return r;
-      return { ...r, unitPrice: next ? 0 : r.autoUnitPrice };
-    }));
+    setRows(prev => prev.map(r => ({
+      ...r,
+      unitPrice: next ? 0 : r.autoUnitPrice,
+      pricedManually: next ? false : r.pricedManually,
+    })));
   }
 
   async function applyInbound(t: TransactionRecord) {
@@ -389,7 +397,8 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
           note, userId: user.id, userName: user.name,
           batchId,
           transactionNo,
-          unitPrice: r.unitPrice || 0,
+          // 무상 체크 시 화면 상태와 관계없이 저장 단가는 무조건 0.
+          unitPrice: freeOfCharge ? 0 : (r.unitPrice || 0),
           createdAt: outboundDate,
         });
       }
@@ -542,9 +551,12 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
                   </div>
                 </Td>
                 <Td right>
-                  <input type="text" inputMode="numeric" value={r.unitPrice === 0 ? "" : fmtNum(r.unitPrice)}
+                  <input type="text" inputMode="numeric"
+                    value={freeOfCharge ? "0" : (r.unitPrice === 0 ? "" : fmtNum(r.unitPrice))}
                     onChange={e => patchRow(r.id, { unitPrice: parseNum(e.target.value), pricedManually: true })}
-                    className={cellInput + " text-right"} />
+                    readOnly={freeOfCharge}
+                    title={freeOfCharge ? "무상 체크 상태: 단가는 0원으로 저장됩니다" : undefined}
+                    className={cellInput + " text-right" + (freeOfCharge ? " bg-gray-50 dark:bg-gray-700 text-orange-600 dark:text-orange-400 cursor-not-allowed" : "")} />
                 </Td>
                 <Td right className="text-gray-700 dark:text-gray-300 tabular-nums">{fmtNum(r.qty * r.unitPrice)}</Td>
                 <Td>
