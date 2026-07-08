@@ -13,7 +13,7 @@ import Combobox, { ComboboxHandle } from "./Combobox";
 
 interface Site { id: number; name: string }
 interface Elevator { id: number; site_name: string; unit_name: string }
-interface UserMini { id: number; name: string; dept: string }
+interface UserMini { id: number; name: string | null; dept: string | null }
 interface Schedule {
   id: number; site_name: string; elevator_name: string;
   start_date: string; end_date: string; details: string;
@@ -149,11 +149,12 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
   });
 
   const filteredParticipants = participantSearch.trim()
-    ? users.filter(u =>
-        u.id !== user?.id &&
-        !participants.some(p => p.id === u.id) &&
-        (u.name.includes(participantSearch.trim()) || u.dept.includes(participantSearch.trim()))
-      ).slice(0, 8)
+    ? users.filter(u => {
+        const q = participantSearch.trim();
+        return u.id !== user?.id &&
+          !participants.some(p => p.id === u.id) &&
+          ((u.name ?? "").includes(q) || (u.dept ?? "").includes(q));
+      }).slice(0, 8)
     : [];
 
   // ------- 핸들러 -------

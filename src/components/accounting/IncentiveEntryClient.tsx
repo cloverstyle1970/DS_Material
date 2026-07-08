@@ -384,13 +384,19 @@ export default function IncentiveEntryClient() {
           </label>
         </header>
         <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Field label="발행일 *">
+          <Field label={editMode ? "발행일 * (수정 가능)" : "발행일 *"}>
             <input
               type="date"
               value={header.issueDate}
-              onChange={e => updateHeader("issueDate", e.target.value || today())}
-              className={inputCls}
+              onChange={e => updateHeader("issueDate", e.target.value)}
+              className={`${inputCls} ${editMode ? "border-amber-400 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-600 focus:ring-amber-300" : ""}`}
+              title={editMode ? "발행일을 수정하면 통계상 월도 함께 이동합니다" : undefined}
             />
+            {editMode && (
+              <span className="block mt-1 text-[10px] text-amber-700 dark:text-amber-300">
+                날짜 변경 시 월(month) 자동 재계산 · 검색 기간 밖으로 이동하면 목록에서 사라짐
+              </span>
+            )}
           </Field>
           <Field label="회사 *">
             <select
