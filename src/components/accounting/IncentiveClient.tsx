@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import * as XLSX from "xlsx";
 import { supabase } from "@/lib/supabase";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
@@ -162,6 +163,61 @@ export default function IncentiveClient() {
     return parts.length === 0 ? "전체" : parts.join(" · ");
   })();
 
+  function exportToExcel() {
+    if (visibleRows.length === 0) { alert("내보낼 데이터가 없습니다."); return; }
+    const rows = visibleRows.map(r => {
+      const { nego, pure, incentive } = computeMetrics(r);
+      return {
+        "발행일": r.issueDate,
+        "회사": r.company,
+        "지역": r.region,
+        "현장명": r.site,
+        "계약내역": r.contract,
+        "견적가": r.quote,
+        "확정가": r.fixed,
+        "자재비": r.material,
+        "Nego(40%)": Number(nego.toFixed(2)),
+        "순수자재비": Number(pure.toFixed(2)),
+        "인센티브": Number(incentive.toFixed(2)),
+        "담당자": r.manager,
+        "비고": r.remark,
+      };
+    });
+    // 합계 행
+    rows.push({
+      "발행일": "",
+      "회사": "",
+      "지역": "",
+      "현장명": "합계",
+      "계약내역": "",
+      "견적가": total.d,
+      "확정가": total.e,
+      "자재비": total.f,
+      "Nego(40%)": Number(total.g.toFixed(2)),
+      "순수자재비": Number(total.h.toFixed(2)),
+      "인센티브": Number(total.i.toFixed(2)),
+      "담당자": "",
+      "비고": "",
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [
+      { wch: 12 }, { wch: 6 }, { wch: 8 }, { wch: 26 }, { wch: 22 },
+      { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 13 },
+      { wch: 12 }, { wch: 10 }, { wch: 20 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "인센티브내역");
+    const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([buf], { type: "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const label = activeLabel === "전체" ? "" : `_${activeLabel.replace(/\s·\s/g, "-")}`;
+    a.href = url;
+    a.download = `인센티브내역${label}_${fromDate.replace(/-/g, "")}_${toDate.replace(/-/g, "")}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="p-6 space-y-5 print:p-0 print:space-y-3">
       {/* 헤더 */}
@@ -171,6 +227,20 @@ export default function IncentiveClient() {
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
             발행일 기준 조회 전용. 신규 등록은 [+ 전표입력] 버튼으로.
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={exportToExcel}
+            disabled={visibleRows.length === 0}
+            className={`h-9 px-3 inline-flex items-center gap-1.5 rounded text-xs font-semibold text-white ${
+              visibleRows.length === 0 ? "bg-emerald-300 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700"
+            }`}
+            title={visibleRows.length === 0 ? "내보낼 데이터가 없습니다" : "현재 검색·필터 결과를 엑셀로 저장"}
+          >
+            <span aria-hidden>📥</span>
+            엑셀 저장 ({visibleRows.length}건)
+          </button>
         </div>
       </div>
 
