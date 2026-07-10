@@ -226,6 +226,16 @@ export default function UniformSafetyAdminClient() {
   }
 
   // ============================================================
+  // 자재 메타 lookup (규격 model_no · 재고 stock_qty)
+  // ============================================================
+
+  const materialMap = useMemo(() => {
+    const m = new Map<string, { model_no: string | null; stock_qty: number | null }>();
+    for (const x of materials) m.set(x.id, { model_no: x.model_no, stock_qty: x.stock_qty });
+    return m;
+  }, [materials]);
+
+  // ============================================================
   // 필터링
   // ============================================================
 
@@ -378,7 +388,7 @@ export default function UniformSafetyAdminClient() {
               <div className="text-center py-12 text-xs text-gray-500">조건에 맞는 신청이 없습니다.</div>
             )}
             {!loading && filteredManage.map(r => (
-              <RequestCard key={r.id} row={r} processingId={processingId} canUpdate={canUpdate} onChange={setStatus} />
+              <RequestCard key={r.id} row={r} processingId={processingId} canUpdate={canUpdate} onChange={setStatus} materialMap={materialMap} />
             ))}
           </div>
         </>
@@ -489,12 +499,18 @@ export default function UniformSafetyAdminClient() {
                       <span className="ml-auto text-gray-400 font-mono">{(r.received_at ?? "").slice(0, 10)}</span>
                     </div>
                     <div className="text-gray-700 dark:text-gray-300">
-                      {r.items.map(it => (
-                        <span key={it.id} className="mr-3">
-                          {it.category_label && <span className="text-gray-400">[{it.category_label}]</span>} {it.material_name}
-                          {it.size && <span className="text-gray-500"> ({it.size})</span>} ×{fmtNum(it.qty)}
-                        </span>
-                      ))}
+                      {r.items.map(it => {
+                        const meta = materialMap.get(it.material_id);
+                        const stock = meta?.stock_qty ?? null;
+                        return (
+                          <span key={it.id} className="mr-3">
+                            {it.category_label && <span className="text-gray-400">[{it.category_label}]</span>} {it.material_name}
+                            {meta?.model_no && <span className="text-gray-500"> · 규격 {meta.model_no}</span>}
+                            {it.size && <span className="text-gray-500"> ({it.size})</span>} ×{fmtNum(it.qty)}
+                            <span className="text-gray-400"> · 재고 {stock === null ? "-" : fmtNum(stock)}</span>
+                          </span>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
@@ -523,12 +539,13 @@ export default function UniformSafetyAdminClient() {
 // ============================================================
 
 function RequestCard({
-  row, processingId, canUpdate, onChange,
+  row, processingId, canUpdate, onChange, materialMap,
 }: {
   row: ReqRow;
   processingId: number | null;
   canUpdate: boolean;
   onChange: (row: ReqRow, status: Status, opts?: { reason?: string }) => void;
+  materialMap: Map<string, { model_no: string | null; stock_qty: number | null }>;
 }) {
   const busy = processingId === row.id;
 
@@ -557,15 +574,24 @@ function RequestCard({
       </div>
 
       <div className="bg-gray-50 dark:bg-gray-700/30 rounded p-2 text-xs space-y-1">
-        {row.items.map(it => (
-          <div key={it.id} className="flex items-center gap-2">
-            <span className="text-gray-400 w-12 shrink-0">{it.category_label}</span>
-            <span className="font-medium text-gray-800 dark:text-gray-200">{it.material_name}</span>
-            <span className="font-mono text-gray-400 text-[11px]">{it.material_id}</span>
-            {it.size && <span className="text-blue-600 dark:text-blue-400 font-bold">사이즈 {it.size}</span>}
-            <span className="ml-auto font-bold text-orange-600 dark:text-orange-400">×{fmtNum(it.qty)}</span>
-          </div>
-        ))}
+        {row.items.map(it => {
+          const meta = materialMap.get(it.material_id);
+          const stock = meta?.stock_qty ?? null;
+          const lack = stock !== null && stock < it.qty;
+          return (
+            <div key={it.id} className="flex items-center gap-2 flex-wrap">
+              <span className="text-gray-400 w-12 shrink-0">{it.category_label}</span>
+              <span className="font-medium text-gray-800 dark:text-gray-200">{it.material_name}</span>
+              <span className="font-mono text-gray-400 text-[11px]">{it.material_id}</span>
+              {meta?.model_no && <span className="text-gray-500 dark:text-gray-400">규격 {meta.model_no}</span>}
+              {it.size && <span className="text-blue-600 dark:text-blue-400 font-bold">사이즈 {it.size}</span>}
+              <span className="ml-auto font-bold text-orange-600 dark:text-orange-400">×{fmtNum(it.qty)}</span>
+              <span className={`shrink-0 text-[11px] font-semibold ${lack ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-gray-400"}`}>
+                재고 {stock === null ? "-" : fmtNum(stock)}
+              </span>
+            </div>
+          );
+        })}
       </div>
 
       {row.note && (

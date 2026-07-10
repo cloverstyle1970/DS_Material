@@ -3,9 +3,13 @@
 import { useEffect, useState } from "react";
 import { useAuth, isAdmin } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { insertNotification } from "@/lib/notify";
 import DraggableModal from "@/components/common/DraggableModal";
 import { useViewMode } from "@/context/ViewModeContext";
 import { fmtNum } from "@/lib/format";
+
+// 근무복·안전장구 신청 알림 고정 수신자 (관리 담당)
+const UNIFORM_NOTIFY_RECIPIENTS = ["황진한"] as const;
 
 // ============================================================
 // 타입
@@ -301,6 +305,24 @@ export default function UniformSafetyClient() {
         payloadItems.map(p => ({ ...p, request_id: header.id }))
       );
       if (e2) throw e2;
+
+      // 관리 담당(황진한)에게 알림 — 본인 포함. 실패는 silent.
+      void (async () => {
+        const { data: targets } = await supabase.from("accounts")
+          .select("id").in("name", UNIFORM_NOTIFY_RECIPIENTS as unknown as string[]);
+        const firstName = payloadItems[0]?.material_name ?? "";
+        const summary = payloadItems.length <= 1 ? firstName : `${firstName} 외 ${payloadItems.length - 1}건`;
+        const reqType = tab === "uniform" ? "근무복" : "안전장구";
+        const payload = {
+          type:    "uniform_safety_request",
+          title:   `새 ${reqType} 신청이 접수되었습니다`,
+          message: `${user.name}${user.dept ? ` (${user.dept})` : ""} — ${summary}`,
+          link:    "/uniform-safety/admin",
+          refType: "uniform_safety_request",
+          refId:   header.id as number,
+        };
+        await Promise.all((targets ?? []).map(t => insertNotification({ userId: t.id as number, ...payload })));
+      })().catch(e => console.warn("[notify] 근무복·안전장구 신청 알림 실패:", e));
 
       setMessage({ type: "success", text: "신청이 등록되었습니다." });
       // 폼 리셋
