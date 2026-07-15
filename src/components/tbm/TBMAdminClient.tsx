@@ -9,6 +9,7 @@ import {
   TBMRecord, TBMParticipant, TBMRecordSafetyRule, TBMChecklistResult, TBMPhoto,
   TBMMode, MODE_LABELS, SUB_TYPE_LABELS,
 } from "@/lib/tbm";
+import { printTBMReport } from "./tbmReportPrint";
 
 interface DetailData {
   participants: TBMParticipant[];
@@ -107,23 +108,37 @@ export default function TBMAdminClient() {
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [modeFilter, fromDate, toDate, page]);
   useReloadOnActivate(() => { void load(); });
 
-  async function loadDetail(rec: TBMRecord) {
-    setOpenDetail(rec);
-    setDetail(null);
-    setDetailLoading(true);
+  async function fetchDetail(recId: number): Promise<DetailData> {
     const [p, r, c, ph] = await Promise.all([
-      supabase.from("tbm_participants").select("*").eq("tbm_id", rec.id),
-      supabase.from("tbm_record_safety_rules").select("*").eq("tbm_id", rec.id),
-      supabase.from("tbm_checklist_results").select("*").eq("tbm_id", rec.id),
-      supabase.from("tbm_photos").select("*").eq("tbm_id", rec.id).order("uploaded_at"),
+      supabase.from("tbm_participants").select("*").eq("tbm_id", recId),
+      supabase.from("tbm_record_safety_rules").select("*").eq("tbm_id", recId),
+      supabase.from("tbm_checklist_results").select("*").eq("tbm_id", recId),
+      supabase.from("tbm_photos").select("*").eq("tbm_id", recId).order("uploaded_at"),
     ]);
-    setDetail({
+    return {
       participants: (p.data ?? []) as TBMParticipant[],
       rules: (r.data ?? []) as TBMRecordSafetyRule[],
       checklist: (c.data ?? []) as TBMChecklistResult[],
       photos: (ph.data ?? []) as TBMPhoto[],
-    });
+    };
+  }
+
+  async function loadDetail(rec: TBMRecord) {
+    setOpenDetail(rec);
+    setDetail(null);
+    setDetailLoading(true);
+    setDetail(await fetchDetail(rec.id));
     setDetailLoading(false);
+  }
+
+  async function openPdf(rec: TBMRecord) {
+    try {
+      // 상세 모달이 열려있고 데이터가 이미 로드된 경우 재사용
+      const d = openDetail?.id === rec.id && detail ? detail : await fetchDetail(rec.id);
+      printTBMReport({ record: rec, ...d });
+    } catch (e) {
+      alert(`PDF 출력 실패: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   function startEdit(rec: TBMRecord) {
@@ -300,6 +315,10 @@ export default function TBMAdminClient() {
                           className="px-2 py-1 text-[11px] rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600">
                           상세
                         </button>
+                        <button type="button" onClick={() => openPdf(r)}
+                          className="ml-1 px-2 py-1 text-[11px] rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/70">
+                          PDF
+                        </button>
                         {canWrite && (
                           <>
                             <button type="button" onClick={() => startEdit(r)}
@@ -467,6 +486,10 @@ export default function TBMAdminClient() {
             </div>
 
             <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+              <button type="button" onClick={() => openPdf(openDetail)} disabled={detailLoading}
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50">
+                🖨️ PDF 출력
+              </button>
               {canWrite && (
                 <>
                   <button type="button" onClick={() => deleteTbm(openDetail.id)}
