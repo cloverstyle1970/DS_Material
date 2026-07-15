@@ -8,6 +8,7 @@ import {
   SafetyCategory,
   MODE_LABELS, SUB_TYPE_LABELS, SUB_TYPE_ICONS, CATEGORY_LABELS, SEASON_LABELS,
 } from "@/lib/tbm";
+import { insertNotification } from "@/lib/notify";
 import SignaturePad, { SignaturePadHandle } from "./SignaturePad";
 import Combobox, { ComboboxHandle } from "./Combobox";
 
@@ -299,6 +300,25 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
       const results = await Promise.all(tasks);
       const insertErr = results.find(r => r.error);
       if (insertErr?.error) throw new Error(insertErr.error.message);
+
+      // 4. 참가자 알림 (본인 제외, 실패해도 저장은 성공 처리)
+      const notifyTargets = participants.filter(p => p.id !== user.id);
+      if (notifyTargets.length > 0) {
+        const sitePart = siteName.trim();
+        const elevPart = elevatorName.trim() ? ` ${elevatorName.trim()}` : "";
+        const summary = workContent.trim().replace(/\s+/g, " ").slice(0, 40);
+        (async () => {
+          await Promise.all(notifyTargets.map(p => insertNotification({
+            userId:  p.id,
+            type:    "tbm_participant",
+            title:   "TBM 참가자로 지정되었습니다",
+            message: `[${sitePart}${elevPart}] ${user.name ?? ""} · ${summary}`,
+            link:    "/safety/tbm",
+            refType: "tbm_record",
+            refId:   tbmId,
+          })));
+        })().catch(e => console.warn("[notify] TBM 참가자 알림 실패:", e));
+      }
 
       resetForm();
       onSaved();
@@ -683,18 +703,31 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
       {/* 사진 */}
       <div className={sectionCls}>
         <label className={labelCls}>📷 사진 ({photos.length}장)</label>
-        <label className="block w-full py-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-center cursor-pointer hover:border-blue-400 transition-colors">
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            capture="environment"
-            onChange={onPhotoChange}
-            className="hidden"
-          />
-          <div className="text-2xl mb-1">📸</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">탭하여 사진 촬영 또는 업로드</div>
-        </label>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="flex flex-col items-center justify-center py-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-blue-400 transition-colors">
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              capture="environment"
+              onChange={onPhotoChange}
+              className="hidden"
+            />
+            <div className="text-2xl mb-1">📸</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">카메라 촬영</div>
+          </label>
+          <label className="flex flex-col items-center justify-center py-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-blue-400 transition-colors">
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={onPhotoChange}
+              className="hidden"
+            />
+            <div className="text-2xl mb-1">🖼️</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">사진 업로드</div>
+          </label>
+        </div>
         {photoPreviews.length > 0 && (
           <div className="grid grid-cols-3 gap-2 mt-3">
             {photoPreviews.map((src, i) => (
