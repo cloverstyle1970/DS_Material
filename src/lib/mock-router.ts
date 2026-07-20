@@ -335,6 +335,8 @@ function dbToMaterial(r: any): MaterialRecord {
     opinionImageUrl:    r.opinion_image_url    ?? null,
     referenceImageUrl1: r.reference_image_url1 ?? null,
     referenceImageUrl2: r.reference_image_url2 ?? null,
+    vendor1Id:    r.vendor1_id ?? null,
+    vendor2Id:    r.vendor2_id ?? null,
     createdAt:    r.created_at,
   };
 }
@@ -355,6 +357,8 @@ function materialToDb(d: any): Record<string, unknown> {
   if (d.isRepair     !== undefined) obj.is_repair    = d.isRepair;
   if (d.trackSerial  !== undefined) obj.track_serial = d.trackSerial;
   if (d.eCountCd     !== undefined) obj.e_count_cd   = d.eCountCd;
+  if (d.vendor1Id    !== undefined) obj.vendor1_id   = d.vendor1Id != null ? Number(d.vendor1Id) : null;
+  if (d.vendor2Id    !== undefined) obj.vendor2_id   = d.vendor2Id != null ? Number(d.vendor2Id) : null;
   if (d.createdAt    !== undefined) obj.created_at   = d.createdAt;
   return obj;
 }
@@ -884,7 +888,7 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
 
 async function routePOST(path: string, body: AnyBody): Promise<unknown> {
   if (path === "/api/materials") {
-    const { sourceId, directId, isDs, major, mid, sub, isRepair, trackSerial, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty, opinionText, opinionImageUrl, referenceImageUrl1, referenceImageUrl2 } = body;
+    const { sourceId, directId, isDs, major, mid, sub, isRepair, trackSerial, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, stockQty, opinionText, opinionImageUrl, referenceImageUrl1, referenceImageUrl2, vendor1Id, vendor2Id } = body;
     if (!major || !mid || !sub) throw new MockApiError("분류 코드(major/mid/sub)가 누락됐습니다", 400);
 
     let id: string;
@@ -942,6 +946,8 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
       opinion_image_url:     opinionImageUrl    || null,
       reference_image_url1:  referenceImageUrl1 || null,
       reference_image_url2:  referenceImageUrl2 || null,
+      vendor1_id:            vendor1Id != null && vendor1Id !== "" ? Number(vendor1Id) : null,
+      vendor2_id:            vendor2Id != null && vendor2Id !== "" ? Number(vendor2Id) : null,
     };
     const { data, error } = await supabase.from("materials").insert(row).select().single();
     if (error) throw new MockApiError(error.message, 500);
@@ -1168,7 +1174,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
       return dbToMaterial(data);
     }
     const patch: Record<string, unknown> = {};
-    const { stockQty, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, isRepair, trackSerial, opinionText, opinionImageUrl, referenceImageUrl1, referenceImageUrl2 } = body;
+    const { stockQty, name, alias, modelNo, unit, buyPrice, sellPrice, storageLoc, isRepair, trackSerial, opinionText, opinionImageUrl, referenceImageUrl1, referenceImageUrl2, vendor1Id, vendor2Id } = body;
     if (name        !== undefined) patch.name          = name;
     if (alias       !== undefined) patch.alias         = alias      || null;
     if (modelNo     !== undefined) patch.model_no      = modelNo    || null;
@@ -1183,6 +1189,8 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
     if (opinionImageUrl    !== undefined) patch.opinion_image_url    = opinionImageUrl    || null;
     if (referenceImageUrl1 !== undefined) patch.reference_image_url1 = referenceImageUrl1 || null;
     if (referenceImageUrl2 !== undefined) patch.reference_image_url2 = referenceImageUrl2 || null;
+    if (vendor1Id !== undefined) patch.vendor1_id = vendor1Id != null && vendor1Id !== "" ? Number(vendor1Id) : null;
+    if (vendor2Id !== undefined) patch.vendor2_id = vendor2Id != null && vendor2Id !== "" ? Number(vendor2Id) : null;
     const { data, error } = await supabase.from("materials")
       .update(patch).eq("id", dbId).select().single();
     if (error) throw new MockApiError(error.message, 500);

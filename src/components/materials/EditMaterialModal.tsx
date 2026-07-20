@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { useViewMode } from "@/context/ViewModeContext";
 import { MaterialRecord } from "@/lib/mock-materials";
+import { VendorRecord } from "@/lib/mock-vendors";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
 import RegisterRepairModal from "./RegisterRepairModal";
 import DraggableModal from "@/components/common/DraggableModal";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 import { parseNum } from "@/lib/format";
 import { formatMoney } from "@/lib/input-format";
 
@@ -39,6 +41,27 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
   const [error,        setError]        = useState("");
   const [showRepair,   setShowRepair]   = useState(false);
 
+  // 구입처 (매입/공통 거래처 중 검색·선택)
+  const [vendors, setVendors] = useState<VendorRecord[]>([]);
+  const [vendor1Name, setVendor1Name] = useState("");
+  const [vendor2Name, setVendor2Name] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const list = await api.get<VendorRecord[]>("/api/vendors?type=매입");
+        if (!alive) return;
+        setVendors(list);
+        const v1 = list.find(v => v.id === material.vendor1Id);
+        const v2 = list.find(v => v.id === material.vendor2Id);
+        if (v1) setVendor1Name(v1.name);
+        if (v2) setVendor2Name(v2.name);
+      } catch { /* 목록 로드 실패는 편집 자체를 막지 않음 */ }
+    })();
+    return () => { alive = false; };
+  }, [material.vendor1Id, material.vendor2Id]);
+
   const isDs = material.id.startsWith("D");
   const canRegisterRepair = isDs && !material.isRepair;
 
@@ -65,10 +88,14 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
       if (refFile1) finalRef1 = await uploadReferenceImage(refFile1, 1);
       let finalRef2 = refUrl2;
       if (refFile2) finalRef2 = await uploadReferenceImage(refFile2, 2);
+      const vendor1Id = vendor1Name.trim() ? (vendors.find(v => v.name === vendor1Name.trim())?.id ?? null) : null;
+      const vendor2Id = vendor2Name.trim() ? (vendors.find(v => v.name === vendor2Name.trim())?.id ?? null) : null;
       await api.patch(`/api/materials/${encodeURIComponent(material.id)}`, {
         name, alias, modelNo, unit, buyPrice: parseNum(buyPrice), sellPrice: parseNum(sellPrice), storageLoc, stockQty, isRepair,
         referenceImageUrl1: finalRef1 || "",
         referenceImageUrl2: finalRef2 || "",
+        vendor1Id,
+        vendor2Id,
       });
       onSaved();
     } catch (e) {
@@ -174,6 +201,28 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">재고</label>
               <input type="number" min={0} value={stockQty} onChange={e => setStockQty(Number(e.target.value))}
                 className={field} />
+            </div>
+          </div>
+
+          {/* 구입처 (매입/공통 거래처 중 검색·선택, 최대 2개) */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">구입처 1</label>
+              <SearchableSelect
+                options={vendors.map(v => ({ id: v.id, name: v.name }))}
+                value={vendor1Name}
+                onChange={setVendor1Name}
+                placeholder="매입 거래처 검색"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">구입처 2</label>
+              <SearchableSelect
+                options={vendors.map(v => ({ id: v.id, name: v.name }))}
+                value={vendor2Name}
+                onChange={setVendor2Name}
+                placeholder="매입 거래처 검색"
+              />
             </div>
           </div>
 

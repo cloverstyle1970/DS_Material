@@ -18,6 +18,8 @@ export interface MaterialRecord {
   opinionImageUrl: string | null;
   referenceImageUrl1: string | null;
   referenceImageUrl2: string | null;
+  vendor1Id: number | null;
+  vendor2Id: number | null;
   createdAt: string;
 }
 

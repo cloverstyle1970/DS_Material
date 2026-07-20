@@ -7,10 +7,12 @@ import { generateMaterialCode } from "@/lib/category-codes";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
 import { MaterialRecord } from "@/lib/mock-materials";
+import { VendorRecord } from "@/lib/mock-vendors";
 import { parseNum } from "@/lib/format";
 import { formatMoney } from "@/lib/input-format";
 import CategoryManagerModal from "./CategoryManagerModal";
 import DraggableModal from "@/components/common/DraggableModal";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 
 const REFERENCE_BUCKET = "material-references";
 
@@ -43,6 +45,11 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
   const [stockQty, setStockQty] = useState(0);
   const [saving, setSaving] = useState(false);
 
+  // 구입처 (매입/공통 거래처 중 선택)
+  const [vendors, setVendors] = useState<VendorRecord[]>([]);
+  const [vendor1Name, setVendor1Name] = useState("");
+  const [vendor2Name, setVendor2Name] = useState("");
+
   // 참조 사진
   const [refFile1, setRefFile1] = useState<File | null>(null);
   const [refFile2, setRefFile2] = useState<File | null>(null);
@@ -71,6 +78,25 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
   }
 
   useEffect(() => { const t = setTimeout(loadCats, 0); return () => clearTimeout(t); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 매입/공통 거래처 로드 + 수리품 등록 시 원본 자재의 구입처 초기값 세팅
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const list = await api.get<VendorRecord[]>("/api/vendors?type=매입");
+        if (!alive) return;
+        setVendors(list);
+        if (source) {
+          const v1 = list.find(v => v.id === source.vendor1Id);
+          const v2 = list.find(v => v.id === source.vendor2Id);
+          if (v1) setVendor1Name(v1.name);
+          if (v2) setVendor2Name(v2.name);
+        }
+      } catch { /* 거래처 목록 실패는 자재 등록 자체를 막지 않는다 */ }
+    })();
+    return () => { alive = false; };
+  }, [source]);
 
   // TK 자재(_)는 자재코드 체계를 따르지 않으므로 직접 입력만 허용
   useEffect(() => {
@@ -146,9 +172,13 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
         } finally { setRefUploading(false); }
       }
 
+      const vendor1Id = vendor1Name.trim() ? (vendors.find(v => v.name === vendor1Name.trim())?.id ?? null) : null;
+      const vendor2Id = vendor2Name.trim() ? (vendors.find(v => v.name === vendor2Name.trim())?.id ?? null) : null;
       const extra = {
         referenceImageUrl1,
         referenceImageUrl2,
+        vendor1Id,
+        vendor2Id,
       };
       const buyPriceNum  = parseNum(buyPrice);
       const sellPriceNum = parseNum(sellPrice);
@@ -361,6 +391,28 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">초기 재고</label>
                 <input type="number" min={0} value={stockQty} onChange={e => setStockQty(Number(e.target.value))}
                   className="w-full rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+              </div>
+            </div>
+
+            {/* 구입처 (매입/공통 거래처 중 검색·선택, 최대 2개) */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">구입처 1</label>
+                <SearchableSelect
+                  options={vendors.map(v => ({ id: v.id, name: v.name }))}
+                  value={vendor1Name}
+                  onChange={setVendor1Name}
+                  placeholder="매입 거래처 검색"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">구입처 2</label>
+                <SearchableSelect
+                  options={vendors.map(v => ({ id: v.id, name: v.name }))}
+                  value={vendor2Name}
+                  onChange={setVendor2Name}
+                  placeholder="매입 거래처 검색"
+                />
               </div>
             </div>
 
