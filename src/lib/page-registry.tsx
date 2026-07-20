@@ -26,6 +26,7 @@ import HazardMasterClient from "@/components/safety/HazardMasterClient";
 import HazardRegisterClient from "@/components/safety/HazardRegisterClient";
 import RiskRegisterClient from "@/components/safety/RiskRegisterClient";
 import RiskAssessmentClient from "@/components/safety/RiskAssessmentClient";
+import RiskAssessmentMobileClient from "@/components/safety/RiskAssessmentMobileClient";
 import EmployeeRegisterClient from "@/components/hr/EmployeeRegisterClient";
 import ClaimEntryClient from "@/components/claim/ClaimEntryClient";
 import QuoteRequestsListClient from "@/components/claim/QuoteRequestsListClient";
@@ -105,6 +106,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/safety/risk-assessment": {
     label: "위험성평가 등록",
     render: () => <RiskAssessmentClient />,
+  },
+  "/safety/risk-assessment/mobile": {
+    label: "위험성평가 등록(모바일)",
+    render: () => <RiskAssessmentMobileClient />,
   },
   "/hr/employee-register": {
     label: "사원등록",
