@@ -215,7 +215,7 @@ const ORD_COLS: { key: OrdSortKey | null; label: string; sortable: boolean; togg
   { key: "elevatorName",  label: "호기",     sortable: true  },
   { key: "requesterName", label: "신청자",   sortable: true  },
   { key: "vendorName",    label: "거래처",   sortable: true  },
-  { key: "unitPrice",     label: "판매단가",     sortable: true  },
+  { key: "unitPrice",     label: "구매단가",     sortable: true  },
   { key: null,            label: "적요",     sortable: false },
 ];
 
@@ -552,7 +552,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
       호기: o.elevatorName ?? "",
       신청자: o.requesterName ?? "",
       거래처: o.vendorName ?? "",
-      판매단가: o.unitPrice ?? "",
+      구매단가: o.unitPrice ?? "",
       적요: (o.note ?? "").replace(/^\[[^\]]*\]\s*/, "").trim(),
     }));
     xlsxDownload(rows, "발주", `발주내역_${label}_${stamp}.xlsx`);
