@@ -102,8 +102,9 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/safety/hazard-survey", label: "유해요인조사표 등록",      icon: "📝" },
       { href: "/safety/hazard-register", label: "유해요인조사대장",       icon: "📒" },
       { href: "/safety/hazard-master", label: "유해요인조사 마스터",       icon: "🗂️" },
+      // /safety/risk-assessment/mobile 은 메뉴로 노출하지 않는다.
+      // 화면 모드가 모바일일 때 '위험성평가 등록'의 신규 등록 버튼이 탭으로 열어준다.
       { href: "/safety/risk-assessment", label: "위험성평가 등록",        icon: "⚠️" },
-      { href: "/safety/risk-assessment/mobile", label: "위험성평가 등록(모바일)", icon: "📱" },
       { href: "/safety/risk-register",   label: "위험성평가대장",          icon: "📕" },
       { href: "/uniform-safety",     label: "근무복·안전장구 신청",       icon: "🦺" },
       { href: "/uniform-safety/admin", label: "근무복·안전장구 관리",     icon: "🗃️" },

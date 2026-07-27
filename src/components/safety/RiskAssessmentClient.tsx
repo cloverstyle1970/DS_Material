@@ -4,6 +4,7 @@ import { Fragment, useEffect, useRef, useState, useCallback } from "react";
 import { useAuth, hasMenuPermission, isAdmin } from "@/context/AuthContext";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { useViewMode } from "@/context/ViewModeContext";
+import { useTabs, MAX_TABS } from "@/context/TabsContext";
 import { supabase } from "@/lib/supabase";
 import {
   ASSESS_TYPES,
@@ -31,6 +32,8 @@ interface UserMini {
 type ParticipantDraft = UserMini;
 
 const HREF = "/safety/risk-assessment";
+// 모바일 전용 등록 화면. 사이드바 메뉴로는 노출하지 않고 이 화면에서만 열어준다.
+const MOBILE_HREF = "/safety/risk-assessment/mobile";
 
 const inputCls =
   "px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-rose-400";
@@ -110,6 +113,23 @@ function AssessTab({
   const [selId, setSelId] = useState<number | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
   const [signingSurveyId, setSigningSurveyId] = useState<number | null>(null);
+
+  // 화면 모드가 모바일이면 신규 등록은 이 화면의 모달 대신 모바일 전용 페이지로 보낸다.
+  // (모달도 모바일 대응은 돼 있지만, 모바일 페이지가 큰 버튼·풀스크린으로 현장 입력에 맞음)
+  const { viewMode } = useViewMode();
+  const { tabs, openTab } = useTabs();
+
+  function startNew() {
+    if (viewMode !== "mobile") {
+      setShowNewModal(true);
+      return;
+    }
+    if (!tabs.some((t) => t.href === MOBILE_HREF) && tabs.length >= MAX_TABS) {
+      alert(`탭은 최대 ${MAX_TABS}개까지 열 수 있습니다.`);
+      return;
+    }
+    openTab(MOBILE_HREF, "위험성평가 등록(모바일)");
+  }
 
   const [survey, setSurvey] = useState<HazardSurvey | null>(null);
   const [selCat, setSelCat] = useState<RiskCategory | null>(null);
@@ -308,7 +328,7 @@ function AssessTab({
           {canWrite && (
             <button
               type="button"
-              onClick={() => setShowNewModal(true)}
+              onClick={startNew}
               className="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-bold hover:bg-rose-700"
             >
               + 신규 등록
