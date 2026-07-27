@@ -67,8 +67,10 @@ export const PERMISSION_MENUS: PermissionMenuGroup[] = [
       { href: "/safety/hazard-survey", label: "유해요인조사표 등록" },
       { href: "/safety/hazard-register", label: "유해요인조사대장" },
       { href: "/safety/hazard-master", label: "유해요인조사 마스터" },
+      // /safety/risk-assessment/mobile 은 일부러 등록하지 않는다.
+      // 여기에 없어야 matchMenuHref 가 부모(/safety/risk-assessment)로 떨어져
+      // PC·모바일이 하나의 권한을 공유한다. (별도 권한으로 열고 닫을 일이 없음)
       { href: "/safety/risk-assessment", label: "위험성평가 등록" },
-      { href: "/safety/risk-assessment/mobile", label: "위험성평가 등록(모바일)" },
       { href: "/safety/risk-register",   label: "위험성평가대장" },
       { href: "/uniform-safety",      label: "근무복·안전장구 신청" },
       { href: "/uniform-safety/admin", label: "근무복·안전장구 관리" },

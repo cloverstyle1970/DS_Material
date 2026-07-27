@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth, isViewOnly, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { useTabs, MAX_TABS } from "@/context/TabsContext";
 import { PAGE_REGISTRY } from "@/lib/page-registry";
+import { matchMenuHref } from "@/lib/permissions";
 import { supabase } from "@/lib/supabase";
 
 const MAINTENANCE_SITE_URL = "https://men.daesol.kr";
@@ -352,8 +353,12 @@ export default function Sidebar({ open, isPc, onToggle, onClose }: Props) {
                 // 권한 체크박스가 없으므로 admin에게만 노출. 비관리자는 조회 권한과 무관하게 숨김.
                 if (item.href.startsWith("#")) return user ? isAdmin(user) : false;
                 // 그 외 모든 메뉴는 권한 그룹 설정의 체크박스(menu:{href}:read)를 따른다.
-                // admin이면 모두 허용, 아니면 read 권한 보유한 메뉴만 노출
-                return user ? hasMenuPermission(user, item.href, "read") : false;
+                // admin이면 모두 허용, 아니면 read 권한 보유한 메뉴만 노출.
+                // 권한 목록에 없는 하위 라우트(예: .../mobile)는 matchMenuHref 로 부모 권한을
+                // 따르게 한다. AdminShell 라우트 가드와 동일한 기준이라 노출/접근이 어긋나지 않는다.
+                if (!user) return false;
+                const canonical = matchMenuHref(item.href) ?? item.href;
+                return hasMenuPermission(user, canonical, "read");
               });
             if (visibleItems.length === 0) return null;
             const isExpanded = expanded.has(group.id);
