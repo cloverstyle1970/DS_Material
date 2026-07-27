@@ -10,6 +10,7 @@ import {
   TBMMode, MODE_LABELS, SUB_TYPE_LABELS,
 } from "@/lib/tbm";
 import { printTBMReport } from "./tbmReportPrint";
+import { deleteTbmRecord } from "./tbmDelete";
 
 interface DetailData {
   participants: TBMParticipant[];
@@ -177,8 +178,12 @@ export default function TBMAdminClient() {
 
   async function deleteTbm(id: number) {
     if (!confirm("이 TBM 기록을 삭제하시겠습니까?\n(연관된 참가자/사진/안전수칙/체크리스트도 함께 삭제됩니다)")) return;
-    const { error } = await supabase.from("tbm_records").delete().eq("id", id);
-    if (error) { alert(`삭제 실패: ${error.message}`); return; }
+    try {
+      await deleteTbmRecord(id);
+    } catch (e) {
+      alert(`삭제 실패: ${e instanceof Error ? e.message : String(e)}`);
+      return;
+    }
     setOpenDetail(null);
     load();
   }
