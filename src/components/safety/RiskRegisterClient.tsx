@@ -4,7 +4,13 @@ import { useEffect, useState, useCallback, Fragment } from "react";
 import { useAuth, hasMenuPermission } from "@/context/AuthContext";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
-import { ASSESS_TYPES, type RiskCategory, type HazardSurvey, type HazardSurveyItem } from "@/lib/risk";
+import {
+  ASSESS_TYPES,
+  type RiskCategory,
+  type HazardSurvey,
+  type HazardSurveyItem,
+  type HazardSurveyParticipant,
+} from "@/lib/risk";
 import { printRiskSheet } from "@/components/safety/riskSheetPrint";
 
 const HREF = "/safety/risk-register";
@@ -257,6 +263,7 @@ export default function RiskRegisterClient() {
 function DetailModal({ row, onClose }: { row: Row; onClose: () => void }) {
   const [items, setItems] = useState<HazardSurveyItem[]>([]);
   const [cat, setCat] = useState<RiskCategory | null>(null);
+  const [parts, setParts] = useState<HazardSurveyParticipant[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -270,6 +277,12 @@ function DetailModal({ row, onClose }: { row: Row; onClose: () => void }) {
       setItems((its ?? []) as HazardSurveyItem[]);
       const { data: c } = await supabase.from("risk_categories").select("*").eq("id", row.category_id).single();
       setCat((c ?? null) as RiskCategory | null);
+      const { data: ps } = await supabase
+        .from("hazard_survey_participants")
+        .select("*")
+        .eq("survey_id", row.id)
+        .order("created_at");
+      setParts((ps ?? []) as HazardSurveyParticipant[]);
       setLoading(false);
     })();
   }, [row.id, row.category_id]);
@@ -295,7 +308,7 @@ function DetailModal({ row, onClose }: { row: Row; onClose: () => void }) {
             <button
               type="button"
               disabled={!cat}
-              onClick={() => cat && printRiskSheet(cat, row, items)}
+              onClick={() => cat && printRiskSheet(cat, row, items, parts)}
               className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold hover:bg-gray-200 disabled:opacity-50"
             >
               🖨 인쇄
@@ -318,6 +331,39 @@ function DetailModal({ row, onClose }: { row: Row; onClose: () => void }) {
           <span>평가자: {row.assessor ?? "-"}</span>
           <span>작성일: {row.survey_date}</span>
         </div>
+
+        {parts.length > 0 && (
+          <div className="px-5 py-2 border-b border-gray-100 dark:border-gray-700/60">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+                👷 평가 참가자 ({parts.length}명)
+              </span>
+              <span className="text-[11px] text-gray-400">
+                서명 {parts.filter((p) => p.signature_url).length}/{parts.length}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {parts.map((p) => (
+                <div
+                  key={p.user_id}
+                  className="flex items-center gap-2 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40"
+                >
+                  <span className="text-xs font-medium text-gray-800 dark:text-gray-100">{p.user_name}</span>
+                  {p.signature_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.signature_url}
+                      alt={`${p.user_name} 서명`}
+                      className="h-7 w-auto max-w-[90px] object-contain bg-white rounded"
+                    />
+                  ) : (
+                    <span className="text-[11px] text-amber-600 dark:text-amber-400">서명 대기</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="overflow-auto p-4">
           {loading ? (

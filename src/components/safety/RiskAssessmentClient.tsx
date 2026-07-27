@@ -12,6 +12,7 @@ import {
   type RiskHazardItem,
   type HazardSurvey,
   type HazardSurveyItem,
+  type HazardSurveyParticipant,
 } from "@/lib/risk";
 import { printRiskSheet } from "@/components/safety/riskSheetPrint";
 import SignaturePad, { type SignaturePadHandle } from "@/components/tbm/SignaturePad";
@@ -113,6 +114,7 @@ function AssessTab({
   const [survey, setSurvey] = useState<HazardSurvey | null>(null);
   const [selCat, setSelCat] = useState<RiskCategory | null>(null);
   const [rows, setRows] = useState<HazardSurveyItem[]>([]);
+  const [sheetParts, setSheetParts] = useState<HazardSurveyParticipant[]>([]);
   const [edit, setEdit] = useState<Record<number, EditRow>>({});
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -158,11 +160,22 @@ function AssessTab({
     void loadSurveys();
   });
 
+  // 선택 조사의 참가자·서명 현황. 서명 직후에도 다시 불러 최신 상태를 반영한다.
+  const loadSheetParts = useCallback(async (surveyId: number) => {
+    const { data } = await supabase
+      .from("hazard_survey_participants")
+      .select("*")
+      .eq("survey_id", surveyId)
+      .order("created_at");
+    setSheetParts((data ?? []) as HazardSurveyParticipant[]);
+  }, []);
+
   // 선택 조사 상세 로드 ('유' 항목만)
   useEffect(() => {
     if (selId == null) {
       setSurvey(null);
       setRows([]);
+      setSheetParts([]);
       return;
     }
     (async () => {
@@ -180,6 +193,7 @@ function AssessTab({
         .order("sort_order");
       const list = (its ?? []) as HazardSurveyItem[];
       setRows(list);
+      void loadSheetParts(selId);
       setExpandedGroups(new Set()); // 기본 접기
       const e: Record<number, EditRow> = {};
       for (const r of list)
@@ -191,7 +205,7 @@ function AssessTab({
         };
       setEdit(e);
     })();
-  }, [selId]);
+  }, [selId, loadSheetParts]);
 
   async function save() {
     if (!survey) return;
@@ -223,7 +237,7 @@ function AssessTab({
   function print() {
     if (!survey || !selCat) return;
     const merged = rows.map((r) => ({ ...r, ...edit[r.id] }));
-    printRiskSheet(selCat, survey, merged);
+    printRiskSheet(selCat, survey, merged, sheetParts);
   }
 
   function toggleGroup(g: string) {
@@ -259,6 +273,7 @@ function AssessTab({
       if (error) throw error;
       setSigningSurveyId(null);
       void loadSurveys();
+      if (selId === surveyId) void loadSheetParts(surveyId);
     } catch (e: any) {
       alert("서명 저장 실패: " + (e?.message ?? e));
     }
@@ -447,6 +462,39 @@ function AssessTab({
               <span>평가자: {survey.assessor ?? "-"}</span>
               <span>작성일: {survey.survey_date}</span>
             </div>
+
+            {sheetParts.length > 0 && (
+              <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+                    👷 평가 참가자 ({sheetParts.length}명)
+                  </span>
+                  <span className="text-[11px] text-gray-400">
+                    서명 {sheetParts.filter((p) => p.signature_url).length}/{sheetParts.length}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {sheetParts.map((p) => (
+                    <div
+                      key={p.user_id}
+                      className="flex items-center gap-2 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40"
+                    >
+                      <span className="text-xs font-medium text-gray-800 dark:text-gray-100">{p.user_name}</span>
+                      {p.signature_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={p.signature_url}
+                          alt={`${p.user_name} 서명`}
+                          className="h-7 w-auto max-w-[90px] object-contain bg-white rounded"
+                        />
+                      ) : (
+                        <span className="text-[11px] text-amber-600 dark:text-amber-400">서명 대기</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="overflow-x-auto">
               <table className="w-full text-xs border-collapse">

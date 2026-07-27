@@ -53,6 +53,17 @@ export interface HazardSurveyItem {
   sort_order: number;
 }
 
+// 평가 참가자 + 서명. 등록 시 signature_url=null 로 생성되고,
+// 각자 알림을 받아 서명하면 signature_url/signed_at 이 채워진다.
+export interface HazardSurveyParticipant {
+  survey_id: number;
+  user_id: number;
+  user_name: string;
+  signature_url: string | null;
+  signed_at: string | null;
+  created_at?: string;
+}
+
 export const RESULT_OPTIONS = ["적정", "보완", "해당없음"] as const;
 export type RiskResult = (typeof RESULT_OPTIONS)[number];
 
