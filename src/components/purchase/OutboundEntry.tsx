@@ -162,6 +162,26 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
           setFreeOfCharge(true);
         }
 
+        // transactions 에는 규격·재고·보관위치·구매단가가 저장되지 않으므로
+        // 자재 마스터에서 다시 채운다. 단가(unitPrice)는 전표에 저장된 값이 진리원이라 건드리지 않는다.
+        const matIds = Array.from(new Set(loaded.map(r => r.materialId).filter(Boolean)));
+        if (matIds.length > 0) {
+          const { data: mats } = await supabase.from("materials")
+            .select("id, model_no, buy_price, storage_loc, stock_qty").in("id", matIds);
+          if (mats) {
+            const map = new Map(mats.map(m => [m.id as string, m]));
+            for (const r of loaded) {
+              const m = map.get(r.materialId);
+              if (!m) continue;
+              r.spec       = m.model_no ?? "";
+              r.buyPrice   = m.buy_price ?? 0;
+              r.storageLoc = m.storage_loc ?? "";
+              r.stockQty   = m.stock_qty ?? 0;
+            }
+          }
+        }
+        if (cancelled) return;
+
         while (loaded.length < 5) loaded.push(newRow());
         setRows(loaded);
       } catch (e) {

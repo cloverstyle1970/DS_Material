@@ -122,6 +122,21 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
           });
         }
         
+        // transactions 에는 규격이 저장되지 않으므로 자재 마스터에서 다시 채운다.
+        // 단가(unitPrice)는 전표에 저장된 값이 진리원이라 건드리지 않는다.
+        const matIds = Array.from(new Set(loaded.map(r => r.materialId).filter(Boolean)));
+        if (matIds.length > 0) {
+          const { data: mats } = await supabase.from("materials")
+            .select("id, model_no").in("id", matIds);
+          if (mats) {
+            const map = new Map(mats.map(m => [m.id as string, m.model_no as string | null]));
+            for (const r of loaded) {
+              if (map.has(r.materialId)) r.spec = map.get(r.materialId) ?? "";
+            }
+          }
+        }
+        if (cancelled) return;
+
         while (loaded.length < 5) loaded.push(newRow());
         setRows(loaded);
       } catch (e) {
