@@ -10,7 +10,10 @@ import {
   type RiskCategory,
   type RiskHazardItem,
   type HazardSurvey,
+  type HazardSurveyItem,
+  type HazardSurveyParticipant,
 } from "@/lib/risk";
+import { printRiskSheet } from "@/components/safety/riskSheetPrint";
 import SignaturePad, { type SignaturePadHandle } from "@/components/tbm/SignaturePad";
 
 const HREF = "/safety/risk-assessment";
@@ -508,6 +511,7 @@ function MySignTab({ currentUserId, currentUserName }: { currentUserId: number; 
   const [rows, setRows] = useState<SignRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [signingId, setSigningId] = useState<number | null>(null);
+  const [printingId, setPrintingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -570,6 +574,35 @@ function MySignTab({ currentUserId, currentUserName }: { currentUserId: number; 
     }
   }
 
+  // 위험성평가표 인쇄. 목록에는 표 본문이 없으므로 누른 시점에 분류·항목·참가자를 조회한다.
+  // 인쇄 양식은 PC(riskSheetPrint)와 동일한 것을 쓴다.
+  async function printRow(r: SignRow) {
+    setPrintingId(r.id);
+    try {
+      const [catRes, itemRes, partRes] = await Promise.all([
+        supabase.from("risk_categories").select("*").eq("id", r.category_id).single(),
+        supabase
+          .from("hazard_survey_items")
+          .select("*")
+          .eq("survey_id", r.id)
+          .eq("present", true)
+          .order("sort_order"),
+        supabase.from("hazard_survey_participants").select("*").eq("survey_id", r.id).order("created_at"),
+      ]);
+      if (!catRes.data) throw new Error("대분류 정보를 찾을 수 없습니다.");
+      printRiskSheet(
+        catRes.data as RiskCategory,
+        r,
+        (itemRes.data ?? []) as HazardSurveyItem[],
+        (partRes.data ?? []) as HazardSurveyParticipant[]
+      );
+    } catch (e) {
+      alert("인쇄 준비 실패: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setPrintingId(null);
+    }
+  }
+
   const unsigned = rows.filter((r) => !r._mySigned).length;
 
   return (
@@ -616,15 +649,25 @@ function MySignTab({ currentUserId, currentUserName }: { currentUserId: number; 
                 <span>{r.survey_date}</span>
                 <span>· 작성자 {r.assessor ?? "-"}</span>
               </div>
-              <button
-                type="button"
-                onClick={() => setSigningId(r.id)}
-                className={`w-full py-2.5 rounded-lg text-sm font-bold ${
-                  r._mySigned ? "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200" : "bg-rose-600 text-white hover:bg-rose-700"
-                }`}
-              >
-                {r._mySigned ? "재서명" : "✍️ 서명하기"}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSigningId(r.id)}
+                  className={`flex-1 py-2.5 rounded-lg text-sm font-bold ${
+                    r._mySigned ? "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200" : "bg-rose-600 text-white hover:bg-rose-700"
+                  }`}
+                >
+                  {r._mySigned ? "재서명" : "✍️ 서명하기"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void printRow(r)}
+                  disabled={printingId === r.id}
+                  className="px-4 py-2.5 rounded-lg text-sm font-bold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
+                >
+                  {printingId === r.id ? "준비 중…" : "🖨 인쇄"}
+                </button>
+              </div>
             </div>
           ))}
         </div>
