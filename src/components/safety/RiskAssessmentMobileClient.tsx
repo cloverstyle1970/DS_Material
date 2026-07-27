@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth, hasMenuPermission } from "@/context/AuthContext";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
-import { insertNotification } from "@/lib/notify";
+import { notifyRiskParticipants } from "@/components/safety/riskNotify";
 import {
   ASSESS_TYPES,
   type RiskCategory,
@@ -266,23 +266,14 @@ function WriteTab({
         // 참가자 알림 발송 (본인 제외)
         const targets = participants.filter((p) => p.id !== currentUserId);
         if (targets.length > 0) {
-          const titleParts = [cat.doc_no, cat.name].filter(Boolean).join(" ");
-          const sitePart = siteName.trim() ? ` · ${siteName.trim()}` : "";
-          void (async () => {
-            await Promise.all(
-              targets.map((p) =>
-                insertNotification({
-                  userId: p.id,
-                  type: "risk_participant",
-                  title: "위험성평가 참가자로 지정되었습니다 — 서명이 필요합니다",
-                  message: `[${titleParts}]${sitePart} / ${surveyDate}`,
-                  link: "/safety/risk-assessment/mobile",
-                  refType: "hazard_survey",
-                  refId: sv.id,
-                })
-              )
-            );
-          })().catch((e) => console.warn("[notify] 위험성평가 참가자 알림 실패:", e));
+          void notifyRiskParticipants({
+            userIds: targets.map((p) => p.id),
+            surveyId: sv.id,
+            docNo: cat.doc_no,
+            categoryName: cat.name,
+            siteName,
+            surveyDate,
+          }).catch((e) => console.warn("[notify] 위험성평가 참가자 알림 실패:", e));
         }
       }
 

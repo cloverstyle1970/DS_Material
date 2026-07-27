@@ -16,7 +16,7 @@ import {
 } from "@/lib/risk";
 import { printRiskSheet } from "@/components/safety/riskSheetPrint";
 import SignaturePad, { type SignaturePadHandle } from "@/components/tbm/SignaturePad";
-import { insertNotification } from "@/lib/notify";
+import { notifyRiskParticipants } from "@/components/safety/riskNotify";
 
 // 서명 이미지는 기존 tbm-photos 버킷 재활용 (risk/ 접두사로 구분)
 const SIGN_BUCKET = "tbm-photos";
@@ -772,23 +772,14 @@ function NewSurveyModal({
         // 참가자 알림 발송 (본인 제외, 실패해도 저장은 성공 처리)
         const notifyTargets = participants.filter((p) => p.id !== currentUserId);
         if (notifyTargets.length > 0) {
-          const titleParts = [cat.doc_no, cat.name].filter(Boolean).join(" ");
-          const sitePart = siteName.trim() ? ` · ${siteName.trim()}` : "";
-          void (async () => {
-            await Promise.all(
-              notifyTargets.map((p) =>
-                insertNotification({
-                  userId: p.id,
-                  type: "risk_participant",
-                  title: "위험성평가 참가자로 지정되었습니다 — 서명이 필요합니다",
-                  message: `[${titleParts}]${sitePart} / ${surveyDate}`,
-                  link: "/safety/risk-assessment",
-                  refType: "hazard_survey",
-                  refId: sv.id,
-                })
-              )
-            );
-          })().catch((e) => console.warn("[notify] 위험성평가 참가자 알림 실패:", e));
+          void notifyRiskParticipants({
+            userIds: notifyTargets.map((p) => p.id),
+            surveyId: sv.id,
+            docNo: cat.doc_no,
+            categoryName: cat.name,
+            siteName,
+            surveyDate,
+          }).catch((e) => console.warn("[notify] 위험성평가 참가자 알림 실패:", e));
         }
       }
 
