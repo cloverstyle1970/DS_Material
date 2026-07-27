@@ -238,6 +238,9 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
     if (mode === "repair" && !repairTypeId) { setError("공사구분을 선택하세요."); return; }
     if (subType === "fault" && !faultTypeId) { setError("고장 증상을 선택하세요."); return; }
     if (subType === "parts" && !partsName.trim()) { setError("교체 부품명을 입력하세요."); return; }
+    // TBM 은 안전 서류로 보관되므로 참가자와 작업책임자 서명은 필수.
+    if (participants.length === 0) { setError("작업 참가자를 1명 이상 추가하세요."); return; }
+    if (!sigPadRef.current || sigPadRef.current.isEmpty()) { setError("작업책임자 서명을 입력하세요."); return; }
 
     setSaving(true);
     try {
@@ -622,7 +625,7 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
 
       {/* 참가자 */}
       <div className={sectionCls}>
-        <label className={labelCls}>👷 작업 참가자 ({participants.length}명)</label>
+        <label className={labelCls}>👷 작업 참가자 ({participants.length}명) <span className="text-red-500">*</span></label>
         <input
           ref={participantSearchRef}
           type="text"
@@ -747,7 +750,7 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
 
       {/* 서명 */}
       <div className={sectionCls}>
-        <label className={labelCls}>✍️ 작업책임자 서명 ({user?.name})</label>
+        <label className={labelCls}>✍️ 작업책임자 서명 ({user?.name}) <span className="text-red-500">*</span></label>
         <SignaturePad ref={sigPadRef} />
       </div>
 
