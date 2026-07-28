@@ -99,6 +99,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/safety/tbm",         label: "TBM등록",                   icon: "🛡️" },
       { href: "/safety/tbm/admin",   label: "TBM 관리(PC)",              icon: "🗂️" },
       { href: "/safety/tbm/master",  label: "TBM 마스터(PC)",            icon: "⚙️" },
+      { href: "/safety/work-journal", label: "작업일지",                  icon: "📓" },
       { href: "/safety/hazard-survey", label: "유해요인조사표 등록",      icon: "📝" },
       { href: "/safety/hazard-register", label: "유해요인조사대장",       icon: "📒" },
       { href: "/safety/hazard-master", label: "유해요인조사 마스터",       icon: "🗂️" },

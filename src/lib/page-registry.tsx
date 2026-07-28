@@ -21,6 +21,7 @@ import ConstructionRequestClient from "@/components/construction/ConstructionReq
 import TBMClient from "@/components/tbm/TBMClient";
 import TBMAdminClient from "@/components/tbm/TBMAdminClient";
 import TBMMasterClient from "@/components/tbm/TBMMasterClient";
+import WorkJournalClient from "@/components/work-journal/WorkJournalClient";
 import HazardSurveyClient from "@/components/safety/HazardSurveyClient";
 import HazardMasterClient from "@/components/safety/HazardMasterClient";
 import HazardRegisterClient from "@/components/safety/HazardRegisterClient";
@@ -86,6 +87,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/safety/tbm/master": {
     label: "TBM 마스터",
     render: () => <TBMMasterClient />,
+  },
+  "/safety/work-journal": {
+    label: "작업일지",
+    render: () => <WorkJournalClient />,
   },
   "/safety/hazard-survey": {
     label: "유해요인조사표 등록",

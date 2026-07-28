@@ -38,6 +38,17 @@ body {
   }
 }
 
+/* input[type="time"] 을 항상 24시간 표시로 강제.
+   Chromium(Chrome/Edge) — AM/PM 필드를 숨겨 hh:mm 만 보이게 함.
+   저장 값은 원래 24h HH:MM 이므로 로직에 영향 없음. */
+input[type="time"]::-webkit-datetime-edit-ampm-field {
+  display: none !important;
+}
+input[type="time"]::-webkit-datetime-edit-hour-field,
+input[type="time"]::-webkit-datetime-edit-minute-field {
+  color: inherit;
+}
+
 /* ──────────────────────────────────────────────────────────────────────
    화면 모드 = 모바일 강제 스코프
    ----------------------------------------------------------------------
