@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import * as XLSX from "xlsx";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
@@ -129,6 +130,49 @@ export default function CompanyVehiclesClient() {
       })
     : filtered;
 
+  function exportExcel() {
+    const fmt = (v: string | null | undefined) => (v ? sharedFormatYmd(v) : "");
+    const data = sorted.map((r, i) => ({
+      번호:         i + 1,
+      구분:         r.vehicle_type,
+      사용자:       r.user_name,
+      부서:         r.user_dept,
+      차량번호:     r.plate_number,
+      차종:         r.model,
+      연식:         r.year_made ?? "",
+      유종:         r.fuel_type,
+      등록일:       fmt(r.registration_date),
+      보험사:       r.insurance_company ?? "",
+      보험시작:     fmt(r.insurance_start_date),
+      보험만기:     fmt(r.insurance_end_date),
+      운전자연령:   r.driver_age_range ?? "",
+      운전자범위:   r.driver_scope ?? "",
+      상태:         r.status === "active" ? "활성" : "폐차",
+      폐차일:       fmt(r.scrapped_at),
+      폐차처리자:   r.scrapped_by_name ?? "",
+      폐차사유:     r.scrapped_note ?? "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    // 대략적인 컬럼 폭 지정
+    ws["!cols"] = [
+      { wch: 5 }, { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 14 },
+      { wch: 14 }, { wch: 6 }, { wch: 8 }, { wch: 12 }, { wch: 14 },
+      { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 6 },
+      { wch: 12 }, { wch: 10 }, { wch: 30 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "회사차량현황");
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([buf], { type: "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `회사차량현황_${stamp}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="min-h-full bg-gray-50 dark:bg-gray-900">
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
@@ -150,9 +194,18 @@ export default function CompanyVehiclesClient() {
         <input type="text" value={search} onChange={e => setSearch(e.target.value)}
           placeholder="사용자명·부서·차량번호·차종 검색" lang="ko"
           className="flex-1 max-w-md px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-xs" />
+        <button
+          type="button"
+          onClick={exportExcel}
+          disabled={loading || sorted.length === 0}
+          title={sorted.length === 0 ? "출력할 데이터가 없습니다" : `${sorted.length}건 엑셀 출력`}
+          className="ml-auto px-3 py-1.5 rounded border border-emerald-600 text-emerald-700 dark:text-emerald-300 dark:border-emerald-500 text-xs font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-900/30 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          📊 엑셀 출력
+        </button>
         {canCreate && (
           <button type="button" onClick={() => setShowNew(true)}
-            className="ml-auto px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800">+ 회사차량 등록</button>
+            className="px-3 py-1.5 rounded bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800">+ 회사차량 등록</button>
         )}
       </div>
 
