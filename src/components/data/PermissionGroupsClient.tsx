@@ -78,6 +78,7 @@ const PERMISSION_TREE: MenuSection[] = [
       { href: "/safety/tbm/admin",     label: "TBM 관리" },
       { href: "/safety/tbm/master",    label: "TBM 마스터" },
       { href: "/safety/work-journal",  label: "작업일지" },
+      { href: "/safety/work-journal-register", label: "작업일지대장" },
       { href: "/safety/hazard-survey", label: "유해요인조사표 등록" },
       { href: "/safety/hazard-register", label: "유해요인조사대장" },
       { href: "/safety/hazard-master", label: "유해요인조사 마스터" },

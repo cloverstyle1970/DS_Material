@@ -22,6 +22,7 @@ import TBMClient from "@/components/tbm/TBMClient";
 import TBMAdminClient from "@/components/tbm/TBMAdminClient";
 import TBMMasterClient from "@/components/tbm/TBMMasterClient";
 import WorkJournalClient from "@/components/work-journal/WorkJournalClient";
+import WorkJournalRegisterClient from "@/components/work-journal/WorkJournalRegisterClient";
 import HazardSurveyClient from "@/components/safety/HazardSurveyClient";
 import HazardMasterClient from "@/components/safety/HazardMasterClient";
 import HazardRegisterClient from "@/components/safety/HazardRegisterClient";
@@ -91,6 +92,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/safety/work-journal": {
     label: "작업일지",
     render: () => <WorkJournalClient />,
+  },
+  "/safety/work-journal-register": {
+    label: "작업일지대장",
+    render: () => <WorkJournalRegisterClient />,
   },
   "/safety/hazard-survey": {
     label: "유해요인조사표 등록",
