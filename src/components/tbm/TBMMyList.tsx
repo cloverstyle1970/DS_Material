@@ -6,17 +6,21 @@ import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 import {
   TBMRecord, TBMParticipant, TBMRecordSafetyRule, TBMChecklistResult, TBMPhoto,
+  TBMEnvReading, TBMHeatRest,
   MODE_LABELS, SUB_TYPE_LABELS,
 } from "@/lib/tbm";
+import { heatStressLevel } from "@/lib/apparent-temperature";
 import TBMParticipantConfirmModal from "./TBMParticipantConfirmModal";
+import EditTBMModal from "./EditTBMModal";
 import { deleteTbmRecord } from "./tbmDelete";
-import DraggableModal from "@/components/common/DraggableModal";
 
 interface DetailData {
   participants: TBMParticipant[];
   rules: TBMRecordSafetyRule[];
   checklist: TBMChecklistResult[];
   photos: TBMPhoto[];
+  envReadings: TBMEnvReading[];
+  heatRests: TBMHeatRest[];
 }
 
 type Role = "writer" | "participant" | "viewer";
@@ -107,17 +111,21 @@ export default function TBMMyList() {
       setOpenId(null); setDetail(null); return;
     }
     setOpenId(id); setDetailLoading(true); setDetail(null);
-    const [p, r, c, ph] = await Promise.all([
+    const [p, r, c, ph, en, hr] = await Promise.all([
       supabase.from("tbm_participants").select("*").eq("tbm_id", id),
       supabase.from("tbm_record_safety_rules").select("*").eq("tbm_id", id),
       supabase.from("tbm_checklist_results").select("*").eq("tbm_id", id),
       supabase.from("tbm_photos").select("*").eq("tbm_id", id).order("uploaded_at"),
+      supabase.from("tbm_env_readings").select("*").eq("tbm_id", id).order("seq"),
+      supabase.from("tbm_heat_rests").select("*").eq("tbm_id", id).order("seq"),
     ]);
     setDetail({
       participants: (p.data ?? []) as TBMParticipant[],
       rules: (r.data ?? []) as TBMRecordSafetyRule[],
       checklist: (c.data ?? []) as TBMChecklistResult[],
       photos: (ph.data ?? []) as TBMPhoto[],
+      envReadings: (en.data ?? []) as TBMEnvReading[],
+      heatRests: (hr.data ?? []) as TBMHeatRest[],
     });
     setDetailLoading(false);
   }
@@ -235,6 +243,52 @@ export default function TBMMyList() {
                       {r.risk_assessment && (
                         <Section title="위험요소">
                           <p className="text-xs text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{r.risk_assessment}</p>
+                        </Section>
+                      )}
+                      {detail.envReadings.length > 0 && (
+                        <Section title={`환경지표 (${detail.envReadings.length}건)`}>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-[11px] border-collapse">
+                              <thead>
+                                <tr className="bg-white dark:bg-gray-800">
+                                  <th className="border border-gray-200 dark:border-gray-700 px-1.5 py-1">시각</th>
+                                  <th className="border border-gray-200 dark:border-gray-700 px-1.5 py-1">온도(℃)</th>
+                                  <th className="border border-gray-200 dark:border-gray-700 px-1.5 py-1">습도(%)</th>
+                                  <th className="border border-gray-200 dark:border-gray-700 px-1.5 py-1">체감</th>
+                                  <th className="border border-gray-200 dark:border-gray-700 px-1.5 py-1">지역</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {detail.envReadings.map(x => {
+                                  const info = heatStressLevel(x.apparent_temperature);
+                                  return (
+                                    <tr key={x.id} className="text-center text-gray-700 dark:text-gray-200">
+                                      <td className="border border-gray-200 dark:border-gray-700 px-1.5 py-1">{x.observed_at?.slice(0,5) ?? "-"}</td>
+                                      <td className="border border-gray-200 dark:border-gray-700 px-1.5 py-1">{x.temperature ?? "-"}</td>
+                                      <td className="border border-gray-200 dark:border-gray-700 px-1.5 py-1">{x.humidity ?? "-"}</td>
+                                      <td className={`border px-1.5 py-1 ${info?.colorClass ?? "border-gray-200 dark:border-gray-700"}`}>
+                                        {x.apparent_temperature ?? "-"}
+                                        {info && <span className="ml-1 font-bold">({info.label})</span>}
+                                      </td>
+                                      <td className="border border-gray-200 dark:border-gray-700 px-1.5 py-1">{x.location ?? "-"}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </Section>
+                      )}
+                      {detail.heatRests.length > 0 && (
+                        <Section title={`온열질환 예방 휴게 (${detail.heatRests.length}건)`}>
+                          <ul className="space-y-1">
+                            {detail.heatRests.map(x => (
+                              <li key={x.id} className="text-xs text-gray-700 dark:text-gray-200">
+                                ✓ 휴게 {x.rest_start?.slice(0,5) ?? "-"} ~ {x.rest_end?.slice(0,5) ?? "-"}
+                                {x.rest_method && ` · ${x.rest_method}`}
+                              </li>
+                            ))}
+                          </ul>
                         </Section>
                       )}
                       {detail.checklist.length > 0 && (
@@ -362,104 +416,3 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 // 수정 모달 (기본 텍스트 필드만)
 // ============================================================
 
-function EditTBMModal({
-  record, onClose, onSaved,
-}: { record: TBMRecord; onClose: () => void; onSaved: () => void }) {
-  const [siteName, setSiteName] = useState(record.site_name);
-  const [elevatorName, setElevatorName] = useState(record.elevator_name);
-  const [workContent, setWorkContent] = useState(record.work_content);
-  const [riskAssessment, setRiskAssessment] = useState(record.risk_assessment);
-  const [partsName, setPartsName] = useState(record.parts_name);
-  const [passengerTrapped, setPassengerTrapped] = useState(record.passenger_trapped);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  async function save() {
-    if (!siteName.trim() || !workContent.trim()) {
-      setError("현장명과 작업 내용은 필수입니다."); return;
-    }
-    setSaving(true); setError("");
-    const { error: err } = await supabase.from("tbm_records").update({
-      site_name: siteName.trim(),
-      elevator_name: elevatorName.trim(),
-      work_content: workContent.trim(),
-      risk_assessment: riskAssessment.trim(),
-      parts_name: record.sub_type === "parts" ? partsName.trim() : "",
-      passenger_trapped: record.sub_type === "fault" ? passengerTrapped : false,
-      updated_at: new Date().toISOString(),
-    }).eq("id", record.id);
-    setSaving(false);
-    if (err) { setError(err.message); return; }
-    onSaved();
-  }
-
-  const inputCls = "w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100";
-
-  return (
-    <DraggableModal
-      open={true}
-      onClose={onClose}
-      panelClassName="w-full max-w-md max-h-[90vh]"
-      z={60}
-      header={
-        <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-          <div className="text-base font-bold text-gray-900 dark:text-white">TBM 기본정보 수정</div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
-        </div>
-      }
-    >
-        <div className="flex-1 overflow-y-auto p-5 space-y-3">
-          <Field label="현장명 *">
-            <input type="text" value={siteName} onChange={e => setSiteName(e.target.value)} lang="ko" className={inputCls} />
-          </Field>
-          <Field label="호기">
-            <input type="text" value={elevatorName} onChange={e => setElevatorName(e.target.value)} lang="ko" className={inputCls} />
-          </Field>
-          {record.sub_type === "parts" && (
-            <Field label="교체 부품명">
-              <input type="text" value={partsName} onChange={e => setPartsName(e.target.value)} lang="ko" className={inputCls} />
-            </Field>
-          )}
-          {record.sub_type === "fault" && (
-            <Field label="승객 갇힘 여부">
-              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
-                <input type="checkbox" checked={passengerTrapped} onChange={e => setPassengerTrapped(e.target.checked)} />
-                승객 갇힘 발생
-              </label>
-            </Field>
-          )}
-          <Field label="작업 내용 *">
-            <textarea value={workContent} onChange={e => setWorkContent(e.target.value)} rows={4} lang="ko" className={inputCls + " resize-none"} />
-          </Field>
-          <Field label="위험요소">
-            <textarea value={riskAssessment} onChange={e => setRiskAssessment(e.target.value)} rows={2} lang="ko" className={inputCls + " resize-none"} />
-          </Field>
-          <p className="text-[11px] text-gray-400 dark:text-gray-500">
-            ※ 체크리스트·안전수칙·참가자·사진·서명은 별도로 다시 작성해야 합니다.
-          </p>
-          {error && (
-            <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 text-xs px-3 py-2 rounded">
-              {error}
-            </div>
-          )}
-        </div>
-        <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
-          <button type="button" onClick={onClose}
-            className="px-4 py-2 rounded text-sm font-semibold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">취소</button>
-          <button type="button" onClick={save} disabled={saving}
-            className="px-4 py-2 rounded text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
-            {saving ? "저장 중..." : "저장"}
-          </button>
-        </div>
-    </DraggableModal>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">{label}</label>
-      {children}
-    </div>
-  );
-}

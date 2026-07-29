@@ -1,7 +1,9 @@
 import type {
   TBMRecord, TBMParticipant, TBMRecordSafetyRule, TBMChecklistResult, TBMPhoto,
+  TBMEnvReading, TBMHeatRest,
 } from "@/lib/tbm";
 import { MODE_LABELS, SUB_TYPE_LABELS } from "@/lib/tbm";
+import { heatStressLevel } from "@/lib/apparent-temperature";
 
 export interface TBMReportData {
   record: TBMRecord;
@@ -9,12 +11,14 @@ export interface TBMReportData {
   rules: TBMRecordSafetyRule[];
   checklist: TBMChecklistResult[];
   photos: TBMPhoto[];
+  envReadings: TBMEnvReading[];
+  heatRests: TBMHeatRest[];
 }
 
 // TBM 작성일지 인쇄(새 창) — A4 세로 양식.
 // 사용자가 인쇄 다이얼로그에서 "PDF로 저장" 선택 시 PDF 파일 생성.
 export function printTBMReport(data: TBMReportData) {
-  const { record: r, participants, rules, checklist, photos } = data;
+  const { record: r, participants, rules, checklist, photos, envReadings, heatRests } = data;
 
   const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -43,6 +47,58 @@ export function printTBMReport(data: TBMReportData) {
     ? `<div class="sec">
         <div class="sec-h">위험요소 · 특이사항</div>
         <div class="sec-b pre">${esc(r.risk_assessment)}</div>
+      </div>`
+    : "";
+
+  const envBlock = envReadings.length > 0
+    ? `<div class="sec">
+        <div class="sec-h">환경지표 (${envReadings.length}건)</div>
+        <table class="grid">
+          <thead>
+            <tr>
+              <th style="width:14%">시각</th>
+              <th style="width:14%">온도(℃)</th>
+              <th style="width:14%">습도(%)</th>
+              <th style="width:22%">체감온도</th>
+              <th>지역정보</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${envReadings.map(x => {
+              const info = heatStressLevel(x.apparent_temperature);
+              const level = info ? ` (${info.label})` : "";
+              return `<tr>
+                <td>${esc((x.observed_at ?? "").slice(0,5) || "-")}</td>
+                <td>${x.temperature ?? "-"}</td>
+                <td>${x.humidity ?? "-"}</td>
+                <td>${x.apparent_temperature ?? "-"}${esc(level)}</td>
+                <td class="l">${esc(x.location ?? "-")}</td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>`
+    : "";
+
+  const heatRestsBlock = heatRests.length > 0
+    ? `<div class="sec">
+        <div class="sec-h">온열질환 예방 휴게 실시 (${heatRests.length}건)</div>
+        <table class="grid">
+          <thead>
+            <tr>
+              <th style="width:20%">시작</th>
+              <th style="width:20%">종료</th>
+              <th>휴게방법</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${heatRests.map(x => `<tr>
+              <td>${esc((x.rest_start ?? "").slice(0,5) || "-")}</td>
+              <td>${esc((x.rest_end ?? "").slice(0,5) || "-")}</td>
+              <td class="l">${esc(x.rest_method ?? "-")}</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
       </div>`
     : "";
 
@@ -149,6 +205,8 @@ export function printTBMReport(data: TBMReportData) {
   </table>
   ${workBlock}
   ${riskBlock}
+  ${envBlock}
+  ${heatRestsBlock}
   ${checklistBlock}
   ${rulesBlock}
   ${participantsBlock}

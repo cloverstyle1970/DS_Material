@@ -110,6 +110,26 @@ export interface TBMPhoto {
   uploaded_at: string;
 }
 
+export interface TBMEnvReading {
+  id: number;
+  tbm_id: number;
+  seq: number;
+  observed_at: string | null;         // "HH:MM:SS"
+  temperature: number | null;
+  humidity: number | null;
+  apparent_temperature: number | null;
+  location: string | null;
+}
+
+export interface TBMHeatRest {
+  id: number;
+  tbm_id: number;
+  seq: number;
+  rest_start: string | null;          // "HH:MM:SS"
+  rest_end: string | null;
+  rest_method: string | null;
+}
+
 // ============================================================
 // 라벨 헬퍼
 // ============================================================
