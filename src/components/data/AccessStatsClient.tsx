@@ -82,6 +82,7 @@ export default function AccessStatsClient() {
   const [from, setFrom] = useState(init.from);
   const [to, setTo] = useState(init.to);
   const [dept, setDept] = useState<string>("전체");
+  const [searchName, setSearchName] = useState<string>("");
   const [enabledCats, setEnabledCats] = useState<Set<Category>>(
     new Set<Category>(CATEGORY_ORDER)
   );
@@ -263,12 +264,14 @@ export default function AccessStatsClient() {
   }, [accounts]);
 
   const filteredEvents = useMemo(() => {
+    const kw = searchName.trim().toLowerCase();
     return events.filter((e) => {
       if (!enabledCats.has(e.category)) return false;
       if (dept !== "전체" && (e.dept || "") !== dept) return false;
+      if (kw && !e.user_name.toLowerCase().includes(kw)) return false;
       return true;
     });
-  }, [events, enabledCats, dept]);
+  }, [events, enabledCats, dept, searchName]);
 
   // 카테고리별 총합 (요약 카드)
   const summary = useMemo(() => {
@@ -325,6 +328,35 @@ export default function AccessStatsClient() {
         <select className={inputCls} value={dept} onChange={(e) => setDept(e.target.value)}>
           {deptOptions.map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
+
+        <div className="w-px h-5 bg-gray-200 dark:bg-gray-600 mx-1" />
+
+        <label className="text-xs text-gray-600 dark:text-gray-300">사용자</label>
+        <input
+          type="text"
+          lang="ko"
+          className={inputCls}
+          placeholder="사원명 검색"
+          list="access-stats-user-list"
+          value={searchName}
+          onChange={(e) => setSearchName(e.target.value)}
+          style={{ width: "9rem" }}
+        />
+        <datalist id="access-stats-user-list">
+          {accounts
+            .filter((a) => a.name && (dept === "전체" || (a.dept || "") === dept))
+            .map((a) => (
+              <option key={a.id} value={a.name}>{a.dept ?? ""}</option>
+            ))}
+        </datalist>
+        {searchName && (
+          <button
+            type="button"
+            onClick={() => setSearchName("")}
+            className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+            title="검색 초기화"
+          >×</button>
+        )}
 
         <div className="w-px h-5 bg-gray-200 dark:bg-gray-600 mx-1" />
 
@@ -428,8 +460,46 @@ export default function AccessStatsClient() {
 }
 
 // ─────────────────────────────────────────────────────────
+// 정렬 헤더 공통
+// ─────────────────────────────────────────────────────────
+
+type SortDir = "asc" | "desc";
+type SortState<K extends string> = { key: K; dir: SortDir };
+
+function SortHeader<K extends string>({
+  label, columnKey, sort, setSort, align = "left",
+}: {
+  label: React.ReactNode;
+  columnKey: K;
+  sort: SortState<K>;
+  setSort: (s: SortState<K>) => void;
+  align?: "left" | "right";
+}) {
+  const active = sort.key === columnKey;
+  const arrow = !active ? "↕" : sort.dir === "asc" ? "▲" : "▼";
+  return (
+    <th
+      className={`${align === "right" ? "text-right" : "text-left"} px-3 py-2 font-semibold cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-700/40`}
+      onClick={() => setSort({ key: columnKey, dir: active && sort.dir === "desc" ? "asc" : "desc" })}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <span className={`text-[9px] ${active ? "text-blue-500 dark:text-blue-300" : "text-gray-300 dark:text-gray-600"}`}>{arrow}</span>
+      </span>
+    </th>
+  );
+}
+
+function cmp(a: unknown, b: unknown): number {
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  return String(a ?? "").localeCompare(String(b ?? ""), "ko", { numeric: true });
+}
+
+// ─────────────────────────────────────────────────────────
 // 사용자별 표
 // ─────────────────────────────────────────────────────────
+
+type UserSortKey = "user_name" | "dept" | "login" | "menu" | "material" | "maintenance" | "total" | "lastAt";
 
 interface UserRow {
   key: string;              // user_id 또는 이름
@@ -453,6 +523,8 @@ function UserTable({
   enabledCats: Set<Category>;
   onExport: (rows: Record<string, unknown>[]) => void;
 }) {
+  const [sort, setSort] = useState<SortState<UserSortKey>>({ key: "total", dir: "desc" });
+
   const rows = useMemo<UserRow[]>(() => {
     const map = new Map<string, UserRow>();
     for (const e of events) {
@@ -478,8 +550,11 @@ function UserTable({
       if (e.at > r.lastAt) r.lastAt = e.at;
       if (!r.dept && e.dept) r.dept = e.dept;
     }
-    return Array.from(map.values()).sort((a, b) => b.total - a.total);
-  }, [events]);
+    const list = Array.from(map.values());
+    const sign = sort.dir === "asc" ? 1 : -1;
+    list.sort((a, b) => sign * cmp(a[sort.key], b[sort.key]));
+    return list;
+  }, [events, sort]);
 
   function exportRows() {
     onExport(
@@ -518,14 +593,14 @@ function UserTable({
         <table className="w-full text-xs">
           <thead className="bg-gray-50 dark:bg-gray-900/40 text-gray-700 dark:text-gray-200">
             <tr>
-              <th className="text-left px-3 py-2 font-semibold">사용자</th>
-              <th className="text-left px-3 py-2 font-semibold">부서</th>
-              {enabledCats.has("login") && <th className="text-right px-3 py-2 font-semibold">로그인</th>}
-              {enabledCats.has("menu") && <th className="text-right px-3 py-2 font-semibold">메뉴방문</th>}
-              {enabledCats.has("material") && <th className="text-right px-3 py-2 font-semibold">자재관리</th>}
-              {enabledCats.has("maintenance") && <th className="text-right px-3 py-2 font-semibold">유지보수</th>}
-              <th className="text-right px-3 py-2 font-semibold">합계</th>
-              <th className="text-left px-3 py-2 font-semibold">최근활동</th>
+              <SortHeader label="사용자" columnKey="user_name" sort={sort} setSort={setSort} />
+              <SortHeader label="부서" columnKey="dept" sort={sort} setSort={setSort} />
+              {enabledCats.has("login") && <SortHeader label="로그인" columnKey="login" sort={sort} setSort={setSort} align="right" />}
+              {enabledCats.has("menu") && <SortHeader label="메뉴방문" columnKey="menu" sort={sort} setSort={setSort} align="right" />}
+              {enabledCats.has("material") && <SortHeader label="자재관리" columnKey="material" sort={sort} setSort={setSort} align="right" />}
+              {enabledCats.has("maintenance") && <SortHeader label="유지보수" columnKey="maintenance" sort={sort} setSort={setSort} align="right" />}
+              <SortHeader label="합계" columnKey="total" sort={sort} setSort={setSort} align="right" />
+              <SortHeader label="최근활동" columnKey="lastAt" sort={sort} setSort={setSort} />
             </tr>
           </thead>
           <tbody>
@@ -569,6 +644,8 @@ function UserTable({
 // 일자별·월별 (bucket 표)
 // ─────────────────────────────────────────────────────────
 
+type BucketSortKey = "key" | "login" | "menu" | "material" | "maintenance" | "usersSize" | "total";
+
 interface BucketRow {
   key: string;
   login: number;
@@ -598,6 +675,8 @@ function BucketTable({
   mode: "day" | "month";
   onExport: (rows: Record<string, unknown>[]) => void;
 }) {
+  const [sort, setSort] = useState<SortState<BucketSortKey>>({ key: "key", dir: "desc" });
+
   const rows = useMemo<BucketRow[]>(() => {
     const map = new Map<string, BucketRow>();
 
@@ -633,8 +712,14 @@ function BucketTable({
         r.users.add(e.user_id != null ? `id:${e.user_id}` : `nm:${e.user_name}`);
       }
     }
-    return Array.from(map.values()).sort((a, b) => b.key.localeCompare(a.key));
-  }, [events, bucketKey, from, to, mode]);
+    const list = Array.from(map.values());
+    const sign = sort.dir === "asc" ? 1 : -1;
+    list.sort((a, b) => sign * cmp(
+      sort.key === "usersSize" ? a.users.size : a[sort.key],
+      sort.key === "usersSize" ? b.users.size : b[sort.key],
+    ));
+    return list;
+  }, [events, bucketKey, from, to, mode, sort]);
 
   function exportRows() {
     const cols: Record<string, unknown>[] = rows.map((r) => {
@@ -667,13 +752,13 @@ function BucketTable({
         <table className="w-full text-xs">
           <thead className="bg-gray-50 dark:bg-gray-900/40 text-gray-700 dark:text-gray-200">
             <tr>
-              <th className="text-left px-3 py-2 font-semibold">{bucketLabel}</th>
-              {enabledCats.has("login") && <th className="text-right px-3 py-2 font-semibold">로그인</th>}
-              {enabledCats.has("menu") && <th className="text-right px-3 py-2 font-semibold">메뉴방문</th>}
-              {enabledCats.has("material") && <th className="text-right px-3 py-2 font-semibold">자재관리</th>}
-              {enabledCats.has("maintenance") && <th className="text-right px-3 py-2 font-semibold">유지보수</th>}
-              <th className="text-right px-3 py-2 font-semibold">활동사용자수</th>
-              <th className="text-right px-3 py-2 font-semibold">합계</th>
+              <SortHeader label={bucketLabel} columnKey="key" sort={sort} setSort={setSort} />
+              {enabledCats.has("login") && <SortHeader label="로그인" columnKey="login" sort={sort} setSort={setSort} align="right" />}
+              {enabledCats.has("menu") && <SortHeader label="메뉴방문" columnKey="menu" sort={sort} setSort={setSort} align="right" />}
+              {enabledCats.has("material") && <SortHeader label="자재관리" columnKey="material" sort={sort} setSort={setSort} align="right" />}
+              {enabledCats.has("maintenance") && <SortHeader label="유지보수" columnKey="maintenance" sort={sort} setSort={setSort} align="right" />}
+              <SortHeader label="활동사용자수" columnKey="usersSize" sort={sort} setSort={setSort} align="right" />
+              <SortHeader label="합계" columnKey="total" sort={sort} setSort={setSort} align="right" />
             </tr>
           </thead>
           <tbody>
@@ -710,6 +795,8 @@ function BucketTable({
 // 행 클릭 시 해당 메뉴를 방문한 사용자별 방문수 드릴다운
 // ─────────────────────────────────────────────────────────
 
+type MenuSortKey = "label" | "href" | "visits" | "usersSize" | "lastAt";
+
 interface MenuVisitor {
   key: string;
   name: string;
@@ -738,6 +825,7 @@ function MenuTable({
   onExport: (rows: Record<string, unknown>[]) => void;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [sort, setSort] = useState<SortState<MenuSortKey>>({ key: "visits", dir: "desc" });
 
   const rows = useMemo<MenuRow[]>(() => {
     const menuMap = new Map<string, {
@@ -770,17 +858,21 @@ function MenuTable({
       if (e.at > v.lastAt) v.lastAt = e.at;
       if (!v.dept && e.dept) v.dept = e.dept;
     }
-    return Array.from(menuMap.values())
-      .map((m) => ({
-        href: m.href,
-        label: m.label,
-        visits: m.visits,
-        users: m.users,
-        lastAt: m.lastAt,
-        visitors: Array.from(m.visitorMap.values()).sort((a, b) => b.visits - a.visits),
-      }))
-      .sort((a, b) => b.visits - a.visits);
-  }, [events]);
+    const list = Array.from(menuMap.values()).map((m) => ({
+      href: m.href,
+      label: m.label,
+      visits: m.visits,
+      users: m.users,
+      lastAt: m.lastAt,
+      visitors: Array.from(m.visitorMap.values()).sort((a, b) => b.visits - a.visits),
+    }));
+    const sign = sort.dir === "asc" ? 1 : -1;
+    list.sort((a, b) => sign * cmp(
+      sort.key === "usersSize" ? a.users.size : a[sort.key],
+      sort.key === "usersSize" ? b.users.size : b[sort.key],
+    ));
+    return list;
+  }, [events, sort]);
 
   function exportRows() {
     onExport(
@@ -815,12 +907,12 @@ function MenuTable({
           <thead className="bg-gray-50 dark:bg-gray-900/40 text-gray-700 dark:text-gray-200">
             <tr>
               <th className="w-6 px-2 py-2"></th>
-              <th className="text-left px-3 py-2 font-semibold">메뉴</th>
-              <th className="text-left px-3 py-2 font-semibold">경로</th>
-              <th className="text-right px-3 py-2 font-semibold">방문수</th>
-              <th className="text-right px-3 py-2 font-semibold">유니크 사용자수</th>
+              <SortHeader label="메뉴" columnKey="label" sort={sort} setSort={setSort} />
+              <SortHeader label="경로" columnKey="href" sort={sort} setSort={setSort} />
+              <SortHeader label="방문수" columnKey="visits" sort={sort} setSort={setSort} align="right" />
+              <SortHeader label="유니크 사용자수" columnKey="usersSize" sort={sort} setSort={setSort} align="right" />
               <th className="text-left px-3 py-2 font-semibold">상위 방문자</th>
-              <th className="text-left px-3 py-2 font-semibold">최근 방문</th>
+              <SortHeader label="최근 방문" columnKey="lastAt" sort={sort} setSort={setSort} />
             </tr>
           </thead>
           <tbody>
