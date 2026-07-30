@@ -128,14 +128,13 @@ export function printTBMReport(data: TBMReportData) {
     ? `<div class="sec">
         <div class="sec-h">참가자 확인 (${confirmedCount}/${participants.length})</div>
         <table class="grid">
-          <thead><tr><th style="width:30%">성명</th><th style="width:30%">확인 일시</th><th>서명</th></tr></thead>
+          <thead><tr><th style="width:40%">성명</th><th>서명</th></tr></thead>
           <tbody>
             ${participants.map(p => {
-              const dt = p.confirmed_at ? fmtDt(p.confirmed_at) : "";
               const sig = p.signature_url
                 ? `<img src="${esc(p.signature_url)}" alt="서명" class="sig-mini" />`
                 : (p.confirmed_at ? "확인" : "<span class='muted'>미확인</span>");
-              return `<tr><td>${esc(p.user_name)}</td><td>${dt || "<span class='muted'>—</span>"}</td><td class="sig-cell">${sig}</td></tr>`;
+              return `<tr><td>${esc(p.user_name)}</td><td class="sig-cell">${sig}</td></tr>`;
             }).join("")}
           </tbody>
         </table>
@@ -151,12 +150,7 @@ export function printTBMReport(data: TBMReportData) {
       </div>`
     : "";
 
-  const authorSigBlock = r.signature_url
-    ? `<div class="sec">
-        <div class="sec-h">작업책임자 서명 (${esc(r.user_name)})</div>
-        <div class="sec-b"><img src="${esc(r.signature_url)}" alt="작업책임자 서명" class="sig-main" /></div>
-      </div>`
-    : "";
+  // 작성자 서명은 참가자 확인 표에 이미 노출되므로 중복 방지를 위해 별도 블록은 생성하지 않음.
 
   const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>TBM 작성일지 ${esc(docNo)}</title>
   <style>
@@ -184,7 +178,6 @@ export function printTBMReport(data: TBMReportData) {
     .rules li{margin:2px 0;}
     .sig-cell{padding:2px 4px;}
     .sig-mini{max-height:32px;max-width:120px;background:#fff;}
-    .sig-main{max-height:80px;max-width:220px;background:#fff;border:1px solid #ccc;}
     .photos{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:6px;border:1px solid #333;border-top:none;}
     .photos img{width:100%;height:auto;object-fit:contain;border:1px solid #ddd;page-break-inside:avoid;}
     @media print{
@@ -211,7 +204,6 @@ export function printTBMReport(data: TBMReportData) {
   ${rulesBlock}
   ${participantsBlock}
   ${photosBlock}
-  ${authorSigBlock}
   <script>
     // 모든 이미지 로드 후 인쇄 (Supabase Storage 지연 대비)
     window.addEventListener("load", function(){

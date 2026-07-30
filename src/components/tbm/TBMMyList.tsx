@@ -340,13 +340,6 @@ export default function TBMMyList() {
                           </div>
                         </Section>
                       )}
-                      {r.signature_url && (
-                        <Section title="작성자 서명">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={r.signature_url} alt="작성자 서명" className="h-20 bg-white rounded border border-gray-200" />
-                        </Section>
-                      )}
-
                       {/* 액션 버튼 */}
                       <div className="flex gap-2">
                         {canEditDelete && (
