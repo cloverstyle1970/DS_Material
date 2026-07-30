@@ -48,6 +48,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/data/profile",           label: "개인정보수정",     icon: "🪪" },
       { href: "/data/company-info",      label: "회사 정보 관리",   icon: "🏢" },
       { href: "/data/permission-groups", label: "사용자권한그룹",   icon: "🔑" },
+      { href: "/data/access-stats",      label: "시스템접속통계",   icon: "📊" },
     ],
   },
   {
@@ -99,8 +100,6 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/safety/tbm",         label: "TBM등록",                   icon: "🛡️" },
       { href: "/safety/tbm/admin",   label: "TBM 관리(PC)",              icon: "🗂️" },
       { href: "/safety/tbm/master",  label: "TBM 마스터(PC)",            icon: "⚙️" },
-      { href: "/safety/work-journal", label: "작업일지",                  icon: "📓" },
-      { href: "/safety/work-journal-register", label: "작업일지대장",     icon: "📗" },
       { href: "/safety/hazard-survey", label: "유해요인조사표 등록",      icon: "📝" },
       { href: "/safety/hazard-register", label: "유해요인조사대장",       icon: "📒" },
       { href: "/safety/hazard-master", label: "유해요인조사 마스터",       icon: "🗂️" },

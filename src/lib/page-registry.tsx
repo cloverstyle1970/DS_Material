@@ -21,8 +21,6 @@ import ConstructionRequestClient from "@/components/construction/ConstructionReq
 import TBMClient from "@/components/tbm/TBMClient";
 import TBMAdminClient from "@/components/tbm/TBMAdminClient";
 import TBMMasterClient from "@/components/tbm/TBMMasterClient";
-import WorkJournalClient from "@/components/work-journal/WorkJournalClient";
-import WorkJournalRegisterClient from "@/components/work-journal/WorkJournalRegisterClient";
 import HazardSurveyClient from "@/components/safety/HazardSurveyClient";
 import HazardMasterClient from "@/components/safety/HazardMasterClient";
 import HazardRegisterClient from "@/components/safety/HazardRegisterClient";
@@ -45,6 +43,7 @@ import RewardsPunishmentsClient from "@/components/hr/RewardsPunishmentsClient";
 import MyProfileClient from "@/components/data/MyProfileClient";
 import CompanyInfoClient from "@/components/data/CompanyInfoClient";
 import PermissionGroupsClient from "@/components/data/PermissionGroupsClient";
+import AccessStatsClient from "@/components/data/AccessStatsClient";
 import UniformSafetyClient from "@/components/uniform-safety/UniformSafetyClient";
 import UniformSafetyAdminClient from "@/components/uniform-safety/UniformSafetyAdminClient";
 import QuoteEntryClient from "@/components/quotes/QuoteEntryClient";
@@ -88,14 +87,6 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/safety/tbm/master": {
     label: "TBM 마스터",
     render: () => <TBMMasterClient />,
-  },
-  "/safety/work-journal": {
-    label: "작업일지",
-    render: () => <WorkJournalClient />,
-  },
-  "/safety/work-journal-register": {
-    label: "작업일지대장",
-    render: () => <WorkJournalRegisterClient />,
   },
   "/safety/hazard-survey": {
     label: "유해요인조사표 등록",
@@ -220,6 +211,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/data/permission-groups": {
     label: "사용자권한그룹",
     render: () => <PermissionGroupsClient />,
+  },
+  "/data/access-stats": {
+    label: "시스템접속통계",
+    render: () => <AccessStatsClient />,
   },
   "/data/users": {
     label: "사원 관리",

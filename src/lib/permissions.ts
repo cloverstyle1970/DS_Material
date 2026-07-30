@@ -12,8 +12,9 @@ export const PERMISSION_MENUS: PermissionMenuGroup[] = [
   {
     group: "데이터관리",
     items: [
-      { href: "/data/users",        label: "사원 관리" },
-      { href: "/data/company-info", label: "회사 정보 관리" },
+      { href: "/data/users",         label: "사원 관리" },
+      { href: "/data/company-info",  label: "회사 정보 관리" },
+      { href: "/data/access-stats",  label: "시스템접속통계" },
     ],
   },
   {
@@ -64,8 +65,6 @@ export const PERMISSION_MENUS: PermissionMenuGroup[] = [
       { href: "/safety/tbm",          label: "TBM등록" },
       { href: "/safety/tbm/admin",    label: "TBM 관리(PC)" },
       { href: "/safety/tbm/master",   label: "TBM 마스터(PC)" },
-      { href: "/safety/work-journal", label: "작업일지" },
-      { href: "/safety/work-journal-register", label: "작업일지대장" },
       { href: "/safety/hazard-survey", label: "유해요인조사표 등록" },
       { href: "/safety/hazard-register", label: "유해요인조사대장" },
       { href: "/safety/hazard-master", label: "유해요인조사 마스터" },

@@ -75,6 +75,26 @@ const AuthContext = createContext<AuthContextType>({
 
 const STORAGE_KEY = "ds_auth_user";
 
+// 시스템접속통계용 "세션 시작 로그" — 사용자별 하루 1회만 login_logs 에 기록.
+// signInWithPassword 성공 시(login())뿐 아니라 이미 살아 있는 세션으로 부팅한 경우
+// (자재관리 재방문·SSO 진입 등)에도 호출해 "일간 활성 사용자"에 가까운 지표를 만든다.
+// localStorage 플래그로 중복 방지 — 브라우저를 지우면 재기록되지만 심각한 과다 집계는 없음.
+function pingSessionOncePerDay(userId: number, username: string) {
+  if (typeof window === "undefined") return;
+  const d = new Date();
+  const key = `ds_session_pinged:${userId}:${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  if (localStorage.getItem(key)) return;
+  // 실패해도 flag 유지 — insert 재시도 루프 방지 (원인은 콘솔 경고로만 노출)
+  localStorage.setItem(key, "1");
+  void supabase.from("login_logs").insert({
+    user_id: userId,
+    username,
+    user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+  }).then(({ error }) => {
+    if (error) console.warn("[auth] login_logs ping 실패:", error.message);
+  });
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -175,6 +195,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
           applyTheme(theme);
           setStoredViewMode(viewMode);
+          pingSessionOncePerDay(id, freshUser.name);
         } else {
           // 세션은 있는데 accounts 행이 없음 → 사고. 세션 정리.
           if (!opts.skipSignOut) await supabase.auth.signOut();
@@ -213,6 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
     applyTheme(u.theme);
     if (u.viewMode) setStoredViewMode(u.viewMode);
+    pingSessionOncePerDay(u.id, u.name);
   }
 
   function logout() {

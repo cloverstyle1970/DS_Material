@@ -1,6 +1,8 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { recordMenuVisit } from "@/lib/menu-visit";
 
 export interface Tab {
   href: string;
@@ -29,6 +31,10 @@ const TabsContext = createContext<TabsContextType>({
 });
 
 export function TabsProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  const userRef = useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
+
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeHref, setActiveHref] = useState<string | null>(null);
   const hydrated = useRef(false);
@@ -73,6 +79,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       return [...prev, { href, label }];
     });
     setActiveHref(href);
+    if (added) recordMenuVisit(userRef.current, href, label);
     return added;
   }, []);
 

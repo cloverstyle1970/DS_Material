@@ -13,7 +13,7 @@ import { calcApparentTemperature, heatStressLevel } from "@/lib/apparent-tempera
 import { fetchCurrentWeather } from "@/lib/weather";
 import SignaturePad, { SignaturePadHandle } from "./SignaturePad";
 import Combobox, { ComboboxHandle } from "./Combobox";
-import TimeText from "@/components/work-journal/TimeText";
+import TimeText from "@/components/common/TimeText";
 
 interface EnvReading {
   seq: number;

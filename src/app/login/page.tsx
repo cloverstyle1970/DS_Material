@@ -103,6 +103,7 @@ export default function LoginPage() {
       viewMode: account.view_mode === "mobile" ? "mobile" : "pc",
       groupName,
     });
+    // login_logs 세션 시작 로그는 AuthContext.login() 이 pingSessionOncePerDay 로 처리.
     router.replace("/me");
   }
 

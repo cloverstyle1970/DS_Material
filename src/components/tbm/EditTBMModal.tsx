@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
-import TimeText from "@/components/work-journal/TimeText";
+import TimeText from "@/components/common/TimeText";
 import { calcApparentTemperature, heatStressLevel } from "@/lib/apparent-temperature";
 import { fetchCurrentWeather } from "@/lib/weather";
 import type { TBMRecord, TBMEnvReading, TBMHeatRest } from "@/lib/tbm";
