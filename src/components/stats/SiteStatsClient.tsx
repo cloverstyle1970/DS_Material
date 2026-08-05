@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { api } from "@/lib/api-client";
+import { supabase } from "@/lib/supabase";
 import { fmtNum } from "@/lib/format";
 import { useAuth, isViewOnly, isNonManager } from "@/context/AuthContext";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
@@ -77,6 +78,8 @@ export default function SiteStatsClient() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [sites, setSites] = useState<SiteOption[]>([]);
   const [loading, setLoading] = useState(true);
+  // 자재별 투입현황에서 '입고 이력이 없고 출고만 있는' 자재의 차변(입고)을 buy_price로 채우기 위한 맵.
+  const [materialBuyPrices, setMaterialBuyPrices] = useState<Record<string, number>>({});
 
   const loadStats = () => {
     setLoading(true);
@@ -95,6 +98,16 @@ export default function SiteStatsClient() {
   }, []);
   useEffect(() => {
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
+  }, []);
+  useEffect(() => {
+    supabase.from("materials").select("id, buy_price").then(({ data }) => {
+      if (!data) return;
+      const map: Record<string, number> = {};
+      for (const m of data as { id: string; buy_price: number | null }[]) {
+        map[m.id] = m.buy_price ?? 0;
+      }
+      setMaterialBuyPrices(map);
+    });
   }, []);
   useReloadOnActivate(() => { loadStats(); });
 
@@ -188,8 +201,19 @@ export default function SiteStatsClient() {
       }
       if (t.createdAt > map[t.materialId].lastDate) map[t.materialId].lastDate = t.createdAt;
     });
+    // 조회 기간 내 입고 수량이 출고 수량보다 적으면 그 차이만큼(부족분)이 기존 재고에서 소진된 것.
+    // 정확한 수익금 산출을 위해 부족분을 자재 설정 구매가(buy_price)로 차변(입고)에 가산한다.
+    // ─ 완전히 입고 없음(inQty=0)도 이 규칙에 포함됨.
+    for (const m of Object.values(map)) {
+      if (m.outQty > m.inQty) {
+        const deficit = m.outQty - m.inQty;
+        const bp = materialBuyPrices[m.id] ?? 0;
+        m.inQty += deficit;
+        m.inAmt += deficit * bp;
+      }
+    }
     return Object.values(map).sort((a, b) => b.outAmt - a.outAmt); // Note: sorting by outbound amount
-  }, [filtered, detailSite]);
+  }, [filtered, detailSite, materialBuyPrices]);
 
   const totalIn  = filtered.filter(t => t.type === "입고").reduce((s, t) => s + t.qty, 0);
   const totalOut = filtered.filter(t => t.type === "출고").reduce((s, t) => s + t.qty, 0);
