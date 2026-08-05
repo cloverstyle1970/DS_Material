@@ -425,7 +425,9 @@ async function supabaseAddTransaction(data: {
   const records: TransactionRecord[] = (result?.records ?? []).map((r: any) => dbToTransaction(r));
   // RPC가 unit_price·transaction_no 인자를 받지 않으므로(서명 변경 회피), 생성 직후 별도 UPDATE.
   const ids = records.map(r => r.id);
-  if (data.unitPrice && data.unitPrice > 0 && records.length > 0) {
+  // unitPrice가 명시적으로 넘어오면(0 포함) UPDATE. undefined/null 이면 RPC가 채운 자재 기본단가(buy_price/sell_price) 유지.
+  // ※ 0을 스킵하면 출고 무상저장이 sell_price로 되돌아오는 버그 발생 (2026-08-05 수정)
+  if (data.unitPrice != null && records.length > 0) {
     await supabase.from("transactions").update({ unit_price: data.unitPrice }).in("id", ids);
     records.forEach(r => { r.unitPrice = data.unitPrice as number; });
   }
