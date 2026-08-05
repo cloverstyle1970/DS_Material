@@ -100,14 +100,26 @@ export default function SiteStatsClient() {
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
   }, []);
   useEffect(() => {
-    supabase.from("materials").select("id, buy_price").then(({ data }) => {
-      if (!data) return;
+    // Supabase 기본 응답 상한(1000행)을 넘기려면 range 페이지네이션 필요.
+    // 자재 총 수(2026-08 기준 약 3,500건) > 1000 이라 단일 select 로는 뒷부분이 잘려
+    // 자재별 투입현황의 buy_price 보정이 적용되지 않는 자재가 생겼음.
+    (async () => {
+      const pageSize = 1000;
       const map: Record<string, number> = {};
-      for (const m of data as { id: string; buy_price: number | null }[]) {
-        map[m.id] = m.buy_price ?? 0;
+      let offset = 0;
+      while (true) {
+        const { data, error } = await supabase.from("materials")
+          .select("id, buy_price")
+          .range(offset, offset + pageSize - 1);
+        if (error || !data || data.length === 0) break;
+        for (const m of data as { id: string; buy_price: number | null }[]) {
+          map[m.id] = m.buy_price ?? 0;
+        }
+        if (data.length < pageSize) break;
+        offset += pageSize;
       }
       setMaterialBuyPrices(map);
-    });
+    })();
   }, []);
   useReloadOnActivate(() => { loadStats(); });
 
