@@ -203,25 +203,27 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
     if (firstOrderDate) setInboundDate(firstOrderDate);
 
     let mats: MaterialRecord[] = [];
-    try { mats = await api.get<MaterialRecord[]>("/api/materials"); } catch (e) {}
+    try { mats = await api.get<MaterialRecord[]>("/api/materials"); } catch {}
 
     setRows(prev => {
       const next = [...prev];
       let emptyIdx = next.findIndex(r => !r.materialId);
-      
+
       orders.forEach(o => {
         const mat = mats.find(m => m.id === o.materialId);
         const spec = mat?.modelNo || "";
+        // 부분입고 지원: 잔량(qty - receivedQty)을 기본 수량으로 채움
+        const remaining = Math.max(0, o.qty - (o.receivedQty ?? 0));
         // remark는 사용자 메모 자리이므로 비워둠. 발주 식별은 orderId로,
-        // transaction note의 '발주 #N 입고완료' 패턴은 save() 단에서 자동 prepend.
+        // transaction note의 '발주 #<line_id> 입고완료' 패턴은 save() 단에서 자동 prepend.
         const patch = {
           materialId: o.materialId, materialName: o.materialName,
           spec,
-          qty: o.qty, unitPrice: o.unitPrice ?? 0,
+          qty: remaining, unitPrice: o.unitPrice ?? 0,
           elevatorName: o.elevatorName ?? "", remark: "", orderId: o.id,
           serialNos: [] as string[],
         };
-        
+
         if (emptyIdx >= 0 && emptyIdx < next.length) {
           next[emptyIdx] = { ...next[emptyIdx], ...patch };
           emptyIdx = next.findIndex((r, idx) => idx > emptyIdx && !r.materialId);
@@ -290,17 +292,9 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
           createdAt: inboundDate,
         });
       }
-      // 발주서 참조로 가져온 row가 있으면 해당 발주 상태를 "입고완료"로 갱신.
-      // 그렇지 않으면 OrderPopup 미입고 리스트(status=발주)에 계속 노출됨.
-      const orderIds = Array.from(new Set(
-        valid.map(r => r.orderId).filter((id): id is number => id !== null)
-      ));
-      if (orderIds.length > 0) {
-        const receivedAtIso = new Date(`${inboundDate}T00:00:00Z`).toISOString();
-        await supabase.from("purchase_orders")
-          .update({ status: "입고완료", received_at: receivedAtIso })
-          .in("id", orderIds);
-      }
+      // 발주 라인 상태 및 헤더 상태 갱신은 mock-router의 POST /api/transactions
+      // 에서 note '발주 #<line_id>' 패턴을 인식해 자동 처리됨.
+      // (received_qty 증분 + line status + 헤더 status 재계산 + 헤더 received_at 갱신)
       window.dispatchEvent(new CustomEvent("ds:transactions_changed", { detail: { mode: "입고" } }));
       if (goList) router.push("/inbound");
       else clearAll();
@@ -874,26 +868,17 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
   const [checked, setChecked] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    // 안전장치: status='발주'인 발주 중에서도 이미 입고 transaction이 있는 건은 제외.
-    // InboundEntry.save()의 status 갱신이 누락되거나(과거 잔존 데이터) 다른 경로로
-    // 입고 처리된 경우를 모두 커버하기 위함. transactions의 note에 '발주 #N' 또는
-    // '발주#N' 패턴이 매칭되면 미입고 리스트에서 빼낸다.
-    Promise.all([
-      api.get<PurchaseOrderRecord[]>("/api/purchase-orders?status=발주"),
-      supabase.from("transactions").select("note").eq("type", "입고").ilike("note", "%발주%"),
-    ]).then(([rawOrders, txRes]) => {
-      const matchedIds = new Set<number>();
-      const re = /발주\s*#(\d+)/g;
-      for (const t of (txRes.data ?? []) as { note: string | null }[]) {
-        if (!t.note) continue;
-        let m: RegExpExecArray | null;
-        while ((m = re.exec(t.note)) !== null) {
-          const id = Number(m[1]);
-          if (id) matchedIds.add(id);
-        }
-      }
-      setOrders(rawOrders.filter(o => !matchedIds.has(o.id)));
-    }).catch(() => setOrders([]));
+    // 헤더 상태가 '발주' 또는 '부분입고' 인 발주의 라인 중, 잔량이 남은 것(qty > receivedQty)만.
+    // 라인 자체 상태로도 필터 (취소·입고완료 제외).
+    api.get<PurchaseOrderRecord[]>("/api/purchase-orders?status=발주,부분입고")
+      .then(list => {
+        const pending = list.filter(o =>
+          o.status !== "취소" && o.status !== "입고완료" &&
+          (o.qty - (o.receivedQty ?? 0)) > 0
+        );
+        setOrders(pending);
+      })
+      .catch(() => setOrders([]));
 
     api.get<MaterialRecord[]>("/api/materials").then(list => {
       const map: Record<string, string> = {};
@@ -962,28 +947,36 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
                 <th className="px-2 py-2 border-b-2 border-gray-300 dark:border-gray-600 text-center w-10">
                   <input type="checkbox" checked={filtered.length > 0 && checked.size === filtered.length} onChange={toggleAll} className="accent-blue-600 w-4 h-4" />
                 </th>
-                {["발주참조번호","발주일","자재코드","품목명","규격","수량","단가","거래처","현장","신청자"].map(h =>
+                {["발주참조번호","발주일","자재코드","품목명","규격","수량","잔량","단가","거래처","현장","신청자"].map(h =>
                 <th key={h} className="px-2 py-2 text-left border-b-2 border-gray-300 dark:border-gray-600 font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap">{h}</th>)}
               </tr>
             </thead>
             <tbody>
-              {filtered.map(o => (
+              {filtered.map(o => {
+                const remaining = Math.max(0, o.qty - (o.receivedQty ?? 0));
+                const isPartial = (o.receivedQty ?? 0) > 0;
+                return (
                 <tr key={o.id} onClick={() => toggle(o.id)} className={`cursor-pointer border-b border-gray-200 dark:border-gray-700 ${checked.has(o.id) ? "bg-blue-50 dark:bg-blue-900/30" : "hover:bg-blue-50/40 dark:hover:bg-gray-700/60"}`}>
                   <td className="px-2 py-2 text-center" onClick={e => e.stopPropagation()}>
                     <input type="checkbox" checked={checked.has(o.id)} onChange={() => toggle(o.id)} className="accent-blue-600 w-4 h-4" />
                   </td>
                   <td className="px-2 py-2 text-blue-700 dark:text-blue-300 font-bold whitespace-nowrap">{extractOrderRef(o.note) || "-"}</td>
-                  <td className="px-2 py-2 text-gray-700 dark:text-gray-200 font-medium whitespace-nowrap">{o.orderedAt.slice(0,10)}</td>
+                  <td className="px-2 py-2 text-gray-700 dark:text-gray-200 font-medium whitespace-nowrap">
+                    {o.orderedAt.slice(0,10)}
+                    {isPartial && <span className="ml-1 text-[10px] px-1 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 font-bold">부분</span>}
+                  </td>
                   <td className={`px-2 py-2 font-mono font-semibold whitespace-nowrap ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-slate-700 dark:text-slate-200"}`}>{o.materialId}</td>
                   <td className={`px-2 py-2 font-semibold whitespace-nowrap ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-gray-900 dark:text-gray-100"}`}>{o.materialName}</td>
                   <td className="px-2 py-2 text-gray-700 dark:text-gray-200 font-medium whitespace-nowrap">{mats[o.materialId] || "-"}</td>
                   <td className="px-2 py-2 text-right tabular-nums font-semibold text-gray-900 dark:text-gray-100 whitespace-nowrap">{fmtNum(o.qty)}</td>
+                  <td className={`px-2 py-2 text-right tabular-nums font-bold whitespace-nowrap ${remaining < o.qty ? "text-amber-600 dark:text-amber-400" : "text-gray-900 dark:text-gray-100"}`}>{fmtNum(remaining)}</td>
                   <td className="px-2 py-2 text-right tabular-nums font-medium text-gray-800 dark:text-gray-100 whitespace-nowrap">{o.unitPrice ? fmtNum(o.unitPrice) : "-"}</td>
                   <td className="px-2 py-2 text-gray-800 dark:text-gray-100 font-medium whitespace-nowrap">{o.vendorName ?? "-"}</td>
                   <td className="px-2 py-2 text-gray-800 dark:text-gray-100 font-medium whitespace-nowrap">{o.siteName ?? "-"}</td>
                   <td className="px-2 py-2 text-gray-800 dark:text-gray-100 font-medium whitespace-nowrap">{o.requesterName ?? "-"}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
           {filtered.length === 0 && <p className="text-center py-8 text-sm text-gray-500 dark:text-gray-400 font-medium">미입고 발주서 없음</p>}

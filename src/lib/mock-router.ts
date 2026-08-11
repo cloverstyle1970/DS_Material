@@ -458,55 +458,56 @@ function dbToRequest(r: any): MaterialRequestRecord {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function dbToOrder(r: any): PurchaseOrderRecord {
+function joinOrderRow(header: any, line: any): PurchaseOrderRecord {
   return {
-    id:            r.id,
-    orderNo:       r.order_no       ?? null,
-    status:        r.status,
-    materialId:    r.material_id,
-    materialName:  r.material_name,
-    qty:           r.qty,
-    vendorName:    r.vendor_name    ?? null,
-    unitPrice:     r.unit_price     ?? null,
-    requestId:     r.request_id     ?? null,
-    siteName:      r.site_name      ?? null,
-    elevatorName:  r.elevator_name  ?? null,
-    requesterName: r.requester_name ?? null,
-    note:          r.note           ?? null,
-    userId:        r.user_id,
-    userName:      r.user_name,
-    orderedAt:     r.ordered_at,
-    receivedAt:    r.received_at    ?? null,
-    batchId:       r.batch_id       ?? null,
-    shipTo:        r.ship_to        ?? null,
-    shipDueDate:   r.ship_due_date  ?? null,
-    shipReceiver:  r.ship_receiver  ?? null,
-    shipContact:   r.ship_contact   ?? null,
-    shipManager:   r.ship_manager   ?? null,
-    shipNote:      r.ship_note      ?? null,
+    id:            line.id,
+    orderId:       header.id,
+    lineNo:        line.line_no        ?? 1,
+    orderNo:       header.order_no     ?? null,
+    status:        line.status,
+    headerStatus:  header.status,
+    materialId:    line.material_id,
+    materialName:  line.material_name,
+    qty:           line.qty,
+    receivedQty:   line.received_qty   ?? 0,
+    vendorName:    header.vendor_name  ?? null,
+    unitPrice:     line.unit_price     ?? null,
+    requestId:     line.request_id     ?? null,
+    siteName:      header.site_name    ?? null,
+    elevatorName:  line.elevator_name  ?? null,
+    requesterName: header.requester_name ?? null,
+    note:          line.note           ?? null,
+    headerNote:    header.note         ?? null,
+    orderRefNo:    header.order_ref_no ?? null,
+    formType:      (header.form_type ?? "기본") as "기본" | "긴급" | "수리",
+    userId:        header.user_id,
+    userName:      header.user_name,
+    orderedAt:     header.ordered_at,
+    receivedAt:    header.received_at  ?? null,
+    shipTo:        header.ship_to      ?? null,
+    shipDueDate:   header.ship_due_date ?? null,
+    shipReceiver:  header.ship_receiver ?? null,
+    shipContact:   header.ship_contact  ?? null,
+    shipManager:   header.ship_manager  ?? null,
+    shipNote:      header.ship_note     ?? null,
   };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function orderToDb(d: any): Record<string, unknown> {
+function headerToDb(d: any): Record<string, unknown> {
   const obj: Record<string, unknown> = {};
   if (d.orderNo       !== undefined) obj.order_no       = d.orderNo;
-  if (d.materialId    !== undefined) obj.material_id    = d.materialId;
-  if (d.materialName  !== undefined) obj.material_name  = d.materialName;
-  if (d.qty           !== undefined) obj.qty            = d.qty;
+  if (d.status        !== undefined) obj.status         = d.status;
   if (d.vendorName    !== undefined) obj.vendor_name    = d.vendorName;
-  if (d.unitPrice     !== undefined) obj.unit_price     = d.unitPrice;
-  if (d.requestId     !== undefined) obj.request_id     = d.requestId;
   if (d.siteName      !== undefined) obj.site_name      = d.siteName;
-  if (d.elevatorName  !== undefined) obj.elevator_name  = d.elevatorName;
   if (d.requesterName !== undefined) obj.requester_name = d.requesterName;
+  if (d.orderedAt     !== undefined) obj.ordered_at     = d.orderedAt;
+  if (d.receivedAt    !== undefined) obj.received_at    = d.receivedAt;
+  if (d.orderRefNo    !== undefined) obj.order_ref_no   = d.orderRefNo;
+  if (d.formType      !== undefined) obj.form_type      = d.formType;
   if (d.note          !== undefined) obj.note           = d.note;
   if (d.userId        !== undefined) obj.user_id        = d.userId;
   if (d.userName      !== undefined) obj.user_name      = d.userName;
-  if (d.status        !== undefined) obj.status         = d.status;
-  if (d.orderedAt     !== undefined) obj.ordered_at     = d.orderedAt;
-  if (d.receivedAt    !== undefined) obj.received_at    = d.receivedAt;
-  if (d.batchId       !== undefined) obj.batch_id       = d.batchId;
   if (d.shipTo        !== undefined) obj.ship_to        = d.shipTo;
   if (d.shipDueDate   !== undefined) obj.ship_due_date  = d.shipDueDate;
   if (d.shipReceiver  !== undefined) obj.ship_receiver  = d.shipReceiver;
@@ -514,6 +515,63 @@ function orderToDb(d: any): Record<string, unknown> {
   if (d.shipManager   !== undefined) obj.ship_manager   = d.shipManager;
   if (d.shipNote      !== undefined) obj.ship_note      = d.shipNote;
   return obj;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function lineToDb(d: any, orderId?: number): Record<string, unknown> {
+  const obj: Record<string, unknown> = {};
+  if (orderId          !== undefined) obj.order_id      = orderId;
+  if (d.lineNo         !== undefined) obj.line_no       = d.lineNo;
+  if (d.materialId     !== undefined) obj.material_id   = d.materialId;
+  if (d.materialName   !== undefined) obj.material_name = d.materialName;
+  if (d.qty            !== undefined) obj.qty           = d.qty;
+  if (d.receivedQty    !== undefined) obj.received_qty  = d.receivedQty;
+  if (d.unitPrice      !== undefined) obj.unit_price    = d.unitPrice;
+  if (d.elevatorName   !== undefined) obj.elevator_name = d.elevatorName;
+  if (d.requestId      !== undefined) obj.request_id    = d.requestId;
+  if (d.note           !== undefined) obj.note          = d.note;
+  if (d.status         !== undefined) obj.status        = d.status;
+  return obj;
+}
+
+// 라인 상태 재계산: received_qty vs qty 관계로 결정
+function calcLineStatus(qty: number, receivedQty: number, prev?: string): "발주" | "부분입고" | "입고완료" | "취소" {
+  if (prev === "취소") return "취소";
+  if (receivedQty <= 0)      return "발주";
+  if (receivedQty >= qty)    return "입고완료";
+  return "부분입고";
+}
+
+// 헤더 상태 재계산: 소속 라인들의 상태 조합으로 결정
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function calcHeaderStatus(lines: any[]): "발주" | "부분입고" | "입고완료" | "취소" {
+  if (lines.length === 0) return "발주";
+  const cancelled = lines.every(l => l.status === "취소");
+  if (cancelled) return "취소";
+  const active = lines.filter(l => l.status !== "취소");
+  if (active.length === 0) return "취소";
+  const allDone = active.every(l => l.status === "입고완료");
+  if (allDone) return "입고완료";
+  const anyPartial = active.some(l => l.received_qty > 0);
+  return anyPartial ? "부분입고" : "발주";
+}
+
+// 헤더 id 로 라인 재조회 + 헤더 상태/received_at 재계산 + UPDATE
+async function refreshHeaderStatus(orderId: number): Promise<void> {
+  const { data: lines } = await supabase.from("purchase_order_lines")
+    .select("status, qty, received_qty").eq("order_id", orderId);
+  const list = lines ?? [];
+  const newStatus = calcHeaderStatus(list);
+  const patch: Record<string, unknown> = { status: newStatus, updated_at: new Date().toISOString() };
+  if (newStatus === "입고완료") {
+    // 이미 received_at 있으면 유지, 없으면 지금 시각으로
+    const { data: cur } = await supabase.from("purchase_orders")
+      .select("received_at").eq("id", orderId).single();
+    if (!cur?.received_at) patch.received_at = new Date().toISOString();
+  } else {
+    patch.received_at = null;
+  }
+  await supabase.from("purchase_orders").update(patch).eq("id", orderId);
 }
 
 export class MockApiError extends Error {
@@ -836,13 +894,54 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
     return data.map(dbToRequest);
   }
   if (path === "/api/purchase-orders") {
+    // 라인 단위 flat 목록. status 파라미터는 헤더 상태 필터. 콤마 리스트 지원.
     const status = params.get("status");
-    const data = await fetchAllRows(() => {
+    const headers = await fetchAllRows(() => {
       let q = supabase.from("purchase_orders").select("*").order("ordered_at", { ascending: false });
-      if (status) q = q.eq("status", status);
+      if (status) {
+        const list = status.split(",").map(s => s.trim()).filter(Boolean);
+        if (list.length === 1)      q = q.eq("status", list[0]);
+        else if (list.length > 1)   q = q.in("status", list);
+      }
       return q;
     });
-    return data.map(dbToOrder);
+    if (headers.length === 0) return [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const headerIds = headers.map((h: any) => h.id);
+    const lines = await fetchAllRows(() =>
+      supabase.from("purchase_order_lines").select("*").in("order_id", headerIds).order("order_id").order("line_no")
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const headerMap = new Map<number, any>(headers.map((h: any) => [h.id, h]));
+    const out: PurchaseOrderRecord[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const l of lines as any[]) {
+      const h = headerMap.get(l.order_id);
+      if (!h) continue;
+      out.push(joinOrderRow(h, l));
+    }
+    // 표시 순서: ordered_at DESC, order_id DESC, line_no ASC
+    out.sort((a, b) => {
+      if (a.orderedAt !== b.orderedAt) return a.orderedAt < b.orderedAt ? 1 : -1;
+      if (a.orderId   !== b.orderId)   return b.orderId - a.orderId;
+      return a.lineNo - b.lineNo;
+    });
+    return out;
+  }
+  {
+    // GET /api/purchase-orders/:orderId — 헤더 + 라인 배열 조회
+    const m = path.match(/^\/api\/purchase-orders\/(\d+)$/);
+    if (m) {
+      const orderId = Number(m[1]);
+      const { data: header, error: hErr } = await supabase.from("purchase_orders")
+        .select("*").eq("id", orderId).single();
+      if (hErr || !header) throw new MockApiError("not found", 404);
+      const { data: lines, error: lErr } = await supabase.from("purchase_order_lines")
+        .select("*").eq("order_id", orderId).order("line_no");
+      if (lErr) throw new MockApiError(lErr.message, 500);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (lines ?? []).map((l: any) => joinOrderRow(header, l));
+    }
   }
   if (path === "/api/users") {
     const q = params.get("q")?.toLowerCase();
@@ -1051,6 +1150,29 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
         .update({ created_at: createdAtIso }).in("id", records.map(r => r.id));
       records.forEach(r => { r.createdAt = createdAtIso; });
     }
+    // 입고 트랜잭션 note 에 '발주 #<line_id>' 패턴이 있으면 라인 received_qty 증분 + 헤더 상태 갱신
+    if (body.type === "입고" && typeof body.note === "string") {
+      const m = (body.note as string).match(/발주\s*#(\d+)/);
+      if (m) {
+        const lineId = Number(m[1]);
+        const incQty = Number(body.qty ?? 0);
+        if (lineId > 0 && incQty > 0) {
+          const { data: line } = await supabase.from("purchase_order_lines")
+            .select("id, order_id, qty, received_qty, status").eq("id", lineId).maybeSingle();
+          if (line) {
+            const nextReceived = Math.min(line.qty, (line.received_qty ?? 0) + incQty);
+            const nextStatus = line.status === "취소" ? "취소"
+              : nextReceived >= line.qty ? "입고완료"
+              : nextReceived > 0         ? "부분입고"
+              :                            "발주";
+            await supabase.from("purchase_order_lines")
+              .update({ received_qty: nextReceived, status: nextStatus, updated_at: new Date().toISOString() })
+              .eq("id", lineId);
+            await refreshHeaderStatus(line.order_id);
+          }
+        }
+      }
+    }
     // 단일 트랜잭션이면 record로, 다중이면 records 배열로 반환 (호환성 유지)
     if (records && records.length === 1) return records[0];
     return { records };
@@ -1070,9 +1192,31 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
     return dbToRequest(data);
   }
   if (path === "/api/purchase-orders") {
-    const { data, error } = await supabase.from("purchase_orders").insert(orderToDb(body)).select().single();
-    if (error) throw new MockApiError(error.message, 500);
-    return dbToOrder(data);
+    // 신규 발주서 저장: body = { header: {...}, lines: [{...}, ...] }
+    const header = body.header ?? {};
+    const lines: unknown[] = Array.isArray(body.lines) ? body.lines : [];
+    if (lines.length === 0) throw new MockApiError("최소 1개 라인이 필요합니다", 400);
+    const { data: h, error: hErr } = await supabase.from("purchase_orders")
+      .insert(headerToDb({ ...header, status: header.status ?? "발주" })).select().single();
+    if (hErr || !h) throw new MockApiError(hErr?.message ?? "header insert failed", 500);
+    const insertedLines: unknown[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const l = lines[i] as any;
+      const payload = lineToDb({
+        ...l,
+        lineNo: l.lineNo ?? i + 1,
+        receivedQty: l.receivedQty ?? 0,
+        status: l.status ?? "발주",
+      }, h.id);
+      const { data: line, error: lErr } = await supabase.from("purchase_order_lines")
+        .insert(payload).select().single();
+      if (lErr) throw new MockApiError(lErr.message, 500);
+      insertedLines.push(line);
+    }
+    // 신규 저장이므로 헤더 상태는 body의 값 유지 (일반적으로 '발주')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (insertedLines as any[]).map(l => joinOrderRow(h, l));
   }
   if (path === "/api/users") {
     const payload = userToDb(body);
@@ -1359,105 +1503,250 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
     throw new MockApiError("unknown action", 400);
   }
 
+  // ── PATCH /api/purchase-orders/lines/:lineId ─────────────
+  {
+    const m = path.match(/^\/api\/purchase-orders\/lines\/(\d+)$/);
+    if (m) {
+      const lineId = Number(m[1]);
+      const { action, userId, userName } = body;
+      const { data: line } = await supabase.from("purchase_order_lines")
+        .select("*, order_id, qty, received_qty, material_id, material_name, elevator_name, request_id, status")
+        .eq("id", lineId).maybeSingle();
+      if (!line) throw new MockApiError("line not found", 404);
+      const { data: header } = await supabase.from("purchase_orders")
+        .select("id, site_name, user_id").eq("id", line.order_id).maybeSingle();
+      if (!header) throw new MockApiError("header not found", 404);
+
+      if (action === "입고완료") {
+        if (line.status === "취소")     throw new MockApiError("취소된 라인은 입고할 수 없습니다", 400);
+        if (line.status === "입고완료") throw new MockApiError("이미 전량 입고된 라인입니다", 400);
+        const remaining = line.qty - (line.received_qty ?? 0);
+        if (remaining <= 0) throw new MockApiError("입고할 잔량이 없습니다", 400);
+
+        const inputReceivedAt = body.receivedAt as string | undefined;
+        const receivedAt = inputReceivedAt
+          ? new Date(`${inputReceivedAt}T00:00:00Z`).toISOString()
+          : new Date().toISOString();
+
+        const { records: txs, error: txErr } = await supabaseAddTransaction({
+          type: "입고",
+          materialId: line.material_id,
+          materialName: line.material_name,
+          qty: remaining,
+          siteName: header.site_name,
+          elevatorName: line.elevator_name,
+          note: `발주 #${lineId} 입고완료`,
+          userId,
+          userName,
+        });
+        if (txErr) throw new MockApiError(txErr, 400);
+        if (inputReceivedAt && txs && txs.length > 0) {
+          await supabase.from("transactions")
+            .update({ created_at: receivedAt }).in("id", txs.map(t => t.id));
+        }
+        // 라인/헤더 상태 재계산은 POST /api/transactions 훅이 처리하지만,
+        // 여기서는 명시 UPDATE 로 즉시 반영 후 refresh
+        await supabase.from("purchase_order_lines")
+          .update({ received_qty: line.qty, status: "입고완료", updated_at: new Date().toISOString() })
+          .eq("id", lineId);
+        await refreshHeaderStatus(line.order_id);
+
+        // 알림 (신청자 + 발주자)
+        const processorUid = Number(userId);
+        if (line.request_id) {
+          const { data: req } = await supabase.from("material_requests")
+            .select("requester_id").eq("id", line.request_id).single();
+          const reqUid = req?.requester_id;
+          if (reqUid && reqUid !== processorUid) {
+            const sitePart = header.site_name
+              ? `${header.site_name}${line.elevator_name ? ` (${line.elevator_name})` : ""} · `
+              : "";
+            await insertNotification({
+              userId:  reqUid,
+              type:    "request_inbound",
+              title:   "신청하신 자재가 입고되었습니다",
+              message: `${sitePart}${line.material_name} x${remaining}`,
+              link:    "/requests",
+              refType: "material_request",
+              refId:   line.request_id,
+            });
+          }
+        }
+        if (header.user_id && header.user_id !== processorUid) {
+          await insertNotification({
+            userId:  header.user_id,
+            type:    "purchase_received",
+            title:   "발주하신 자재가 입고되었습니다",
+            message: `${line.material_name} x${remaining}`,
+            link:    "/stock/history",
+            refType: "purchase_order",
+            refId:   line.order_id,
+          });
+        }
+        return { lineId, orderId: line.order_id, transaction: txs?.[0] ?? null };
+      }
+
+      if (action === "취소") {
+        if (line.received_qty > 0) throw new MockApiError("이미 입고가 시작된 라인은 취소할 수 없습니다", 400);
+        await supabase.from("purchase_order_lines")
+          .update({ status: "취소", updated_at: new Date().toISOString() })
+          .eq("id", lineId);
+        await refreshHeaderStatus(line.order_id);
+        return { lineId, orderId: line.order_id, status: "취소" };
+      }
+
+      throw new MockApiError("unknown action", 400);
+    }
+  }
+
   const orderId = extractId(path, "/api/purchase-orders");
   if (orderId) {
     const numId = Number(orderId);
     const { action, userId, userName } = body;
+
+    // === 헤더 단위 액션 ===
+
     if (action === "입고완료") {
-      const { data: ord, error: fetchErr } = await supabase.from("purchase_orders")
+      // 라인 하나 = 발주(레거시). 요청은 라인 id 로 오는 것이 아니라 헤더 id 로 옴.
+      // '전량 입고' 처리: 헤더의 모든 라인을 입고완료 처리 + 트랜잭션 발행.
+      const { data: header, error: hErr } = await supabase.from("purchase_orders")
         .select("*").eq("id", numId).single();
-      if (fetchErr || !ord) throw new MockApiError("not found", 404);
-      const order = dbToOrder(ord);
+      if (hErr || !header) throw new MockApiError("not found", 404);
+      const { data: lines, error: lErr } = await supabase.from("purchase_order_lines")
+        .select("*").eq("order_id", numId).order("line_no");
+      if (lErr || !lines) throw new MockApiError(lErr?.message ?? "lines not found", 500);
+      const activeLines = lines.filter(l => l.status !== "취소" && l.status !== "입고완료");
+      if (activeLines.length === 0) throw new MockApiError("이미 입고 처리된 발주입니다", 400);
+
       const inputReceivedAt = body.receivedAt as string | undefined;
       const receivedAt = inputReceivedAt
         ? new Date(`${inputReceivedAt}T00:00:00Z`).toISOString()
         : new Date().toISOString();
-      const { records: txs, error } = await supabaseAddTransaction({
-        type: "입고",
-        materialId: order.materialId,
-        materialName: order.materialName,
-        qty: order.qty,
-        siteName: order.siteName,
-        elevatorName: order.elevatorName,
-        note: `발주 #${numId} 입고완료`,
-        userId,
-        userName,
-      });
-      if (error) throw new MockApiError(error, 400);
-      if (inputReceivedAt && txs && txs.length > 0) {
-        await supabase.from("transactions")
-          .update({ created_at: receivedAt }).in("id", txs.map(t => t.id));
-      }
-      const { data: updated, error: updateErr } = await supabase.from("purchase_orders")
-        .update({ status: "입고완료", received_at: receivedAt })
-        .eq("id", numId).select().single();
-      if (updateErr) throw new MockApiError(updateErr.message, 500);
-      // 입고 알림: 발주 담당자 + (연결된 신청자) — 처리자 본인 제외
-      const sitePart = order.siteName
-        ? `${order.siteName}${order.elevatorName ? ` (${order.elevatorName})` : ""} · `
-        : "";
-      const inboundMsg = `${sitePart}${order.materialName} x${order.qty}`;
-      const notified = new Set<number>();
+
+      const allTxs: TransactionRecord[] = [];
       const processorUid = Number(userId);
-      if (order.userId && order.userId !== processorUid) {
+      const notified = new Set<number>();
+
+      for (const l of activeLines) {
+        const remaining = l.qty - l.received_qty;
+        if (remaining <= 0) continue;
+        const { records: txs, error: txErr } = await supabaseAddTransaction({
+          type: "입고",
+          materialId: l.material_id,
+          materialName: l.material_name,
+          qty: remaining,
+          siteName: header.site_name,
+          elevatorName: l.elevator_name,
+          note: `발주 #${l.id} 입고완료`,
+          userId,
+          userName,
+        });
+        if (txErr) throw new MockApiError(txErr, 400);
+        if (inputReceivedAt && txs && txs.length > 0) {
+          await supabase.from("transactions")
+            .update({ created_at: receivedAt }).in("id", txs.map(t => t.id));
+        }
+        if (txs) allTxs.push(...txs);
+
+        // 라인 received_qty = qty, status = 입고완료
+        await supabase.from("purchase_order_lines")
+          .update({ received_qty: l.qty, status: "입고완료", updated_at: new Date().toISOString() })
+          .eq("id", l.id);
+
+        // 신청자 알림 (라인의 request_id 로)
+        if (l.request_id) {
+          const { data: req } = await supabase.from("material_requests")
+            .select("requester_id").eq("id", l.request_id).single();
+          const reqUid = req?.requester_id;
+          if (reqUid && reqUid !== processorUid && !notified.has(reqUid)) {
+            const sitePart = header.site_name
+              ? `${header.site_name}${l.elevator_name ? ` (${l.elevator_name})` : ""} · `
+              : "";
+            await insertNotification({
+              userId:  reqUid,
+              type:    "request_inbound",
+              title:   "신청하신 자재가 입고되었습니다",
+              message: `${sitePart}${l.material_name} x${remaining}`,
+              link:    "/requests",
+              refType: "material_request",
+              refId:   l.request_id,
+            });
+            notified.add(reqUid);
+          }
+        }
+      }
+
+      // 헤더 상태 재계산
+      await refreshHeaderStatus(numId);
+
+      // 발주 담당자 알림 (헤더 단위 1건)
+      if (header.user_id && header.user_id !== processorUid && !notified.has(header.user_id)) {
+        const summary = activeLines.length === 1
+          ? `${activeLines[0].material_name} x${activeLines[0].qty - activeLines[0].received_qty}`
+          : `${activeLines[0].material_name} 외 ${activeLines.length - 1}건`;
         await insertNotification({
-          userId:  order.userId,
+          userId:  header.user_id,
           type:    "purchase_received",
           title:   "발주하신 자재가 입고되었습니다",
-          message: inboundMsg,
+          message: summary,
           link:    "/stock/history",
           refType: "purchase_order",
           refId:   numId,
         });
-        notified.add(order.userId);
       }
-      if (order.requestId) {
-        const { data: req } = await supabase.from("material_requests")
-          .select("requester_id").eq("id", order.requestId).single();
-        const reqUid = req?.requester_id;
-        if (reqUid && reqUid !== processorUid && !notified.has(reqUid)) {
-          await insertNotification({
-            userId:  reqUid,
-            type:    "request_inbound",
-            title:   "신청하신 자재가 입고되었습니다",
-            message: inboundMsg,
-            link:    "/requests",
-            refType: "material_request",
-            refId:   order.requestId,
-          });
-        }
-      }
-      return { order: dbToOrder(updated), transaction: txs?.[0] ?? null, transactions: txs };
+      return { orderId: numId, transactions: allTxs };
     }
+
     if (action === "취소") {
+      // 헤더 + 모든 라인 취소 처리
+      await supabase.from("purchase_order_lines")
+        .update({ status: "취소", updated_at: new Date().toISOString() })
+        .eq("order_id", numId);
       const { data, error } = await supabase.from("purchase_orders")
         .update({ status: "취소" }).eq("id", numId).select().single();
       if (error) throw new MockApiError(error.message, 500);
-      return dbToOrder(data);
+      return { orderId: numId, status: data.status };
     }
-    if (action === "수정") {
-      const patch: Record<string, unknown> = {};
-      if (body.qty !== undefined) patch.qty = Number(body.qty);
-      if (body.siteName !== undefined) patch.site_name = body.siteName || null;
-      if (body.elevatorName !== undefined) patch.elevator_name = body.elevatorName || null;
-      if (body.vendorName !== undefined) patch.vendor_name = body.vendorName || null;
-      if (body.unitPrice !== undefined) patch.unit_price = body.unitPrice ? Number(body.unitPrice) : null;
-      if (body.note !== undefined) patch.note = body.note || null;
-      if (body.requesterName !== undefined) patch.requester_name = body.requesterName || null;
-      if (body.orderedAt !== undefined) patch.ordered_at = body.orderedAt;
-      if (body.batchId !== undefined) patch.batch_id = body.batchId;
-      if (body.shipTo !== undefined) patch.ship_to = body.shipTo || null;
-      if (body.shipDueDate !== undefined) patch.ship_due_date = body.shipDueDate || null;
-      if (body.shipReceiver !== undefined) patch.ship_receiver = body.shipReceiver || null;
-      if (body.shipContact !== undefined) patch.ship_contact = body.shipContact || null;
-      if (body.shipManager !== undefined) patch.ship_manager = body.shipManager || null;
-      if (body.shipNote !== undefined) patch.ship_note = body.shipNote || null;
 
+    if (action === "헤더수정") {
+      // 헤더 필드만 갱신 (라인은 별도 API)
+      const patch = headerToDb(body);
+      patch.updated_at = new Date().toISOString();
       const { data, error } = await supabase.from("purchase_orders")
         .update(patch).eq("id", numId).select().single();
       if (error) throw new MockApiError(error.message, 500);
-      return dbToOrder(data);
+      return { orderId: numId, header: data };
     }
+
+    if (action === "저장") {
+      // 발주서 편집 저장: 헤더 수정 + 라인 upsert(id 있으면 UPDATE, 없으면 INSERT) + 삭제(removedLineIds)
+      const headerPatch = headerToDb(body.header ?? {});
+      headerPatch.updated_at = new Date().toISOString();
+      await supabase.from("purchase_orders").update(headerPatch).eq("id", numId);
+
+      const removed: number[] = Array.isArray(body.removedLineIds) ? body.removedLineIds : [];
+      if (removed.length > 0) {
+        await supabase.from("purchase_order_lines").delete().in("id", removed);
+      }
+
+      const lines: unknown[] = Array.isArray(body.lines) ? body.lines : [];
+      for (let i = 0; i < lines.length; i++) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const l = lines[i] as any;
+        const payload = lineToDb({ ...l, lineNo: l.lineNo ?? i + 1 }, numId);
+        payload.updated_at = new Date().toISOString();
+        if (l.id) {
+          await supabase.from("purchase_order_lines").update(payload).eq("id", l.id);
+        } else {
+          payload.received_qty = payload.received_qty ?? 0;
+          payload.status = payload.status ?? "발주";
+          await supabase.from("purchase_order_lines").insert(payload);
+        }
+      }
+      await refreshHeaderStatus(numId);
+      return { orderId: numId };
+    }
+
     throw new MockApiError("unknown action", 400);
   }
 
@@ -1713,8 +2002,31 @@ async function routeDELETE(path: string, body: AnyBody): Promise<unknown> {
     return { ok: true };
   }
 
+  // DELETE /api/purchase-orders/lines/:lineId — 라인 하나만 삭제
+  {
+    const m = path.match(/^\/api\/purchase-orders\/lines\/(\d+)$/);
+    if (m) {
+      const lineId = Number(m[1]);
+      const { data: line } = await supabase.from("purchase_order_lines")
+        .select("order_id").eq("id", lineId).single();
+      const { error } = await supabase.from("purchase_order_lines").delete().eq("id", lineId);
+      if (error) throw new MockApiError(error.message, 500);
+      if (line?.order_id) {
+        // 마지막 라인이었으면 헤더도 삭제
+        const { data: remaining } = await supabase.from("purchase_order_lines")
+          .select("id").eq("order_id", line.order_id).limit(1);
+        if (!remaining || remaining.length === 0) {
+          await supabase.from("purchase_orders").delete().eq("id", line.order_id);
+        } else {
+          await refreshHeaderStatus(line.order_id);
+        }
+      }
+      return { ok: true };
+    }
+  }
   const purchOrdId = extractId(path, "/api/purchase-orders");
   if (purchOrdId) {
+    // 헤더 삭제 (CASCADE 로 라인도 삭제됨)
     const { error } = await supabase.from("purchase_orders").delete().eq("id", Number(purchOrdId));
     if (error) throw new MockApiError(error.message, 500);
     return { ok: true };
@@ -1808,11 +2120,24 @@ async function routeDELETE(path: string, body: AnyBody): Promise<unknown> {
     else if (tx.type === "출고") newStock += tx.qty;
     await supabase.from("materials").update({ stock_qty: newStock }).eq("id", tx.material_id);
 
-    // 발주/신청 상태 원복
+    // 발주 라인 상태 원복 — note '발주 #<line_id>' 의 라인에서 received_qty 감산 후 상태 재계산
     if (tx.note) {
-      const ordMatch = tx.note.match(/발주 #(\d+) 입고완료/);
+      const ordMatch = tx.note.match(/발주\s*#(\d+)/);
       if (ordMatch) {
-        await supabase.from("purchase_orders").update({ status: "발주", received_at: null }).eq("id", Number(ordMatch[1]));
+        const lineId = Number(ordMatch[1]);
+        const { data: line } = await supabase.from("purchase_order_lines")
+          .select("id, order_id, qty, received_qty, status").eq("id", lineId).single();
+        if (line) {
+          const nextReceived = Math.max(0, (line.received_qty ?? 0) - tx.qty);
+          const nextStatus = line.status === "취소" ? "취소"
+            : nextReceived <= 0            ? "발주"
+            : nextReceived >= line.qty     ? "입고완료"
+            :                                "부분입고";
+          await supabase.from("purchase_order_lines")
+            .update({ received_qty: nextReceived, status: nextStatus, updated_at: new Date().toISOString() })
+            .eq("id", lineId);
+          await refreshHeaderStatus(line.order_id);
+        }
       }
       const reqMatch = tx.note.match(/신청 #(\d+) 출고처리/);
       if (reqMatch) {

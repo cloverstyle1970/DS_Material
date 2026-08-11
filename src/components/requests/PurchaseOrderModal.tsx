@@ -184,24 +184,27 @@ export default function PurchaseOrderModal({ vendors, sites, pendingRequests, us
       const elevatorName = elevatorId !== ""
         ? (elevators.find(e => e.id === elevatorId)?.unitName ?? null)
         : null;
-      const batchId = crypto.randomUUID();
-      for (const item of selectedItems) {
-        await api.post("/api/purchase-orders", {
-          materialId: item.material.id,
-          materialName: item.material.name,
-          qty: item.qty,
-          vendorName: vendorName || null,
-          unitPrice: item.unitPrice ? parseNum(item.unitPrice) : null,
-          requestId: linkedRequestId,
-          siteName: siteName || null,
-          elevatorName,
+      // 신 스키마: 헤더 1건 + 라인 배열 통합 저장
+      await api.post("/api/purchase-orders", {
+        header: {
+          vendorName:    vendorName || null,
+          siteName:      siteName   || null,
           requesterName: requesterName || null,
-          note: note || null,
-          userId: user.id,
-          userName: user.name,
-          batchId,
-        });
-      }
+          orderedAt:     new Date().toISOString(),
+          note:          note || null,
+          userId:        user.id,
+          userName:      user.name,
+        },
+        lines: selectedItems.map(item => ({
+          materialId:   item.material.id,
+          materialName: item.material.name,
+          qty:          item.qty,
+          unitPrice:    item.unitPrice ? parseNum(item.unitPrice) : null,
+          requestId:    linkedRequestId,
+          elevatorName,
+          note:         null,
+        })),
+      });
       onSaved();
     } catch (e) {
       setError(getErrorMessage(e));

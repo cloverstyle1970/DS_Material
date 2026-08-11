@@ -144,19 +144,25 @@ export default function PurchaseOrderBulkUploadModal({ onClose, onSaved }: Props
       const t = targets[i];
       const idx = updated.findIndex(r => r.rowNo === t.rowNo);
       try {
+        // 엑셀 각 행 = 신규 발주서 1건 (헤더 + 라인 1개)
         await api.post("/api/purchase-orders", {
-          materialId: t.materialId,
-          materialName: t.materialName,
-          qty: t.qty,
-          vendorName: t.vendorName || null,
-          unitPrice: t.unitPrice,
-          requestId: null,
-          siteName: t.siteName || null,
-          elevatorName: t.elevatorName || null,
-          requesterName: t.requesterName || null,
-          note: t.note || null,
-          userId: user.id,
-          userName: user.name,
+          header: {
+            vendorName:    t.vendorName || null,
+            siteName:      t.siteName   || null,
+            requesterName: t.requesterName || null,
+            orderedAt:     new Date().toISOString(),
+            note:          null,
+            userId:        user.id,
+            userName:      user.name,
+          },
+          lines: [{
+            materialId:   t.materialId,
+            materialName: t.materialName,
+            qty:          t.qty,
+            unitPrice:    t.unitPrice,
+            elevatorName: t.elevatorName || null,
+            note:         t.note || null,
+          }],
         });
         updated[idx] = { ...updated[idx], status: "ok" };
       } catch (e) {

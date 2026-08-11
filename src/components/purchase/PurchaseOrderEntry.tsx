@@ -21,42 +21,29 @@ interface SiteOption   { id: number; name: string; alias?: string | null; addres
 interface VendorOption { id: number; name: string }
 
 interface Row {
-  id: string;
+  id: string;                  // 클라이언트 임시 키
+  lineId: number | null;       // 서버 라인 id (편집 시)
   materialId: string;
   materialName: string;
   spec: string;
   qty: number;
+  receivedQty: number;         // 편집 시 서버에서 로드된 누적 입고량 (읽기전용 표시)
   unitPrice: number;
   elevatorName: string;
   remark: string;
   reqId: number | null;
-  editingId: number | null;   // 기존 PO id (편집 모드에서 로드된 행)
+  status: "발주" | "부분입고" | "입고완료" | "취소";  // 편집 시 표시용
 }
 
 function newRow(seed: Partial<Row> = {}): Row {
-  return { id: crypto.randomUUID(), materialId: "", materialName: "", spec: "", qty: 0, unitPrice: 0, elevatorName: "", remark: "", reqId: null, editingId: null, ...seed };
+  return {
+    id: crypto.randomUUID(), lineId: null, materialId: "", materialName: "", spec: "",
+    qty: 0, receivedQty: 0, unitPrice: 0, elevatorName: "", remark: "", reqId: null,
+    status: "발주", ...seed,
+  };
 }
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
-
-// note → formType + orderRefNo + remark 역파싱
-// 자동채번 발주번호(`order_no`)와는 별개로 사용자가 발주서에 적는 외부 참조번호는
-// `note`의 첫 `[...]` 태그(긴급/수리 형식 태그가 아닌 것)에 보존된다.
-function parseNoteForEdit(note: string | null): { formType: "기본" | "긴급" | "수리"; orderRefNo: string; remark: string } {
-  if (!note) return { formType: "기본", orderRefNo: "", remark: "" };
-  let s = note.trim();
-  let formType: "기본" | "긴급" | "수리" = "기본";
-  let orderRefNo = "";
-  while (true) {
-    const m = s.match(/^\[([^\]]+)\]\s*/);
-    if (!m) break;
-    const tag = m[1];
-    if (tag === "긴급" || tag === "수리") formType = tag;
-    else if (!orderRefNo) orderRefNo = tag;
-    s = s.slice(m[0].length);
-  }
-  return { formType, orderRefNo, remark: s };
-}
 
 // 발주서 발송지 지정 장소 (고정 목록 — 화물사/택배 안내문)
 const FIXED_SHIP_PLACES: POShipPlace[] = [
@@ -88,8 +75,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
   const [formType,    setFormType]    = useState<"기본" | "긴급" | "수리">("기본");
   const [requesterNames, setRequesterNames] = useState<string[]>([]);
   const [requesterPhones, setRequesterPhones] = useState<Record<string, string>>({});
-  const [batchId, setBatchId] = useState<string | null>(null);
-  const [removedExistingIds, setRemovedExistingIds] = useState<Set<number>>(new Set());
+  const [removedLineIds, setRemovedLineIds] = useState<Set<number>>(new Set());
   const [editLoading, setEditLoading] = useState(isEdit);
 
   useEffect(() => {
@@ -135,19 +121,16 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
   const [company,     setCompany]     = useState<POPrintCompany | null>(null);
   const [shipInfo,    setShipInfo]    = useState<POShipInfo>({ shipTo: "", dueDate: "", receiver: "", contact: "", manager: "", note: "" });
 
-  // 편집 모드: 진입한 PO와 동일 batch_id를 가진 모든 PO 로드
+  // 편집 모드: editId는 이제 발주 헤더 id. 헤더+라인 배열을 한 번의 요청으로 로드.
   useEffect(() => {
     if (!isEdit || !editId) return;
     let cancelled = false;
     (async () => {
       try {
-        const all = await api.get<PurchaseOrderRecord[]>("/api/purchase-orders");
-        const target = all.find(o => o.id === editId);
-        if (!target) { alert("발주 내역을 찾을 수 없습니다."); router.push("/purchase-orders"); return; }
-        const siblings = target.batchId
-          ? all.filter(o => o.batchId === target.batchId).sort((a, b) => a.id - b.id)
-          : [target];
-        const ids = [...new Set(siblings.map(o => o.materialId))];
+        // GET /api/purchase-orders/:orderId 는 헤더+라인을 join 해 PurchaseOrderRecord[] 반환
+        const rows = await api.get<PurchaseOrderRecord[]>(`/api/purchase-orders/${editId}`);
+        if (rows.length === 0) { alert("발주 내역을 찾을 수 없습니다."); router.push("/purchase-orders"); return; }
+        const ids = [...new Set(rows.map(o => o.materialId))];
         const matMap = new Map<string, MaterialRecord>();
         await Promise.all(ids.map(async mid => {
           try {
@@ -157,16 +140,14 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
           } catch {}
         }));
         if (cancelled) return;
-        const head = siblings[0];
-        const noteHead = parseNoteForEdit(head.note);
+        const head = rows[0];
         setVendorName(head.vendorName ?? "");
         setSiteName(head.siteName ?? "");
         setManagerName(head.requesterName ?? "");
         setOrderNo(head.orderNo ?? "");
-        setOrderRefNo(noteHead.orderRefNo);
-        setFormType(noteHead.formType);
+        setOrderRefNo(head.orderRefNo ?? "");
+        setFormType(head.formType);
         setOrderDate(head.orderedAt.slice(0, 10));
-        setBatchId(target.batchId ?? null);
         setShipInfo({
           shipTo:   head.shipTo       ?? "",
           dueDate:  head.shipDueDate  ?? "",
@@ -175,19 +156,21 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
           manager:  head.shipManager  ?? "",
           note:     head.shipNote     ?? "",
         });
-        const loaded = siblings.map(o => {
-          const parsed = parseNoteForEdit(o.note);
+        setReference(head.headerNote ?? "");
+        const loaded = rows.map(o => {
           const m = matMap.get(o.materialId);
           return newRow({
-            editingId: o.id,
+            lineId: o.id,
             materialId: o.materialId,
             materialName: o.materialName,
             spec: m?.modelNo ?? "",
             qty: o.qty,
+            receivedQty: o.receivedQty,
             unitPrice: o.unitPrice ?? 0,
             elevatorName: o.elevatorName ?? "",
-            remark: parsed.remark,
+            remark: o.note ?? "",
             reqId: o.requestId,
+            status: o.status,
           });
         });
         // 신규 행 추가가 가능하도록 마지막에 빈 행 1개 부착
@@ -216,11 +199,15 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
   function addRow() { setRows(prev => [...prev, newRow()]); }
   function removeRow(id: string) {
     const tgt = rows.find(r => r.id === id);
-    if (tgt?.editingId) {
+    if (tgt?.lineId) {
+      if (tgt.receivedQty > 0) {
+        alert("이미 일부/전량 입고된 라인은 삭제할 수 없습니다.\n입고를 먼저 취소한 뒤 시도해 주세요.");
+        return;
+      }
       if (!confirm("기존 발주 행을 삭제하면 저장 시 영구 삭제됩니다. 진행할까요?")) return;
-      setRemovedExistingIds(set => {
+      setRemovedLineIds(set => {
         const next = new Set(set);
-        next.add(tgt.editingId!);
+        next.add(tgt.lineId!);
         return next;
       });
     }
@@ -276,7 +263,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
   async function save(goList: boolean) {
     if (!user) return;
     const valid = rows.filter(r => r.materialId && r.qty > 0);
-    if (valid.length === 0 && removedExistingIds.size === 0) {
+    if (valid.length === 0 && removedLineIds.size === 0) {
       alert("품목을 1개 이상 입력해 주세요.");
       return;
     }
@@ -286,68 +273,53 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
       const orderedAtIso = orderDate === todayISO()
         ? new Date().toISOString()
         : new Date(`${orderDate}T00:00:00Z`).toISOString();
-      // 편집 모드: 기존 배치 id 유지(있으면), 없으면 새로 생성하여 같은 묶음으로 묶음
-      // 신규 모드: 매 저장마다 새 batch_id
-      const effectiveBatchId = isEdit ? (batchId ?? crypto.randomUUID()) : crypto.randomUUID();
 
       // 발주번호 — 신규는 채번, 수정은 기존 값 유지
       const effectiveOrderNo = isEdit && orderNo ? orderNo : await generateDocNo("B", orderDate);
       if (!isEdit) setOrderNo(effectiveOrderNo);
 
-      const buildNote = (rowRemark: string) => [
-        orderRefNo ? `[${orderRefNo}]` : "",
-        formType !== "기본" ? `[${formType}]` : "",
-        rowRemark || reference || "",
-      ].filter(Boolean).join(" ") || null;
-
-      // 발송지 기록란 — 같은 batch 의 모든 행에 동일 값 저장
-      const shipPayload = {
-        shipTo:       shipInfo.shipTo   || null,
-        shipDueDate:  shipInfo.dueDate  || null,
-        shipReceiver: shipInfo.receiver || null,
-        shipContact:  shipInfo.contact  || null,
-        shipManager:  shipInfo.manager  || null,
-        shipNote:     shipInfo.note     || null,
+      const header = {
+        orderNo:       effectiveOrderNo,
+        vendorName:    vendorName || null,
+        siteName:      siteName || null,
+        requesterName: managerName || null,
+        orderedAt:     orderedAtIso,
+        orderRefNo:    orderRefNo || null,
+        formType:      formType,
+        note:          reference || null,
+        userId:        user.id,
+        userName:      user.name,
+        shipTo:        shipInfo.shipTo   || null,
+        shipDueDate:   shipInfo.dueDate  || null,
+        shipReceiver:  shipInfo.receiver || null,
+        shipContact:   shipInfo.contact  || null,
+        shipManager:   shipInfo.manager  || null,
+        shipNote:      shipInfo.note     || null,
       };
 
-      for (const r of valid) {
-        if (r.editingId) {
-          // 기존 PO PATCH (수정)
-          await api.patch(`/api/purchase-orders/${r.editingId}`, {
-            action: "수정",
-            qty: r.qty,
-            unitPrice: r.unitPrice || null,
-            vendorName: vendorName || null,
-            siteName: siteName || null,
-            elevatorName: r.elevatorName || null,
-            requesterName: managerName || null,
-            note: buildNote(r.remark),
-            orderedAt: orderedAtIso,
-            batchId: effectiveBatchId,
-            orderNo: effectiveOrderNo,
-            ...shipPayload,
-          });
-        } else {
-          // 신규 행 → POST
-          await api.post("/api/purchase-orders", {
-            materialId: r.materialId, materialName: r.materialName, qty: r.qty,
-            vendorName: vendorName || null, unitPrice: r.unitPrice || null, requestId: r.reqId,
-            siteName: siteName || null, elevatorName: r.elevatorName || null,
-            requesterName: managerName || null,
-            note: buildNote(r.remark),
-            userId: user.id, userName: user.name,
-            orderedAt: orderedAtIso,
-            batchId: effectiveBatchId,
-            orderNo: effectiveOrderNo,
-            ...shipPayload,
-          });
-        }
+      const lines = valid.map((r, i) => ({
+        id:           r.lineId,          // null 이면 신규 라인
+        lineNo:       i + 1,
+        materialId:   r.materialId,
+        materialName: r.materialName,
+        qty:          r.qty,
+        unitPrice:    r.unitPrice || null,
+        elevatorName: r.elevatorName || null,
+        requestId:    r.reqId,
+        note:         r.remark || null,
+      }));
+
+      if (isEdit && editId) {
+        await api.patch(`/api/purchase-orders/${editId}`, {
+          action: "저장",
+          header,
+          lines,
+          removedLineIds: [...removedLineIds],
+        });
+      } else {
+        await api.post("/api/purchase-orders", { header, lines });
       }
-      // 편집 모드에서 사용자가 X로 제거한 기존 행은 DELETE
-      for (const removedId of removedExistingIds) {
-        await api.delete(`/api/purchase-orders/${removedId}`);
-      }
-      setRemovedExistingIds(new Set());
+      setRemovedLineIds(new Set());
       window.dispatchEvent(new CustomEvent("ds:purchase_orders_changed"));
       if (goList || isEdit) {
         router.push("/purchase-orders");
@@ -466,12 +438,18 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
           </thead>
           <tbody>
             {rows.map((r, i) => {
-              const isExisting = r.editingId != null;
+              const isExisting = r.lineId != null;
+              const isReceived = isExisting && r.receivedQty > 0;  // 부분/전량 입고된 라인
               return (
               <tr key={r.id} className={`border-b border-gray-100 dark:border-gray-700 ${isExisting ? "bg-gray-50/40 dark:bg-gray-900/30" : "hover:bg-blue-50/30 dark:hover:bg-blue-900/10"}`}>
                 <Td center className="text-gray-800 dark:text-gray-200 font-medium">
                   {i + 1}
-                  {isExisting && <span className="ml-1 text-[9px] text-gray-400">#{r.editingId}</span>}
+                  {isExisting && <span className="ml-1 text-[9px] text-gray-400">#{r.lineId}</span>}
+                  {isReceived && (
+                    <span className={`ml-1 text-[9px] px-1 rounded font-bold ${r.status === "입고완료" ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"}`}>
+                      {r.status === "입고완료" ? "완료" : `부분 ${r.receivedQty}/${r.qty}`}
+                    </span>
+                  )}
                 </Td>
                 <Td>
                   {isExisting ? (
@@ -514,9 +492,14 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
                   )}
                 </Td>
                 <Td right>
-                  <input type="text" inputMode="numeric" value={r.qty === 0 ? "" : String(r.qty)}
+                  <input
+                    type="text" inputMode="numeric"
+                    readOnly={isReceived}
+                    title={isReceived ? "이미 입고가 시작된 라인은 수량 변경 불가" : undefined}
+                    value={r.qty === 0 ? "" : String(r.qty)}
                     onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); patchRow(r.id, { qty: v === "" ? 0 : Number(v) }); }}
-                    className={cellInput + " text-right"} />
+                    className={cellInput + " text-right" + (isReceived ? " text-gray-400 cursor-not-allowed" : "")}
+                  />
                 </Td>
                 <Td right>
                   <input type="text" inputMode="numeric" readOnly={freeOfCharge}

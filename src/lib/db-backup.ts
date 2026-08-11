@@ -13,7 +13,7 @@ export const NEWDB_TABLES = [
   "managed_sites", "site_elevators", "vendors",
   // 자재·재고
   "materials", "material_units", "material_requests", "categories",
-  "transactions", "purchase_orders",
+  "transactions", "purchase_orders", "purchase_order_lines",
   // 견적
   "quotes", "quote_items", "quote_labor_lines", "quote_revisions",
   "quote_revision_notes", "quote_settings", "quote_requests",

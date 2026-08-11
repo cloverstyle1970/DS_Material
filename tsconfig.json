@@ -30,5 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "scripts", "ds-page", "DS-Material", "desktop-tutorial", "daesol-sketch.github.io", "supabase/functions"]
+  "exclude": ["node_modules", "scripts", "ds-page", "DS-Material", "DS_Material", "desktop-tutorial", "daesol-sketch.github.io", "supabase/functions"]
 }

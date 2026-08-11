@@ -176,6 +176,7 @@ function reqStatusCls(status: RequestStatus, kind: MatKind) {
 }
 const ORD_STATUS_STYLE: Record<OrderStatus, string> = {
   "발주":     "bg-indigo-50 text-indigo-600",
+  "부분입고": "bg-amber-50 text-amber-700",
   "입고완료": "bg-green-50 text-green-700",
   "취소":     "bg-gray-100 text-gray-400",
 };
@@ -360,12 +361,13 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
     }
   }
 
-  // ── 발주 액션 ────────────────────────────────────────────────────
-  async function handleOrdAction(id: number, action: string, data?: Record<string, unknown>) {
+  // ── 발주 액션 (라인 단위) ────────────────────────────────────────
+  //    id 는 line.id. 입고완료/취소는 line 단위, 편집은 orderId(헤더) 단위.
+  async function handleOrdLineAction(lineId: number, action: "입고완료" | "취소", data?: Record<string, unknown>) {
     if (!user) return;
-    setActionLoading(id);
+    setActionLoading(lineId);
     try {
-      await api.patch(`/api/purchase-orders/${id}`, { action, userId: user.id, userName: user.name, ...data });
+      await api.patch(`/api/purchase-orders/lines/${lineId}`, { action, userId: user.id, userName: user.name, ...data });
       setOrders(await api.get<PurchaseOrderRecord[]>("/api/purchase-orders"));
     } catch (e) {
       alert(getErrorMessage(e));
@@ -374,12 +376,12 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
     }
   }
 
-  async function handleOrdDelete(id: number) {
+  async function handleOrdDelete(lineId: number) {
     if (!user) return;
-    if (!confirm("이 발주 내역을 삭제하시겠습니까? 삭제 후에는 복구할 수 없습니다.")) return;
-    setActionLoading(id);
+    if (!confirm("이 발주 라인을 삭제하시겠습니까?\n(마지막 라인 삭제 시 발주서 자체가 삭제됩니다)")) return;
+    setActionLoading(lineId);
     try {
-      await api.delete(`/api/purchase-orders/${id}`);
+      await api.delete(`/api/purchase-orders/lines/${lineId}`);
       setOrders(await api.get<PurchaseOrderRecord[]>("/api/purchase-orders"));
     } catch (e) {
       alert(getErrorMessage(e));
@@ -392,9 +394,9 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
   const [bulkInboundOpen, setBulkInboundOpen] = useState(false);
 
   function openBulkInboundModal() {
-    const targets = orders.filter(o => selectedOrdIds.has(o.id) && o.status === "발주");
+    const targets = orders.filter(o => selectedOrdIds.has(o.id) && (o.status === "발주" || o.status === "부분입고"));
     if (targets.length === 0) {
-      alert("입고 처리 가능한 발주(상태=발주)가 선택되지 않았습니다.");
+      alert("입고 처리 가능한 라인(발주/부분입고)이 선택되지 않았습니다.");
       return;
     }
     setBulkInboundOpen(true);
@@ -402,13 +404,14 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
 
   async function handleBulkInboundSubmit(receivedAt: string) {
     if (!user) return;
-    const targets = orders.filter(o => selectedOrdIds.has(o.id) && o.status === "발주");
+    const targets = orders.filter(o => selectedOrdIds.has(o.id) && (o.status === "발주" || o.status === "부분입고"));
     if (targets.length === 0) return;
     setBulkInboundLoading(true);
     const fails: string[] = [];
     for (const o of targets) {
       try {
-        await api.patch(`/api/purchase-orders/${o.id}`, {
+        // o.id 는 line.id
+        await api.patch(`/api/purchase-orders/lines/${o.id}`, {
           action: "입고완료", userId: user.id, userName: user.name, receivedAt,
         });
       } catch (e) {
@@ -1042,14 +1045,21 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                           <div><span className="text-gray-400">신청자 </span>{o.requesterName ?? "-"}</div>
                           {noteText && <div className="col-span-2"><span className="text-gray-400">비고 </span>{noteText}</div>}
                         </div>
-                        {admin && o.status === "발주" && (
-                          <div className="flex gap-1 mt-2 flex-wrap">
-                            <button type="button" disabled={actionLoading === o.id} onClick={() => router.push(`/purchase-orders/edit?id=${o.id}`)}
+                        {admin && (o.status === "발주" || o.status === "부분입고") && (
+                          <div className="flex items-center gap-1 mt-2 flex-wrap">
+                            {o.receivedQty > 0 && (
+                              <span className="text-[10px] px-1 rounded font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                                입고 {o.receivedQty}/{o.qty}
+                              </span>
+                            )}
+                            <button type="button" disabled={actionLoading === o.id} onClick={() => router.push(`/purchase-orders/edit?id=${o.orderId}`)}
                               className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 whitespace-nowrap">수정</button>
-                            <button type="button" disabled={actionLoading === o.id} onClick={() => handleOrdAction(o.id, "입고완료")}
+                            <button type="button" disabled={actionLoading === o.id} onClick={() => handleOrdLineAction(o.id, "입고완료")}
                               className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 whitespace-nowrap">입고완료</button>
-                            <button type="button" disabled={actionLoading === o.id} onClick={() => handleOrdDelete(o.id)}
-                              className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100">삭제</button>
+                            {o.receivedQty === 0 && (
+                              <button type="button" disabled={actionLoading === o.id} onClick={() => handleOrdDelete(o.id)}
+                                className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100">삭제</button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1127,7 +1137,18 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                     <td className={`px-2 py-3 text-left font-mono whitespace-nowrap ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>{o.materialId}</td>
                     <td className={`px-2 py-3 text-left font-medium max-w-[160px] truncate ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>{o.materialName}</td>
                     <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{matModelMap.get(o.materialId) || "-"}</td>
-                    <td className="px-2 py-3 text-right tabular-nums text-black dark:text-white">{fmtNum(o.qty)}</td>
+                    <td className="px-2 py-3 text-right tabular-nums text-black dark:text-white">
+                      {fmtNum(o.qty)}
+                      {o.status === "부분입고" && (
+                        <span className="ml-1 text-[10px] font-bold text-amber-600 dark:text-amber-400">({o.receivedQty}/{o.qty})</span>
+                      )}
+                      {o.status === "입고완료" && (
+                        <span className="ml-1 text-[10px] font-bold text-green-600 dark:text-green-400">완료</span>
+                      )}
+                      {o.status === "취소" && (
+                        <span className="ml-1 text-[10px] font-bold text-gray-400">취소</span>
+                      )}
+                    </td>
                     <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.siteName ?? "-"}</td>
                     <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.elevatorName ?? "-"}</td>
                     <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{o.requesterName ?? "-"}</td>
@@ -1140,17 +1161,22 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                     </td>
                     {admin && (
                       <td className="px-2 py-3">
-                        {o.status === "발주" && (
+                        {(o.status === "발주" || o.status === "부분입고") ? (
                           <div className="flex gap-1">
-                            <button type="button" disabled={actionLoading === o.id} onClick={() => router.push(`/purchase-orders/edit?id=${o.id}`)}
+                            <button type="button" disabled={actionLoading === o.id} onClick={() => router.push(`/purchase-orders/edit?id=${o.orderId}`)}
                               className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 whitespace-nowrap">수정</button>
-                            <button type="button" disabled={actionLoading === o.id} onClick={() => handleOrdAction(o.id, "입고완료")}
-                              className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 whitespace-nowrap">입고완료</button>
-                            <button type="button" disabled={actionLoading === o.id} onClick={() => handleOrdDelete(o.id)}
-                              className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100">삭제</button>
+                            <button type="button" disabled={actionLoading === o.id} onClick={() => handleOrdLineAction(o.id, "입고완료")}
+                              className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 whitespace-nowrap">
+                              {o.status === "부분입고" ? "잔량입고" : "입고완료"}
+                            </button>
+                            {o.receivedQty === 0 && (
+                              <button type="button" disabled={actionLoading === o.id} onClick={() => handleOrdDelete(o.id)}
+                                className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100">삭제</button>
+                            )}
                           </div>
+                        ) : (
+                          <span className="text-xs text-gray-300 dark:text-gray-600">-</span>
                         )}
-                        {o.status !== "발주" && <span className="text-xs text-gray-300 dark:text-gray-600">-</span>}
                       </td>
                     )}
                   </tr>
