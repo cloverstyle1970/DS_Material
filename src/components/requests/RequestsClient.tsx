@@ -545,7 +545,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
     const label = selectedOrdIds.size > 0 ? `선택${selectedOrdIds.size}건` : "전체";
     const rows = list.map(o => ({
       발주일자: fmtDateOnly(o.orderedAt),
-      참조번호: extractOrderRef(o.note) || "",
+      참조번호: o.orderRefNo || extractOrderRef(o.note) || "",
       발주번호: o.orderNo || "",
       자재코드: o.materialId,
       자재명: o.materialName,
@@ -1020,7 +1020,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
               ) : (
                 <div className="divide-y divide-gray-100 dark:divide-gray-700">
                   {sortedOrds.map(o => {
-                    const refTag = extractOrderRef(o.note);
+                    const refTag = o.orderRefNo || extractOrderRef(o.note);
                     const noTag  = o.orderNo;
                     const noteText = (o.note ?? "").replace(/^\[[^\]]*\]\s*/, "").trim();
                     return (
@@ -1126,7 +1126,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                     <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{fmtDateOnly(o.orderedAt)}</td>
                     {showOrderRefCol && (
                       <td className="px-2 py-3 text-left text-blue-600 dark:text-blue-400 font-mono text-xs whitespace-nowrap">
-                        {extractOrderRef(o.note) || "-"}
+                        {o.orderRefNo || extractOrderRef(o.note) || "-"}
                       </td>
                     )}
                     {showOrderNoCol && (
