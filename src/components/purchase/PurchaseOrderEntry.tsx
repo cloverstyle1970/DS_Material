@@ -370,11 +370,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
             <VendorInlineSearch value={vendorName} onChange={setVendorName} vendors={vendors} />
           </FormField>
           <FormField label="신청자" className="w-48">
-            <input type="text" lang="ko" value={managerName} onChange={e => setManagerName(e.target.value)}
-              list="po-requester-names" placeholder="입력 또는 선택" className={inputCls} />
-            <datalist id="po-requester-names">
-              {requesterNames.map(n => <option key={n} value={n} />)}
-            </datalist>
+            <RequesterInlineSearch value={managerName} onChange={setManagerName} names={requesterNames} phones={requesterPhones} />
           </FormField>
           <FormField label="무상" className="w-20">
             <input
@@ -727,6 +723,66 @@ function SiteInlineSearch({ value, onChange, sites }: { value: string; onChange:
                 {s.alias && s.alias !== s.name && (
                   <span className="ml-2 text-[10px] text-gray-400 dark:text-gray-500">({s.alias})</span>
                 )}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function RequesterInlineSearch({ value, onChange, names, phones }: {
+  value: string; onChange: (v: string) => void; names: string[]; phones?: Record<string, string>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const ref = useRef<HTMLDivElement>(null);
+  const ulRef = useRef<HTMLUListElement>(null);
+  const suggestions = value.trim()
+    ? names.filter(n => n.toLowerCase().includes(value.toLowerCase())).slice(0, 20)
+    : names.slice(0, 50);
+
+  useEffect(() => { setFocusedIndex(-1); }, [value]);
+
+  useEffect(() => {
+    if (focusedIndex >= 0 && ulRef.current) {
+      const el = ulRef.current.children[focusedIndex] as HTMLElement;
+      if (el) el.scrollIntoView({ block: "nearest" });
+    }
+  }, [focusedIndex]);
+
+  useEffect(() => {
+    function h(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      if (suggestions.length === 1) { e.preventDefault(); onChange(suggestions[0]); setOpen(false); return; }
+      if (open && focusedIndex >= 0 && suggestions.length > 0) { e.preventDefault(); onChange(suggestions[focusedIndex]); setOpen(false); return; }
+      return;
+    }
+    if (!open || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setFocusedIndex(i => (i < suggestions.length - 1 ? i + 1 : i)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setFocusedIndex(i => (i > 0 ? i - 1 : 0)); }
+    else if (e.key === "Escape") setOpen(false);
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <input type="text" lang="ko" value={value} placeholder="입력 또는 선택"
+        onChange={e => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)} onKeyDown={handleKeyDown} className={inputCls} />
+      {open && suggestions.length > 0 && (
+        <ul ref={ulRef} className="absolute z-50 top-full left-0 mt-0.5 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-52 overflow-y-auto">
+          {suggestions.map((name, idx) => (
+            <li key={name}>
+              <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => { onChange(name); setOpen(false); }}
+                className={`w-full text-left px-3 py-2 text-xs text-gray-800 dark:text-gray-200 border-b border-gray-50 dark:border-gray-700 last:border-0 ${focusedIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-blue-50 dark:hover:bg-blue-900/20"}`}>
+                <span>{name}</span>
+                {phones?.[name] && <span className="ml-2 text-[10px] text-gray-400 dark:text-gray-500">{phones[name]}</span>}
               </button>
             </li>
           ))}
