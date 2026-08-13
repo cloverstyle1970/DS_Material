@@ -1211,7 +1211,7 @@ function InboundRefPopup({
                     </td>
                     <td className="px-2 py-2 text-blue-700 dark:text-blue-300 font-bold whitespace-nowrap">{refForRecord(t) || "—"}</td>
                     <td className="px-2 py-2 text-gray-700 dark:text-gray-200 font-medium whitespace-nowrap">{t.createdAt.slice(0, 10)}</td>
-                    <td className="px-2 py-2">
+                    <td className="px-2 py-2 max-w-[220px]">
                       <div className={`flex items-center gap-1 font-semibold whitespace-nowrap ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-gray-900 dark:text-gray-100"}`}>
                         {t.materialName}
                         <PhotoIconBtn urls={matImgMap.get(t.materialId) ?? []} />
