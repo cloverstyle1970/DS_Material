@@ -1185,7 +1185,7 @@ function InboundRefPopup({
                     title={allChecked ? "표시된 항목 전체 선택 해제" : "표시된 항목 전체 선택"}
                   />
                 </th>
-                {["발주참조번호","입고일","자재명","규격","코드","수량","현재재고","현장","호기"].map(h =>
+                {["발주참조번호","입고일","자재명 / 규격","코드","수량","현재재고","현장","호기"].map(h =>
                   <th key={h} className="px-2 py-2 text-left border-b-2 border-gray-300 dark:border-gray-600 font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap">{h}</th>)}
               </tr>
             </thead>
@@ -1203,8 +1203,10 @@ function InboundRefPopup({
                     </td>
                     <td className="px-2 py-2 text-blue-700 dark:text-blue-300 font-bold whitespace-nowrap">{refForRecord(t) || "—"}</td>
                     <td className="px-2 py-2 text-gray-700 dark:text-gray-200 font-medium whitespace-nowrap">{t.createdAt.slice(0, 10)}</td>
-                    <td className={`px-2 py-2 font-semibold whitespace-nowrap ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-gray-900 dark:text-gray-100"}`}>{t.materialName}</td>
-                    <td className="px-2 py-2 text-gray-600 dark:text-gray-300 whitespace-nowrap">{matSpecMap.get(t.materialId) || "—"}</td>
+                    <td className="px-2 py-2">
+                      <div className={`font-semibold whitespace-nowrap ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-gray-900 dark:text-gray-100"}`}>{t.materialName}</div>
+                      {matSpecMap.get(t.materialId) && <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap mt-0.5">{matSpecMap.get(t.materialId)}</div>}
+                    </td>
                     <td className={`px-2 py-2 font-mono font-semibold whitespace-nowrap ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-slate-700 dark:text-slate-200"}`}>{t.materialId}</td>
                     <td className="px-2 py-2 text-right tabular-nums font-bold text-blue-700 dark:text-blue-300 whitespace-nowrap">{fmtNum(t.qty)}</td>
                     <td className="px-2 py-2 text-right tabular-nums font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap">{fmtNum(t.afterStock)}</td>
