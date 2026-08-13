@@ -11,6 +11,7 @@ import type { PurchaseOrderRecord } from "@/lib/mock-purchase-orders";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNum, parseNum } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS, isRepairMaterial } from "@/lib/material-style";
+import { PhotoIconBtn } from "@/components/ui/PhotoIconBtn";
 import { supabase } from "@/lib/supabase";
 import { generateDocNo } from "@/lib/document-no";
 import DraggableModal from "@/components/common/DraggableModal";
@@ -33,13 +34,14 @@ interface Row {
   remark: string;
   reqId: number | null;
   status: "발주" | "부분입고" | "입고완료" | "취소";  // 편집 시 표시용
+  imgUrls: string[];
 }
 
 function newRow(seed: Partial<Row> = {}): Row {
   return {
     id: crypto.randomUUID(), lineId: null, materialId: "", materialName: "", spec: "",
     qty: 0, receivedQty: 0, unitPrice: 0, elevatorName: "", remark: "", reqId: null,
-    status: "발주", ...seed,
+    status: "발주", imgUrls: [], ...seed,
   };
 }
 
@@ -159,6 +161,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
         setReference(head.headerNote ?? "");
         const loaded = rows.map(o => {
           const m = matMap.get(o.materialId);
+          const imgUrls = [m?.referenceImageUrl1, m?.referenceImageUrl2, m?.opinionImageUrl].filter((u): u is string => !!u);
           return newRow({
             lineId: o.id,
             materialId: o.materialId,
@@ -171,6 +174,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
             remark: o.note ?? "",
             reqId: o.requestId,
             status: o.status,
+            imgUrls,
           });
         });
         // 신규 행 추가가 가능하도록 마지막에 빈 행 1개 부착
@@ -226,7 +230,8 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
       materials.forEach((m, i) => {
         const idx = startIdx + i;
         const unitPrice = freeOfCharge ? 0 : (m.buyPrice ?? 0);
-        const patch = { materialId: m.id, materialName: m.name, spec: m.modelNo ?? "", qty: 1, unitPrice };
+        const imgUrls = [m.referenceImageUrl1, m.referenceImageUrl2, m.opinionImageUrl].filter((u): u is string => !!u);
+        const patch = { materialId: m.id, materialName: m.name, spec: m.modelNo ?? "", qty: 1, unitPrice, imgUrls };
         if (idx < next.length) next[idx] = { ...next[idx], ...patch };
         else next.push(newRow(patch));
       });
@@ -472,6 +477,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
                           onChange={v => patchRow(r.id, { materialId: v, materialName: v, spec: v })} />
                       )}
                     </div>
+                    {r.imgUrls.length > 0 && <PhotoIconBtn urls={r.imgUrls} />}
                   </div>
                 </Td>
                 <Td>
@@ -944,7 +950,7 @@ function MatInlineSearch({ value, materialId, matType, onMultiSelect, onChange }
                 <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => toggle(m.id)}
                   className={`w-full text-left px-3 py-2 border-b border-gray-50 dark:border-gray-700 last:border-0 flex items-center gap-2 ${checked.has(m.id) ? "bg-blue-50 dark:bg-blue-900/30" : focusedIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
                   <input type="checkbox" readOnly checked={checked.has(m.id)} className="accent-blue-600 shrink-0" />
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className={`text-xs font-medium ${nameCls}`}>
                       {repair && <span className="mr-1 text-[9px] px-1 rounded bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300 font-bold align-middle">RE</span>}
                       {m.name}
@@ -956,6 +962,7 @@ function MatInlineSearch({ value, materialId, matType, onMultiSelect, onChange }
                       <span className="text-[10px] text-gray-300 dark:text-gray-500 ml-auto">재고 {fmtNum(m.stockQty)}</span>
                     </div>
                   </div>
+                  <PhotoIconBtn urls={[m.referenceImageUrl1, m.referenceImageUrl2, m.opinionImageUrl]} />
                 </button>
               </li>
               );

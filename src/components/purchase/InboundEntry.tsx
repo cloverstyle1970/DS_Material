@@ -13,6 +13,7 @@ import { generateDocNo } from "@/lib/document-no";
 import { extractOrderRef } from "@/lib/order-ref";
 import { fmtNum, parseNum } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS, isRepairMaterial } from "@/lib/material-style";
+import { PhotoIconBtn } from "@/components/ui/PhotoIconBtn";
 import DraggableModal from "@/components/common/DraggableModal";
 import SerialEntryModal from "./SerialEntryModal";
 
@@ -633,7 +634,7 @@ function MatInlineSearch({ value, materialId, matType, onMultiSelect, onChange }
                 <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => toggle(m.id)}
                   className={`w-full text-left px-3 py-2 border-b border-gray-50 dark:border-gray-700 last:border-0 flex items-center gap-2 ${checked.has(m.id) ? "bg-blue-50 dark:bg-blue-900/30" : focusedIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
                   <input type="checkbox" readOnly checked={checked.has(m.id)} className="accent-blue-600 shrink-0" />
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className={`text-xs font-medium ${nameCls}`}>
                       {repair && <span className="mr-1 text-[9px] px-1 rounded bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300 font-bold align-middle">RE</span>}
                       {m.name}
@@ -645,6 +646,7 @@ function MatInlineSearch({ value, materialId, matType, onMultiSelect, onChange }
                       <span className="text-[10px] text-gray-300 dark:text-gray-500 ml-auto">단가 {m.buyPrice ? fmtNum(m.buyPrice) : "-"} / 재고 {fmtNum(m.stockQty)}</span>
                     </div>
                   </div>
+                  <PhotoIconBtn urls={[m.referenceImageUrl1, m.referenceImageUrl2, m.opinionImageUrl]} />
                 </button>
               </li>
               );

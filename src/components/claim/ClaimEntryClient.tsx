@@ -9,6 +9,7 @@ import { MaterialRecord } from "@/lib/mock-materials";
 import { visibleUserIds } from "@/lib/crew";
 import { insertNotification } from "@/lib/notify";
 import { isRepairMaterial, isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
+import { PhotoIconBtn } from "@/components/ui/PhotoIconBtn";
 
 const DEFAULT_ROW_COUNT = 1;
 
@@ -533,11 +534,6 @@ export default function ClaimEntryClient() {
                           const codeCls = repair
                             ? "text-green-600 dark:text-green-400"
                             : tk ? TK_TEXT_CLASS : "text-slate-400";
-                          const refImgs = [
-                            { url: m.referenceImageUrl1, label: "참조1" },
-                            { url: m.referenceImageUrl2, label: "참조2" },
-                            { url: m.opinionImageUrl,    label: "소견" },
-                          ].filter((x): x is { url: string; label: string } => !!x.url);
                           return (
                           <li key={m.id}>
                             <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => applyMaterial(r.key, m)}
@@ -553,23 +549,7 @@ export default function ClaimEntryClient() {
                                     {m.modelNo && <span className="text-[10px] text-gray-500 truncate">{m.modelNo}</span>}
                                   </div>
                                 </div>
-                                {refImgs.length > 0 && (
-                                  <div className="flex gap-1 flex-shrink-0">
-                                    {refImgs.map(({ url, label }) => (
-                                      <span
-                                        key={label}
-                                        title={`${label} 이미지 보기`}
-                                        role="link"
-                                        tabIndex={-1}
-                                        onClick={e => { e.stopPropagation(); window.open(url, "_blank"); }}
-                                        onMouseDown={e => e.stopPropagation()}
-                                        className="w-9 h-9 rounded border border-gray-200 dark:border-gray-600 overflow-hidden cursor-pointer flex-shrink-0 hover:border-blue-400 dark:hover:border-blue-500 transition-colors"
-                                      >
-                                        <img src={url} alt={label} className="w-full h-full object-cover" />
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
+                                <PhotoIconBtn urls={[m.referenceImageUrl1, m.referenceImageUrl2, m.opinionImageUrl]} />
                               </div>
                             </button>
                           </li>
@@ -679,11 +659,6 @@ export default function ClaimEntryClient() {
                               const codeCls = repair
                                 ? "text-green-600 dark:text-green-400"
                                 : tk ? TK_TEXT_CLASS : "text-slate-400";
-                              const refImgs2 = [
-                                { url: m.referenceImageUrl1, label: "참조1" },
-                                { url: m.referenceImageUrl2, label: "참조2" },
-                                { url: m.opinionImageUrl,    label: "소견" },
-                              ].filter((x): x is { url: string; label: string } => !!x.url);
                               return (
                               <li key={m.id}>
                                 <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => applyMaterial(r.key, m)}
@@ -699,23 +674,7 @@ export default function ClaimEntryClient() {
                                         {m.modelNo && <span className="text-[10px] text-gray-500 truncate">{m.modelNo}</span>}
                                       </div>
                                     </div>
-                                    {refImgs2.length > 0 && (
-                                      <div className="flex gap-1 flex-shrink-0">
-                                        {refImgs2.map(({ url, label }) => (
-                                          <span
-                                            key={label}
-                                            title={`${label} 이미지 보기`}
-                                            role="link"
-                                            tabIndex={-1}
-                                            onClick={e => { e.stopPropagation(); window.open(url, "_blank"); }}
-                                            onMouseDown={e => e.stopPropagation()}
-                                            className="w-8 h-8 rounded border border-gray-200 dark:border-gray-600 overflow-hidden cursor-pointer flex-shrink-0 hover:border-blue-400 dark:hover:border-blue-500 transition-colors"
-                                          >
-                                            <img src={url} alt={label} className="w-full h-full object-cover" />
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
+                                    <PhotoIconBtn urls={[m.referenceImageUrl1, m.referenceImageUrl2, m.opinionImageUrl]} />
                                   </div>
                                 </button>
                               </li>

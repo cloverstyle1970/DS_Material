@@ -11,6 +11,7 @@ import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
 import { fmtNum } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
+import { PhotoIconBtn } from "@/components/ui/PhotoIconBtn";
 import DraggableModal from "@/components/common/DraggableModal";
 import { useViewMode } from "@/context/ViewModeContext";
 import Autocomplete from "@/components/common/Autocomplete";
@@ -68,6 +69,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
   const [sites, setSites] = useState<SiteOption[]>([]);
   const [userNames, setUserNames] = useState<string[]>([]);
   const [matMap, setMatMap] = useState<Map<string, string>>(new Map()); // materialId → modelNo(규격)
+  const [matImgMap, setMatImgMap] = useState<Map<string, string[]>>(new Map()); // materialId → 사진 URL 목록
   // 입고 모드 한정: transactionId → 신청자명. transaction.note 의 '발주 #N' 패턴을 모아
   // purchase_orders 를 한 번에 조회해 매핑한다.
   const [requesterMap, setRequesterMap] = useState<Map<number, string>>(new Map());
@@ -103,8 +105,14 @@ export default function StockHistoryClient({ mode, initial }: Props) {
     api.get<MaterialRecord[]>("/api/materials")
       .then(data => {
         const m = new Map<string, string>();
-        data.forEach(x => m.set(x.id, x.modelNo ?? ""));
+        const imgs = new Map<string, string[]>();
+        data.forEach(x => {
+          m.set(x.id, x.modelNo ?? "");
+          const urls = [x.referenceImageUrl1, x.referenceImageUrl2, x.opinionImageUrl].filter((u): u is string => !!u);
+          if (urls.length > 0) imgs.set(x.id, urls);
+        });
         setMatMap(m);
+        setMatImgMap(imgs);
       })
       .catch(() => {});
   }, []);
@@ -582,7 +590,12 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                 <td className="pl-2 pr-0 py-3 text-left text-black dark:text-white whitespace-nowrap">{fmtDateOnly(t.createdAt)}</td>
                 <td className="px-2 py-3 text-left font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">{t.transactionNo ?? "-"}</td>
                 <td className={`px-2 py-3 text-left font-mono whitespace-nowrap ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>{t.materialId}</td>
-                <td className={`px-2 py-3 text-left font-medium max-w-[200px] truncate ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>{t.materialName}</td>
+                <td className={`px-2 py-3 text-left font-medium max-w-[200px] ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>
+                  <div className="flex items-center gap-1 min-w-0">
+                    <span className="truncate">{t.materialName}</span>
+                    <PhotoIconBtn urls={matImgMap.get(t.materialId) ?? []} />
+                  </div>
+                </td>
                 <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{matMap.get(t.materialId) || "-"}</td>
                 <td className="px-2 py-3 text-left font-mono text-black dark:text-white whitespace-nowrap max-w-[140px] truncate">
                   {t.serialNo || "-"}
