@@ -9,7 +9,6 @@ import { TransactionRecord } from "@/lib/mock-transactions";
 import { UserRecord } from "@/lib/mock-users";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
-import { extractOrderRef } from "@/lib/order-ref";
 import { generateDocNo } from "@/lib/document-no";
 import { fmtNum, parseNum } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS, isRepairMaterial } from "@/lib/material-style";
@@ -1046,8 +1045,10 @@ function InboundRefPopup({
   onClose: () => void;
 }) {
   const [records, setRecords] = useState<TransactionRecord[]>([]);
-  // 입고 note의 "발주 #N" → 그 발주의 참조번호 (purchase_orders.note 첫 [태그]) 매핑
+  // 입고 note의 "발주 #N" → 그 발주의 참조번호 매핑 (order_ref_no 우선)
   const [orderRefMap, setOrderRefMap] = useState<Map<number, string>>(new Map());
+  // materialId → modelNo(규격)
+  const [matSpecMap, setMatSpecMap] = useState<Map<string, string>>(new Map());
   const [q, setQ] = useState("");
   // 다수 선택된 입고 id 집합
   const [checked, setChecked] = useState<Set<number>>(new Set());
@@ -1057,7 +1058,13 @@ function InboundRefPopup({
     Promise.all([
       api.get<TransactionRecord[]>("/api/transactions?type=입고"),
       supabase.from("transactions").select("note").eq("type", "출고").ilike("note", "%입고%"),
-    ]).then(async ([inboundRecords, txRes]) => {
+      api.get<{ id: string; modelNo: string | null }[]>("/api/materials"),
+    ]).then(async ([inboundRecords, txRes, matList]) => {
+      // 규격 맵 구성
+      const specMap = new Map<string, string>();
+      matList.forEach(m => { if (m.modelNo) specMap.set(m.id, m.modelNo); });
+      setMatSpecMap(specMap);
+
       const matchedIds = new Set<number>();
       const re = /입고\s*#(\d+)/g;
       for (const t of (txRes.data ?? []) as { note: string | null }[]) {
@@ -1071,7 +1078,7 @@ function InboundRefPopup({
       const remaining = inboundRecords.filter(r => !matchedIds.has(r.id)).slice(0, 200);
       setRecords(remaining);
 
-      // 남은 입고들의 note에서 "발주 #N" → orderId 추출 → purchase_orders 일괄 조회
+      // 남은 입고들의 note에서 "발주 #N" → orderId 추출 → purchase_order_lines 일괄 조회
       const orderIds = new Set<number>();
       const orderRe = /발주\s*#(\d+)/;
       for (const r of remaining) {
@@ -1080,12 +1087,12 @@ function InboundRefPopup({
       }
       if (orderIds.size > 0) {
         const { data } = await supabase
-          .from("purchase_orders")
-          .select("id, note")
+          .from("purchase_order_lines")
+          .select("id, order_id, purchase_orders(order_ref_no, order_no)")
           .in("id", Array.from(orderIds));
         const map = new Map<number, string>();
-        for (const row of (data ?? []) as { id: number; note: string | null }[]) {
-          const ref = extractOrderRef(row.note);
+        for (const row of (data ?? []) as unknown as { id: number; purchase_orders: { order_ref_no: string | null; order_no: string | null } | null }[]) {
+          const ref = row.purchase_orders?.order_ref_no || row.purchase_orders?.order_no || "";
           if (ref) map.set(row.id, ref);
         }
         setOrderRefMap(map);
@@ -1178,7 +1185,7 @@ function InboundRefPopup({
                     title={allChecked ? "표시된 항목 전체 선택 해제" : "표시된 항목 전체 선택"}
                   />
                 </th>
-                {["발주참조번호","입고일","자재명","코드","수량","현재재고","현장","호기"].map(h =>
+                {["발주참조번호","입고일","자재명","규격","코드","수량","현재재고","현장","호기"].map(h =>
                   <th key={h} className="px-2 py-2 text-left border-b-2 border-gray-300 dark:border-gray-600 font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap">{h}</th>)}
               </tr>
             </thead>
@@ -1197,6 +1204,7 @@ function InboundRefPopup({
                     <td className="px-2 py-2 text-blue-700 dark:text-blue-300 font-bold whitespace-nowrap">{refForRecord(t) || "—"}</td>
                     <td className="px-2 py-2 text-gray-700 dark:text-gray-200 font-medium whitespace-nowrap">{t.createdAt.slice(0, 10)}</td>
                     <td className={`px-2 py-2 font-semibold whitespace-nowrap ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-gray-900 dark:text-gray-100"}`}>{t.materialName}</td>
+                    <td className="px-2 py-2 text-gray-600 dark:text-gray-300 whitespace-nowrap">{matSpecMap.get(t.materialId) || "—"}</td>
                     <td className={`px-2 py-2 font-mono font-semibold whitespace-nowrap ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-slate-700 dark:text-slate-200"}`}>{t.materialId}</td>
                     <td className="px-2 py-2 text-right tabular-nums font-bold text-blue-700 dark:text-blue-300 whitespace-nowrap">{fmtNum(t.qty)}</td>
                     <td className="px-2 py-2 text-right tabular-nums font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap">{fmtNum(t.afterStock)}</td>
