@@ -199,8 +199,6 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
     const firstRequester = orders.find(o => o.requesterName)?.requesterName;
     if (firstRequester) setRequesterName(firstRequester);
 
-    const firstOrderDate = orders[0]?.orderedAt?.slice(0, 10);
-    if (firstOrderDate) setInboundDate(firstOrderDate);
 
     let mats: MaterialRecord[] = [];
     try { mats = await api.get<MaterialRecord[]>("/api/materials"); } catch {}
