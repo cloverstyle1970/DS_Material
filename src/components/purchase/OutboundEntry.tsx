@@ -1049,6 +1049,8 @@ function InboundRefPopup({
   const [orderRefMap, setOrderRefMap] = useState<Map<number, string>>(new Map());
   // materialId → modelNo(규격)
   const [matSpecMap, setMatSpecMap] = useState<Map<string, string>>(new Map());
+  // materialId → imgUrls
+  const [matImgMap,  setMatImgMap]  = useState<Map<string, string[]>>(new Map());
   const [q, setQ] = useState("");
   // 다수 선택된 입고 id 집합
   const [checked, setChecked] = useState<Set<number>>(new Set());
@@ -1058,12 +1060,18 @@ function InboundRefPopup({
     Promise.all([
       api.get<TransactionRecord[]>("/api/transactions?type=입고"),
       supabase.from("transactions").select("note").eq("type", "출고").ilike("note", "%입고%"),
-      api.get<{ id: string; modelNo: string | null }[]>("/api/materials"),
+      api.get<{ id: string; modelNo: string | null; referenceImageUrl1?: string | null; referenceImageUrl2?: string | null; opinionImageUrl?: string | null }[]>("/api/materials"),
     ]).then(async ([inboundRecords, txRes, matList]) => {
-      // 규격 맵 구성
+      // 규격·이미지 맵 구성
       const specMap = new Map<string, string>();
-      matList.forEach(m => { if (m.modelNo) specMap.set(m.id, m.modelNo); });
+      const imgMap  = new Map<string, string[]>();
+      matList.forEach(m => {
+        if (m.modelNo) specMap.set(m.id, m.modelNo);
+        const urls = [m.referenceImageUrl1, m.referenceImageUrl2, m.opinionImageUrl].filter((u): u is string => !!u);
+        if (urls.length > 0) imgMap.set(m.id, urls);
+      });
       setMatSpecMap(specMap);
+      setMatImgMap(imgMap);
 
       const matchedIds = new Set<number>();
       const re = /입고\s*#(\d+)/g;
@@ -1204,7 +1212,10 @@ function InboundRefPopup({
                     <td className="px-2 py-2 text-blue-700 dark:text-blue-300 font-bold whitespace-nowrap">{refForRecord(t) || "—"}</td>
                     <td className="px-2 py-2 text-gray-700 dark:text-gray-200 font-medium whitespace-nowrap">{t.createdAt.slice(0, 10)}</td>
                     <td className="px-2 py-2">
-                      <div className={`font-semibold whitespace-nowrap ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-gray-900 dark:text-gray-100"}`}>{t.materialName}</div>
+                      <div className={`flex items-center gap-1 font-semibold whitespace-nowrap ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-gray-900 dark:text-gray-100"}`}>
+                        {t.materialName}
+                        <PhotoIconBtn urls={matImgMap.get(t.materialId) ?? []} />
+                      </div>
                       {matSpecMap.get(t.materialId) && <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap mt-0.5">{matSpecMap.get(t.materialId)}</div>}
                     </td>
                     <td className={`px-2 py-2 font-mono font-semibold whitespace-nowrap ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-slate-700 dark:text-slate-200"}`}>{t.materialId}</td>
