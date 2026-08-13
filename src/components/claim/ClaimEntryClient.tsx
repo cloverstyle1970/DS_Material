@@ -71,6 +71,7 @@ interface ItemRow {
   searchOpen: boolean;
   searchResults: MaterialRecord[];
   searchFocusIndex: number;
+  elevOpen: boolean;
 }
 
 function newRow(seed: Partial<ItemRow> = {}): ItemRow {
@@ -79,6 +80,7 @@ function newRow(seed: Partial<ItemRow> = {}): ItemRow {
     material_id: "", material_name: "", spec: "", unit: "EA",
     qty: 1, elevator_name: "", remark: "",
     searchOpen: false, searchResults: [], searchFocusIndex: -1,
+    elevOpen: false,
     ...seed,
   };
 }
@@ -105,7 +107,6 @@ export default function ClaimEntryClient() {
   // 사이트/호기 마스터
   const [sites, setSites] = useState<SiteOption[]>([]);
   const [elevatorOptions, setElevatorOptions] = useState<string[]>([]);
-  const elevatorDatalistId = "claim-entry-elevator-options";
 
   // 저장 상태
   const [saving, setSaving]     = useState(false);
@@ -198,8 +199,13 @@ export default function ClaimEntryClient() {
         setRows(prev => prev.map(r => r.elevator_name.trim() ? r : { ...r, elevator_name: opts[0] }));
       }
       const ct = (ms as { contract_type: string | null } | null)?.contract_type;
-      if (ct && (ct === "TK-FM" || ct === "대솔FM" || ct === "DS-FM")) {
-        setMode("무상신청");
+      if (ms !== null) {
+        // DB에 등록된 현장이면 계약구분에 따라 모드 자동 재설정
+        if (ct === "TK-FM" || ct === "대솔FM" || ct === "DS-FM") {
+          setMode("무상신청");
+        } else {
+          setMode("유상견적요청");
+        }
       }
     })();
   }, [siteName]);
@@ -402,11 +408,7 @@ export default function ClaimEntryClient() {
         <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">유상/무상/당직 모드 선택 후 자재 청구를 접수합니다.</p>
       </div>
 
-      <datalist id={elevatorDatalistId}>
-        {elevatorOptions.map(e => <option key={e} value={e} />)}
-      </datalist>
-
-      <div className="p-6 space-y-4 max-w-5xl">
+<div className="p-6 space-y-4 max-w-5xl">
         {/* 모드 선택 */}
         <div className={sectionCls}>
           <label className={labelCls}>청구 구분</label>
@@ -475,10 +477,33 @@ export default function ClaimEntryClient() {
                   <button type="button" onClick={() => removeRow(r.key)} className="text-red-500 text-xs">삭제</button>
                 </div>
                 {/* 호기 먼저 입력 → 품목 검색 활성화 */}
-                <div>
+                <div className="relative">
                   <label className={labelCls}>호기 <span className="text-red-500">*</span></label>
-                  <input type="text" lang="ko" value={r.elevator_name} list={elevatorDatalistId}
-                    onChange={e => patchRow(r.key, { elevator_name: e.target.value })} placeholder="호기 (예: 1호기)" className={fieldCls} />
+                  <input type="text" lang="ko" value={r.elevator_name}
+                    onChange={e => patchRow(r.key, { elevator_name: e.target.value })}
+                    onFocus={() => patchRow(r.key, { elevOpen: true })}
+                    onBlur={() => setTimeout(() => patchRow(r.key, { elevOpen: false }), 150)}
+                    placeholder="호기 (예: 1호기)" className={fieldCls} />
+                  {r.elevOpen && elevatorOptions.length > 0 && (() => {
+                    const q = r.elevator_name.trim().toLowerCase();
+                    const filtered = q
+                      ? elevatorOptions.filter(e => e.toLowerCase().includes(q))
+                      : elevatorOptions;
+                    return filtered.length > 0 ? (
+                      <ul className="absolute z-50 top-full left-0 mt-0.5 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                        {filtered.map(e => (
+                          <li key={e}>
+                            <button type="button"
+                              onMouseDown={ev => ev.preventDefault()}
+                              onClick={() => patchRow(r.key, { elevator_name: e, elevOpen: false })}
+                              className="w-full text-left px-3 py-2 text-sm text-gray-800 dark:text-gray-200 border-b border-gray-50 dark:border-gray-700 last:border-0 hover:bg-blue-50 dark:hover:bg-blue-900/40">
+                              {e}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null;
+                  })()}
                 </div>
                 {/* 품목 검색 — 전체폭 입력 + 전체폭 드롭다운 (호기 입력 후 활성화) */}
                 <div className="relative">
@@ -508,17 +533,43 @@ export default function ClaimEntryClient() {
                           const codeCls = repair
                             ? "text-green-600 dark:text-green-400"
                             : tk ? TK_TEXT_CLASS : "text-slate-400";
+                          const refImgs = [
+                            { url: m.referenceImageUrl1, label: "참조1" },
+                            { url: m.referenceImageUrl2, label: "참조2" },
+                            { url: m.opinionImageUrl,    label: "소견" },
+                          ].filter((x): x is { url: string; label: string } => !!x.url);
                           return (
                           <li key={m.id}>
                             <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => applyMaterial(r.key, m)}
                               className={`w-full text-left px-3 py-2.5 border-b border-gray-50 dark:border-gray-700 last:border-0 ${r.searchFocusIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
-                              <div className={`text-sm font-medium ${nameCls}`}>
-                                {repair && <span className="mr-1 text-[9px] px-1 rounded bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300 font-bold align-middle">RE</span>}
-                                {m.name}
-                              </div>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <span className={`text-[10px] font-mono ${codeCls}`}>{m.id}</span>
-                                {m.modelNo && <span className="text-[10px] text-gray-500">{m.modelNo}</span>}
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className={`text-sm font-medium ${nameCls} truncate`}>
+                                    {repair && <span className="mr-1 text-[9px] px-1 rounded bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300 font-bold align-middle">RE</span>}
+                                    {m.name}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <span className={`text-[10px] font-mono ${codeCls}`}>{m.id}</span>
+                                    {m.modelNo && <span className="text-[10px] text-gray-500 truncate">{m.modelNo}</span>}
+                                  </div>
+                                </div>
+                                {refImgs.length > 0 && (
+                                  <div className="flex gap-1 flex-shrink-0">
+                                    {refImgs.map(({ url, label }) => (
+                                      <span
+                                        key={label}
+                                        title={`${label} 이미지 보기`}
+                                        role="link"
+                                        tabIndex={-1}
+                                        onClick={e => { e.stopPropagation(); window.open(url, "_blank"); }}
+                                        onMouseDown={e => e.stopPropagation()}
+                                        className="w-9 h-9 rounded border border-gray-200 dark:border-gray-600 overflow-hidden cursor-pointer flex-shrink-0 hover:border-blue-400 dark:hover:border-blue-500 transition-colors"
+                                      >
+                                        <img src={url} alt={label} className="w-full h-full object-cover" />
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </button>
                           </li>
@@ -570,12 +621,33 @@ export default function ClaimEntryClient() {
                 {rows.map((r, i) => (
                   <tr key={r.key} className="border-b border-gray-100 dark:border-gray-700 hover:bg-blue-50/20 dark:hover:bg-blue-900/10">
                     <td className="px-2 py-1.5 text-center text-gray-600 dark:text-gray-400">{i + 1}</td>
-                    <td className="px-1 py-0.5">
+                    <td className="px-1 py-0.5 relative">
                       <input type="text" lang="ko" value={r.elevator_name}
-                        list={elevatorDatalistId}
                         onChange={e => patchRow(r.key, { elevator_name: e.target.value })}
+                        onFocus={() => patchRow(r.key, { elevOpen: true })}
+                        onBlur={() => setTimeout(() => patchRow(r.key, { elevOpen: false }), 150)}
                         placeholder={elevatorOptions[0] ?? "호기"}
                         className={cellInput + " text-center"} />
+                      {r.elevOpen && elevatorOptions.length > 0 && (() => {
+                        const q = r.elevator_name.trim().toLowerCase();
+                        const filtered = q
+                          ? elevatorOptions.filter(e => e.toLowerCase().includes(q))
+                          : elevatorOptions;
+                        return filtered.length > 0 ? (
+                          <ul className="absolute z-50 top-full left-0 mt-0.5 w-36 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                            {filtered.map(e => (
+                              <li key={e}>
+                                <button type="button"
+                                  onMouseDown={ev => ev.preventDefault()}
+                                  onClick={() => patchRow(r.key, { elevator_name: e, elevOpen: false })}
+                                  className="w-full text-left px-3 py-1.5 text-xs text-gray-800 dark:text-gray-200 border-b border-gray-50 dark:border-gray-700 last:border-0 hover:bg-blue-50 dark:hover:bg-blue-900/40">
+                                  {e}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null;
+                      })()}
                     </td>
                     <td className="px-1 py-0.5 relative">
                       <input type="text" lang="ko" value={r.material_name}
@@ -607,17 +679,43 @@ export default function ClaimEntryClient() {
                               const codeCls = repair
                                 ? "text-green-600 dark:text-green-400"
                                 : tk ? TK_TEXT_CLASS : "text-slate-400";
+                              const refImgs2 = [
+                                { url: m.referenceImageUrl1, label: "참조1" },
+                                { url: m.referenceImageUrl2, label: "참조2" },
+                                { url: m.opinionImageUrl,    label: "소견" },
+                              ].filter((x): x is { url: string; label: string } => !!x.url);
                               return (
                               <li key={m.id}>
                                 <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => applyMaterial(r.key, m)}
                                   className={`w-full text-left px-3 py-2 border-b border-gray-50 dark:border-gray-700 last:border-0 ${r.searchFocusIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
-                                  <div className={`text-xs font-medium ${nameCls}`}>
-                                    {repair && <span className="mr-1 text-[9px] px-1 rounded bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300 font-bold align-middle">RE</span>}
-                                    {m.name}
-                                  </div>
-                                  <div className="flex items-center gap-2 mt-0.5">
-                                    <span className={`text-[10px] font-mono ${codeCls}`}>{m.id}</span>
-                                    {m.modelNo && <span className="text-[10px] text-gray-500">{m.modelNo}</span>}
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex-1 min-w-0">
+                                      <div className={`text-xs font-medium ${nameCls} truncate`}>
+                                        {repair && <span className="mr-1 text-[9px] px-1 rounded bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300 font-bold align-middle">RE</span>}
+                                        {m.name}
+                                      </div>
+                                      <div className="flex items-center gap-2 mt-0.5">
+                                        <span className={`text-[10px] font-mono ${codeCls}`}>{m.id}</span>
+                                        {m.modelNo && <span className="text-[10px] text-gray-500 truncate">{m.modelNo}</span>}
+                                      </div>
+                                    </div>
+                                    {refImgs2.length > 0 && (
+                                      <div className="flex gap-1 flex-shrink-0">
+                                        {refImgs2.map(({ url, label }) => (
+                                          <span
+                                            key={label}
+                                            title={`${label} 이미지 보기`}
+                                            role="link"
+                                            tabIndex={-1}
+                                            onClick={e => { e.stopPropagation(); window.open(url, "_blank"); }}
+                                            onMouseDown={e => e.stopPropagation()}
+                                            className="w-8 h-8 rounded border border-gray-200 dark:border-gray-600 overflow-hidden cursor-pointer flex-shrink-0 hover:border-blue-400 dark:hover:border-blue-500 transition-colors"
+                                          >
+                                            <img src={url} alt={label} className="w-full h-full object-cover" />
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 </button>
                               </li>

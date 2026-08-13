@@ -1173,18 +1173,44 @@ function QuoteEntryInner() {
                                 const codeCls = repair
                                   ? "text-green-600 dark:text-green-400"
                                   : tk ? TK_TEXT_CLASS : "text-slate-400";
+                                const refImgs = [
+                                  { url: m.referenceImageUrl1, label: "참조1" },
+                                  { url: m.referenceImageUrl2, label: "참조2" },
+                                  { url: m.opinionImageUrl,    label: "소견" },
+                                ].filter((x): x is { url: string; label: string } => !!x.url);
                                 return (
                                 <li key={m.id}>
                                   <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => applyMaterial(r.key, m)}
                                     className={`w-full text-left px-3 py-2 border-b border-gray-50 dark:border-gray-700 last:border-0 ${r.searchFocusIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
-                                    <div className={`text-xs font-medium ${nameCls}`}>
-                                      {repair && <span className="mr-1 text-[9px] px-1 rounded bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300 font-bold align-middle">RE</span>}
-                                      {m.name}
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                      <span className={`text-[10px] font-mono ${codeCls}`}>{m.id}</span>
-                                      {m.modelNo && <span className="text-[10px] text-gray-500">{m.modelNo}</span>}
-                                      <span className="text-[10px] ml-auto text-gray-400">{fmtNum(m.sellPrice ?? 0)}원</span>
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex-1 min-w-0">
+                                        <div className={`text-xs font-medium ${nameCls} truncate`}>
+                                          {repair && <span className="mr-1 text-[9px] px-1 rounded bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300 font-bold align-middle">RE</span>}
+                                          {m.name}
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                          <span className={`text-[10px] font-mono ${codeCls}`}>{m.id}</span>
+                                          {m.modelNo && <span className="text-[10px] text-gray-500 truncate">{m.modelNo}</span>}
+                                          <span className="text-[10px] ml-auto text-gray-400">{fmtNum(m.sellPrice ?? 0)}원</span>
+                                        </div>
+                                      </div>
+                                      {refImgs.length > 0 && (
+                                        <div className="flex gap-1 flex-shrink-0">
+                                          {refImgs.map(({ url, label }) => (
+                                            <span
+                                              key={label}
+                                              title={`${label} 이미지 보기`}
+                                              role="link"
+                                              tabIndex={-1}
+                                              onClick={e => { e.stopPropagation(); window.open(url, "_blank"); }}
+                                              onMouseDown={e => e.stopPropagation()}
+                                              className="w-9 h-9 rounded border border-gray-200 dark:border-gray-600 overflow-hidden cursor-pointer flex-shrink-0 hover:border-blue-400 dark:hover:border-blue-500 transition-colors"
+                                            >
+                                              <img src={url} alt={label} className="w-full h-full object-cover" />
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
                                   </button>
                                 </li>
