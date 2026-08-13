@@ -10,7 +10,6 @@ import { UserRecord } from "@/lib/mock-users";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
 import { generateDocNo } from "@/lib/document-no";
-import { extractOrderRef } from "@/lib/order-ref";
 import { fmtNum, parseNum } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS, isRepairMaterial } from "@/lib/material-style";
 import { PhotoIconBtn } from "@/components/ui/PhotoIconBtn";
@@ -892,7 +891,7 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
   const filtered = orders.filter(o => {
     if (!q) return true;
     const ql = q.toLowerCase();
-    const refNo = extractOrderRef(o.note);
+    const refNo = (o.orderRefNo || o.orderNo || "").toLowerCase();
     return (
       o.materialName.toLowerCase().includes(ql) ||
       o.materialId.toLowerCase().includes(ql) ||
@@ -900,7 +899,7 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
       (o.siteName?.toLowerCase().includes(ql) ?? false) ||
       (o.requesterName?.toLowerCase().includes(ql) ?? false) ||
       (o.note?.toLowerCase().includes(ql) ?? false) ||
-      refNo.toLowerCase().includes(ql)
+      refNo.includes(ql)
     );
   });
 
@@ -962,7 +961,7 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
                   <td className="px-2 py-2 text-center" onClick={e => e.stopPropagation()}>
                     <input type="checkbox" checked={checked.has(o.id)} onChange={() => toggle(o.id)} className="accent-blue-600 w-4 h-4" />
                   </td>
-                  <td className="px-2 py-2 text-blue-700 dark:text-blue-300 font-bold whitespace-nowrap">{extractOrderRef(o.note) || "-"}</td>
+                  <td className="px-2 py-2 text-blue-700 dark:text-blue-300 font-bold whitespace-nowrap">{o.orderRefNo || o.orderNo || "-"}</td>
                   <td className="px-2 py-2 text-gray-700 dark:text-gray-200 font-medium whitespace-nowrap">
                     {o.orderedAt.slice(0,10)}
                     {isPartial && <span className="ml-1 text-[10px] px-1 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 font-bold">부분</span>}
