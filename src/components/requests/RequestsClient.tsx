@@ -728,7 +728,10 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                           <div className="mt-2 rounded-lg border border-gray-200 dark:border-gray-600 p-2 space-y-1">
                             {r.items.map((item, idx) => (
                               <div key={idx} className="flex items-center justify-between gap-2 text-xs">
-                                <span className="text-gray-600 dark:text-gray-300 min-w-0 truncate">{item.elevatorName ? `${item.elevatorName} · ` : ""}{item.materialName}</span>
+                                <div className="flex items-center gap-1 min-w-0">
+                                  <span className="text-gray-600 dark:text-gray-300 min-w-0 truncate">{item.elevatorName ? `${item.elevatorName} · ` : ""}{item.materialName}</span>
+                                  <PhotoIconBtn urls={matImgMap.get(item.materialId) ?? []} />
+                                </div>
                                 <span className="tabular-nums text-gray-700 dark:text-gray-300 shrink-0">{fmtNum(item.qty)}</span>
                               </div>
                             ))}
@@ -825,8 +828,11 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                           )}
                         </td>
                         <td className="px-2 py-3 text-center text-gray-700 dark:text-gray-300 text-xs">
-                          <span className="font-medium">{r.items[0]?.materialName ?? "-"}</span>
-                          {r.items.length > 1 && <span className="text-gray-400 dark:text-gray-500"> 외 {r.items.length - 1}건</span>}
+                          <div className="flex items-center justify-center gap-1">
+                            <span className="font-medium">{r.items[0]?.materialName ?? "-"}</span>
+                            {r.items.length > 1 && <span className="text-gray-400 dark:text-gray-500"> 외 {r.items.length - 1}건</span>}
+                            {r.items[0] && <PhotoIconBtn urls={matImgMap.get(r.items[0].materialId) ?? []} />}
+                          </div>
                         </td>
                         <td className="px-2 py-3 text-center tabular-nums text-gray-700 dark:text-gray-300">{totalQty}</td>
                         <td className="px-2 py-3 text-center text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{r.requesterName} <span className="text-gray-400 dark:text-gray-500">({r.requesterDept})</span></td>
@@ -875,7 +881,12 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                                     return (
                                       <tr key={idx}>
                                         <td className="px-3 py-2 text-center text-gray-600 dark:text-gray-400 whitespace-nowrap">{item.elevatorName ?? "-"}</td>
-                                        <td className={`px-3 py-2 text-center font-medium ${isTkMaterial(item.materialId) ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-200"}`}>{item.materialName}</td>
+                                        <td className={`px-3 py-2 text-center font-medium ${isTkMaterial(item.materialId) ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-200"}`}>
+                                          <div className="flex items-center justify-center gap-1">
+                                            <span>{item.materialName}</span>
+                                            <PhotoIconBtn urls={matImgMap.get(item.materialId) ?? []} />
+                                          </div>
+                                        </td>
                                         <td className={`px-3 py-2 text-center font-mono whitespace-nowrap ${isTkMaterial(item.materialId) ? TK_TEXT_CLASS : "text-slate-500 dark:text-slate-400"}`}>{item.materialId}</td>
                                         <td className="px-3 py-2 text-center">
                                           <span className={`px-1.5 py-0.5 rounded font-medium ${KIND_CLS[itemKind]}`}>{itemKind}</span>
