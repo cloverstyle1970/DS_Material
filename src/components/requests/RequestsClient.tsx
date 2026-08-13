@@ -18,6 +18,7 @@ import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 import { extractOrderRef } from "@/lib/order-ref";
 import DraggableModal from "@/components/common/DraggableModal";
 import Autocomplete from "@/components/common/Autocomplete";
+import { PhotoIconBtn } from "@/components/ui/PhotoIconBtn";
 
 interface SiteOption   { id: number; name: string }
 interface VendorOption { id: number; name: string }
@@ -243,6 +244,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
   const [orders,   setOrders]   = useState(initialOrders);
   const [showOrderBulkUpload, setShowOrderBulkUpload] = useState(false);
   const [matModelMap, setMatModelMap] = useState<Map<string, string>>(new Map()); // materialId → modelNo(규격)
+  const [matImgMap,   setMatImgMap]   = useState<Map<string, string[]>>(new Map()); // materialId → imgUrls
 
   // 숨어 있던 탭이 다시 보일 때 신청/발주 목록을 다시 받아 stale 방지
   const reloadData = useCallback(() => {
@@ -278,11 +280,17 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
         setUserNames(active);
       })
       .catch(() => {});
-    api.get<{ id: string; modelNo: string | null }[]>("/api/materials")
+    api.get<{ id: string; modelNo: string | null; referenceImageUrl1?: string | null; referenceImageUrl2?: string | null; opinionImageUrl?: string | null }[]>("/api/materials")
       .then(data => {
         const m = new Map<string, string>();
-        data.forEach(x => m.set(x.id, x.modelNo ?? ""));
+        const imgs = new Map<string, string[]>();
+        data.forEach(x => {
+          m.set(x.id, x.modelNo ?? "");
+          const urls = [x.referenceImageUrl1, x.referenceImageUrl2, x.opinionImageUrl].filter((u): u is string => !!u);
+          if (urls.length > 0) imgs.set(x.id, urls);
+        });
         setMatModelMap(m);
+        setMatImgMap(imgs);
       })
       .catch(() => {});
   }, []);
@@ -1033,9 +1041,11 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                           </span>
                           <span className="text-xs text-gray-400 dark:text-gray-500">{fmtDateOnly(o.orderedAt)}</span>
                         </div>
-                        <p className={`font-medium mt-1.5 ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-100"}`}>
-                          {o.materialName} <span className="font-mono text-xs text-gray-400">{o.materialId}</span>
-                        </p>
+                        <div className={`flex items-center gap-1 font-medium mt-1.5 min-w-0 ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-100"}`}>
+                          <span className="truncate">{o.materialName}</span>
+                          <span className="font-mono text-xs text-gray-400 shrink-0">{o.materialId}</span>
+                          <PhotoIconBtn urls={matImgMap.get(o.materialId) ?? []} />
+                        </div>
                         <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-gray-600 dark:text-gray-300 mt-1">
                           <div><span className="text-gray-400">규격 </span>{matModelMap.get(o.materialId) || "-"}</div>
                           <div><span className="text-gray-400">수량 </span>{fmtNum(o.qty)}</div>
@@ -1135,7 +1145,12 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                       </td>
                     )}
                     <td className={`px-2 py-3 text-left font-mono whitespace-nowrap ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>{o.materialId}</td>
-                    <td className={`px-2 py-3 text-left font-medium max-w-[160px] truncate ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>{o.materialName}</td>
+                    <td className={`px-2 py-3 text-left font-medium max-w-[160px] ${isTkMaterial(o.materialId) ? TK_TEXT_CLASS : "text-black dark:text-white"}`}>
+                      <div className="flex items-center gap-1 min-w-0">
+                        <span className="truncate">{o.materialName}</span>
+                        <PhotoIconBtn urls={matImgMap.get(o.materialId) ?? []} />
+                      </div>
+                    </td>
                     <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">{matModelMap.get(o.materialId) || "-"}</td>
                     <td className="px-2 py-3 text-right tabular-nums text-black dark:text-white">
                       {fmtNum(o.qty)}
