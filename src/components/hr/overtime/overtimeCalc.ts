@@ -67,24 +67,23 @@ export function calcOvertimeResult(start: Date, end: Date, isHoliday: boolean): 
   if (isHoliday) {
     const holidayH   = Math.min(workH, 8);
     const overtimeH  = Math.max(0, workH - 8);
-    const overtimeStr = overtimeH > 0 ? ` + 잔업 ${overtimeH % 1 === 0 ? overtimeH : overtimeH.toFixed(1)}H` : "";
+    const holidayStr  = `${holidayH % 1 === 0 ? holidayH : holidayH.toFixed(1)}HR`;
+    const overtimeStr = overtimeH > 0 ? ` + ${overtimeH % 1 === 0 ? overtimeH : overtimeH.toFixed(1)}HR` : "";
     return {
       workHours:     workH,
       holidayHours:  holidayH,
       overtimeHours: overtimeH,
-      display:       `휴일근무 ${holidayH % 1 === 0 ? holidayH : holidayH.toFixed(1)}H${overtimeStr}`,
+      display:       `휴일 ${holidayStr}${overtimeStr}`,
     };
   }
 
   const overtimeH  = Math.max(0, workH - 8);
-  const overtimeStr = overtimeH > 0
-    ? `잔업 ${overtimeH % 1 === 0 ? overtimeH : overtimeH.toFixed(1)}H`
-    : `잔업 없음`;
+  const otStr = `${overtimeH % 1 === 0 ? overtimeH : overtimeH.toFixed(1)}HR`;
   return {
     workHours:     workH,
     holidayHours:  0,
     overtimeHours: overtimeH,
-    display:       overtimeStr,
+    display:       otStr,
   };
 }
 
