@@ -550,6 +550,10 @@ export default function OvertimeReportClient() {
             color: black !important; background: transparent !important;
             -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
+          #ot-print-doc input::placeholder,
+          #ot-print-doc textarea::placeholder {
+            color: transparent !important;
+          }
           #ot-print-doc th, #ot-print-doc td[data-label="true"] {
             background-color: #f0f0f0 !important;
             -webkit-print-color-adjust: exact; print-color-adjust: exact;
