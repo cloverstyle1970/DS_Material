@@ -394,9 +394,17 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
             <SiteInlineSearch value={siteName} onChange={setSiteName} sites={sites} />
           </FormField>
           <FormField label="발주참조번호" className="w-56">
-            <input type="text" value={orderRefNo} onChange={e => setOrderRefNo(e.target.value)}
-              placeholder="예: MNG2026060450"
-              className={`${inputCls} w-full`} />
+            <div className="flex items-center w-full border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-200">
+              <span className="pl-2 pr-0.5 text-xs font-medium text-gray-500 dark:text-gray-400 select-none whitespace-nowrap">MNG</span>
+              <input
+                type="text"
+                value={orderRefNo.startsWith("MNG") ? orderRefNo.slice(3) : orderRefNo}
+                onChange={e => setOrderRefNo("MNG" + e.target.value)}
+                placeholder="숫자 10자리"
+                maxLength={10}
+                className="flex-1 min-w-0 py-1 pr-2 text-xs font-medium text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:font-normal"
+              />
+            </div>
           </FormField>
           <FormField label="참조" className="flex-1 min-w-[280px]">
             <input type="text" value={reference} onChange={e => setReference(e.target.value)} className={`${inputCls} w-full`} />
