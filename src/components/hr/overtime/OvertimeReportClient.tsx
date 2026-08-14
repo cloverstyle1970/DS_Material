@@ -614,21 +614,37 @@ export default function OvertimeReportClient() {
                       </td>
                     </tr>
 
-                    {/* 작업자명 — 10명 1단 */}
+                    {/* 작업자명 + 비고 — 번호/성명/비고 3행 표 */}
                     <tr style={{ borderBottom: bdr }}>
-                      <td data-label="true" style={{ ...labelCell, height:"11mm" }}>작업자명</td>
-                      <td colSpan={3} style={{ padding:0, verticalAlign:"middle" }}>
+                      <td data-label="true" style={{ ...labelCell, padding:0, verticalAlign:"top" }}>
+                        <table style={{ width:"100%", height:"100%", borderCollapse:"collapse" }}>
+                          <tbody>
+                            <tr><td style={{ height:"6mm", borderBottom:bdr, textAlign:"center", padding:"0.5mm 2mm", fontSize:"8pt", color:"#777" }}>번 호</td></tr>
+                            <tr><td style={{ height:"9mm", borderBottom:bdr, textAlign:"center", padding:"0.5mm 2mm" }}>작업자명</td></tr>
+                            <tr><td style={{ height:"8mm", textAlign:"center", padding:"0.5mm 2mm" }}>비 고</td></tr>
+                          </tbody>
+                        </table>
+                      </td>
+                      <td colSpan={3} style={{ padding:0, verticalAlign:"top" }}>
                         <table style={{ width:"100%", borderCollapse:"collapse", height:"100%" }}>
                           <tbody>
-                            <tr>
+                            {/* 번호 행 */}
+                            <tr style={{ borderBottom: bdr }}>
+                              {Array.from({ length: 10 }, (_, i) => (
+                                <td key={i} style={{
+                                  borderLeft: bdr, width:"10%", height:"6mm",
+                                  textAlign:"center", fontSize:"8pt", color:"#555", fontWeight:"bold",
+                                  padding:"0.5mm",
+                                }}>{i + 1}</td>
+                              ))}
+                            </tr>
+                            {/* 작업자명 행 */}
+                            <tr style={{ borderBottom: bdr }}>
                               {f.workers.map((w, i) => (
                                 <td key={i} style={{
-                                  borderLeft: bdr,
+                                  borderLeft: bdr, width:"10%", height:"9mm",
+                                  textAlign:"center", verticalAlign:"middle", overflow:"visible",
                                   padding:"0.5mm 0.5mm",
-                                  textAlign:"center",
-                                  width:"10%",
-                                  verticalAlign:"middle",
-                                  overflow:"visible",
                                 }}>
                                   <WorkerSearchInput
                                     value={w}
@@ -640,25 +656,13 @@ export default function OvertimeReportClient() {
                                 </td>
                               ))}
                             </tr>
-                          </tbody>
-                        </table>
-                      </td>
-                    </tr>
-
-                    {/* 비고 — 작업자 10칸 1:1 대응 */}
-                    <tr style={{ borderBottom: bdr }}>
-                      <td data-label="true" style={{ ...labelCell, height:"9mm" }}>비 고</td>
-                      <td colSpan={3} style={{ padding:0, verticalAlign:"middle" }}>
-                        <table style={{ width:"100%", borderCollapse:"collapse", height:"100%" }}>
-                          <tbody>
+                            {/* 비고 행 */}
                             <tr>
                               {f.worker_notes.map((n, i) => (
                                 <td key={i} style={{
-                                  borderLeft: bdr,
+                                  borderLeft: bdr, width:"10%", height:"8mm",
+                                  textAlign:"center", verticalAlign:"middle",
                                   padding:"1mm 0.5mm",
-                                  textAlign:"center",
-                                  width:"10%",
-                                  verticalAlign:"middle",
                                 }}>
                                   <input
                                     style={{ ...iCell, textAlign:"center", padding:"0", fontSize:"8.5pt" }}
