@@ -16,7 +16,7 @@ export async function notifyOvertimeApprovalRequest(params: {
   await insertNotification({
     userId:  approverId,
     type:    "overtime_approval_request",
-    title:   `잔업보고서 결재 요청 — ${reportNo}`,
+    title:   `잔업보고서 승인 요청 — ${reportNo}`,
     message: `${authorName} · ${siteName} · ${startAt.slice(0, 10)}`,
     link:    LEDGER_HREF,
     refType: "overtime_report",

@@ -85,6 +85,8 @@ export const PERMISSION_MENUS: PermissionMenuGroup[] = [
       { href: "/hr/dept-rank",         label: "부서/직급관리" },
       { href: "/hr/team-crew",         label: "팀구성 관리" },
       { href: "/hr/rewards-punishments", label: "상벌사항 관리" },
+      { href: "/hr/overtime-report",   label: "잔업보고서" },
+      { href: "/hr/overtime-ledger",   label: "잔업보고서 등록대장" },
     ],
   },
   {
