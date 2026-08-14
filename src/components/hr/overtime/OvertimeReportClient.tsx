@@ -541,79 +541,90 @@ export default function OvertimeReportClient() {
                       </td>
                     </tr>
 
-                    {/* 작업일시 – 시작 */}
-                    <tr style={{ borderBottom: "1px solid #ccc" }}>
-                      <td data-label="true" rowSpan={2} style={{ ...labelCell, borderBottom:"none" }}>작업일시</td>
-                      <td colSpan={3} style={{ padding:"1.5mm 3mm", verticalAlign:"middle" }}>
-                        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                          <div style={{ display:"flex", alignItems:"center", flexWrap:"nowrap", gap:"0.8mm", fontSize:"10pt" }}>
-                            <span>20</span>
-                            <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_yr} placeholder="YY"
-                              onChange={e => { sf({ s_yr: e.target.value }); detectFromStart(e.target.value, f.s_mo, f.s_dy); }} />
-                            <span>년</span>
-                            <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_mo} placeholder="MM"
-                              onChange={e => { sf({ s_mo: e.target.value }); detectFromStart(f.s_yr, e.target.value, f.s_dy); }} />
-                            <span>월</span>
-                            <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_dy} placeholder="DD"
-                              onChange={e => { sf({ s_dy: e.target.value }); detectFromStart(f.s_yr, f.s_mo, e.target.value); }} />
-                            <span>일(</span>
-                            <span style={{ width:"5mm", textAlign:"center", fontWeight:"bold", color:"#1d4ed8" }}>{startDow || "??"}</span>
-                            <span>요일)</span>
-                            <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_hr} placeholder="HH"
-                              onChange={e => sf({ s_hr: e.target.value })} />
-                            <span>시</span>
-                            <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_mi} placeholder="MM"
-                              onChange={e => sf({ s_mi: e.target.value })} />
-                            <span>분부터</span>
-                          </div>
-                          <div style={{ fontSize:"10pt", fontWeight:"bold", flexShrink:0, borderLeft: bdr, paddingLeft:"4mm", marginLeft:"4mm" }}>
-                            {otResult
-                              ? <span style={{ color:"#1d4ed8" }}>({otResult.display})</span>
-                              : <span style={{ color:"#aaa" }}>(        HR)</span>}
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-
-                    {/* 작업일시 – 종료 */}
+                    {/* 작업일시 – 시작 + 종료 표 형태 */}
                     <tr style={{ borderBottom: bdr }}>
-                      <td colSpan={3} style={{ padding:"1.5mm 3mm", verticalAlign:"middle" }}>
-                        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                          <div style={{ display:"flex", alignItems:"center", flexWrap:"nowrap", gap:"0.8mm", fontSize:"10pt" }}>
-                            <span>20</span>
-                            <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_yr} placeholder="YY"
-                              onChange={e => sf({ e_yr: e.target.value })} />
-                            <span>년</span>
-                            <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_mo} placeholder="MM"
-                              onChange={e => sf({ e_mo: e.target.value })} />
-                            <span>월</span>
-                            <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_dy} placeholder="DD"
-                              onChange={e => sf({ e_dy: e.target.value })} />
-                            <span>일(</span>
-                            <span style={{ width:"5mm", textAlign:"center", fontWeight:"bold", color:"#1d4ed8" }}>{endDow || "??"}</span>
-                            <span>요일)</span>
-                            <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_hr} placeholder="HH"
-                              onChange={e => sf({ e_hr: e.target.value })} />
-                            <span>시</span>
-                            <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_mi} placeholder="MM"
-                              onChange={e => sf({ e_mi: e.target.value })} />
-                            <span>분까지</span>
-                          </div>
-                          <div style={{ fontSize:"9pt", flexShrink:0, display:"flex", alignItems:"center", gap:"2mm", borderLeft: bdr, paddingLeft:"4mm", marginLeft:"4mm" }}>
-                            <label style={{ display:"flex", alignItems:"center", gap:"1mm", cursor:"pointer" }}>
-                              <input type="checkbox" checked={f.is_holiday}
-                                onChange={e => sf({ is_holiday: e.target.checked, holiday_type: e.target.checked ? (f.holiday_type || "공휴일") : "" })} />
-                              휴일근무
-                            </label>
-                            {f.is_holiday && (
-                              <select value={f.holiday_type}
-                                onChange={e => sf({ holiday_type: e.target.value })}
-                                style={{ border:"none", borderBottom:"1px solid #888", background:"transparent", fontSize:"8.5pt", outline:"none" }}>
-                                <option>토요일</option><option>일요일</option><option>공휴일</option>
-                              </select>
-                            )}
-                          </div>
-                        </div>
+                      <td data-label="true" style={{ ...labelCell, borderBottom:"none" }}>작업일시</td>
+                      <td colSpan={3} style={{ padding:0 }}>
+                        <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                          <colgroup>
+                            <col style={{ width:"12mm" }} />
+                            <col />
+                            <col style={{ width:"36mm" }} />
+                          </colgroup>
+                          <tbody>
+                            {/* 시작 행 */}
+                            <tr style={{ borderBottom: "1px solid #ccc" }}>
+                              <td style={{ borderRight:bdr, textAlign:"center", fontSize:"9pt", fontWeight:"bold", padding:"1.5mm 0", verticalAlign:"middle" }}>시 작</td>
+                              <td style={{ padding:"1.5mm 3mm", verticalAlign:"middle" }}>
+                                <div style={{ display:"flex", alignItems:"center", flexWrap:"nowrap", gap:"0.8mm", fontSize:"10pt" }}>
+                                  <span>20</span>
+                                  <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_yr} placeholder="YY"
+                                    onChange={e => { sf({ s_yr: e.target.value }); detectFromStart(e.target.value, f.s_mo, f.s_dy); }} />
+                                  <span>년</span>
+                                  <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_mo} placeholder="MM"
+                                    onChange={e => { sf({ s_mo: e.target.value }); detectFromStart(f.s_yr, e.target.value, f.s_dy); }} />
+                                  <span>월</span>
+                                  <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_dy} placeholder="DD"
+                                    onChange={e => { sf({ s_dy: e.target.value }); detectFromStart(f.s_yr, f.s_mo, e.target.value); }} />
+                                  <span>일(</span>
+                                  <span style={{ width:"5mm", textAlign:"center", fontWeight:"bold", color:"#1d4ed8" }}>{startDow || "??"}</span>
+                                  <span>요일)</span>
+                                  <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_hr} placeholder="HH"
+                                    onChange={e => sf({ s_hr: e.target.value })} />
+                                  <span>시</span>
+                                  <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_mi} placeholder="MM"
+                                    onChange={e => sf({ s_mi: e.target.value })} />
+                                  <span>분부터</span>
+                                </div>
+                              </td>
+                              <td style={{ borderLeft:bdr, textAlign:"center", fontWeight:"bold", fontSize:"10pt", verticalAlign:"middle", padding:"1.5mm 2mm" }}>
+                                {otResult
+                                  ? <span style={{ color:"#1d4ed8" }}>{otResult.display}</span>
+                                  : <span style={{ color:"#aaa" }}>—— HR</span>}
+                              </td>
+                            </tr>
+                            {/* 종료 행 */}
+                            <tr>
+                              <td style={{ borderRight:bdr, textAlign:"center", fontSize:"9pt", fontWeight:"bold", padding:"1.5mm 0", verticalAlign:"middle" }}>종 료</td>
+                              <td style={{ padding:"1.5mm 3mm", verticalAlign:"middle" }}>
+                                <div style={{ display:"flex", alignItems:"center", flexWrap:"nowrap", gap:"0.8mm", fontSize:"10pt" }}>
+                                  <span>20</span>
+                                  <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_yr} placeholder="YY"
+                                    onChange={e => sf({ e_yr: e.target.value })} />
+                                  <span>년</span>
+                                  <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_mo} placeholder="MM"
+                                    onChange={e => sf({ e_mo: e.target.value })} />
+                                  <span>월</span>
+                                  <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_dy} placeholder="DD"
+                                    onChange={e => sf({ e_dy: e.target.value })} />
+                                  <span>일(</span>
+                                  <span style={{ width:"5mm", textAlign:"center", fontWeight:"bold", color:"#1d4ed8" }}>{endDow || "??"}</span>
+                                  <span>요일)</span>
+                                  <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_hr} placeholder="HH"
+                                    onChange={e => sf({ e_hr: e.target.value })} />
+                                  <span>시</span>
+                                  <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_mi} placeholder="MM"
+                                    onChange={e => sf({ e_mi: e.target.value })} />
+                                  <span>분까지</span>
+                                </div>
+                              </td>
+                              <td style={{ borderLeft:bdr, padding:"1.5mm 2mm", fontSize:"9pt", verticalAlign:"middle" }}>
+                                <label style={{ display:"flex", alignItems:"center", gap:"1mm", cursor:"pointer" }}>
+                                  <input type="checkbox" checked={f.is_holiday}
+                                    onChange={e => sf({ is_holiday: e.target.checked, holiday_type: e.target.checked ? (f.holiday_type || "공휴일") : "" })} />
+                                  휴일근무
+                                </label>
+                                {f.is_holiday && (
+                                  <select value={f.holiday_type}
+                                    onChange={e => sf({ holiday_type: e.target.value })}
+                                    style={{ marginTop:"0.5mm", border:"none", borderBottom:"1px solid #888", background:"transparent", fontSize:"8.5pt", outline:"none", width:"100%" }}>
+                                    <option>토요일</option><option>일요일</option><option>공휴일</option>
+                                  </select>
+                                )}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
                       </td>
                     </tr>
 
