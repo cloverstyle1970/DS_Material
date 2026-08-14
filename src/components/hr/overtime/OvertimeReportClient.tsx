@@ -337,8 +337,16 @@ export default function OvertimeReportClient() {
     setRejectModal(null); setRejectReason(""); await load();
   }
 
-  const canEdit   = (r: OvertimeReport) => !!user && (isManager || (r.author_id === user.id && r.approval_status !== "approved"));
+  const canEdit   = (r: OvertimeReport) => !!user && r.author_id === user.id && r.approval_status !== "approved";
+  const canDelete = (r: OvertimeReport) => !!user && r.author_id === user.id && r.approval_status !== "approved";
   const canApprove = (r: OvertimeReport) => !!user && r.approver_id === user.id && r.approval_status === "pending";
+
+  async function deleteReport(id: number, reportNo: string) {
+    if (!confirm(`보고서 ${reportNo}을(를) 삭제하시겠습니까?`)) return;
+    const { error } = await supabase.from("overtime_reports").delete().eq("id", id);
+    if (error) { alert("삭제 실패: " + error.message); return; }
+    load();
+  }
 
   // ── 셀 배경 스타일 (라벨) ──
   const labelCell: React.CSSProperties = {
@@ -1022,6 +1030,9 @@ export default function OvertimeReportClient() {
                         <div className="flex flex-col gap-1 shrink-0">
                           {canEdit(r) && (
                             <button onClick={() => openEdit(r)} className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded">수정</button>
+                          )}
+                          {canDelete(r) && (
+                            <button onClick={() => deleteReport(r.id, r.report_no)} className="px-2 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 rounded">삭제</button>
                           )}
                           <button onClick={() => openEdit(r, true)} className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded">🖨️ 인쇄</button>
                           {canApprove(r) && (
