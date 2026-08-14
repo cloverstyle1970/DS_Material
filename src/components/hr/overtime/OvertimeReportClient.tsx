@@ -528,43 +528,33 @@ export default function OvertimeReportClient() {
                       </td>
                     </tr>
 
-                    {/* 작업자명 — 5열 × 2행 표 */}
+                    {/* 작업자명 — 10명 1단 */}
                     <tr style={{ borderBottom: bdr }}>
-                      <td data-label="true" rowSpan={2} style={{ ...labelCell, borderBottom:"none" }}>작업자명</td>
-                      {f.workers.slice(0, 5).map((w, i) => (
-                        <td key={i} style={{
-                          borderLeft: bdr,
-                          borderBottom: bdr,
-                          padding:"1mm 1.5mm",
-                          textAlign:"center",
-                          width:"18.6%",
-                          verticalAlign:"middle",
-                        }}>
-                          <input
-                            style={{ ...iCell, textAlign:"center", padding:"0" }}
-                            value={w}
-                            placeholder={`작업자 ${i + 1}`}
-                            onChange={e => { const ws=[...f.workers]; ws[i]=e.target.value; sf({ workers: ws }); }}
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                    <tr style={{ borderBottom: bdr }}>
-                      {f.workers.slice(5, 10).map((w, i) => (
-                        <td key={i} style={{
-                          borderLeft: bdr,
-                          padding:"1mm 1.5mm",
-                          textAlign:"center",
-                          verticalAlign:"middle",
-                        }}>
-                          <input
-                            style={{ ...iCell, textAlign:"center", padding:"0" }}
-                            value={w}
-                            placeholder={`작업자 ${i + 6}`}
-                            onChange={e => { const ws=[...f.workers]; ws[i+5]=e.target.value; sf({ workers: ws }); }}
-                          />
-                        </td>
-                      ))}
+                      <td data-label="true" style={{ ...labelCell, height:"11mm" }}>작업자명</td>
+                      <td colSpan={3} style={{ padding:0, verticalAlign:"middle" }}>
+                        <table style={{ width:"100%", borderCollapse:"collapse", height:"100%" }}>
+                          <tbody>
+                            <tr>
+                              {f.workers.map((w, i) => (
+                                <td key={i} style={{
+                                  borderLeft: bdr,
+                                  padding:"1mm 0.5mm",
+                                  textAlign:"center",
+                                  width:"10%",
+                                  verticalAlign:"middle",
+                                }}>
+                                  <input
+                                    style={{ ...iCell, textAlign:"center", padding:"0", fontSize:"8.5pt" }}
+                                    value={w}
+                                    placeholder={`${i + 1}`}
+                                    onChange={e => { const ws=[...f.workers]; ws[i]=e.target.value; sf({ workers: ws }); }}
+                                  />
+                                </td>
+                              ))}
+                            </tr>
+                          </tbody>
+                        </table>
+                      </td>
                     </tr>
 
                     {/* 비고 */}
