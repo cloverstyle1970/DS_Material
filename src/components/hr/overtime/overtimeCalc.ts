@@ -56,34 +56,39 @@ export interface OvertimeResult {
   display:       string; // UI 표시 문자열
 }
 
+/** 잔업시간 0.5 단위 올림: 0 < x ≤ 0.5 → 0.5, 0.5 < x ≤ 1.0 → 1.0 */
+function roundOT(h: number): number {
+  return Math.ceil(h * 2) / 2;
+}
+function hrStr(h: number): string {
+  return `${h % 1 === 0 ? h : h.toFixed(1)}HR`;
+}
+
 export function calcOvertimeResult(start: Date, end: Date, isHoliday: boolean): OvertimeResult {
   const elapsedMin = (end.getTime() - start.getTime()) / 60000;
   if (elapsedMin <= 0) return { workHours: 0, holidayHours: 0, overtimeHours: 0, display: "-" };
 
-  const workMin  = calcWorkMinutes(elapsedMin);
-  const workH    = workMin / 60;
-  const workHStr = workH % 1 === 0 ? `${workH}` : workH.toFixed(1);
+  const workMin = calcWorkMinutes(elapsedMin);
+  const workH   = workMin / 60;
 
   if (isHoliday) {
-    const holidayH   = Math.min(workH, 8);
-    const overtimeH  = Math.max(0, workH - 8);
-    const holidayStr  = `${holidayH % 1 === 0 ? holidayH : holidayH.toFixed(1)}HR`;
-    const overtimeStr = overtimeH > 0 ? ` + ${overtimeH % 1 === 0 ? overtimeH : overtimeH.toFixed(1)}HR` : "";
+    const holidayH  = Math.min(workH, 8);
+    const overtimeH = roundOT(Math.max(0, workH - 8));
+    const overtimeStr = overtimeH > 0 ? ` + ${hrStr(overtimeH)}` : "";
     return {
       workHours:     workH,
       holidayHours:  holidayH,
       overtimeHours: overtimeH,
-      display:       `휴일 ${holidayStr}${overtimeStr}`,
+      display:       `휴일 ${hrStr(holidayH)}${overtimeStr}`,
     };
   }
 
-  const overtimeH  = Math.max(0, workH - 8);
-  const otStr = `${overtimeH % 1 === 0 ? overtimeH : overtimeH.toFixed(1)}HR`;
+  const overtimeH = roundOT(Math.max(0, workH - 8));
   return {
     workHours:     workH,
     holidayHours:  0,
     overtimeHours: overtimeH,
-    display:       otStr,
+    display:       hrStr(overtimeH),
   };
 }
 
