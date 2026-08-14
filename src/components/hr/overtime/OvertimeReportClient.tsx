@@ -566,7 +566,7 @@ export default function OvertimeReportClient() {
                               onChange={e => sf({ s_mi: e.target.value })} />
                             <span>분부터</span>
                           </div>
-                          <div style={{ fontSize:"10pt", fontWeight:"bold", marginLeft:"4mm", flexShrink:0 }}>
+                          <div style={{ fontSize:"10pt", fontWeight:"bold", flexShrink:0, borderLeft: bdr, paddingLeft:"4mm", marginLeft:"4mm" }}>
                             {otResult
                               ? <span style={{ color:"#1d4ed8" }}>({otResult.display})</span>
                               : <span style={{ color:"#aaa" }}>(        HR)</span>}
@@ -599,7 +599,7 @@ export default function OvertimeReportClient() {
                               onChange={e => sf({ e_mi: e.target.value })} />
                             <span>분까지</span>
                           </div>
-                          <div style={{ fontSize:"9pt", marginLeft:"4mm", flexShrink:0, display:"flex", alignItems:"center", gap:"2mm" }}>
+                          <div style={{ fontSize:"9pt", flexShrink:0, display:"flex", alignItems:"center", gap:"2mm", borderLeft: bdr, paddingLeft:"4mm", marginLeft:"4mm" }}>
                             <label style={{ display:"flex", alignItems:"center", gap:"1mm", cursor:"pointer" }}>
                               <input type="checkbox" checked={f.is_holiday}
                                 onChange={e => sf({ is_holiday: e.target.checked, holiday_type: e.target.checked ? (f.holiday_type || "공휴일") : "" })} />
