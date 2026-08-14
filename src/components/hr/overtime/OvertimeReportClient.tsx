@@ -608,12 +608,11 @@ export default function OvertimeReportClient() {
                                   <span>분까지</span>
                                 </div>
                               </td>
-                              <td style={{ borderLeft:bdr, padding:"1.5mm 2mm", fontSize:"9pt", verticalAlign:"middle" }}>
+                              <td style={{ borderLeft:bdr, padding:"1.5mm 2mm", verticalAlign:"middle" }}>
                                 <input
                                   style={{ ...iCell, fontSize:"9pt" }}
-                                  value={f.holiday_type}
-                                  onChange={e => sf({ holiday_type: e.target.value, is_holiday: e.target.value.trim() !== "" })}
-                                  placeholder=""
+                                  value={f.note}
+                                  onChange={e => sf({ note: e.target.value })}
                                 />
                               </td>
                             </tr>
