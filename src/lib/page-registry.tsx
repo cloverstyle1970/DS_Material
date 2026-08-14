@@ -57,6 +57,8 @@ import SalesInvoicesClient from "@/components/accounting/SalesInvoicesClient";
 import IncentiveClient from "@/components/accounting/IncentiveClient";
 import ManualCenterClient from "@/components/manual/ManualCenterClient";
 import ImprovementRequestsClient from "@/components/board/ImprovementRequestsClient";
+import OvertimeReportClient from "@/components/hr/overtime/OvertimeReportClient";
+import OvertimeLedgerClient from "@/components/hr/overtime/OvertimeLedgerClient";
 
 export interface PageEntry {
   label: string;
@@ -147,6 +149,14 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
         <RewardsPunishmentsClient />
       </div>
     ),
+  },
+  "/hr/overtime-report": {
+    label: "잔업보고서",
+    render: () => <OvertimeReportClient />,
+  },
+  "/hr/overtime-ledger": {
+    label: "잔업보고서 등록대장",
+    render: () => <OvertimeLedgerClient />,
   },
   "/uniform-safety": {
     label: "근무복·안전장구 신청",
