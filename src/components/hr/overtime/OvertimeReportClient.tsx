@@ -17,7 +17,7 @@ interface OvertimeReport {
   work_reasons: string[]; work_reason_etc: string | null; work_elevator: string | null;
   start_at: string; end_at: string; is_holiday: boolean; holiday_type: string | null;
   work_hours: number | null; holiday_hours: number | null; overtime_hours: number | null;
-  workers: string[]; work_content: string | null; work_result: string | null; note: string | null;
+  workers: string[]; worker_notes: string[]; work_content: string | null; work_result: string | null; note: string | null;
   approver_id: number | null; approval_status: string;
   submitted_at: string | null; approved_at: string | null; rejected_at: string | null; reject_reason: string | null;
   created_at: string; updated_at: string;
@@ -28,7 +28,7 @@ interface FormState {
   s_yr: string; s_mo: string; s_dy: string; s_hr: string; s_mi: string;
   e_yr: string; e_mo: string; e_dy: string; e_hr: string; e_mi: string;
   is_holiday: boolean; holiday_type: string;
-  workers: string[]; work_content: string; work_result: string; note: string;
+  workers: string[]; worker_notes: string[]; work_content: string; work_result: string; note: string;
   approver_id: number | null;
   work_hours: number | null; holiday_hours: number | null; overtime_hours: number | null;
 }
@@ -59,7 +59,7 @@ function makeEmptyForm(): FormState {
     s_yr: String(n.getFullYear()).slice(2), s_mo: String(n.getMonth()+1).padStart(2,"0"), s_dy: String(n.getDate()).padStart(2,"0"), s_hr: "", s_mi: "",
     e_yr: String(n.getFullYear()).slice(2), e_mo: String(n.getMonth()+1).padStart(2,"0"), e_dy: String(n.getDate()).padStart(2,"0"), e_hr: "", e_mi: "",
     is_holiday: false, holiday_type: "",
-    workers: Array(10).fill(""), work_content: "", work_result: "", note: "",
+    workers: Array(10).fill(""), worker_notes: Array(10).fill(""), work_content: "", work_result: "", note: "",
     approver_id: null, work_hours: null, holiday_hours: null, overtime_hours: null,
   };
 }
@@ -73,7 +73,9 @@ function reportToForm(r: OvertimeReport): FormState {
     s_yr: sp.yr, s_mo: sp.mo, s_dy: sp.dy, s_hr: sp.hr, s_mi: sp.mi,
     e_yr: ep.yr, e_mo: ep.mo, e_dy: ep.dy, e_hr: ep.hr, e_mi: ep.mi,
     is_holiday: r.is_holiday, holiday_type: r.holiday_type ?? "",
-    workers: ws, work_content: r.work_content ?? "", work_result: r.work_result ?? "", note: r.note ?? "",
+    workers: ws,
+    worker_notes: (() => { const ns=[...(r.worker_notes??[])]; while(ns.length<10) ns.push(""); return ns; })(),
+    work_content: r.work_content ?? "", work_result: r.work_result ?? "", note: r.note ?? "",
     approver_id: r.approver_id, work_hours: r.work_hours, holiday_hours: r.holiday_hours, overtime_hours: r.overtime_hours,
   };
 }
@@ -196,6 +198,7 @@ export default function OvertimeReportClient() {
         is_holiday: f.is_holiday, holiday_type: f.holiday_type || null,
         work_hours: f.work_hours, holiday_hours: f.holiday_hours, overtime_hours: f.overtime_hours,
         workers: f.workers.filter(w => w.trim()),
+        worker_notes: f.worker_notes,
         work_content: f.work_content.trim() || null, work_result: f.work_result.trim() || null,
         note: f.note.trim() || null, approver_id: f.approver_id,
         approval_status: submitForApproval ? "pending" : "draft",
@@ -557,11 +560,31 @@ export default function OvertimeReportClient() {
                       </td>
                     </tr>
 
-                    {/* 비고 */}
+                    {/* 비고 — 작업자 10칸 1:1 대응 */}
                     <tr style={{ borderBottom: bdr }}>
                       <td data-label="true" style={{ ...labelCell, height:"9mm" }}>비 고</td>
-                      <td colSpan={3} style={{ padding:"0 2mm", verticalAlign:"middle" }}>
-                        <input style={iCell} value={f.note} onChange={e => sf({ note: e.target.value })} />
+                      <td colSpan={3} style={{ padding:0, verticalAlign:"middle" }}>
+                        <table style={{ width:"100%", borderCollapse:"collapse", height:"100%" }}>
+                          <tbody>
+                            <tr>
+                              {f.worker_notes.map((n, i) => (
+                                <td key={i} style={{
+                                  borderLeft: bdr,
+                                  padding:"1mm 0.5mm",
+                                  textAlign:"center",
+                                  width:"10%",
+                                  verticalAlign:"middle",
+                                }}>
+                                  <input
+                                    style={{ ...iCell, textAlign:"center", padding:"0", fontSize:"8.5pt" }}
+                                    value={n}
+                                    onChange={e => { const ns=[...f.worker_notes]; ns[i]=e.target.value; sf({ worker_notes: ns }); }}
+                                  />
+                                </td>
+                              ))}
+                            </tr>
+                          </tbody>
+                        </table>
                       </td>
                     </tr>
 
