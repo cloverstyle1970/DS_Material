@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { calcOvertimeResult, dayOfWeekKr } from "./overtimeCalc";
+import { calcOvertimeResult, detectHoliday, dayOfWeekKr } from "./overtimeCalc";
 
 const WORK_REASONS = ["점검", "공사", "수리·부품교체", "상주", "조출", "기타"] as const;
 const bdr = "1px solid #444";
@@ -47,6 +47,29 @@ interface OTRow {
   approval_status: string;
 }
 
+interface EditForm {
+  site_name: string; work_instructor: string;
+  work_reasons: string[]; work_reason_etc: string; work_elevator: string;
+  start_at: string; end_at: string;
+  workers: string[]; worker_notes: string[];
+  work_content: string; work_result: string; note: string;
+  approver_id: number | null;
+}
+
+function rowToEditForm(r: OTRow): EditForm {
+  const ws = [...(r.workers ?? [])];      while (ws.length < 10) ws.push("");
+  const wn = [...(r.worker_notes ?? [])]; while (wn.length < 10) wn.push("");
+  return {
+    site_name: r.site_name, work_instructor: r.work_instructor ?? "",
+    work_reasons: r.work_reasons, work_reason_etc: r.work_reason_etc ?? "",
+    work_elevator: r.work_elevator ?? "",
+    start_at: r.start_at.slice(0, 16), end_at: r.end_at.slice(0, 16),
+    workers: ws, worker_notes: wn,
+    work_content: r.work_content ?? "", work_result: r.work_result ?? "",
+    note: r.note ?? "", approver_id: r.approver_id,
+  };
+}
+
 export default function OvertimeLedgerClient() {
   const { user } = useAuth();
   const isManager = user ? (isAdmin(user) || hasMenuPermission(user, OT_LEDGER_MENU_HREF, "update")) : false;
@@ -57,6 +80,10 @@ export default function OvertimeLedgerClient() {
   const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
   const [monthFilter, setMonthFilter] = useState("");
   const [detail, setDetail] = useState<OTRow | null>(null);
+  const [editingRow, setEditingRow] = useState<OTRow | null>(null);
+  const [editForm, setEditForm] = useState<EditForm | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const ef = (patch: Partial<EditForm>) => setEditForm(f => f ? { ...f, ...patch } : f);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -87,6 +114,42 @@ export default function OvertimeLedgerClient() {
 
   useEffect(() => { load(); }, [load]);
   useReloadOnActivate(load);
+
+  async function saveEdit() {
+    if (!editingRow || !editForm) return;
+    setEditSaving(true);
+    const s = new Date(editForm.start_at);
+    const e = new Date(editForm.end_at);
+    const { isHoliday, holidayType } = detectHoliday(s);
+    const ot = calcOvertimeResult(s, e, isHoliday);
+    const { error } = await supabase.from("overtime_reports").update({
+      site_name: editForm.site_name.trim(),
+      work_instructor: editForm.work_instructor.trim() || null,
+      work_reasons: editForm.work_reasons,
+      work_reason_etc: editForm.work_reasons.includes("기타") ? (editForm.work_reason_etc.trim() || null) : null,
+      work_elevator: editForm.work_elevator.trim() || null,
+      start_at: s.toISOString(), end_at: e.toISOString(),
+      is_holiday: isHoliday, holiday_type: isHoliday ? holidayType : null,
+      work_hours: ot.workHours, holiday_hours: ot.holidayHours, overtime_hours: ot.overtimeHours,
+      workers: editForm.workers, worker_notes: editForm.worker_notes,
+      work_content: editForm.work_content.trim() || null,
+      work_result: editForm.work_result.trim() || null,
+      note: editForm.note.trim() || null,
+      approver_id: editForm.approver_id,
+      updated_at: new Date().toISOString(),
+    }).eq("id", editingRow.id);
+    setEditSaving(false);
+    if (error) { alert("수정 실패: " + error.message); return; }
+    setEditingRow(null); setEditForm(null);
+    load();
+  }
+
+  async function deleteRow(id: number, reportNo: string) {
+    if (!confirm(`보고서 ${reportNo}을(를) 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+    const { error } = await supabase.from("overtime_reports").delete().eq("id", id);
+    if (error) { alert("삭제 실패: " + error.message); return; }
+    load();
+  }
 
   const years = Array.from(
     new Set(rows.map(r => r.start_at.slice(0, 4)))
@@ -175,7 +238,7 @@ export default function OvertimeLedgerClient() {
                   <th className="px-3 py-2 text-center">잔업</th>
                   <th className="px-3 py-2 text-left">작업사유</th>
                   {isManager && <th className="px-3 py-2 text-left">작성자</th>}
-                  <th className="px-3 py-2 text-center">상세</th>
+                  <th className="px-3 py-2 text-center">작업</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -215,10 +278,22 @@ export default function OvertimeLedgerClient() {
                         <td className="px-3 py-2">{author?.username ?? "-"}</td>
                       )}
                       <td className="px-3 py-2 text-center">
-                        <button onClick={() => setDetail(r)}
-                          className="text-xs text-blue-600 hover:underline dark:text-blue-400">
-                          보기
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button onClick={() => setDetail(r)}
+                            className="text-xs text-blue-600 hover:underline dark:text-blue-400">
+                            보기
+                          </button>
+                          {isManager && <>
+                            <button onClick={() => { setEditingRow(r); setEditForm(rowToEditForm(r)); }}
+                              className="text-xs text-gray-600 hover:underline dark:text-gray-300">
+                              수정
+                            </button>
+                            <button onClick={() => deleteRow(r.id, r.report_no)}
+                              className="text-xs text-red-500 hover:underline dark:text-red-400">
+                              삭제
+                            </button>
+                          </>}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -495,6 +570,135 @@ export default function OvertimeLedgerClient() {
           </>
         );
       })()}
+
+      {/* 수정 모달 (관리자) */}
+      {editingRow && editForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            {/* 헤더 */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
+              <span className="font-bold text-sm">잔업보고서 수정 — {editingRow.report_no}</span>
+              <button onClick={() => { setEditingRow(null); setEditForm(null); }}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+            </div>
+
+            {/* 폼 */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">현장명</label>
+                  <input className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
+                    value={editForm.site_name} onChange={e => ef({ site_name: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">작업지시자</label>
+                  <input className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
+                    value={editForm.work_instructor} onChange={e => ef({ work_instructor: e.target.value })} />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">작업사유</label>
+                <div className="flex flex-wrap gap-2">
+                  {WORK_REASONS.map(r => (
+                    <label key={r} className="flex items-center gap-1.5 px-3 py-1.5 border rounded-lg cursor-pointer text-xs select-none"
+                      style={{ borderColor: editForm.work_reasons.includes(r) ? "#2563eb" : "#d1d5db", background: editForm.work_reasons.includes(r) ? "#eff6ff" : "white", color: editForm.work_reasons.includes(r) ? "#1d4ed8" : "#374151" }}>
+                      <input type="checkbox" className="hidden" checked={editForm.work_reasons.includes(r)}
+                        onChange={e => ef({ work_reasons: e.target.checked ? [...editForm.work_reasons, r] : editForm.work_reasons.filter(x => x !== r) })} />
+                      {r}
+                    </label>
+                  ))}
+                </div>
+                {editForm.work_reasons.includes("기타") && (
+                  <input className="mt-2 w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
+                    value={editForm.work_reason_etc} onChange={e => ef({ work_reason_etc: e.target.value })} placeholder="기타 내용" />
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">작업호기</label>
+                <input className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
+                  value={editForm.work_elevator} onChange={e => ef({ work_elevator: e.target.value })} placeholder="예: 1호기, 2·3호기" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">시작일시</label>
+                  <input type="datetime-local"
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
+                    value={editForm.start_at} onChange={e => ef({ start_at: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">종료일시</label>
+                  <input type="datetime-local"
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
+                    value={editForm.end_at} onChange={e => ef({ end_at: e.target.value })} />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">작업자 / 비고</label>
+                <div className="space-y-1.5">
+                  {editForm.workers.map((w, i) => (
+                    <div key={i} className="flex gap-2 items-center">
+                      <span className="text-xs text-gray-400 w-14 shrink-0">작업자{i + 1}</span>
+                      <input className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
+                        value={w} placeholder={`작업자${i + 1}`}
+                        onChange={e => { const ws = [...editForm.workers]; ws[i] = e.target.value; ef({ workers: ws }); }} />
+                      <input className="w-28 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
+                        value={editForm.worker_notes[i]} placeholder="비고"
+                        onChange={e => { const ns = [...editForm.worker_notes]; ns[i] = e.target.value; ef({ worker_notes: ns }); }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">작업내용</label>
+                <textarea rows={4}
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm resize-none bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
+                  value={editForm.work_content} onChange={e => ef({ work_content: e.target.value })} />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">작업결과</label>
+                <textarea rows={3}
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm resize-none bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
+                  value={editForm.work_result} onChange={e => ef({ work_result: e.target.value })} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">잔업승인자</label>
+                  <select className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
+                    value={editForm.approver_id ?? ""}
+                    onChange={e => ef({ approver_id: e.target.value ? Number(e.target.value) : null })}>
+                    <option value="">— 선택 —</option>
+                    {accounts.map(a => <option key={a.id} value={a.id}>{a.username}{a.dept ? ` (${a.dept})` : ""}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">메모</label>
+                  <input className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
+                    value={editForm.note} onChange={e => ef({ note: e.target.value })} />
+                </div>
+              </div>
+            </div>
+
+            {/* 푸터 */}
+            <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-200 dark:border-gray-700 shrink-0">
+              <button onClick={() => { setEditingRow(null); setEditForm(null); }}
+                className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg font-medium">
+                취소
+              </button>
+              <button onClick={saveEdit} disabled={editSaving}
+                className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50">
+                {editSaving ? "저장중…" : "저장"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
