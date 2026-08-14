@@ -56,8 +56,8 @@ function makeEmptyForm(): FormState {
   return {
     site_name: "", work_instructor: "", work_instructor_id: null,
     work_reasons: [], work_reason_etc: "", work_elevator: "",
-    s_yr: String(n.getFullYear()).slice(2), s_mo: String(n.getMonth()+1).padStart(2,"0"), s_dy: String(n.getDate()).padStart(2,"0"), s_hr: "07", s_mi: "00",
-    e_yr: String(n.getFullYear()).slice(2), e_mo: String(n.getMonth()+1).padStart(2,"0"), e_dy: String(n.getDate()).padStart(2,"0"), e_hr: "16", e_mi: "00",
+    s_yr: String(n.getFullYear()).slice(2), s_mo: String(n.getMonth()+1).padStart(2,"0"), s_dy: String(n.getDate()).padStart(2,"0"), s_hr: "", s_mi: "",
+    e_yr: String(n.getFullYear()).slice(2), e_mo: String(n.getMonth()+1).padStart(2,"0"), e_dy: String(n.getDate()).padStart(2,"0"), e_hr: "", e_mi: "",
     is_holiday: false, holiday_type: "",
     workers: Array(8).fill(""), work_content: "", work_result: "", note: "",
     approver_id: null, work_hours: null, holiday_hours: null, overtime_hours: null,
@@ -475,7 +475,7 @@ export default function OvertimeReportClient() {
                           <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_hr} placeholder="HH"
                             onChange={e => sf({ s_hr: e.target.value })} />
                           <span>시</span>
-                          <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_mi} placeholder="mm"
+                          <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_mi} placeholder="MM"
                             onChange={e => sf({ s_mi: e.target.value })} />
                           <span>분부터</span>
                         </div>
@@ -506,7 +506,7 @@ export default function OvertimeReportClient() {
                           <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_hr} placeholder="HH"
                             onChange={e => sf({ e_hr: e.target.value })} />
                           <span>시</span>
-                          <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_mi} placeholder="mm"
+                          <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_mi} placeholder="MM"
                             onChange={e => sf({ e_mi: e.target.value })} />
                           <span>분부터</span>
                         </div>
