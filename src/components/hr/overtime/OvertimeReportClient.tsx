@@ -108,6 +108,14 @@ function WorkerSearchInput({ value, onChange, accounts, placeholder, cellStyle }
     }
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" && suggestions.length === 1) {
+      e.preventDefault();
+      onChange(suggestions[0].username);
+      setOpen(false);
+    }
+  }
+
   return (
     <>
       <input
@@ -116,6 +124,7 @@ function WorkerSearchInput({ value, onChange, accounts, placeholder, cellStyle }
         onChange={e => onChange(e.target.value)}
         onFocus={() => { updatePos(); setOpen(true); }}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={handleKeyDown}
         placeholder={placeholder}
         style={cellStyle}
       />
