@@ -548,6 +548,8 @@ export default function OvertimeReportClient() {
           .ot-print-hide { display: none !important; }
           #ot-print-doc input, #ot-print-doc select, #ot-print-doc textarea {
             color: black !important; background: transparent !important;
+            border: none !important; border-bottom: none !important;
+            outline: none !important; box-shadow: none !important;
             -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
           #ot-print-doc input::placeholder,
