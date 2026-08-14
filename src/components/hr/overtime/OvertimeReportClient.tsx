@@ -634,7 +634,7 @@ export default function OvertimeReportClient() {
                             <tr style={{ borderBottom: bdr }}>
                               {f.workers.map((w, i) => (
                                 <td key={i} style={{
-                                  borderLeft: bdr, width:"10%", height:"9mm",
+                                  borderLeft: i === 0 ? "none" : bdr, width:"10%", height:"9mm",
                                   textAlign:"center", verticalAlign:"middle", overflow:"visible",
                                   padding:"0.5mm 0.5mm",
                                 }}>
@@ -652,7 +652,7 @@ export default function OvertimeReportClient() {
                             <tr>
                               {f.worker_notes.map((n, i) => (
                                 <td key={i} style={{
-                                  borderLeft: bdr, width:"10%", height:"8mm",
+                                  borderLeft: i === 0 ? "none" : bdr, width:"10%", height:"8mm",
                                   textAlign:"center", verticalAlign:"middle",
                                   padding:"1mm 0.5mm",
                                 }}>
