@@ -609,18 +609,12 @@ export default function OvertimeReportClient() {
                                 </div>
                               </td>
                               <td style={{ borderLeft:bdr, padding:"1.5mm 2mm", fontSize:"9pt", verticalAlign:"middle" }}>
-                                <label style={{ display:"flex", alignItems:"center", gap:"1mm", cursor:"pointer" }}>
-                                  <input type="checkbox" checked={f.is_holiday}
-                                    onChange={e => sf({ is_holiday: e.target.checked, holiday_type: e.target.checked ? (f.holiday_type || "공휴일") : "" })} />
-                                  휴일근무
-                                </label>
-                                {f.is_holiday && (
-                                  <select value={f.holiday_type}
-                                    onChange={e => sf({ holiday_type: e.target.value })}
-                                    style={{ marginTop:"0.5mm", border:"none", borderBottom:"1px solid #888", background:"transparent", fontSize:"8.5pt", outline:"none", width:"100%" }}>
-                                    <option>토요일</option><option>일요일</option><option>공휴일</option>
-                                  </select>
-                                )}
+                                <input
+                                  style={{ ...iCell, fontSize:"9pt" }}
+                                  value={f.holiday_type}
+                                  onChange={e => sf({ holiday_type: e.target.value, is_holiday: e.target.value.trim() !== "" })}
+                                  placeholder="휴일근무 사유"
+                                />
                               </td>
                             </tr>
                           </tbody>
