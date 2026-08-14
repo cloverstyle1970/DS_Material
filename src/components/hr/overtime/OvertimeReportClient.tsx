@@ -239,8 +239,13 @@ export default function OvertimeReportClient() {
     }
   }
 
-  const startDow = startDT ? dayOfWeekKr(new Date(startDT)) : "";
-  const endDow   = endDT   ? dayOfWeekKr(new Date(endDT))   : "";
+  function dowFromParts(yr: string, mo: string, dy: string) {
+    if (!yr || !mo || !dy) return "";
+    const d = new Date(`20${yr.padStart(2,"0")}-${mo.padStart(2,"0")}-${dy.padStart(2,"0")}`);
+    return isNaN(d.getTime()) ? "" : dayOfWeekKr(d);
+  }
+  const startDow = dowFromParts(f.s_yr, f.s_mo, f.s_dy);
+  const endDow   = dowFromParts(f.e_yr, f.e_mo, f.e_dy);
   const activeAccounts = useMemo(() => accounts.filter(a => a.status !== "퇴직"), [accounts]);
   const approverAcc    = accounts.find(a => a.id === f.approver_id);
   const authorAcc      = accounts.find(a => a.id === user?.id);
