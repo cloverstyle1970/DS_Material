@@ -521,7 +521,7 @@ export default function OvertimeReportClient() {
                               <input type="checkbox" checked={f.work_reasons.includes(r)}
                                 onChange={e => sf({ work_reasons: e.target.checked ? [...f.work_reasons,r] : f.work_reasons.filter(x=>x!==r) })}
                                 style={{ accentColor:"#444" }} />
-                              {r}({f.work_reasons.includes(r) ? "✔" : " "})
+                              {r}
                             </label>
                           ))}
                           {f.work_reasons.includes("기타") && (
