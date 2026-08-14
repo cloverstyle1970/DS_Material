@@ -613,7 +613,7 @@ export default function OvertimeReportClient() {
                                   style={{ ...iCell, fontSize:"9pt" }}
                                   value={f.holiday_type}
                                   onChange={e => sf({ holiday_type: e.target.value, is_holiday: e.target.value.trim() !== "" })}
-                                  placeholder="휴일근무 사유"
+                                  placeholder=""
                                 />
                               </td>
                             </tr>
