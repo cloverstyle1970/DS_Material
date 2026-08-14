@@ -563,7 +563,7 @@ export default function OvertimeReportClient() {
         <div className="flex gap-2">
           {editingId !== null ? (
             <>
-              {!isMobile && <>
+              <>
                 <button onClick={() => save(false)} disabled={saving}
                   className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded font-medium disabled:opacity-50">
                   {saving ? "저장중…" : "임시저장"}
@@ -572,11 +572,11 @@ export default function OvertimeReportClient() {
                   className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium disabled:opacity-50">
                   {saving ? "제출중…" : "승인 요청"}
                 </button>
-                <button onClick={() => window.print()}
+                {!isMobile && <button onClick={() => window.print()}
                   className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded font-medium">
                   🖨️ 인쇄
-                </button>
-              </>}
+                </button>}
+              </>
               <button onClick={() => setEditingId(null)}
                 className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700">
                 목록으로
@@ -613,258 +613,9 @@ export default function OvertimeReportClient() {
               )}
             </div>
 
-            {/* ── 모바일 스텝 폼 ── */}
-            {isMobile && (() => {
-              const STEPS = [
-                "현장명", "작업지시자", "작업사유", "작업호기",
-                "시작일시", "종료일시", "잔업시간", "작업자",
-                "작업내용", "작업결과", "잔업 승인자",
-              ];
-              const total = STEPS.length;
-              const isFirst = mobileStep === 0;
-              const isLast  = mobileStep === total - 1;
-              return (
-                <div className="flex flex-col" style={{ minHeight: "calc(100dvh - 112px)" }}>
-                  {/* 진행률 바 */}
-                  <div className="px-4 pt-4 pb-2 shrink-0">
-                    <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1.5">
-                      <span className="font-semibold text-gray-700 dark:text-gray-200">{STEPS[mobileStep]}</span>
-                      <span>{mobileStep + 1} / {total}</span>
-                    </div>
-                    <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full transition-all duration-300"
-                        style={{ width: `${((mobileStep + 1) / total) * 100}%` }} />
-                    </div>
-                  </div>
-
-                  {/* 스텝 콘텐츠 */}
-                  <div className="flex-1 px-4 py-4 overflow-y-auto">
-
-                    {/* Step 0: 현장명 */}
-                    {mobileStep === 0 && (
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">현장명</label>
-                        <input autoFocus
-                          className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-base bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-400"
-                          value={f.site_name} onChange={e => sf({ site_name: e.target.value })}
-                          placeholder="현장명을 입력하세요"
-                          onKeyDown={e => { if (e.nativeEvent.isComposing) return; if (e.key === "Enter") setMobileStep(1); }} />
-                      </div>
-                    )}
-
-                    {/* Step 1: 작업지시자 */}
-                    {mobileStep === 1 && (
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">작업지시자</label>
-                        <AccountSearchInput
-                          accountId={f.work_instructor_id}
-                          freeText={f.work_instructor}
-                          allowFreeText
-                          onSelect={(id, name) => sf({ work_instructor_id: id, work_instructor: name })}
-                          accounts={activeAccounts}
-                          placeholder="이름 검색 또는 직접 입력"
-                          className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-base bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-400"
-                        />
-                      </div>
-                    )}
-
-                    {/* Step 2: 작업사유 */}
-                    {mobileStep === 2 && (
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">작업사유</label>
-                        <div className="flex flex-wrap gap-2">
-                          {WORK_REASONS.map(r => (
-                            <label key={r}
-                              className="flex items-center gap-2 px-4 py-2.5 border-2 rounded-xl cursor-pointer text-sm font-medium select-none transition-colors"
-                              style={{ borderColor: f.work_reasons.includes(r) ? "#2563eb" : "#d1d5db", background: f.work_reasons.includes(r) ? "#eff6ff" : "white", color: f.work_reasons.includes(r) ? "#1d4ed8" : "#374151" }}>
-                              <input type="checkbox" className="hidden" checked={f.work_reasons.includes(r)}
-                                onChange={e => sf({ work_reasons: e.target.checked ? [...f.work_reasons, r] : f.work_reasons.filter(x => x !== r) })} />
-                              {r}
-                            </label>
-                          ))}
-                        </div>
-                        {f.work_reasons.includes("기타") && (
-                          <input className="mt-3 w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-base bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-400"
-                            value={f.work_reason_etc} onChange={e => sf({ work_reason_etc: e.target.value })} placeholder="기타 내용 입력" />
-                        )}
-                      </div>
-                    )}
-
-                    {/* Step 3: 작업호기 */}
-                    {mobileStep === 3 && (
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">작업호기</label>
-                        <input autoFocus
-                          className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-base bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-400"
-                          value={f.work_elevator} onChange={e => sf({ work_elevator: e.target.value })}
-                          placeholder="예: 1호기, 2·3호기"
-                          onKeyDown={e => { if (e.nativeEvent.isComposing) return; if (e.key === "Enter") setMobileStep(4); }} />
-                      </div>
-                    )}
-
-                    {/* Step 4: 시작일시 */}
-                    {mobileStep === 4 && (
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">시작일시</label>
-                        <input type="datetime-local"
-                          className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-base bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-400"
-                          value={startDT || ""}
-                          onChange={e => {
-                            const p = parseDT(e.target.value);
-                            sf({ s_yr: p.yr, s_mo: p.mo, s_dy: p.dy, s_hr: p.hr, s_mi: p.mi });
-                            detectFromStart(p.yr, p.mo, p.dy);
-                          }} />
-                        {startDow && <p className="text-sm text-blue-600 dark:text-blue-400 mt-2 font-medium">{startDow}요일</p>}
-                      </div>
-                    )}
-
-                    {/* Step 5: 종료일시 */}
-                    {mobileStep === 5 && (
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">종료일시</label>
-                        <input type="datetime-local"
-                          className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-base bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-400"
-                          value={endDT || ""}
-                          onChange={e => {
-                            const p = parseDT(e.target.value);
-                            sf({ e_yr: p.yr, e_mo: p.mo, e_dy: p.dy, e_hr: p.hr, e_mi: p.mi });
-                          }} />
-                        {endDow && <p className="text-sm text-blue-600 dark:text-blue-400 mt-2 font-medium">{endDow}요일</p>}
-                      </div>
-                    )}
-
-                    {/* Step 6: 잔업시간 */}
-                    {mobileStep === 6 && (
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">잔업시간</label>
-                        {otResult ? (
-                          <div className="bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-xl px-4 py-4">
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">자동 계산</p>
-                            <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{otResult.display}</p>
-                          </div>
-                        ) : (
-                          <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-4 text-center text-gray-400 text-sm">
-                            시작/종료 일시를 입력하면 자동 계산됩니다
-                          </div>
-                        )}
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mt-3 mb-1.5">메모 (선택)</label>
-                        <input
-                          className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-base bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-400"
-                          value={f.note} onChange={e => sf({ note: e.target.value })} placeholder="직접 입력" />
-                      </div>
-                    )}
-
-                    {/* Step 7: 작업자 */}
-                    {mobileStep === 7 && (
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                          작업자 <span className="font-normal text-gray-400">(최대 10명)</span>
-                        </label>
-                        <div className="space-y-2">
-                          {f.workers.map((w, i) => (
-                            <div key={i} className="flex gap-2 items-center">
-                              <span className="text-xs text-gray-400 shrink-0" style={{ width: "3.5rem" }}>작업자{i + 1}</span>
-                              <div className="flex-1">
-                                <WorkerSearchInput
-                                  value={w}
-                                  placeholder={`작업자${i + 1}`}
-                                  accounts={activeAccounts}
-                                  cellStyle={{ width: "100%", border: "1px solid #d1d5db", borderRadius: "12px", padding: "8px 12px", fontSize: "14px", outline: "none", background: "white" }}
-                                  onChange={v => {
-                                    if (v && f.workers.some((w, j) => j !== i && w === v)) {
-                                      alert(`'${v}'은(는) 이미 등록된 작업자입니다.`); return;
-                                    }
-                                    const ws = [...f.workers]; ws[i] = v; sf({ workers: ws });
-                                  }}
-                                />
-                              </div>
-                              <input
-                                className="w-24 border border-gray-300 dark:border-gray-600 rounded-xl px-2 py-2 text-sm bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-400"
-                                value={f.worker_notes[i]} placeholder="비고"
-                                onChange={e => { const ns = [...f.worker_notes]; ns[i] = e.target.value; sf({ worker_notes: ns }); }} />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Step 8: 작업내용 */}
-                    {mobileStep === 8 && (
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">작업내용</label>
-                        <textarea autoFocus
-                          className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-base resize-none bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-400"
-                          rows={10} value={f.work_content} onChange={e => sf({ work_content: e.target.value })}
-                          placeholder="작업내용을 입력하세요…" />
-                      </div>
-                    )}
-
-                    {/* Step 9: 작업결과 */}
-                    {mobileStep === 9 && (
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">작업결과</label>
-                        <textarea autoFocus
-                          className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-base resize-none bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-400"
-                          rows={10} value={f.work_result} onChange={e => sf({ work_result: e.target.value })}
-                          placeholder="작업결과를 입력하세요…" />
-                      </div>
-                    )}
-
-                    {/* Step 10: 잔업 승인자 */}
-                    {mobileStep === 10 && (
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">잔업 승인자</label>
-                        <AccountSearchInput
-                          accountId={f.approver_id}
-                          onSelect={id => sf({ approver_id: id })}
-                          accounts={activeAccounts}
-                          placeholder="— 승인자 검색 —"
-                          className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-base bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-400"
-                        />
-                        {otResult && (
-                          <div className="mt-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-xl px-4 py-3">
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">잔업시간</p>
-                            <p className="text-xl font-bold text-blue-700 dark:text-blue-300">{otResult.display}</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                  </div>
-
-                  {/* 하단 내비게이션 */}
-                  <div className="shrink-0 px-4 py-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex gap-3">
-                    {!isFirst && (
-                      <button onClick={() => setMobileStep(s => s - 1)}
-                        className="px-5 py-3 text-sm bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl font-medium">
-                        ← 이전
-                      </button>
-                    )}
-                    {!isLast && (
-                      <button onClick={() => setMobileStep(s => s + 1)}
-                        className="flex-1 py-3 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium">
-                        다음 →
-                      </button>
-                    )}
-                    {isLast && (
-                      <>
-                        <button onClick={() => save(false)} disabled={saving}
-                          className="flex-1 py-3 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-xl font-medium disabled:opacity-50">
-                          {saving ? "저장중…" : "임시저장"}
-                        </button>
-                        <button onClick={() => save(true)} disabled={saving}
-                          className="flex-1 py-3 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium disabled:opacity-50">
-                          {saving ? "제출중…" : "승인 요청"}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
-
             {/* A4 문서 */}
-            {!isMobile && <div className="flex justify-center py-8 print:py-0">
+            <div className="overflow-x-auto">
+            <div className="flex justify-center py-8 print:py-0" style={{ minWidth: "210mm" }}>
               <div id="ot-print-doc" style={{
                 width: "210mm", minHeight: "297mm",
                 padding: "12mm 14mm",
@@ -1185,7 +936,8 @@ export default function OvertimeReportClient() {
                 </div>
 
               </div>{/* /ot-print-doc */}
-            </div>}
+            </div>
+            </div>{/* /overflow-x-auto */}
 
           </>
         )}

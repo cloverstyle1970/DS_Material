@@ -43,6 +43,7 @@ interface OTRow {
   work_result: string | null;
   note: string | null;
   approver_id: number | null;
+  approver_signature: string | null;
   approved_at: string | null;
   approval_status: string;
 }
@@ -387,22 +388,34 @@ export default function OvertimeLedgerClient() {
                         </tr>
                       </thead>
                       <tbody>
-                        <tr>
-                          {[0,1,2,3,4].map(i => (
-                            <td key={i} style={{ border: bdr, width:"17mm", height:"20mm", textAlign:"center", verticalAlign:"middle", fontSize:"8pt", color:"#444" }}>
-                              {i === 0 && approver && <span style={{ fontSize:"8pt", fontWeight:"bold" }}>{approver.username}</span>}
-                            </td>
-                          ))}
-                        </tr>
-                        <tr>
-                          {[0,1,2,3,4].map(i => (
-                            <td key={i} style={{ border: bdr, textAlign:"center", fontSize:"9pt", color:"#888", height:"6mm", padding:0 }}>
-                              {i === 0 && detail.approved_at
-                                ? new Date(detail.approved_at).toLocaleDateString("ko-KR", { month:"2-digit", day:"2-digit" })
-                                : "/"}
-                            </td>
-                          ))}
-                        </tr>
+                        {(() => {
+                          const sigCol = approver?.username === "황진한" ? 0 : 1;
+                          const isApproved = detail.approval_status === "approved";
+                          const approvedAtStr = isApproved && detail.approved_at
+                            ? new Date(detail.approved_at).toLocaleDateString("ko-KR", { month:"2-digit", day:"2-digit" }).replace(". ", "/").replace(".", "")
+                            : null;
+                          return (
+                            <>
+                              <tr>
+                                {[0,1,2,3,4].map(i => (
+                                  <td key={i} style={{ border: bdr, width:"17mm", height:"20mm", textAlign:"center", verticalAlign:"middle", fontSize:"8pt", color:"#444", padding:"1mm" }}>
+                                    {i === sigCol && isApproved && detail.approver_signature && (
+                                      <img src={detail.approver_signature} alt="서명"
+                                        style={{ maxWidth:"100%", maxHeight:"17mm", objectFit:"contain" }} />
+                                    )}
+                                  </td>
+                                ))}
+                              </tr>
+                              <tr>
+                                {[0,1,2,3,4].map(i => (
+                                  <td key={i} style={{ border: bdr, textAlign:"center", fontSize:"9pt", color:"#555", height:"6mm", padding:0 }}>
+                                    {i === sigCol && approvedAtStr ? approvedAtStr : "/"}
+                                  </td>
+                                ))}
+                              </tr>
+                            </>
+                          );
+                        })()}
                       </tbody>
                     </table>
                   </div>
