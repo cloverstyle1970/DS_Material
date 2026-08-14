@@ -632,7 +632,7 @@ export default function OvertimeReportClient() {
                                 }}>
                                   <WorkerSearchInput
                                     value={w}
-                                    placeholder={`${i + 1}`}
+                                    placeholder={`작업자${i + 1}`}
                                     accounts={activeAccounts}
                                     cellStyle={{ ...iCell, textAlign:"center", padding:"0", fontSize:"8.5pt", width:"100%" }}
                                     onChange={v => { const ws=[...f.workers]; ws[i]=v; sf({ workers: ws }); }}
