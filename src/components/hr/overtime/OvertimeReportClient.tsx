@@ -163,6 +163,119 @@ function WorkerSearchInput({ value, onChange, accounts, placeholder, cellStyle }
   );
 }
 
+/** 계정 검색 입력 — 승인자·작업지시자 공용.
+ *  allowFreeText=true 이면 목록에 없는 이름도 허용(작업지시자).
+ *  false 이면 blur 시 미매칭 입력을 마지막 유효값으로 되돌림(승인자). */
+function AccountSearchInput({ accountId, freeText = "", onSelect, accounts, placeholder, style, className, allowFreeText = false }: {
+  accountId: number | null;
+  freeText?: string;
+  onSelect: (id: number | null, name: string) => void;
+  accounts: Account[];
+  placeholder?: string;
+  style?: React.CSSProperties;
+  className?: string;
+  allowFreeText?: boolean;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [text, setText] = useState("");
+  const [open, setOpen] = useState(false);
+  const [dropRect, setDropRect] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (accountId) {
+      const acc = accounts.find(a => a.id === accountId);
+      setText(acc?.username ?? "");
+    } else {
+      setText(freeText);
+    }
+  }, [accountId, freeText, accounts]);
+
+  const suggestions = useMemo(() => {
+    const q = text.trim();
+    if (!q) return accounts.slice(0, 15);
+    return accounts.filter(a => a.username.includes(q) || (a.dept ?? "").includes(q)).slice(0, 15);
+  }, [text, accounts]);
+
+  function pick(a: Account) {
+    onSelect(a.id, a.username);
+    setText(a.username);
+    setOpen(false);
+  }
+
+  function updatePos() {
+    if (inputRef.current) {
+      const r = inputRef.current.getBoundingClientRect();
+      setDropRect({ top: r.bottom + 2, left: r.left });
+    }
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setText(e.target.value);
+    if (!e.target.value.trim()) onSelect(null, "");
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" && suggestions.length === 1) {
+      e.preventDefault(); pick(suggestions[0]);
+    }
+    if (e.key === "Escape") setOpen(false);
+  }
+
+  function handleBlur() {
+    setTimeout(() => {
+      const q = text.trim();
+      if (!q) { onSelect(null, ""); setOpen(false); return; }
+      const exact = accounts.find(a => a.username === q);
+      if (exact) { onSelect(exact.id, exact.username); }
+      else if (allowFreeText) { onSelect(null, q); }
+      else {
+        // 목록에 없으면 이전 값으로 복원
+        const prev = accountId ? (accounts.find(a => a.id === accountId)?.username ?? "") : "";
+        setText(prev);
+        if (!prev) onSelect(null, "");
+      }
+      setOpen(false);
+    }, 150);
+  }
+
+  return (
+    <>
+      <input ref={inputRef} value={text}
+        onChange={handleChange}
+        onFocus={() => { updatePos(); setOpen(true); }}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        style={style} className={className}
+      />
+      {open && dropRect && typeof document !== "undefined" && createPortal(
+        <div style={{
+          position: "fixed", top: dropRect.top, left: dropRect.left,
+          minWidth: 200, zIndex: 9999,
+          background: "white", border: "1px solid #bbb",
+          borderRadius: 4, boxShadow: "0 6px 18px rgba(0,0,0,0.15)",
+          maxHeight: 220, overflowY: "auto",
+          fontSize: "9pt", fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif",
+        }}>
+          {suggestions.length === 0
+            ? <div style={{ padding: "6px 10px", color: "#999" }}>검색 결과 없음</div>
+            : suggestions.map(a => (
+              <div key={a.id}
+                onMouseDown={e => { e.preventDefault(); pick(a); }}
+                style={{ padding: "5px 10px", cursor: "pointer", borderBottom: "1px solid #f0f0f0" }}
+                onMouseEnter={e => (e.currentTarget.style.background = "#eff6ff")}
+                onMouseLeave={e => (e.currentTarget.style.background = "")}>
+                {a.username}
+                {a.dept ? <span style={{ color: "#888", marginLeft: 4 }}>({a.dept})</span> : null}
+              </div>
+            ))}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
 function StatusBadge({ status }: { status: string }) {
   const m: Record<string, [string, string]> = {
     draft: ["작성중","bg-gray-100 text-gray-600"], pending: ["승인 요청","bg-blue-100 text-blue-700"],
@@ -430,12 +543,13 @@ export default function OvertimeReportClient() {
             {/* 보조 바: 잔업 승인자 + 상태 (인쇄 시 숨김) */}
             <div className="print:hidden sticky top-0 z-10 flex flex-wrap items-center gap-3 px-4 py-2 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800 text-xs">
               <span className="text-gray-500 whitespace-nowrap font-medium">잔업 승인자</span>
-              <select value={f.approver_id ?? ""}
-                onChange={e => sf({ approver_id: e.target.value ? Number(e.target.value) : null })}
-                className="border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:border-blue-400 max-w-xs">
-                <option value="">— 승인자 선택 —</option>
-                {activeAccounts.map(a => <option key={a.id} value={a.id}>{a.username}{a.dept ? ` (${a.dept})` : ""}</option>)}
-              </select>
+              <AccountSearchInput
+                accountId={f.approver_id}
+                onSelect={id => sf({ approver_id: id })}
+                accounts={activeAccounts}
+                placeholder="— 승인자 검색 —"
+                className="border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:border-blue-400 w-40"
+              />
               {otResult && (
                 <span className="font-semibold text-blue-700 dark:text-blue-300">{otResult.display}</span>
               )}
@@ -484,20 +598,15 @@ export default function OvertimeReportClient() {
                     {mobileStep === 1 && (
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">작업지시자</label>
-                        <select className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-base bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-400"
-                          value={f.work_instructor_id ?? ""}
-                          onChange={e => {
-                            const id = e.target.value ? Number(e.target.value) : null;
-                            sf({ work_instructor_id: id, work_instructor: id ? (accounts.find(a => a.id === id)?.username ?? "") : "" });
-                          }}>
-                          <option value="">직접 입력</option>
-                          {activeAccounts.map(a => <option key={a.id} value={a.id}>{a.username}{a.dept ? ` (${a.dept})` : ""}</option>)}
-                        </select>
-                        {!f.work_instructor_id && (
-                          <input className="mt-2 w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-base bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-400"
-                            value={f.work_instructor} onChange={e => sf({ work_instructor: e.target.value })}
-                            placeholder="이름 직접 입력" />
-                        )}
+                        <AccountSearchInput
+                          accountId={f.work_instructor_id}
+                          freeText={f.work_instructor}
+                          allowFreeText
+                          onSelect={(id, name) => sf({ work_instructor_id: id, work_instructor: name })}
+                          accounts={activeAccounts}
+                          placeholder="이름 검색 또는 직접 입력"
+                          className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-base bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-400"
+                        />
                       </div>
                     )}
 
@@ -603,7 +712,12 @@ export default function OvertimeReportClient() {
                                   placeholder={`작업자${i + 1}`}
                                   accounts={activeAccounts}
                                   cellStyle={{ width: "100%", border: "1px solid #d1d5db", borderRadius: "12px", padding: "8px 12px", fontSize: "14px", outline: "none", background: "white" }}
-                                  onChange={v => { const ws = [...f.workers]; ws[i] = v; sf({ workers: ws }); }}
+                                  onChange={v => {
+                                    if (v && f.workers.some((w, j) => j !== i && w === v)) {
+                                      alert(`'${v}'은(는) 이미 등록된 작업자입니다.`); return;
+                                    }
+                                    const ws = [...f.workers]; ws[i] = v; sf({ workers: ws });
+                                  }}
                                 />
                               </div>
                               <input
@@ -642,12 +756,13 @@ export default function OvertimeReportClient() {
                     {mobileStep === 10 && (
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">잔업 승인자</label>
-                        <select className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-base bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-400"
-                          value={f.approver_id ?? ""}
-                          onChange={e => sf({ approver_id: e.target.value ? Number(e.target.value) : null })}>
-                          <option value="">— 승인자 선택 —</option>
-                          {activeAccounts.map(a => <option key={a.id} value={a.id}>{a.username}{a.dept ? ` (${a.dept})` : ""}</option>)}
-                        </select>
+                        <AccountSearchInput
+                          accountId={f.approver_id}
+                          onSelect={id => sf({ approver_id: id })}
+                          accounts={activeAccounts}
+                          placeholder="— 승인자 검색 —"
+                          className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-base bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-400"
+                        />
                         {otResult && (
                           <div className="mt-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-xl px-4 py-3">
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">잔업시간</p>
@@ -775,18 +890,15 @@ export default function OvertimeReportClient() {
                       </td>
                       <td data-label="true" style={{ ...labelCell, borderBottom:"none" }}>작업지시자</td>
                       <td style={{ verticalAlign:"middle", padding:"0 2mm" }}>
-                        <select style={{ ...iCell, cursor:"pointer" }} value={f.work_instructor_id ?? ""}
-                          onChange={e => {
-                            const id = e.target.value ? Number(e.target.value) : null;
-                            sf({ work_instructor_id: id, work_instructor: id ? (accounts.find(a=>a.id===id)?.username ?? "") : "" });
-                          }}>
-                          <option value="">직접 입력</option>
-                          {activeAccounts.map(a => <option key={a.id} value={a.id}>{a.username}{a.dept ? ` (${a.dept})` : ""}</option>)}
-                        </select>
-                        {!f.work_instructor_id && (
-                          <input style={{ ...iCell, marginTop:"0.5mm" }} value={f.work_instructor}
-                            onChange={e => sf({ work_instructor: e.target.value })} placeholder="이름 직접 입력" />
-                        )}
+                        <AccountSearchInput
+                          accountId={f.work_instructor_id}
+                          freeText={f.work_instructor}
+                          allowFreeText
+                          onSelect={(id, name) => sf({ work_instructor_id: id, work_instructor: name })}
+                          accounts={activeAccounts}
+                          placeholder="이름 검색 또는 직접 입력"
+                          style={{ ...iCell }}
+                        />
                       </td>
                     </tr>
 
@@ -932,7 +1044,12 @@ export default function OvertimeReportClient() {
                                     placeholder={`작업자${i + 1}`}
                                     accounts={activeAccounts}
                                     cellStyle={{ ...iCell, textAlign:"center", padding:"0", fontSize:"8.5pt", width:"100%" }}
-                                    onChange={v => { const ws=[...f.workers]; ws[i]=v; sf({ workers: ws }); }}
+                                    onChange={v => {
+                                      if (v && f.workers.some((w, j) => j !== i && w === v)) {
+                                        alert(`'${v}'은(는) 이미 등록된 작업자입니다.`); return;
+                                      }
+                                      const ws=[...f.workers]; ws[i]=v; sf({ workers: ws });
+                                    }}
                                   />
                                 </td>
                               ))}
