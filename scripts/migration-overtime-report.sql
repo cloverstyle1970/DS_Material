@@ -36,12 +36,13 @@ CREATE TABLE IF NOT EXISTS overtime_reports (
   note            TEXT,
 
   -- 결재 (단일 승인자)
-  approver_id     INTEGER REFERENCES accounts(id),
-  approval_status TEXT NOT NULL DEFAULT 'draft',  -- draft|pending|approved|rejected
-  submitted_at    TIMESTAMPTZ,
-  approved_at     TIMESTAMPTZ,
-  rejected_at     TIMESTAMPTZ,
-  reject_reason   TEXT,
+  approver_id         INTEGER REFERENCES accounts(id),
+  approval_status     TEXT NOT NULL DEFAULT 'draft',  -- draft|pending|approved|rejected
+  approver_signature  TEXT,                           -- 승인자 서명 (base64 PNG data URL)
+  submitted_at        TIMESTAMPTZ,
+  approved_at         TIMESTAMPTZ,
+  rejected_at         TIMESTAMPTZ,
+  reject_reason       TEXT,
 
   -- 메타
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -91,6 +92,12 @@ CREATE TRIGGER trg_overtime_reports_updated_at
   BEFORE UPDATE ON overtime_reports
   FOR EACH ROW EXECUTE FUNCTION update_overtime_reports_updated_at();
 
+-- 기존 테이블에 컬럼 추가 (idempotent)
+ALTER TABLE overtime_reports ADD COLUMN IF NOT EXISTS worker_notes       TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE overtime_reports ADD COLUMN IF NOT EXISTS work_instructor_id INTEGER REFERENCES accounts(id);
+ALTER TABLE overtime_reports ADD COLUMN IF NOT EXISTS approver_signature TEXT;
+
 -- 결과 확인
 SELECT COUNT(*) AS overtime_reports_rows FROM overtime_reports;
 SELECT proname FROM pg_proc WHERE proname IN ('next_ot_no','update_overtime_reports_updated_at');
+SELECT column_name FROM information_schema.columns WHERE table_name='overtime_reports' AND column_name IN ('worker_notes','approver_signature');

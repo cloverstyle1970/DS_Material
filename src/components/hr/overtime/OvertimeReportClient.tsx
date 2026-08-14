@@ -11,7 +11,7 @@ import { notifyOvertimeApprovalRequest, notifyOvertimeApproved, notifyOvertimeRe
 export const OT_MENU_HREF = "/hr/overtime-report";
 const WORK_REASONS = ["점검", "공사", "수리·부품교체", "상주", "조출", "기타"] as const;
 
-interface Account { id: number; username: string; dept: string | null; status: string | null; }
+interface Account { id: number; username: string; dept: string | null; team: string | null; status: string | null; }
 interface OvertimeReport {
   id: number; report_no: string; author_id: number; site_name: string;
   work_instructor: string | null; work_instructor_id: number | null;
@@ -19,7 +19,7 @@ interface OvertimeReport {
   start_at: string; end_at: string; is_holiday: boolean; holiday_type: string | null;
   work_hours: number | null; holiday_hours: number | null; overtime_hours: number | null;
   workers: string[]; worker_notes: string[]; work_content: string | null; work_result: string | null; note: string | null;
-  approver_id: number | null; approval_status: string;
+  approver_id: number | null; approval_status: string; approver_signature: string | null;
   submitted_at: string | null; approved_at: string | null; rejected_at: string | null; reject_reason: string | null;
   created_at: string; updated_at: string;
 }
@@ -307,6 +307,9 @@ export default function OvertimeReportClient() {
   const [printPending, setPrintPending] = useState(false);
   const [rejectModal, setRejectModal]   = useState<{ id: number; reportNo: string } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [signModal, setSignModal]       = useState<OvertimeReport | null>(null);
+  const signCanvasRef  = useRef<HTMLCanvasElement>(null);
+  const signIsDrawing  = useRef(false);
   const [isMobile, setIsMobile]   = useState(false);
   const [mobileStep, setMobileStep] = useState(0);
   const [listDateFrom, setListDateFrom] = useState(() => {
@@ -337,7 +340,7 @@ export default function OvertimeReportClient() {
   }, [user, isManager]);
 
   useEffect(() => {
-    supabase.from("accounts").select("id,username,dept,status").order("username")
+    supabase.from("accounts").select("id,username,dept,team,status").order("username")
       .then(({ data }) => setAccounts((data as Account[] | null) ?? []));
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -374,15 +377,24 @@ export default function OvertimeReportClient() {
   }
   const startDow = dowFromParts(f.s_yr, f.s_mo, f.s_dy);
   const endDow   = dowFromParts(f.e_yr, f.e_mo, f.e_dy);
-  const activeAccounts = useMemo(() => accounts.filter(a => a.status !== "퇴직"), [accounts]);
-  const approverAcc    = accounts.find(a => a.id === f.approver_id);
-  const authorAcc      = accounts.find(a => a.id === user?.id);
-  const todayStr       = new Date().toLocaleDateString("ko-KR");
+  const activeAccounts  = useMemo(() => accounts.filter(a => a.status !== "퇴직"), [accounts]);
+  const approverAcc     = accounts.find(a => a.id === f.approver_id);
+  const authorAcc       = accounts.find(a => a.id === user?.id);
+  const todayStr        = new Date().toLocaleDateString("ko-KR");
+  const editingReport   = myReports.find(r => r.id === editingId);
+  const isApproved      = editingReport?.approval_status === "approved";
+  const approvedAtStr   = isApproved && editingReport?.approved_at
+    ? new Date(editingReport.approved_at).toLocaleDateString("ko-KR", { month:"2-digit", day:"2-digit" }).replace(". ", "/").replace(".", "")
+    : null;
 
   function openNew() {
     const now = new Date();
     const { isHoliday, holidayType } = detectHoliday(now);
-    setForm({ ...makeEmptyForm(), is_holiday: isHoliday, holiday_type: holidayType });
+    const myAccount = accounts.find(a => a.id === user?.id);
+    const isConstructionTeam = myAccount?.team === "공사팀";
+    const hjhAccount = isConstructionTeam ? accounts.find(a => a.username === "황진한") : undefined;
+    setForm({ ...makeEmptyForm(), is_holiday: isHoliday, holiday_type: holidayType,
+      approver_id: hjhAccount?.id ?? null });
     setOtResult(null); setEditingId("new"); setMobileStep(0);
   }
   function openEdit(r: OvertimeReport, andPrint = false) {
@@ -439,12 +451,57 @@ export default function OvertimeReportClient() {
     finally { setSaving(false); }
   }
 
-  async function approve(r: OvertimeReport) {
-    if (!user || !confirm("승인하시겠습니까?")) return;
-    const { error } = await supabase.from("overtime_reports").update({ approval_status:"approved", approved_at: new Date().toISOString() }).eq("id", r.id);
+  function approve(r: OvertimeReport) {
+    setSignModal(r);
+  }
+  useEffect(() => {
+    if (!signModal || !signCanvasRef.current) return;
+    const ctx = signCanvasRef.current.getContext("2d");
+    if (ctx) ctx.clearRect(0, 0, signCanvasRef.current.width, signCanvasRef.current.height);
+  }, [signModal]);
+
+  function signGetPos(e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement): { x: number; y: number } {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width  / rect.width;
+    const scaleY = canvas.height / rect.height;
+    if ("touches" in e) {
+      return { x: (e.touches[0].clientX - rect.left) * scaleX, y: (e.touches[0].clientY - rect.top) * scaleY };
+    }
+    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+  }
+  function signStart(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
+    e.preventDefault();
+    signIsDrawing.current = true;
+    const canvas = signCanvasRef.current!;
+    const ctx = canvas.getContext("2d")!;
+    const { x, y } = signGetPos(e, canvas);
+    ctx.beginPath(); ctx.moveTo(x, y);
+  }
+  function signMove(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
+    e.preventDefault();
+    if (!signIsDrawing.current || !signCanvasRef.current) return;
+    const canvas = signCanvasRef.current;
+    const ctx = canvas.getContext("2d")!;
+    const { x, y } = signGetPos(e, canvas);
+    ctx.lineTo(x, y);
+    ctx.strokeStyle = "#111"; ctx.lineWidth = 2.5; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.stroke();
+  }
+  function signEnd() { signIsDrawing.current = false; }
+  function signClear() {
+    if (!signCanvasRef.current) return;
+    const ctx = signCanvasRef.current.getContext("2d")!;
+    ctx.clearRect(0, 0, signCanvasRef.current.width, signCanvasRef.current.height);
+  }
+  async function confirmApprove() {
+    if (!signModal || !user || !signCanvasRef.current) return;
+    const sig = signCanvasRef.current.toDataURL("image/png");
+    const { error } = await supabase.from("overtime_reports")
+      .update({ approval_status:"approved", approved_at: new Date().toISOString(), approver_signature: sig })
+      .eq("id", signModal.id);
     if (error) { alert("오류: " + error.message); return; }
-    notifyOvertimeApproved({ authorId: r.author_id, approverName: authorAcc?.username ?? user.name, reportNo: r.report_no, reportId: r.id }).catch(console.warn);
-    await load();
+    notifyOvertimeApproved({ authorId: signModal.author_id, approverName: authorAcc?.username ?? user.name, reportNo: signModal.report_no, reportId: signModal.id }).catch(console.warn);
+    setSignModal(null); await load();
   }
   async function reject() {
     if (!rejectModal || !user) return;
@@ -484,10 +541,11 @@ export default function OvertimeReportClient() {
           #ot-print-doc {
             position: fixed !important; inset: 0 !important;
             width: 210mm !important; height: 297mm !important;
-            padding: 12mm 14mm !important;
+            padding: 22mm 14mm 12mm !important;
             background: white !important; color: black !important;
             overflow: hidden !important; box-shadow: none !important;
           }
+          .ot-print-hide { display: none !important; }
           #ot-print-doc input, #ot-print-doc select, #ot-print-doc textarea {
             color: black !important; background: transparent !important;
             -webkit-print-color-adjust: exact; print-color-adjust: exact;
@@ -844,29 +902,42 @@ export default function OvertimeReportClient() {
                     </thead>
                     <tbody>
                       {/* 서명 공간 */}
-                      <tr>
-                        {[0,1,2,3,4].map(i => (
-                          <td key={i} style={{
-                            border: bdr, width:"17mm", height:"20mm",
-                            textAlign:"center", verticalAlign:"middle", fontSize:"8pt", color:"#444",
-                          }}>
-                            {i === 0 && approverAcc && (
-                              <span style={{ fontSize:"8pt", fontWeight:"bold" }}>{approverAcc.username}</span>
-                            )}
-                          </td>
-                        ))}
-                      </tr>
+                      {(() => {
+                        const sigCol = approverAcc?.username === "황진한" ? 0 : 1;
+                        return (
+                          <tr>
+                            {[0,1,2,3,4].map(i => (
+                              <td key={i} style={{
+                                border: bdr, width:"17mm", height:"20mm",
+                                textAlign:"center", verticalAlign:"middle", fontSize:"8pt", color:"#444",
+                                padding:"1mm",
+                              }}>
+                                {i === sigCol && isApproved && editingReport?.approver_signature && (
+                                  <img src={editingReport.approver_signature}
+                                    alt="서명"
+                                    style={{ maxWidth:"100%", maxHeight:"17mm", objectFit:"contain" }} />
+                                )}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })()}
                       {/* 날짜 라인 */}
-                      <tr>
-                        {[0,1,2,3,4].map(i => (
-                          <td key={i} style={{
-                            border: bdr, textAlign:"center", fontSize:"9pt",
-                            color:"#888", height:"6mm", padding:0,
-                          }}>
-                            /
-                          </td>
-                        ))}
-                      </tr>
+                      {(() => {
+                        const sigCol = approverAcc?.username === "황진한" ? 0 : 1;
+                        return (
+                          <tr>
+                            {[0,1,2,3,4].map(i => (
+                              <td key={i} style={{
+                                border: bdr, textAlign:"center", fontSize:"9pt",
+                                color:"#555", height:"6mm", padding:0,
+                              }}>
+                                {i === sigCol && approvedAtStr ? approvedAtStr : "/"}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })()}
                     </tbody>
                   </table>
                 </div>
@@ -961,7 +1032,9 @@ export default function OvertimeReportClient() {
                                     onFocus={e => e.target.select()}
                                     onChange={e => { sf({ s_dy: e.target.value }); detectFromStart(f.s_yr, f.s_mo, e.target.value); }} />
                                   <span>일(</span>
-                                  <span style={{ width:"5mm", textAlign:"center", fontWeight:"bold", color:"#1d4ed8" }}>{startDow || "??"}</span>
+                                  {startDow
+                                    ? <span style={{ width:"5mm", textAlign:"center", fontWeight:"bold", color:"#1d4ed8" }}>{startDow}</span>
+                                    : <span className="ot-print-hide" style={{ width:"5mm", textAlign:"center", fontWeight:"bold", color:"#1d4ed8" }}>??</span>}
                                   <span>요일)</span>
                                   <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_hr} placeholder="HH"
                                     onFocus={e => e.target.select()}
@@ -976,7 +1049,7 @@ export default function OvertimeReportClient() {
                               <td style={{ borderLeft:bdr, textAlign:"center", fontWeight:"bold", fontSize:"10pt", verticalAlign:"middle", padding:"1.5mm 2mm" }}>
                                 {otResult
                                   ? <span style={{ color:"#1d4ed8" }}>{otResult.display}</span>
-                                  : <span style={{ color:"#aaa" }}>—— HR</span>}
+                                  : <span className="ot-print-hide" style={{ color:"#aaa" }}>—— HR</span>}
                               </td>
                             </tr>
                             {/* 종료 행 */}
@@ -997,7 +1070,9 @@ export default function OvertimeReportClient() {
                                     onFocus={e => e.target.select()}
                                     onChange={e => sf({ e_dy: e.target.value })} />
                                   <span>일(</span>
-                                  <span style={{ width:"5mm", textAlign:"center", fontWeight:"bold", color:"#1d4ed8" }}>{endDow || "??"}</span>
+                                  {endDow
+                                    ? <span style={{ width:"5mm", textAlign:"center", fontWeight:"bold", color:"#1d4ed8" }}>{endDow}</span>
+                                    : <span className="ot-print-hide" style={{ width:"5mm", textAlign:"center", fontWeight:"bold", color:"#1d4ed8" }}>??</span>}
                                   <span>요일)</span>
                                   <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_hr} placeholder="HH"
                                     onFocus={e => e.target.select()}
@@ -1240,6 +1315,38 @@ export default function OvertimeReportClient() {
             <div className="flex gap-2 mt-3">
               <button onClick={reject} className="flex-1 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded font-medium">반려 처리</button>
               <button onClick={() => setRejectModal(null)} className="flex-1 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded">취소</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 서명 모달 */}
+      {signModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-5 w-[340px]">
+            <h3 className="text-sm font-bold mb-1">잔업보고서 승인 — 서명 입력</h3>
+            <p className="text-xs text-gray-400 mb-3">{signModal.report_no} · 아래 영역에 서명해주세요</p>
+            <div className="relative border-2 border-gray-300 rounded-lg overflow-hidden bg-white"
+              style={{ touchAction: "none" }}>
+              <canvas ref={signCanvasRef} width={600} height={220}
+                style={{ width:"100%", height:"110px", display:"block", cursor:"crosshair" }}
+                onMouseDown={signStart} onMouseMove={signMove} onMouseUp={signEnd} onMouseLeave={signEnd}
+                onTouchStart={signStart} onTouchMove={signMove} onTouchEnd={signEnd} />
+              <span className="absolute bottom-1 right-2 text-[10px] text-gray-300 pointer-events-none select-none">서명란</span>
+            </div>
+            <div className="flex gap-2 mt-3">
+              <button onClick={signClear}
+                className="px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded border border-gray-300">
+                지우기
+              </button>
+              <button onClick={confirmApprove}
+                className="flex-1 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium">
+                승인 완료
+              </button>
+              <button onClick={() => setSignModal(null)}
+                className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded">
+                취소
+              </button>
             </div>
           </div>
         </div>
