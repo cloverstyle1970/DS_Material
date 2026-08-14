@@ -180,8 +180,9 @@ export default function OvertimeReportClient() {
   const [editingId, setEditingId] = useState<number | "new" | null>(null);
   const [form, setForm]           = useState<FormState>(makeEmptyForm());
   const [otResult, setOtResult]   = useState<OvertimeResult | null>(null);
-  const [saving, setSaving]       = useState(false);
-  const [rejectModal, setRejectModal] = useState<{ id: number; reportNo: string } | null>(null);
+  const [saving, setSaving]           = useState(false);
+  const [printPending, setPrintPending] = useState(false);
+  const [rejectModal, setRejectModal]   = useState<{ id: number; reportNo: string } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
 
   const load = useCallback(async () => {
@@ -255,11 +256,19 @@ export default function OvertimeReportClient() {
     setEditingId("new");
   }
 
-  function openEdit(r: OvertimeReport) {
+  function openEdit(r: OvertimeReport, andPrint = false) {
     setForm(reportToForm(r));
     setOtResult(null);
     setEditingId(r.id);
+    if (andPrint) setPrintPending(true);
   }
+
+  // printPending: 폼이 화면에 마운트된 뒤 인쇄 실행
+  useEffect(() => {
+    if (!printPending || editingId === null) return;
+    const t = setTimeout(() => { window.print(); setPrintPending(false); }, 300);
+    return () => clearTimeout(t);
+  }, [printPending, editingId]);
 
   async function save(submitForApproval: boolean) {
     if (!user) return;
@@ -357,8 +366,42 @@ export default function OvertimeReportClient() {
   // ── 렌더 ──────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full bg-gray-100 dark:bg-gray-900 text-sm">
-      {/* 상단 툴바 */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0">
+      {/* 인쇄 전용 CSS: #ot-print-doc 만 표시, 나머지 숨김 */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          @page { margin: 12mm 10mm; }
+          body * { visibility: hidden !important; }
+          #ot-print-doc, #ot-print-doc * { visibility: visible !important; }
+          #ot-print-doc {
+            position: fixed !important;
+            inset: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            border: none !important;
+            box-shadow: none !important;
+            background: white !important;
+            color: black !important;
+            font-size: 11pt !important;
+          }
+          #ot-print-doc input,
+          #ot-print-doc select,
+          #ot-print-doc textarea {
+            border-color: transparent !important;
+            background: transparent !important;
+            color: black !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          #ot-print-doc .bg-gray-50,
+          #ot-print-doc .dark\\:bg-gray-700\\/50 {
+            background-color: #f3f4f6 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+        }
+      ` }} />
+      {/* 상단 툴바 — 인쇄 시 숨김 */}
+      <div id="ot-toolbar" className="flex items-center justify-between px-4 py-2.5 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0 print:hidden">
         <h1 className="text-base font-bold text-gray-800 dark:text-gray-100">잔업보고서</h1>
         <div className="flex gap-2">
           {editingId !== null ? (
@@ -370,6 +413,10 @@ export default function OvertimeReportClient() {
               <button onClick={() => save(true)} disabled={saving}
                 className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium disabled:opacity-50">
                 {saving ? "제출중…" : "결재 요청"}
+              </button>
+              <button onClick={() => window.print()}
+                className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded font-medium flex items-center gap-1">
+                🖨️ 인쇄
               </button>
               <button onClick={() => setEditingId(null)}
                 className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
@@ -388,8 +435,8 @@ export default function OvertimeReportClient() {
       <div className="flex-1 overflow-auto">
         {/* ══════════════ 문서 양식 뷰 ══════════════ */}
         {editingId !== null && (
-          <div className="p-4 flex justify-center">
-            <div className="w-full max-w-4xl bg-white dark:bg-gray-800 shadow-lg border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+          <div className="p-4 print:p-0 flex justify-center">
+            <div id="ot-print-doc" className="w-full max-w-4xl bg-white shadow-lg border border-gray-300 dark:border-gray-600 text-gray-900 print:shadow-none print:border-0 print:max-w-none"
               style={{ fontFamily: "'Malgun Gothic', '맑은 고딕', sans-serif" }}>
 
               {/* ── 제목 + 결재란 ── */}
@@ -434,8 +481,8 @@ export default function OvertimeReportClient() {
                 </div>
               </div>
 
-              {/* ── 결재 승인자 선택 (문서 외부 보조 필드) ── */}
-              <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-950/20 border-b border-blue-200 dark:border-blue-800 text-xs">
+              {/* ── 결재 승인자 선택 (인쇄 시 숨김) ── */}
+              <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-950/20 border-b border-blue-200 dark:border-blue-800 text-xs print:hidden">
                 <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap">결재 승인자:</span>
                 <select
                   value={f.approver_id ?? ""}
@@ -755,6 +802,10 @@ export default function OvertimeReportClient() {
                               수정
                             </button>
                           )}
+                          <button onClick={() => openEdit(r, true)}
+                            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded">
+                            🖨️ 인쇄
+                          </button>
                           {canApproveReport(r) && (
                             <>
                               <button onClick={() => approve(r)}
