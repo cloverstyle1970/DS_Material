@@ -194,6 +194,14 @@ export default function OvertimeReportClient() {
   const [printPending, setPrintPending] = useState(false);
   const [rejectModal, setRejectModal]   = useState<{ id: number; reportNo: string } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [isMobile, setIsMobile]   = useState(false);
+
+  useEffect(() => {
+    function check() { setIsMobile(window.innerWidth < 768); }
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -369,18 +377,20 @@ export default function OvertimeReportClient() {
         <div className="flex gap-2">
           {editingId !== null ? (
             <>
-              <button onClick={() => save(false)} disabled={saving}
-                className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded font-medium disabled:opacity-50">
-                {saving ? "저장중…" : "임시저장"}
-              </button>
-              <button onClick={() => save(true)} disabled={saving}
-                className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium disabled:opacity-50">
-                {saving ? "제출중…" : "승인 요청"}
-              </button>
-              <button onClick={() => window.print()}
-                className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded font-medium">
-                🖨️ 인쇄
-              </button>
+              {!isMobile && <>
+                <button onClick={() => save(false)} disabled={saving}
+                  className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded font-medium disabled:opacity-50">
+                  {saving ? "저장중…" : "임시저장"}
+                </button>
+                <button onClick={() => save(true)} disabled={saving}
+                  className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium disabled:opacity-50">
+                  {saving ? "제출중…" : "승인 요청"}
+                </button>
+                <button onClick={() => window.print()}
+                  className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded font-medium">
+                  🖨️ 인쇄
+                </button>
+              </>}
               <button onClick={() => setEditingId(null)}
                 className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700">
                 목록으로
@@ -416,8 +426,149 @@ export default function OvertimeReportClient() {
               )}
             </div>
 
+            {/* ── 모바일 폼 ── */}
+            {isMobile && (
+              <div className="p-4 space-y-4 max-w-lg mx-auto pb-36">
+                {/* 잔업 승인자 */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">잔업 승인자</label>
+                  <select className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-sm bg-white dark:bg-gray-800"
+                    value={f.approver_id ?? ""}
+                    onChange={e => sf({ approver_id: e.target.value ? Number(e.target.value) : null })}>
+                    <option value="">— 승인자 선택 —</option>
+                    {activeAccounts.map(a => <option key={a.id} value={a.id}>{a.username}{a.dept ? ` (${a.dept})` : ""}</option>)}
+                  </select>
+                </div>
+                {/* 현장명 */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">현장명</label>
+                  <input className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-sm bg-white dark:bg-gray-800"
+                    value={f.site_name} onChange={e => sf({ site_name: e.target.value })} placeholder="현장명" />
+                </div>
+                {/* 작업지시자 */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">작업지시자</label>
+                  <select className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-sm bg-white dark:bg-gray-800"
+                    value={f.work_instructor_id ?? ""}
+                    onChange={e => {
+                      const id = e.target.value ? Number(e.target.value) : null;
+                      sf({ work_instructor_id: id, work_instructor: id ? (accounts.find(a=>a.id===id)?.username ?? "") : "" });
+                    }}>
+                    <option value="">직접 입력</option>
+                    {activeAccounts.map(a => <option key={a.id} value={a.id}>{a.username}{a.dept ? ` (${a.dept})` : ""}</option>)}
+                  </select>
+                  {!f.work_instructor_id && (
+                    <input className="mt-2 w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-sm bg-white dark:bg-gray-800"
+                      value={f.work_instructor} onChange={e => sf({ work_instructor: e.target.value })} placeholder="이름 직접 입력" />
+                  )}
+                </div>
+                {/* 작업사유 */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">작업사유</label>
+                  <div className="flex flex-wrap gap-2">
+                    {WORK_REASONS.map(r => (
+                      <label key={r} className="flex items-center gap-1.5 px-3 py-2 border rounded-xl cursor-pointer text-sm"
+                        style={{ borderColor: f.work_reasons.includes(r) ? "#2563eb" : "#d1d5db", background: f.work_reasons.includes(r) ? "#eff6ff" : "white" }}>
+                        <input type="checkbox" checked={f.work_reasons.includes(r)}
+                          onChange={e => sf({ work_reasons: e.target.checked ? [...f.work_reasons,r] : f.work_reasons.filter(x=>x!==r) })} />
+                        {r}
+                      </label>
+                    ))}
+                  </div>
+                  {f.work_reasons.includes("기타") && (
+                    <input className="mt-2 w-full border border-gray-300 rounded-xl px-3 py-3 text-sm"
+                      value={f.work_reason_etc} onChange={e => sf({ work_reason_etc: e.target.value })} placeholder="기타 내용" />
+                  )}
+                </div>
+                {/* 작업호기 */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">작업호기</label>
+                  <input className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-sm bg-white dark:bg-gray-800"
+                    value={f.work_elevator} onChange={e => sf({ work_elevator: e.target.value })} placeholder="예: 1호기, 2·3호기" />
+                </div>
+                {/* 시작일시 */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">시작일시</label>
+                  <input type="datetime-local"
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-sm bg-white dark:bg-gray-800"
+                    value={startDT || ""}
+                    onChange={e => {
+                      const p = parseDT(e.target.value);
+                      sf({ s_yr: p.yr, s_mo: p.mo, s_dy: p.dy, s_hr: p.hr, s_mi: p.mi });
+                      detectFromStart(p.yr, p.mo, p.dy);
+                    }} />
+                  {startDow && <p className="text-xs text-blue-600 mt-1">{startDow}요일</p>}
+                </div>
+                {/* 종료일시 */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">종료일시</label>
+                  <input type="datetime-local"
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-sm bg-white dark:bg-gray-800"
+                    value={endDT || ""}
+                    onChange={e => {
+                      const p = parseDT(e.target.value);
+                      sf({ e_yr: p.yr, e_mo: p.mo, e_dy: p.dy, e_hr: p.hr, e_mi: p.mi });
+                    }} />
+                  {endDow && <p className="text-xs text-blue-600 mt-1">{endDow}요일</p>}
+                </div>
+                {/* 잔업시간 */}
+                {otResult && (
+                  <div className="bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-xl px-4 py-3">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">잔업시간</p>
+                    <p className="text-xl font-bold text-blue-700 dark:text-blue-300 mt-0.5">{otResult.display}</p>
+                    <input className="mt-2 w-full border border-blue-200 dark:border-blue-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800"
+                      value={f.note} onChange={e => sf({ note: e.target.value })} placeholder="직접 입력" />
+                  </div>
+                )}
+                {!otResult && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">잔업시간 메모</label>
+                    <input className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-sm bg-white dark:bg-gray-800"
+                      value={f.note} onChange={e => sf({ note: e.target.value })} />
+                  </div>
+                )}
+                {/* 작업자 + 비고 */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">작업자 (최대 10명)</label>
+                  <div className="space-y-2">
+                    {f.workers.map((w, i) => (
+                      <div key={i} className="flex gap-2 items-center">
+                        <span className="text-xs text-gray-400 w-5 text-right shrink-0">{i+1}</span>
+                        <div className="flex-1">
+                          <WorkerSearchInput
+                            value={w}
+                            placeholder={`작업자${i+1}`}
+                            accounts={activeAccounts}
+                            cellStyle={{ width:"100%", border:"1px solid #d1d5db", borderRadius:"12px", padding:"10px 12px", fontSize:"14px", outline:"none", background:"white" }}
+                            onChange={v => { const ws=[...f.workers]; ws[i]=v; sf({ workers: ws }); }}
+                          />
+                        </div>
+                        <input className="flex-1 border border-gray-300 rounded-xl px-3 py-2.5 text-sm bg-white dark:bg-gray-800"
+                          value={f.worker_notes[i]} placeholder="비고"
+                          onChange={e => { const ns=[...f.worker_notes]; ns[i]=e.target.value; sf({ worker_notes: ns }); }} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* 작업내용 */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">작업내용</label>
+                  <textarea className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-sm resize-none bg-white dark:bg-gray-800"
+                    rows={5} value={f.work_content} onChange={e => sf({ work_content: e.target.value })}
+                    placeholder="작업내용을 입력하세요…" />
+                </div>
+                {/* 작업결과 */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">작업결과</label>
+                  <textarea className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-3 text-sm resize-none bg-white dark:bg-gray-800"
+                    rows={4} value={f.work_result} onChange={e => sf({ work_result: e.target.value })}
+                    placeholder="작업결과를 입력하세요…" />
+                </div>
+              </div>
+            )}
+
             {/* A4 문서 */}
-            <div className="flex justify-center py-8 print:py-0">
+            {!isMobile && <div className="flex justify-center py-8 print:py-0">
               <div id="ot-print-doc" style={{
                 width: "210mm", minHeight: "297mm",
                 padding: "12mm 14mm",
@@ -719,7 +870,21 @@ export default function OvertimeReportClient() {
                 </div>
 
               </div>{/* /ot-print-doc */}
-            </div>
+            </div>}
+
+            {/* 모바일 하단 고정 버튼 */}
+            {isMobile && (
+              <div className="fixed bottom-0 left-0 right-0 z-20 flex gap-3 p-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+                <button onClick={() => save(false)} disabled={saving}
+                  className="flex-1 py-3 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 rounded-xl font-medium disabled:opacity-50">
+                  {saving ? "저장중…" : "임시저장"}
+                </button>
+                <button onClick={() => save(true)} disabled={saving}
+                  className="flex-1 py-3 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium disabled:opacity-50">
+                  {saving ? "제출중…" : "승인 요청"}
+                </button>
+              </div>
+            )}
           </>
         )}
 
