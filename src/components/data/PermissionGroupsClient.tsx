@@ -96,12 +96,14 @@ const PERMISSION_TREE: MenuSection[] = [
   {
     id: "hr", label: "관리/인사", color: "text-purple-500",
     items: [
-      { href: "/hr/company-vehicles",   label: "회사차량관리" },
-      { href: "/hr/employee-register",  label: "사원등록" },
-      { href: "/hr/dept-rank",          label: "부서/직급관리" },
-      { href: "/hr/team-crew",          label: "팀구성 관리" },
-      { href: "/hr/transfer",           label: "인사 이동" },
-      { href: "/hr/employment-status",  label: "재직상태 관리" },
+      { href: "/hr/company-vehicles",    label: "회사차량관리" },
+      { href: "/hr/overtime-report",     label: "잔업보고서" },
+      { href: "/hr/overtime-ledger",     label: "잔업보고서 등록대장" },
+      { href: "/hr/employee-register",   label: "사원등록" },
+      { href: "/hr/dept-rank",           label: "부서/직급관리" },
+      { href: "/hr/team-crew",           label: "팀구성 관리" },
+      { href: "/hr/transfer",            label: "인사 이동" },
+      { href: "/hr/employment-status",   label: "재직상태 관리" },
     ],
   },
   {
