@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -78,6 +79,79 @@ function reportToForm(r: OvertimeReport): FormState {
     work_content: r.work_content ?? "", work_result: r.work_result ?? "", note: r.note ?? "",
     approver_id: r.approver_id, work_hours: r.work_hours, holiday_hours: r.holiday_hours, overtime_hours: r.overtime_hours,
   };
+}
+
+// ── 작업자 검색 인풋 ──────────────────────────────────────────────
+function WorkerSearchInput({ value, onChange, accounts, placeholder, cellStyle }: {
+  value: string;
+  onChange: (v: string) => void;
+  accounts: Account[];
+  placeholder?: string;
+  cellStyle?: React.CSSProperties;
+}) {
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dropRect, setDropRect] = useState<{ top: number; left: number } | null>(null);
+
+  const suggestions = useMemo(() => {
+    const q = value.trim();
+    const list = q
+      ? accounts.filter(a => a.username.includes(q) || (a.dept ?? "").includes(q))
+      : accounts;
+    return list.slice(0, 10);
+  }, [value, accounts]);
+
+  function updatePos() {
+    if (inputRef.current) {
+      const r = inputRef.current.getBoundingClientRect();
+      setDropRect({ top: r.bottom + 2, left: r.left });
+    }
+  }
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onFocus={() => { updatePos(); setOpen(true); }}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder={placeholder}
+        style={cellStyle}
+      />
+      {open && dropRect && typeof document !== "undefined" && createPortal(
+        <div style={{
+          position: "fixed",
+          top: dropRect.top,
+          left: dropRect.left,
+          minWidth: 160,
+          zIndex: 9999,
+          background: "white",
+          border: "1px solid #bbb",
+          borderRadius: 4,
+          boxShadow: "0 6px 18px rgba(0,0,0,0.15)",
+          maxHeight: 220,
+          overflowY: "auto",
+          fontSize: "9pt",
+          fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif",
+        }}>
+          {suggestions.length === 0 ? (
+            <div style={{ padding: "6px 10px", color: "#999" }}>검색 결과 없음</div>
+          ) : suggestions.map(a => (
+            <div key={a.id}
+              onMouseDown={e => { e.preventDefault(); onChange(a.username); setOpen(false); }}
+              style={{ padding: "5px 10px", cursor: "pointer", borderBottom: "1px solid #f0f0f0" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "#eff6ff")}
+              onMouseLeave={e => (e.currentTarget.style.background = "")}>
+              {a.username}
+              {a.dept ? <span style={{ color: "#888", marginLeft: 4 }}>({a.dept})</span> : null}
+            </div>
+          ))}
+        </div>,
+        document.body
+      )}
+    </>
+  );
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -541,16 +615,18 @@ export default function OvertimeReportClient() {
                               {f.workers.map((w, i) => (
                                 <td key={i} style={{
                                   borderLeft: bdr,
-                                  padding:"1mm 0.5mm",
+                                  padding:"0.5mm 0.5mm",
                                   textAlign:"center",
                                   width:"10%",
                                   verticalAlign:"middle",
+                                  overflow:"visible",
                                 }}>
-                                  <input
-                                    style={{ ...iCell, textAlign:"center", padding:"0", fontSize:"8.5pt" }}
+                                  <WorkerSearchInput
                                     value={w}
                                     placeholder={`${i + 1}`}
-                                    onChange={e => { const ws=[...f.workers]; ws[i]=e.target.value; sf({ workers: ws }); }}
+                                    accounts={activeAccounts}
+                                    cellStyle={{ ...iCell, textAlign:"center", padding:"0", fontSize:"8.5pt", width:"100%" }}
+                                    onChange={v => { const ws=[...f.workers]; ws[i]=v; sf({ workers: ws }); }}
                                   />
                                 </td>
                               ))}
