@@ -165,7 +165,7 @@ function WorkerSearchInput({ value, onChange, accounts, placeholder, cellStyle }
 
 function StatusBadge({ status }: { status: string }) {
   const m: Record<string, [string, string]> = {
-    draft: ["작성중","bg-gray-100 text-gray-600"], pending: ["결재 요청","bg-blue-100 text-blue-700"],
+    draft: ["작성중","bg-gray-100 text-gray-600"], pending: ["승인 요청","bg-blue-100 text-blue-700"],
     approved: ["승인완료","bg-green-100 text-green-700"], rejected: ["반려","bg-red-100 text-red-600"],
   };
   const [label, cls] = m[status] ?? [status, "bg-gray-100 text-gray-500"];
@@ -271,7 +271,7 @@ export default function OvertimeReportClient() {
     if (!user) return;
     if (!f.site_name.trim()) { alert("현장명을 입력해주세요."); return; }
     if (!startDT || !endDT)  { alert("작업일시를 입력해주세요."); return; }
-    if (submitForApproval && !f.approver_id) { alert("결재 승인자를 지정해주세요."); return; }
+    if (submitForApproval && !f.approver_id) { alert("잔업 승인자를 지정해주세요."); return; }
     setSaving(true);
     try {
       const instructorName = f.work_instructor_id
@@ -375,7 +375,7 @@ export default function OvertimeReportClient() {
               </button>
               <button onClick={() => save(true)} disabled={saving}
                 className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium disabled:opacity-50">
-                {saving ? "제출중…" : "결재 요청"}
+                {saving ? "제출중…" : "승인 요청"}
               </button>
               <button onClick={() => window.print()}
                 className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded font-medium">
@@ -402,9 +402,9 @@ export default function OvertimeReportClient() {
         ════════════════════════════════ */}
         {editingId !== null && (
           <>
-            {/* 보조 바: 결재 승인자 + 상태 (인쇄 시 숨김) */}
+            {/* 보조 바: 잔업 승인자 + 상태 (인쇄 시 숨김) */}
             <div className="print:hidden sticky top-0 z-10 flex flex-wrap items-center gap-3 px-4 py-2 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800 text-xs">
-              <span className="text-gray-500 whitespace-nowrap font-medium">결재 승인자</span>
+              <span className="text-gray-500 whitespace-nowrap font-medium">잔업 승인자</span>
               <select value={f.approver_id ?? ""}
                 onChange={e => sf({ approver_id: e.target.value ? Number(e.target.value) : null })}
                 className="border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:border-blue-400 max-w-xs">
