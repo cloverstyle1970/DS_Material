@@ -337,8 +337,8 @@ export default function OvertimeReportClient() {
     setRejectModal(null); setRejectReason(""); await load();
   }
 
-  const canEdit   = (r: OvertimeReport) => !!user && r.author_id === user.id && r.approval_status !== "approved";
-  const canDelete = (r: OvertimeReport) => !!user && r.author_id === user.id && r.approval_status !== "approved";
+  const canEdit   = (r: OvertimeReport) => !!user && r.author_id === user.id && (r.approval_status === "draft" || r.approval_status === "rejected");
+  const canDelete = (r: OvertimeReport) => !!user && r.author_id === user.id && (r.approval_status === "draft" || r.approval_status === "rejected");
   const canApprove = (r: OvertimeReport) => !!user && r.approver_id === user.id && r.approval_status === "pending";
 
   async function deleteReport(id: number, reportNo: string) {
