@@ -59,14 +59,14 @@ function makeEmptyForm(): FormState {
     s_yr: String(n.getFullYear()).slice(2), s_mo: String(n.getMonth()+1).padStart(2,"0"), s_dy: String(n.getDate()).padStart(2,"0"), s_hr: "", s_mi: "",
     e_yr: String(n.getFullYear()).slice(2), e_mo: String(n.getMonth()+1).padStart(2,"0"), e_dy: String(n.getDate()).padStart(2,"0"), e_hr: "", e_mi: "",
     is_holiday: false, holiday_type: "",
-    workers: Array(8).fill(""), work_content: "", work_result: "", note: "",
+    workers: Array(10).fill(""), work_content: "", work_result: "", note: "",
     approver_id: null, work_hours: null, holiday_hours: null, overtime_hours: null,
   };
 }
 function reportToForm(r: OvertimeReport): FormState {
   const sp = parseDT(r.start_at?.slice(0,16) ?? "");
   const ep = parseDT(r.end_at?.slice(0,16) ?? "");
-  const ws = [...r.workers]; while (ws.length < 8) ws.push("");
+  const ws = [...r.workers]; while (ws.length < 10) ws.push("");
   return {
     site_name: r.site_name, work_instructor: r.work_instructor ?? "", work_instructor_id: r.work_instructor_id,
     work_reasons: r.work_reasons, work_reason_etc: r.work_reason_etc ?? "", work_elevator: r.work_elevator ?? "",
@@ -528,18 +528,43 @@ export default function OvertimeReportClient() {
                       </td>
                     </tr>
 
-                    {/* 작업자명 */}
+                    {/* 작업자명 — 5열 × 2행 표 */}
                     <tr style={{ borderBottom: bdr }}>
-                      <td data-label="true" style={{ ...labelCell, height:"11mm" }}>작업자명</td>
-                      <td colSpan={3} style={{ padding:"1mm 2mm", verticalAlign:"middle" }}>
-                        <div style={{ display:"grid", gridTemplateColumns:"repeat(8, 1fr)", gap:"0 1mm" }}>
-                          {f.workers.map((w, i) => (
-                            <input key={i} style={{ ...iPart, width:"100%", textAlign:"center", padding:"0 0.5mm" }}
-                              value={w} placeholder={`작업자${i+1}`}
-                              onChange={e => { const ws=[...f.workers]; ws[i]=e.target.value; sf({ workers: ws }); }} />
-                          ))}
-                        </div>
-                      </td>
+                      <td data-label="true" rowSpan={2} style={{ ...labelCell, borderBottom:"none" }}>작업자명</td>
+                      {f.workers.slice(0, 5).map((w, i) => (
+                        <td key={i} style={{
+                          borderLeft: bdr,
+                          borderBottom: bdr,
+                          padding:"1mm 1.5mm",
+                          textAlign:"center",
+                          width:"18.6%",
+                          verticalAlign:"middle",
+                        }}>
+                          <input
+                            style={{ ...iCell, textAlign:"center", padding:"0" }}
+                            value={w}
+                            placeholder={`작업자 ${i + 1}`}
+                            onChange={e => { const ws=[...f.workers]; ws[i]=e.target.value; sf({ workers: ws }); }}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                    <tr style={{ borderBottom: bdr }}>
+                      {f.workers.slice(5, 10).map((w, i) => (
+                        <td key={i} style={{
+                          borderLeft: bdr,
+                          padding:"1mm 1.5mm",
+                          textAlign:"center",
+                          verticalAlign:"middle",
+                        }}>
+                          <input
+                            style={{ ...iCell, textAlign:"center", padding:"0" }}
+                            value={w}
+                            placeholder={`작업자 ${i + 6}`}
+                            onChange={e => { const ws=[...f.workers]; ws[i+5]=e.target.value; sf({ workers: ws }); }}
+                          />
+                        </td>
+                      ))}
                     </tr>
 
                     {/* 비고 */}
