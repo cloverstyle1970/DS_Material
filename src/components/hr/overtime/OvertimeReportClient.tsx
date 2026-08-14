@@ -559,20 +559,25 @@ export default function OvertimeReportClient() {
                                 <div style={{ display:"flex", alignItems:"center", flexWrap:"nowrap", gap:"0.8mm", fontSize:"10pt" }}>
                                   <span>20</span>
                                   <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_yr} placeholder="YY"
+                                    onFocus={e => e.target.select()}
                                     onChange={e => { sf({ s_yr: e.target.value }); detectFromStart(e.target.value, f.s_mo, f.s_dy); }} />
                                   <span>년</span>
                                   <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_mo} placeholder="MM"
+                                    onFocus={e => e.target.select()}
                                     onChange={e => { sf({ s_mo: e.target.value }); detectFromStart(f.s_yr, e.target.value, f.s_dy); }} />
                                   <span>월</span>
                                   <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_dy} placeholder="DD"
+                                    onFocus={e => e.target.select()}
                                     onChange={e => { sf({ s_dy: e.target.value }); detectFromStart(f.s_yr, f.s_mo, e.target.value); }} />
                                   <span>일(</span>
                                   <span style={{ width:"5mm", textAlign:"center", fontWeight:"bold", color:"#1d4ed8" }}>{startDow || "??"}</span>
                                   <span>요일)</span>
                                   <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_hr} placeholder="HH"
+                                    onFocus={e => e.target.select()}
                                     onChange={e => sf({ s_hr: e.target.value })} />
                                   <span>시</span>
                                   <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_mi} placeholder="MM"
+                                    onFocus={e => e.target.select()}
                                     onChange={e => sf({ s_mi: e.target.value })} />
                                   <span>분부터</span>
                                 </div>
@@ -590,20 +595,25 @@ export default function OvertimeReportClient() {
                                 <div style={{ display:"flex", alignItems:"center", flexWrap:"nowrap", gap:"0.8mm", fontSize:"10pt" }}>
                                   <span>20</span>
                                   <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_yr} placeholder="YY"
+                                    onFocus={e => e.target.select()}
                                     onChange={e => sf({ e_yr: e.target.value })} />
                                   <span>년</span>
                                   <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_mo} placeholder="MM"
+                                    onFocus={e => e.target.select()}
                                     onChange={e => sf({ e_mo: e.target.value })} />
                                   <span>월</span>
                                   <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_dy} placeholder="DD"
+                                    onFocus={e => e.target.select()}
                                     onChange={e => sf({ e_dy: e.target.value })} />
                                   <span>일(</span>
                                   <span style={{ width:"5mm", textAlign:"center", fontWeight:"bold", color:"#1d4ed8" }}>{endDow || "??"}</span>
                                   <span>요일)</span>
                                   <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_hr} placeholder="HH"
+                                    onFocus={e => e.target.select()}
                                     onChange={e => sf({ e_hr: e.target.value })} />
                                   <span>시</span>
                                   <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_mi} placeholder="MM"
+                                    onFocus={e => e.target.select()}
                                     onChange={e => sf({ e_mi: e.target.value })} />
                                   <span>분까지</span>
                                 </div>
