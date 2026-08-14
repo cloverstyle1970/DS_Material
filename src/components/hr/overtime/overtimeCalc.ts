@@ -76,11 +76,15 @@ export function calcOvertimeResult(start: Date, end: Date, isHoliday: boolean): 
     };
   }
 
+  const overtimeH  = Math.max(0, workH - 8);
+  const overtimeStr = overtimeH > 0
+    ? `잔업 ${overtimeH % 1 === 0 ? overtimeH : overtimeH.toFixed(1)}H`
+    : `잔업 없음`;
   return {
     workHours:     workH,
     holidayHours:  0,
-    overtimeHours: workH,
-    display:       `${workHStr}H (잔업)`,
+    overtimeHours: overtimeH,
+    display:       overtimeStr,
   };
 }
 
