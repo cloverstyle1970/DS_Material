@@ -196,6 +196,12 @@ export default function OvertimeReportClient() {
   const [rejectReason, setRejectReason] = useState("");
   const [isMobile, setIsMobile]   = useState(false);
   const [mobileStep, setMobileStep] = useState(0);
+  const [listDateFrom, setListDateFrom] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+  });
+  const [listDateTo, setListDateTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [listQuery, setListQuery] = useState("");
 
   useEffect(() => {
     function check() { setIsMobile(window.innerWidth < 768); }
@@ -997,11 +1003,63 @@ export default function OvertimeReportClient() {
         ════════════════════════════════ */}
         {editingId === null && (
           <div className="p-4 max-w-3xl mx-auto">
+            {/* 검색 필터 */}
+            <div className="flex flex-wrap items-center gap-2 mb-4 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">기간</span>
+              <input type="date" value={listDateFrom} onChange={e => setListDateFrom(e.target.value)}
+                className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400" />
+              <span className="text-xs text-gray-400">~</span>
+              <input type="date" value={listDateTo} onChange={e => setListDateTo(e.target.value)}
+                className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400" />
+              <button onClick={() => {
+                const d = new Date();
+                setListDateFrom(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`);
+                setListDateTo(d.toISOString().slice(0, 10));
+              }} className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap">이번달</button>
+              <button onClick={() => {
+                const d = new Date();
+                setListDateFrom(`${d.getFullYear()}-01-01`);
+                setListDateTo(d.toISOString().slice(0, 10));
+              }} className="text-xs text-gray-500 dark:text-gray-400 hover:underline whitespace-nowrap">올해</button>
+              <button onClick={() => { setListDateFrom(""); setListDateTo(""); }}
+                className="text-xs text-gray-400 dark:text-gray-500 hover:underline whitespace-nowrap">전체</button>
+              <div className="w-px h-4 bg-gray-200 dark:bg-gray-600" />
+              <input type="text" value={listQuery} onChange={e => setListQuery(e.target.value)}
+                placeholder="현장명 / 작업사유 검색"
+                className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400 w-44" />
+              {(() => {
+                const cnt = myReports.filter(r => {
+                  const dt = r.start_at.slice(0, 10);
+                  if (listDateFrom && dt < listDateFrom) return false;
+                  if (listDateTo   && dt > listDateTo)   return false;
+                  if (listQuery) {
+                    const q = listQuery.toLowerCase();
+                    if (!r.site_name.toLowerCase().includes(q) && !r.work_reasons.join(",").toLowerCase().includes(q)) return false;
+                  }
+                  return true;
+                }).length;
+                return <span className="text-xs text-gray-400 ml-auto">{cnt}건</span>;
+              })()}
+            </div>
             {myReports.length === 0 ? (
               <div className="text-center text-sm text-gray-400 py-16">등록된 잔업보고서가 없습니다.</div>
-            ) : (
+            ) : (() => {
+              const filteredReports = myReports.filter(r => {
+                const dt = r.start_at.slice(0, 10);
+                if (listDateFrom && dt < listDateFrom) return false;
+                if (listDateTo   && dt > listDateTo)   return false;
+                if (listQuery) {
+                  const q = listQuery.toLowerCase();
+                  if (!r.site_name.toLowerCase().includes(q) && !r.work_reasons.join(",").toLowerCase().includes(q)) return false;
+                }
+                return true;
+              });
+              if (filteredReports.length === 0) return (
+                <div className="text-center text-sm text-gray-400 py-16">검색 결과가 없습니다.</div>
+              );
+              return (
               <div className="space-y-3">
-                {myReports.map(r => {
+                {filteredReports.map(r => {
                   const author   = accounts.find(a => a.id === r.author_id);
                   const approver = accounts.find(a => a.id === r.approver_id);
                   const s = new Date(r.start_at), e = new Date(r.end_at);
@@ -1047,7 +1105,8 @@ export default function OvertimeReportClient() {
                   );
                 })}
               </div>
-            )}
+              );
+            })()}
           </div>
         )}
       </div>

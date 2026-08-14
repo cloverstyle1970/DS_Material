@@ -77,8 +77,11 @@ export default function OvertimeLedgerClient() {
   const [rows, setRows] = useState<OTRow[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [query, setQuery] = useState("");
-  const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
-  const [monthFilter, setMonthFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+  });
+  const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [detail, setDetail] = useState<OTRow | null>(null);
   const [editingRow, setEditingRow] = useState<OTRow | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
@@ -151,14 +154,10 @@ export default function OvertimeLedgerClient() {
     load();
   }
 
-  const years = Array.from(
-    new Set(rows.map(r => r.start_at.slice(0, 4)))
-  ).sort((a, b) => b.localeCompare(a));
-
   const filtered = rows.filter(r => {
-    const dt = r.start_at.slice(0, 7); // YYYY-MM
-    if (yearFilter && !dt.startsWith(yearFilter)) return false;
-    if (monthFilter && dt.slice(5, 7) !== monthFilter) return false;
+    const dt = r.start_at.slice(0, 10); // YYYY-MM-DD
+    if (dateFrom && dt < dateFrom) return false;
+    if (dateTo   && dt > dateTo)   return false;
     if (query) {
       const q = query.toLowerCase();
       const author = accounts.find(a => a.id === r.author_id);
@@ -189,27 +188,29 @@ export default function OvertimeLedgerClient() {
 
       {/* 필터 */}
       <div className="flex flex-wrap items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 shrink-0">
-        <select
-          value={yearFilter}
-          onChange={e => setYearFilter(e.target.value)}
-          className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 focus:outline-none">
-          <option value="">전체 연도</option>
-          {years.map(y => <option key={y}>{y}</option>)}
-          {!years.includes(yearFilter) && yearFilter && <option value={yearFilter}>{yearFilter}</option>}
-        </select>
-        <select
-          value={monthFilter}
-          onChange={e => setMonthFilter(e.target.value)}
-          className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 focus:outline-none">
-          <option value="">전체 월</option>
-          {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0")).map(m => (
-            <option key={m} value={m}>{Number(m)}월</option>
-          ))}
-        </select>
+        <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">기간</span>
+        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+          className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400" />
+        <span className="text-xs text-gray-400">~</span>
+        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+          className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400" />
+        <button onClick={() => {
+          const d = new Date();
+          setDateFrom(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`);
+          setDateTo(d.toISOString().slice(0, 10));
+        }} className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap">이번달</button>
+        <button onClick={() => {
+          const d = new Date();
+          setDateFrom(`${d.getFullYear()}-01-01`);
+          setDateTo(d.toISOString().slice(0, 10));
+        }} className="text-xs text-gray-500 dark:text-gray-400 hover:underline whitespace-nowrap">올해</button>
+        <button onClick={() => { setDateFrom(""); setDateTo(""); }}
+          className="text-xs text-gray-400 dark:text-gray-500 hover:underline whitespace-nowrap">전체</button>
+        <div className="w-px h-4 bg-gray-200 dark:bg-gray-600" />
         <input
           type="text" value={query} onChange={e => setQuery(e.target.value)}
           placeholder="현장명 / 보고서번호 / 작성자 검색"
-          className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400 w-56" />
+          className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400 w-52" />
       </div>
 
       {/* 합계 바 */}
