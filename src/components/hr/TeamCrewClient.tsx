@@ -27,7 +27,7 @@ export default function TeamCrewClient() {
     const [d, c, u, r] = await Promise.all([
       supabase.from("departments").select("id, name, sort_order, is_active").eq("is_active", true).order("sort_order"),
       supabase.from("crews").select("id, department_id, name, sort_order, is_active").order("sort_order"),
-      supabase.from("accounts").select("id, name:username, dept, rank, crew_id, hire_date").order("username"),
+      supabase.from("accounts").select("id, name:username, dept, rank, crew_id, hire_date").eq("status", "재직").order("username"),
       supabase.from("ranks").select("id, name, sort_order"),
     ]);
     setDepts((d.data ?? []) as Department[]);
