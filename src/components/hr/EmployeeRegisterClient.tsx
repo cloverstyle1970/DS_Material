@@ -9,6 +9,7 @@ import { formatDate, formatPhone, formatSsn, genderFromSsn } from "@/lib/input-f
 
 const STORAGE_BUCKET = "employee-photos";
 const CERT_DOCS_BUCKET = "cert-docs";
+const SIGN_BUCKET = "signatures";
 const DAUM_SCRIPT_SRC = "//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
 
 declare global {
@@ -169,6 +170,8 @@ export default function EmployeeRegisterClient() {
 
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>("");
+  const [signature, setSignature] = useState<File | null>(null);
+  const [signaturePreview, setSignaturePreview] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [daumReady, setDaumReady] = useState(false);
@@ -177,6 +180,7 @@ export default function EmployeeRegisterClient() {
   const [permGroups, setPermGroups] = useState<{ id: number; name: string; permissions: string[] }[]>([]);
   const [crews, setCrews] = useState<{ id: number; department_id: number; name: string; is_active: boolean }[]>([]);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const signatureInputRef = useRef<HTMLInputElement>(null);
 
   const loadRefData = async () => {
     const [d, r, p, c] = await Promise.all([
@@ -267,6 +271,21 @@ export default function EmployeeRegisterClient() {
     if (photoInputRef.current) photoInputRef.current.value = "";
   }
 
+  function onSignatureChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setSignature(f);
+    const reader = new FileReader();
+    reader.onload = ev => setSignaturePreview(ev.target?.result as string);
+    reader.readAsDataURL(f);
+  }
+
+  function clearSignature() {
+    setSignature(null);
+    setSignaturePreview("");
+    if (signatureInputRef.current) signatureInputRef.current.value = "";
+  }
+
   // 긴급연락처 1명만 가능 — 토글 시 다른 행은 해제
   function setEmergency(targetIdx: number, on: boolean) {
     setFamily(prev => prev.map((m, i) => ({
@@ -287,6 +306,18 @@ export default function EmployeeRegisterClient() {
     return data.publicUrl;
   }
 
+  async function uploadSignature(): Promise<string | null> {
+    if (!signature) return null;
+    const ext = signature.name.split(".").pop()?.toLowerCase() || "png";
+    const path = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error: upErr } = await supabase.storage.from(SIGN_BUCKET).upload(path, signature, {
+      cacheControl: "3600", upsert: false,
+    });
+    if (upErr) throw upErr;
+    const { data } = supabase.storage.from(SIGN_BUCKET).getPublicUrl(path);
+    return data.publicUrl;
+  }
+
   function resetAll() {
     setForm(emptyForm());
     setFamily([{ ...EMPTY_FAMILY }]);
@@ -295,6 +326,7 @@ export default function EmployeeRegisterClient() {
     setCareers([]);
     setRps([]);
     clearPhoto();
+    clearSignature();
     setMessage(null);
     setTab("basic");
   }
@@ -363,6 +395,7 @@ export default function EmployeeRegisterClient() {
     setSaving(true);
     try {
       const photoUrl = await uploadPhoto();
+      const signatureUrl = await uploadSignature();
       const fullAddress = [form.address_basic, form.address_detail].filter(Boolean).join(" ").trim();
 
       const newPermissions = form.permission_group_id
@@ -388,6 +421,7 @@ export default function EmployeeRegisterClient() {
         postal_code: form.postal_code || null,
         address: fullAddress || null,
         photo_url: photoUrl,
+        signature_url: signatureUrl,
         uniform_top_size: form.uniform_top_size || null,
         uniform_bottom_size: form.uniform_bottom_size || null,
         safety_shoes_size: form.safety_shoes_size || null,
@@ -591,6 +625,7 @@ export default function EmployeeRegisterClient() {
         {tab === "basic" && (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
+              <div className="flex flex-col gap-4">
               <div className={sectionCls + " flex flex-col"}>
                 <label className={labelCls}>📷 프로필 사진 <span className="text-[10px] text-gray-400">(증명사진 3:4)</span></label>
                 <div className="w-full aspect-[3/4] rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 overflow-hidden flex items-center justify-center mb-3 mx-auto">
@@ -617,6 +652,37 @@ export default function EmployeeRegisterClient() {
                   )}
                 </div>
                 <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-2">JPG/PNG/WEBP, 최대 3MB</p>
+              </div>
+
+              <div className={sectionCls + " flex flex-col"}>
+                <label className={labelCls}>✍️ 서명(싸인) 이미지</label>
+                <div className="w-full h-24 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 overflow-hidden flex items-center justify-center mb-3">
+                  {signaturePreview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={signaturePreview} alt="서명 미리보기" className="w-full h-full object-contain" />
+                  ) : (
+                    <div className="text-center text-gray-400">
+                      <div className="text-3xl mb-1">✍️</div>
+                      <div className="text-[10px]">서명 없음</div>
+                    </div>
+                  )}
+                </div>
+                <input ref={signatureInputRef} type="file" accept="image/png,image/jpeg" onChange={onSignatureChange} className="hidden" id="emp-signature-input" />
+                <div className="flex gap-2">
+                  <label htmlFor="emp-signature-input" className="flex-1 text-center px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold cursor-pointer hover:bg-blue-700">
+                    📁 선택
+                  </label>
+                  {signature && (
+                    <button type="button" onClick={clearSignature}
+                      className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-semibold">
+                      지우기
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-2">
+                  PNG/JPG, 최대 2MB. 등록 시 위험성평가·TBM 등에서 &quot;등록된 서명 사용&quot; 버튼으로 재사용됩니다.
+                </p>
+              </div>
               </div>
 
               <div className="flex flex-col gap-4">

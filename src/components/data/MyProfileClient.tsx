@@ -13,6 +13,7 @@ import { daysUntilExpiry, EXPIRY_WARN_DAYS } from "@/lib/cert-expiry";
 const ADMIN_EDIT_USER_KEY = "ds_admin_edit_user_id";
 
 const PHOTO_BUCKET = "employee-photos";
+const SIGN_BUCKET = "signatures";
 const CERT_DOCS_BUCKET = "cert-docs";
 const DAUM_SCRIPT_SRC = "//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
 
@@ -44,6 +45,7 @@ interface UserRow {
   postal_code: string | null;
   address: string | null;
   photo_url: string | null;
+  signature_url: string | null;
   uniform_top_size: string | null;
   uniform_bottom_size: string | null;
   safety_shoes_size: string | null;
@@ -209,6 +211,12 @@ export default function MyProfileClient() {
   const [photoPreview, setPhotoPreview] = useState<string>("");
   const photoInputRef = useRef<HTMLInputElement>(null);
 
+  // 서명
+  const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [signatureFile, setSignatureFile] = useState<File | null>(null);
+  const [signaturePreview, setSignaturePreview] = useState<string>("");
+  const signatureInputRef = useRef<HTMLInputElement>(null);
+
   // 1:N
   const [family, setFamily] = useState<FamilyMember[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -341,6 +349,9 @@ export default function MyProfileClient() {
         setPhotoUrl(r.photo_url ?? null);
         setPhotoFile(null);
         setPhotoPreview("");
+        setSignatureUrl(r.signature_url ?? null);
+        setSignatureFile(null);
+        setSignaturePreview("");
         setMessage(null);
       }
       type FamilyRow = Partial<FamilyMember> & { gender?: string | null; phone?: string | null; is_emergency?: boolean | null };
@@ -438,6 +449,15 @@ export default function MyProfileClient() {
     setPhotoFile(f);
     const reader = new FileReader();
     reader.onload = ev => setPhotoPreview(ev.target?.result as string);
+    reader.readAsDataURL(f);
+  }
+
+  function onSignatureChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setSignatureFile(f);
+    const reader = new FileReader();
+    reader.onload = ev => setSignaturePreview(ev.target?.result as string);
     reader.readAsDataURL(f);
   }
 
@@ -550,6 +570,11 @@ export default function MyProfileClient() {
         const ext = photoFile.name.split(".").pop()?.toLowerCase() || "jpg";
         newPhotoUrl = await uploadFile(PHOTO_BUCKET, photoFile, ext);
       }
+      let newSignatureUrl: string | null = signatureUrl;
+      if (signatureFile) {
+        const ext = signatureFile.name.split(".").pop()?.toLowerCase() || "png";
+        newSignatureUrl = await uploadFile(SIGN_BUCKET, signatureFile, ext);
+      }
       const fullAddress = [addressBasic, addressDetail].filter(Boolean).join(" ").trim();
 
       // users — 본인 수정 가능 필드. 관리자 대리편집 모드에서는 잠금 필드(name/ssn/hire_date/dept/rank/status)도 함께 갱신.
@@ -562,6 +587,7 @@ export default function MyProfileClient() {
         postal_code: postalCode || null,
         address: fullAddress || null,
         photo_url: newPhotoUrl,
+        signature_url: newSignatureUrl,
         uniform_top_size: topSize || null,
         uniform_bottom_size: bottomSize || null,
         safety_shoes_size: shoesSize || null,
@@ -712,6 +738,11 @@ export default function MyProfileClient() {
         setPhotoFile(null);
         setPhotoPreview("");
       }
+      if (newSignatureUrl !== signatureUrl) {
+        setSignatureUrl(newSignatureUrl);
+        setSignatureFile(null);
+        setSignaturePreview("");
+      }
       setMessage({ type: "success", text: isAdminEditing ? `${editName.trim()} 님의 정보가 저장되었습니다.` : "개인정보가 저장되었습니다." });
     } catch (err) {
       console.error("[my-profile] save error:", err);
@@ -803,6 +834,7 @@ export default function MyProfileClient() {
         {tab === "basic" && (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
+              <div className="flex flex-col gap-4">
               <div className={sectionCls + " flex flex-col"}>
                 <label className={labelCls}>📷 프로필 사진 <span className="text-[10px] text-gray-400">(증명사진 3:4)</span></label>
                 <div className="w-full aspect-[3/4] rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 overflow-hidden flex items-center justify-center mb-3 mx-auto">
@@ -828,6 +860,37 @@ export default function MyProfileClient() {
                     </button>
                   )}
                 </div>
+              </div>
+
+              <div className={sectionCls + " flex flex-col"}>
+                <label className={labelCls}>✍️ 서명(싸인) 이미지</label>
+                <div className="w-full h-24 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 overflow-hidden flex items-center justify-center mb-3">
+                  {(signaturePreview || signatureUrl) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={signaturePreview || signatureUrl!} alt="서명" className="w-full h-full object-contain" />
+                  ) : (
+                    <div className="text-center text-gray-400">
+                      <div className="text-3xl mb-1">✍️</div>
+                      <div className="text-[10px]">서명 없음</div>
+                    </div>
+                  )}
+                </div>
+                <input ref={signatureInputRef} type="file" accept="image/png,image/jpeg" onChange={onSignatureChange} className="hidden" id="my-signature-input" />
+                <div className="flex gap-2">
+                  <label htmlFor="my-signature-input" className="flex-1 text-center px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold cursor-pointer hover:bg-blue-700">
+                    📁 서명 변경
+                  </label>
+                  {signatureFile && (
+                    <button type="button" onClick={() => { setSignatureFile(null); setSignaturePreview(""); if (signatureInputRef.current) signatureInputRef.current.value = ""; }}
+                      className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 text-xs font-semibold">
+                      취소
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-2">
+                  PNG/JPG, 최대 2MB. 등록 시 위험성평가·TBM 등에서 &quot;등록된 서명 사용&quot; 버튼으로 재사용됩니다.
+                </p>
+              </div>
               </div>
 
               <div className="flex flex-col gap-4">

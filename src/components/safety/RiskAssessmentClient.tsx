@@ -138,6 +138,14 @@ function AssessTab({
   const [edit, setEdit] = useState<Record<number, EditRow>>({});
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [myRegisteredSigUrl, setMyRegisteredSigUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("accounts").select("signature_url").eq("id", currentUserId).single();
+      setMyRegisteredSigUrl((data as { signature_url: string | null } | null)?.signature_url ?? null);
+    })();
+  }, [currentUserId]);
 
   const loadCats = useCallback(async () => {
     const { data } = await supabase.from("risk_categories").select("*").order("sort_order");
@@ -282,18 +290,31 @@ function AssessTab({
     return data.publicUrl;
   }
 
+  async function finalizeMySignature(surveyId: number, url: string) {
+    const { error } = await supabase
+      .from("hazard_survey_participants")
+      .update({ signature_url: url, signed_at: new Date().toISOString() })
+      .eq("survey_id", surveyId)
+      .eq("user_id", currentUserId);
+    if (error) throw error;
+    setSigningSurveyId(null);
+    void loadSurveys();
+    if (selId === surveyId) void loadSheetParts(surveyId);
+  }
+
   async function saveMySignature(surveyId: number, dataUrl: string) {
     try {
       const url = await uploadMySignature(dataUrl);
-      const { error } = await supabase
-        .from("hazard_survey_participants")
-        .update({ signature_url: url, signed_at: new Date().toISOString() })
-        .eq("survey_id", surveyId)
-        .eq("user_id", currentUserId);
-      if (error) throw error;
-      setSigningSurveyId(null);
-      void loadSurveys();
-      if (selId === surveyId) void loadSheetParts(surveyId);
+      await finalizeMySignature(surveyId, url);
+    } catch (e: any) {
+      alert("서명 저장 실패: " + (e?.message ?? e));
+    }
+  }
+
+  async function useMyRegisteredSignature(surveyId: number) {
+    if (!myRegisteredSigUrl) return;
+    try {
+      await finalizeMySignature(surveyId, myRegisteredSigUrl);
     } catch (e: any) {
       alert("서명 저장 실패: " + (e?.message ?? e));
     }
@@ -632,8 +653,10 @@ function AssessTab({
       {signingSurveyId != null && (
         <SignatureModal
           participant={{ id: currentUserId, name: currentUserName, dept: null }}
+          registeredSigUrl={myRegisteredSigUrl}
           onClose={() => setSigningSurveyId(null)}
           onSigned={(dataUrl) => void saveMySignature(signingSurveyId, dataUrl)}
+          onUseRegistered={() => void useMyRegisteredSignature(signingSurveyId)}
         />
       )}
     </div>
@@ -1206,18 +1229,27 @@ function AddParticipantsModal({
 // 서명 팝업 — 참가자별 서명 캔버스. 확정 시 dataURL을 상위로 전달.
 function SignatureModal({
   participant,
+  registeredSigUrl,
   onClose,
   onSigned,
+  onUseRegistered,
 }: {
   participant: ParticipantDraft;
+  registeredSigUrl?: string | null;
   onClose: () => void;
   onSigned: (dataUrl: string) => void;
+  onUseRegistered?: () => void;
 }) {
   const { viewMode } = useViewMode();
   const isMobile = viewMode === "mobile";
   const padRef = useRef<SignaturePadHandle>(null);
+  const [useRegistered, setUseRegistered] = useState(false);
 
   function confirm() {
+    if (useRegistered && registeredSigUrl) {
+      onUseRegistered?.();
+      return;
+    }
     if (padRef.current?.isEmpty()) {
       alert("서명을 먼저 그려주세요.");
       return;
@@ -1252,10 +1284,31 @@ function SignatureModal({
           </button>
         </div>
         <div className="p-4">
-          <SignaturePad ref={padRef} />
-          <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-2">
-            빈 영역에 손가락·마우스로 서명한 후 확인을 눌러주세요.
-          </p>
+          {useRegistered && registeredSigUrl ? (
+            <div>
+              <div className="w-full h-32 rounded-lg border-2 border-solid border-blue-300 dark:border-blue-700 bg-white flex items-center justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={registeredSigUrl} alt="등록된 서명" className="max-h-full max-w-full object-contain" />
+              </div>
+              <button type="button" onClick={() => setUseRegistered(false)}
+                className="mt-1.5 text-[11px] text-blue-600 dark:text-blue-300 hover:underline">
+                ✍️ 직접 서명으로 변경
+              </button>
+            </div>
+          ) : (
+            <div>
+              <SignaturePad ref={padRef} />
+              {registeredSigUrl && (
+                <button type="button" onClick={() => setUseRegistered(true)}
+                  className="mt-1.5 text-[11px] text-blue-600 dark:text-blue-300 hover:underline">
+                  ✅ 등록된 서명 사용
+                </button>
+              )}
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-2">
+                빈 영역에 손가락·마우스로 서명한 후 확인을 눌러주세요.
+              </p>
+            </div>
+          )}
         </div>
         <div className={`border-t border-gray-200 dark:border-gray-700 flex gap-2 ${isMobile ? "p-3" : "px-5 py-3 justify-end"}`}>
           <button

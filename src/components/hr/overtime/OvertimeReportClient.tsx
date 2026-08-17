@@ -11,7 +11,7 @@ import { notifyOvertimeApprovalRequest, notifyOvertimeApproved, notifyOvertimeRe
 export const OT_MENU_HREF = "/hr/overtime-report";
 const WORK_REASONS = ["점검", "공사", "수리·부품교체", "상주", "조출", "기타"] as const;
 
-interface Account { id: number; username: string; dept: string | null; team: string | null; status: string | null; }
+interface Account { id: number; username: string; dept: string | null; team: string | null; status: string | null; signature_url: string | null; }
 interface OvertimeReport {
   id: number; report_no: string; author_id: number; site_name: string;
   work_instructor: string | null; work_instructor_id: number | null;
@@ -340,7 +340,7 @@ export default function OvertimeReportClient() {
   }, [user, isManager]);
 
   useEffect(() => {
-    supabase.from("accounts").select("id,username,dept,team,status").order("username")
+    supabase.from("accounts").select("id,username,dept,team,status,signature_url").order("username")
       .then(({ data }) => setAccounts((data as Account[] | null) ?? []));
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -493,15 +493,25 @@ export default function OvertimeReportClient() {
     const ctx = signCanvasRef.current.getContext("2d")!;
     ctx.clearRect(0, 0, signCanvasRef.current.width, signCanvasRef.current.height);
   }
-  async function confirmApprove() {
-    if (!signModal || !user || !signCanvasRef.current) return;
-    const sig = signCanvasRef.current.toDataURL("image/png");
+  async function approveWithSignature(sig: string) {
+    if (!signModal || !user) return;
     const { error } = await supabase.from("overtime_reports")
       .update({ approval_status:"approved", approved_at: new Date().toISOString(), approver_signature: sig })
       .eq("id", signModal.id);
     if (error) { alert("오류: " + error.message); return; }
     notifyOvertimeApproved({ authorId: signModal.author_id, approverName: authorAcc?.username ?? user.name, reportNo: signModal.report_no, reportId: signModal.id }).catch(console.warn);
     setSignModal(null); await load();
+  }
+
+  function confirmApprove() {
+    if (!signCanvasRef.current) return;
+    void approveWithSignature(signCanvasRef.current.toDataURL("image/png"));
+  }
+
+  function approveWithRegisteredSignature() {
+    const mySig = accounts.find(a => a.id === user?.id)?.signature_url;
+    if (!mySig) return;
+    void approveWithSignature(mySig);
   }
   async function reject() {
     if (!rejectModal || !user) return;
@@ -1084,6 +1094,16 @@ export default function OvertimeReportClient() {
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-5 w-[340px]">
             <h3 className="text-sm font-bold mb-1">잔업보고서 승인 — 서명 입력</h3>
             <p className="text-xs text-gray-400 mb-3">{signModal.report_no} · 아래 영역에 서명해주세요</p>
+            {(() => {
+              const mySig = accounts.find(a => a.id === user?.id)?.signature_url;
+              if (!mySig) return null;
+              return (
+                <button onClick={approveWithRegisteredSignature}
+                  className="w-full mb-3 py-2 text-xs bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-lg border border-blue-200 dark:border-blue-700 font-semibold">
+                  ✅ 등록된 서명으로 바로 승인
+                </button>
+              );
+            })()}
             <div className="relative border-2 border-gray-300 rounded-lg overflow-hidden bg-white"
               style={{ touchAction: "none" }}>
               <canvas ref={signCanvasRef} width={600} height={220}

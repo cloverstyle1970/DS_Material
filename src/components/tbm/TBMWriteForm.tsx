@@ -32,7 +32,7 @@ interface HeatRest {
 
 interface Site { id: number; name: string }
 interface Elevator { id: number; site_name: string; unit_name: string }
-interface UserMini { id: number; name: string | null; dept: string | null }
+interface UserMini { id: number; name: string | null; dept: string | null; signature_url: string | null }
 interface Worker { name: string; user_id: number | null }
 interface Schedule {
   id: number; site_name: string; elevator_name: string;
@@ -87,6 +87,8 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
     { name: "", user_id: null },
     { name: "", user_id: null },
   ]);
+  // 참가자별 "등록된 서명 사용" 여부 (workers와 인덱스 동기화)
+  const [workerUseRegistered, setWorkerUseRegistered] = useState<boolean[]>([false, false]);
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
   const [ruleCategory, setRuleCategory] = useState<SafetyCategory>("all");
@@ -111,7 +113,7 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
         // 신DB: 현장=managed_sites(site_name→name 별칭), 호기=site_elevators(site_id), 사원=accounts(username→name)
         supabase.from("managed_sites").select("id, name:site_name").order("site_name"),
         supabase.from("site_elevators").select("id, site_id, installation_place, unit_name").order("installation_place"),
-        supabase.from("accounts").select("id, name:username, dept").eq("status", "재직").order("username"),
+        supabase.from("accounts").select("id, name:username, dept, signature_url").eq("status", "재직").order("username"),
       ]);
       if (sr.data) setSafetyRules(sr.data as SafetyRule[]);
       if (rt.data) setRepairTypes(rt.data as RepairType[]);
@@ -254,9 +256,12 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
   function pickWorkerByName(idx: number, name: string) {
     const found = users.find(u => (u.name ?? "").trim() === name.trim());
     updateWorker(idx, { name, user_id: found?.id ?? null });
+    // 참가자가 바뀌면 이전 사람 기준 "등록된 서명 사용" 선택은 무효화
+    setWorkerUseRegistered(prev => prev.map((v, i) => i === idx ? false : v));
   }
   function addWorker() {
     setWorkers(prev => [...prev, { name: "", user_id: null }]);
+    setWorkerUseRegistered(prev => [...prev, false]);
   }
   function removeWorker(idx: number) {
     setWorkers(prev => {
@@ -265,6 +270,10 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
       workerSigRefs.current.splice(idx, 1);
       return prev.filter((_, i) => i !== idx);
     });
+    setWorkerUseRegistered(prev => prev.length <= 2 || idx === 0 ? prev : prev.filter((_, i) => i !== idx));
+  }
+  function toggleUseRegisteredSignature(idx: number) {
+    setWorkerUseRegistered(prev => prev.map((v, i) => i === idx ? !v : v));
   }
 
   async function uploadPhotos(): Promise<string[]> {
@@ -290,6 +299,7 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
       { name: user?.name ?? "", user_id: user?.id ?? null },
       { name: "", user_id: null },
     ]);
+    setWorkerUseRegistered([false, false]);
     workerSigRefs.current.forEach(ref => ref?.clear());
     workerSigRefs.current = [];
     setPhotos([]); setPhotoPreviews([]);
@@ -408,18 +418,28 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
       const uniq = new Set(ids);
       if (uniq.size !== ids.length) { setError("참가자가 중복되었습니다. 중복된 사원을 제거하세요."); return; }
     }
-    // 작성자(첫번째) 서명은 필수, 나머지는 미서명 시 알림 발송
-    if (!workerSigRefs.current[0] || workerSigRefs.current[0].isEmpty()) {
+    // 작성자(첫번째) 서명은 필수(직접 그리기 또는 등록된 서명 사용), 나머지는 미서명 시 알림 발송
+    if (workerUseRegistered[0]) {
+      if (!users.find(u => u.id === workers[0].user_id)?.signature_url) {
+        setError("작성자의 등록된 서명을 찾을 수 없습니다.");
+        return;
+      }
+    } else if (!workerSigRefs.current[0] || workerSigRefs.current[0].isEmpty()) {
       setError("작성자 서명을 입력하세요.");
       return;
     }
 
     setSaving(true);
     try {
-      // 1. 사진/서명(작성자 + 참가자) 업로드
+      // 1. 사진/서명(작성자 + 참가자) 업로드 — 등록된 서명을 사용하는 참가자는 재업로드 없이 그대로 사용
       const [photoUrls, workerSigUrls] = await Promise.all([
         uploadPhotos(),
-        Promise.all(workers.map((_, i) => uploadSignatureRef(workerSigRefs.current[i]))),
+        Promise.all(workers.map((w, i) => {
+          if (workerUseRegistered[i]) {
+            return Promise.resolve(users.find(u => u.id === w.user_id)?.signature_url ?? null);
+          }
+          return uploadSignatureRef(workerSigRefs.current[i]);
+        })),
       ]);
       const sigUrl = workerSigUrls[0]; // 작성자 서명 = tbm_records.signature_url
 
@@ -1137,9 +1157,42 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
                 ? <span className="text-[10px] font-normal text-red-600 dark:text-red-400">(작성자 필수)</span>
                 : <span className="text-[10px] font-normal text-gray-500">(미서명 시 알림 발송)</span>}
             </label>
-            <SignaturePad
-              ref={el => { workerSigRefs.current[idx] = el; }}
-            />
+            {(() => {
+              const regSig = users.find(u => u.id === w.user_id)?.signature_url ?? null;
+              if (workerUseRegistered[idx] && regSig) {
+                return (
+                  <div>
+                    <div className="w-full h-32 rounded-lg border-2 border-solid border-blue-300 dark:border-blue-700 bg-white flex items-center justify-center">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={regSig} alt="등록된 서명" className="max-h-full max-w-full object-contain" />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleUseRegisteredSignature(idx)}
+                      className="mt-1.5 text-[11px] text-blue-600 dark:text-blue-300 hover:underline"
+                    >
+                      ✍️ 직접 서명으로 변경
+                    </button>
+                  </div>
+                );
+              }
+              return (
+                <div>
+                  <SignaturePad
+                    ref={el => { workerSigRefs.current[idx] = el; }}
+                  />
+                  {regSig && (
+                    <button
+                      type="button"
+                      onClick={() => toggleUseRegisteredSignature(idx)}
+                      className="mt-1.5 text-[11px] text-blue-600 dark:text-blue-300 hover:underline"
+                    >
+                      ✅ 등록된 서명 사용
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         ))}
 

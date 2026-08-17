@@ -29,6 +29,8 @@ export default function TBMParticipantConfirmModal({ record, onClose, onSaved }:
   const [myAcks, setMyAcks] = useState<Set<number>>(new Set());
   const [mySigUrl, setMySigUrl] = useState<string | null>(null);
   const [confirmedAt, setConfirmedAt] = useState<string | null>(null);
+  const [registeredSigUrl, setRegisteredSigUrl] = useState<string | null>(null);
+  const [useRegisteredSig, setUseRegisteredSig] = useState(false);
   const [myPhotos, setMyPhotos] = useState<TBMParticipantPhoto[]>([]);
 
   const [newPhotos, setNewPhotos] = useState<File[]>([]);
@@ -44,13 +46,14 @@ export default function TBMParticipantConfirmModal({ record, onClose, onSaved }:
     if (!user) return;
     (async () => {
       setLoading(true);
-      const [c, r, mc, ms, mp, me] = await Promise.all([
+      const [c, r, mc, ms, mp, me, acc] = await Promise.all([
         supabase.from("tbm_checklist_results").select("*").eq("tbm_id", record.id),
         supabase.from("tbm_record_safety_rules").select("*").eq("tbm_id", record.id),
         supabase.from("tbm_participant_checklist").select("*").eq("tbm_id", record.id).eq("user_id", user.id),
         supabase.from("tbm_participant_safety").select("*").eq("tbm_id", record.id).eq("user_id", user.id),
         supabase.from("tbm_participant_photos").select("*").eq("tbm_id", record.id).eq("user_id", user.id).order("uploaded_at"),
         supabase.from("tbm_participants").select("signature_url, confirmed_at").eq("tbm_id", record.id).eq("user_id", user.id).single(),
+        supabase.from("accounts").select("signature_url").eq("id", user.id).single(),
       ]);
       const cl = (c.data ?? []) as TBMChecklistResult[];
       const rl = (r.data ?? []) as TBMRecordSafetyRule[];
@@ -64,6 +67,8 @@ export default function TBMParticipantConfirmModal({ record, onClose, onSaved }:
         setMySigUrl(meRow.signature_url);
         setConfirmedAt(meRow.confirmed_at);
       }
+      const accRow = acc.data as { signature_url: string | null } | null;
+      setRegisteredSigUrl(accRow?.signature_url ?? null);
       setLoading(false);
     })();
   }, [record.id, user]);
@@ -118,13 +123,17 @@ export default function TBMParticipantConfirmModal({ record, onClose, onSaved }:
 
     setSaving(true);
     try {
-      // 1. 새 서명 (있으면)
+      // 1. 새 서명 — 등록된 서명 사용을 선택했으면 그대로, 아니면 캔버스에 그린 서명 업로드
       let sigUrl = mySigUrl;
-      const newSigDataUrl = sigPadRef.current?.getDataURL();
-      const sigEmpty = sigPadRef.current?.isEmpty();
-      if (newSigDataUrl && !sigEmpty) {
-        const blob = await (await fetch(newSigDataUrl)).blob();
-        sigUrl = await uploadFile(blob, "png");
+      if (useRegisteredSig && registeredSigUrl) {
+        sigUrl = registeredSigUrl;
+      } else {
+        const newSigDataUrl = sigPadRef.current?.getDataURL();
+        const sigEmpty = sigPadRef.current?.isEmpty();
+        if (newSigDataUrl && !sigEmpty) {
+          const blob = await (await fetch(newSigDataUrl)).blob();
+          sigUrl = await uploadFile(blob, "png");
+        }
       }
 
       // 2. 새 사진 업로드
@@ -328,7 +337,28 @@ export default function TBMParticipantConfirmModal({ record, onClose, onSaved }:
                   <img src={mySigUrl} alt="기존 서명" className="h-16 bg-white rounded border border-gray-200" />
                 </div>
               )}
-              <SignaturePad ref={sigPadRef} />
+              {useRegisteredSig && registeredSigUrl ? (
+                <div>
+                  <div className="w-full h-32 rounded-lg border-2 border-solid border-blue-300 dark:border-blue-700 bg-white flex items-center justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={registeredSigUrl} alt="등록된 서명" className="max-h-full max-w-full object-contain" />
+                  </div>
+                  <button type="button" onClick={() => setUseRegisteredSig(false)}
+                    className="mt-1.5 text-[11px] text-blue-600 dark:text-blue-300 hover:underline">
+                    ✍️ 직접 서명으로 변경
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <SignaturePad ref={sigPadRef} />
+                  {registeredSigUrl && (
+                    <button type="button" onClick={() => setUseRegisteredSig(true)}
+                      className="mt-1.5 text-[11px] text-blue-600 dark:text-blue-300 hover:underline">
+                      ✅ 등록된 서명 사용
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {error && (
