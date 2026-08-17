@@ -252,7 +252,7 @@ function AccountSearchInput({ accountId, freeText = "", onSelect, accounts, plac
         <div style={{
           position: "fixed", top: dropRect.top, left: dropRect.left,
           minWidth: 200, zIndex: 9999,
-          background: "white", border: "1px solid #bbb",
+          background: "white", color: "#111", border: "1px solid #bbb",
           borderRadius: 4, boxShadow: "0 6px 18px rgba(0,0,0,0.15)",
           maxHeight: 220, overflowY: "auto",
           fontSize: "9pt", fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif",
@@ -622,7 +622,7 @@ export default function OvertimeReportClient() {
                 onSelect={id => sf({ approver_id: id })}
                 accounts={activeAccounts}
                 placeholder="— 승인자 검색 —"
-                className="border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:border-blue-400 w-40"
+                className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400 w-40"
               />
               {otResult && (
                 <span className="font-semibold text-blue-700 dark:text-blue-300">{otResult.display}</span>
@@ -967,10 +967,10 @@ export default function OvertimeReportClient() {
             <div className="flex flex-wrap items-center gap-2 mb-4 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
               <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">기간</span>
               <input type="date" value={listDateFrom} onChange={e => setListDateFrom(e.target.value)}
-                className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400" />
+                className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400" />
               <span className="text-xs text-gray-400">~</span>
               <input type="date" value={listDateTo} onChange={e => setListDateTo(e.target.value)}
-                className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400" />
+                className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400" />
               <button onClick={() => {
                 const d = new Date();
                 setListDateFrom(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`);
