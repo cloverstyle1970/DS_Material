@@ -8,13 +8,15 @@ import DraggableModal from "@/components/common/DraggableModal";
 
 interface Department { id: number; name: string; sort_order: number; is_active: boolean }
 interface Crew { id: number; department_id: number; name: string; sort_order: number; is_active: boolean }
-interface UserRow { id: number; name: string; dept: string | null; rank: string | null; crew_id: number | null }
+interface UserRow { id: number; name: string; dept: string | null; rank: string | null; crew_id: number | null; hire_date: string | null }
+interface RankRow { id: number; name: string; sort_order: number }
 
 export default function TeamCrewClient() {
   const { user } = useAuth();
   const [depts, setDepts] = useState<Department[]>([]);
   const [crews, setCrews] = useState<Crew[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [ranks, setRanks] = useState<RankRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingCrew, setEditingCrew] = useState<Crew | null>(null);
   const [addingForDept, setAddingForDept] = useState<Department | null>(null);
@@ -22,16 +24,38 @@ export default function TeamCrewClient() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [d, c, u] = await Promise.all([
+    const [d, c, u, r] = await Promise.all([
       supabase.from("departments").select("id, name, sort_order, is_active").eq("is_active", true).order("sort_order"),
       supabase.from("crews").select("id, department_id, name, sort_order, is_active").order("sort_order"),
-      supabase.from("accounts").select("id, name:username, dept, rank, crew_id").order("username"),
+      supabase.from("accounts").select("id, name:username, dept, rank, crew_id, hire_date").order("username"),
+      supabase.from("ranks").select("id, name, sort_order"),
     ]);
     setDepts((d.data ?? []) as Department[]);
     setCrews((c.data ?? []) as Crew[]);
     setUsers((u.data ?? []) as UserRow[]);
+    setRanks((r.data ?? []) as RankRow[]);
     setLoading(false);
   }, []);
+
+  // 직급명 → sort_order (낮을수록 높은 직급, migration-add-dept-rank.sql 기준: 대표=10 ... 사원=90)
+  const rankOrder = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of ranks) m.set(r.name, r.sort_order);
+    return m;
+  }, [ranks]);
+
+  // 직급 높은순 정렬. 미등록 직급은 맨 뒤, 동일 직급은 입사일 빠른순(미등록은 맨 뒤).
+  const sortByRank = useCallback((list: UserRow[]) => {
+    return list.slice().sort((a, b) => {
+      const ao = a.rank ? rankOrder.get(a.rank) ?? Infinity : Infinity;
+      const bo = b.rank ? rankOrder.get(b.rank) ?? Infinity : Infinity;
+      if (ao !== bo) return ao - bo;
+      const ah = a.hire_date ?? "9999-99-99";
+      const bh = b.hire_date ?? "9999-99-99";
+      if (ah !== bh) return ah < bh ? -1 : 1;
+      return a.name.localeCompare(b.name, "ko");
+    });
+  }, [rankOrder]);
 
   useEffect(() => { void load(); }, [load]);
   useReloadOnActivate(() => { void load(); });
@@ -158,13 +182,25 @@ export default function TeamCrewClient() {
 
               {isOpen && (
                 <div className="border-t border-gray-100 dark:border-gray-700 px-4 py-3 space-y-3">
+                  {dUsers.length > 0 && (
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/30 px-3 py-2">
+                      <div className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">👥 팀 전체 구성원 (직급순)</div>
+                      <div className="flex flex-col gap-1">
+                        {sortByRank(dUsers).map(m => (
+                          <div key={m.id} className="text-[11px] text-gray-700 dark:text-gray-200">
+                            {m.name} {m.rank && <span className="text-gray-400 dark:text-gray-500">({m.rank})</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {dCrews.length === 0 && (
                     <div className="text-center text-[11px] text-gray-400 dark:text-gray-500 py-4">
                       등록된 조가 없습니다. 우측 상단 [+ 조 추가] 로 시작하세요.
                     </div>
                   )}
                   {dCrews.map(c => {
-                    const members = dUsers.filter(u => u.crew_id === c.id);
+                    const members = sortByRank(dUsers.filter(u => u.crew_id === c.id));
                     return (
                       <div key={c.id} className={`rounded-lg border ${c.is_active ? "border-gray-200 dark:border-gray-600" : "border-dashed border-gray-300 dark:border-gray-600 opacity-60"} bg-gray-50 dark:bg-gray-700/30 px-3 py-2`}>
                         <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -212,7 +248,7 @@ export default function TeamCrewClient() {
                       <div className="overflow-x-auto">
                         <table className="w-full text-xs">
                           <tbody>
-                            {unassigned.map(m => (
+                            {sortByRank(unassigned).map(m => (
                               <tr key={m.id} className="border-t border-amber-100 dark:border-amber-800/40">
                                 <td className="py-1 text-gray-800 dark:text-gray-200">
                                   {m.name} {m.rank && <span className="text-gray-400 dark:text-gray-500">({m.rank})</span>}
