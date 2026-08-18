@@ -125,7 +125,10 @@ function WorkerSearchInput({ value, onChange, accounts, placeholder, cellStyle }
         value={value}
         onChange={e => onChange(e.target.value)}
         onFocus={() => { updatePos(); setOpen(true); }}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onBlur={() => setTimeout(() => {
+          setOpen(false);
+          if (value.trim() && !accounts.some(a => a.username === value)) onChange("");
+        }, 150)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         style={cellStyle}
