@@ -125,13 +125,13 @@ const STATIC_FALLBACK_MANUALS: ManualRecord[] = [
     title: "잔업보고서 사용자 매뉴얼",
     content: `# 잔업보고서 사용자 매뉴얼
 
-본 매뉴얼은 **[인적자원] ▸ [잔업보고서]** 메뉴에서 잔업(연장·휴일) 작업 내역을 보고서로 작성하고, 결재를 요청하며, 승인된 보고서를 인쇄·보관하는 방법을 안내합니다.
+본 매뉴얼은 **[관리/인사] ▸ [잔업보고서]** 메뉴에서 잔업(연장·휴일) 작업 내역을 보고서로 작성하고, 결재를 요청하며, 승인된 보고서를 인쇄·보관하는 방법을 안내합니다.
 
 ---
 
 ## 1. 메뉴 접속 및 권한
 
-1. 좌측 사이드바 **[👥 인적자원]** 그룹에서 **[잔업보고서]** 를 선택합니다.
+1. 좌측 사이드바 **[관리/인사]** 그룹에서 **[잔업보고서]** 를 선택합니다.
 2. 권한에 따라 사용 범위가 다릅니다.
    * **조회 권한 없음**: 🔒 **접근 권한이 없습니다** 안내만 표시됩니다.
    * **조회 권한만 있음**: 목록 조회·상세 보기·인쇄만 가능합니다.
@@ -2644,15 +2644,30 @@ export default function ManualCenterClient() {
         await fetchManuals();
         if (data) setSelectedId(data.id);
       } else if (editMode === "edit" && activeManual) {
-        const { error } = await supabase
-          .from("manuals")
-          .update({ ...payload, updated_at: new Date().toISOString() })
-          .eq("id", activeManual.id);
+        if (activeManual.id < 0) {
+          // 정적 항목 → DB에 INSERT로 승격 (이후 title 중복 필터로 정적 항목 대체됨)
+          const { data, error } = await supabase
+            .from("manuals")
+            .insert(payload)
+            .select()
+            .single();
 
-        if (error) throw error;
-        alert("매뉴얼이 성공적으로 수정되었습니다.");
-        setEditMode(null);
-        await fetchManuals();
+          if (error) throw error;
+          alert("매뉴얼이 성공적으로 수정되었습니다.");
+          setEditMode(null);
+          await fetchManuals();
+          if (data) setSelectedId(data.id);
+        } else {
+          const { error } = await supabase
+            .from("manuals")
+            .update({ ...payload, updated_at: new Date().toISOString() })
+            .eq("id", activeManual.id);
+
+          if (error) throw error;
+          alert("매뉴얼이 성공적으로 수정되었습니다.");
+          setEditMode(null);
+          await fetchManuals();
+        }
       }
     } catch (err) {
       console.error("매뉴얼 저장 오류:", err);
@@ -2731,6 +2746,11 @@ export default function ManualCenterClient() {
             background: white !important;
             color: black !important;
           }
+          /* dark:text-white 등 다크모드 글씨색이 흰 종이에서 안 보이는 문제 방지 */
+          .print-area * {
+            color: black !important;
+            -webkit-text-fill-color: black !important;
+          }
           .print-title {
             text-align: center;
             font-size: 24pt !important;
@@ -2742,10 +2762,8 @@ export default function ManualCenterClient() {
           h1, h2, h3 {
             page-break-after: avoid !important;
             break-after: avoid !important;
-            color: black !important;
           }
           p, li, blockquote, pre {
-            color: black !important;
             font-size: 10.5pt !important;
             line-height: 1.6 !important;
           }
@@ -2988,7 +3006,7 @@ export default function ManualCenterClient() {
               
               {/* 인쇄 및 편집 버튼 (화면에서만 노출) */}
               <div className="no-print flex items-center justify-end gap-2 border-b pb-4 mb-6">
-                {canManage && isDbMode && activeManual.id >= 0 && (
+                {canManage && isDbMode && (
                   <>
                     <button
                       type="button"

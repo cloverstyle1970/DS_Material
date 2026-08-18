@@ -543,30 +543,52 @@ export default function OvertimeReportClient() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-300 dark:bg-gray-900 text-sm">
+    <div className="flex flex-col h-full bg-gray-300 dark:bg-gray-900 text-sm print:block print:bg-white print:h-auto">
       {/* ── 인쇄 전용 CSS ── */}
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           @page { size: A4 portrait; margin: 0; }
-          body * { visibility: hidden !important; }
-          #ot-print-doc, #ot-print-doc * { visibility: visible !important; }
-          #ot-print-doc {
-            position: fixed !important; inset: 0 !important;
-            width: 210mm !important; height: 297mm !important;
-            padding: 22mm 14mm 12mm !important;
-            background: white !important; color: black !important;
-            overflow: hidden !important; box-shadow: none !important;
-          }
+          /* AdminShell 전역 CSS가 탭 컨테이너를 이미 page flow로 풀어준다.
+             position:fixed / visibility:hidden 방식 대신 자연 흐름으로 인쇄한다. */
           .ot-print-hide { display: none !important; }
+          /* 스크롤 래퍼 해제 */
+          #ot-scroll-wrap {
+            overflow: visible !important;
+            height: auto !important;
+            background: white !important;
+          }
+          /* overflow-x-auto 래퍼 해제 */
+          #ot-scroll-wrap > div {
+            overflow: visible !important;
+            min-width: 0 !important;
+          }
+          /* flex 센터 래퍼 여백 제거 */
+          #ot-scroll-wrap > div > div {
+            padding: 0 !important;
+          }
+          #ot-print-doc {
+            box-shadow: none !important;
+            width: 210mm !important;
+            min-height: 0 !important;
+            margin: 0 auto !important;
+            color: black !important;
+            background: white !important;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
+          }
+          /* 다크모드 글씨색이 흰 종이에서 안 보이는 문제 방지 */
+          #ot-print-doc * {
+            color: black !important;
+            background: transparent !important;
+            -webkit-text-fill-color: black !important;
+          }
           #ot-print-doc input, #ot-print-doc select, #ot-print-doc textarea {
-            color: black !important; background: transparent !important;
             border: none !important; border-bottom: none !important;
             outline: none !important; box-shadow: none !important;
-            -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
           #ot-print-doc input::placeholder,
           #ot-print-doc textarea::placeholder {
             color: transparent !important;
+            -webkit-text-fill-color: transparent !important;
           }
           #ot-print-doc th, #ot-print-doc td[data-label="true"] {
             background-color: #f0f0f0 !important;
@@ -609,7 +631,7 @@ export default function OvertimeReportClient() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div id="ot-scroll-wrap" className="flex-1 overflow-auto">
 
         {/* ════════════════════════════════
             문서 뷰
