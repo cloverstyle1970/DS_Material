@@ -998,23 +998,23 @@ export default function OvertimeReportClient() {
                 </table>
 
                 {/* ── 작업내용 ── */}
-                <div style={{ border: bdr, borderTop:"none", padding:"2mm 3mm", flex:1 }}>
-                  <div style={{ fontSize:"9pt", fontWeight:"bold", marginBottom:"1mm" }}>
+                <div style={{ border: bdr, borderTop:"none", padding:"2mm 3mm", flex:1, display:"flex", flexDirection:"column" }}>
+                  <div style={{ fontSize:"9pt", fontWeight:"bold", marginBottom:"1mm", flexShrink:0 }}>
                     ※ 작업내용(점검 및 수리 경우 호기별 기록)
                   </div>
-                  <textarea style={{ ...iTArea, height:"74mm" }} value={f.work_content}
+                  <textarea style={{ ...iTArea, flex:"1 1 0", minHeight:"60mm" }} value={f.work_content}
                     onChange={e => sf({ work_content: e.target.value })} placeholder="작업내용을 입력하세요…" />
                 </div>
 
                 {/* ── 작업결과 ── */}
-                <div style={{ border: bdr, borderTop:"none", padding:"2mm 3mm", height:"44mm" }}>
-                  <div style={{ fontSize:"9pt", fontWeight:"bold", marginBottom:"1mm" }}>※ 작업결과</div>
-                  <textarea style={{ ...iTArea, height:"33mm" }} value={f.work_result}
+                <div style={{ border: bdr, borderTop:"none", padding:"2mm 3mm", display:"flex", flexDirection:"column", height:"44mm" }}>
+                  <div style={{ fontSize:"9pt", fontWeight:"bold", marginBottom:"1mm", flexShrink:0 }}>※ 작업결과</div>
+                  <textarea style={{ ...iTArea, flex:"1 1 0" }} value={f.work_result}
                     onChange={e => sf({ work_result: e.target.value })} placeholder="작업결과를 입력하세요…" />
                 </div>
 
                 {/* ── 회사명 ── */}
-                <div style={{ textAlign:"right", marginTop:"2mm", fontSize:"10pt", fontWeight:"bold", color:"#333" }}>
+                <div style={{ textAlign:"right", marginTop:"2mm", fontSize:"10pt", fontWeight:"bold", color:"#333", flexShrink:0 }}>
                   주식회사 대솔E/L
                 </div>
 
