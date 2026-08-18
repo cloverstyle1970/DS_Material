@@ -309,8 +309,11 @@ export default function LeaveRequestClient() {
         author_signature: authorSig ?? null,
       };
       if (editingId === "new") {
-        const { data: no, error: ne } = await supabase.rpc("next_lr_no");
+        const yy = new Date().toISOString().slice(2, 4);
+        const { count, error: ne } = await supabase
+          .from("leave_requests").select("*", { count:"exact", head:true }).like("request_no", `LR-${yy}-%`);
         if (ne) throw new Error("문서번호 채번 실패: " + ne.message);
+        const no = `LR-${yy}-${String((count ?? 0) + 1).padStart(3, "0")}`;
         const { error: ie } = await supabase.from("leave_requests").insert({ ...payload, request_no: no });
         if (ie) throw ie;
         if (submitForApproval && f.approver_id) {
