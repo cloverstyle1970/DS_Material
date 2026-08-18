@@ -127,7 +127,15 @@ function WorkerSearchInput({ value, onChange, accounts, placeholder, cellStyle }
         onFocus={() => { updatePos(); setOpen(true); }}
         onBlur={() => setTimeout(() => {
           setOpen(false);
-          if (value.trim() && !accounts.some(a => a.username === value)) onChange("");
+          const q = value.trim();
+          if (!q) return;
+          if (!accounts.some(a => a.username === q)) {
+            const hasSuggestions = accounts.some(
+              a => a.username.includes(q) || (a.dept ?? "").includes(q)
+            );
+            if (!hasSuggestions) alert(`'${q}'에 대한 검색 결과가 없습니다.`);
+            onChange("");
+          }
         }, 150)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
