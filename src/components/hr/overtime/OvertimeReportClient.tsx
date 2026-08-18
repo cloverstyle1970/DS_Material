@@ -617,7 +617,7 @@ export default function OvertimeReportClient() {
             <>
               <>
                 <button onClick={() => save(false)} disabled={saving}
-                  className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded font-medium disabled:opacity-50">
+                  className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-medium disabled:opacity-50">
                   {saving ? "저장중…" : "임시저장"}
                 </button>
                 <button onClick={() => save(true)} disabled={saving}
