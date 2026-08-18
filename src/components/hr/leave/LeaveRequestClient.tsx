@@ -216,10 +216,11 @@ export default function LeaveRequestClient() {
   const [editingId, setEditingId] = useState<number | "new" | null>(null);
   const [form, setForm]           = useState<FormState>(makeEmptyForm());
   const [saving, setSaving]       = useState(false);
-  const [printPending, setPrintPending] = useState(false);
-  const [rejectModal, setRejectModal]   = useState<{ id: number; no: string } | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
-  const [signModal, setSignModal]       = useState<LeaveRequest | null>(null);
+  const [printPending, setPrintPending]     = useState(false);
+  const [rejectModal, setRejectModal]       = useState<{ id: number; no: string } | null>(null);
+  const [rejectReason, setRejectReason]     = useState("");
+  const [signModal, setSignModal]           = useState<LeaveRequest | null>(null);
+  const [authorSignPending, setAuthorSignPending] = useState(false);
   const signCanvasRef = useRef<HTMLCanvasElement>(null);
   const signIsDrawing = useRef(false);
   const [listQuery, setListQuery]       = useState("");
@@ -259,7 +260,7 @@ export default function LeaveRequestClient() {
   // 탭이 비활성화될 때 서명 모달을 닫아 다른 탭의 승인 동작과 혼선 방지
   const isTabActive = useTabIsActive();
   useEffect(() => {
-    if (!isTabActive) { setSignModal(null); setRejectModal(null); }
+    if (!isTabActive) { setSignModal(null); setRejectModal(null); setAuthorSignPending(false); }
   }, [isTabActive]);
 
   const activeAccounts = useMemo(() => accounts.filter(a => a.status !== "퇴직"), [accounts]);
@@ -288,7 +289,7 @@ export default function LeaveRequestClient() {
     if (andPrint) setPrintPending(true);
   }
 
-  async function save(submitForApproval: boolean) {
+  async function save(submitForApproval: boolean, authorSig?: string) {
     if (!user) return;
     if (!f.s_yr || !f.s_mo || !f.s_dy) { alert("시작 날짜를 입력해주세요."); return; }
     if (submitForApproval && !f.approver_id) { alert("승인자를 지정해주세요."); return; }
@@ -305,15 +306,11 @@ export default function LeaveRequestClient() {
         approver_id: f.approver_id,
         approval_status: submitForApproval ? "pending" : "draft",
         submitted_at: submitForApproval ? new Date().toISOString() : null,
+        author_signature: authorSig ?? null,
       };
       if (editingId === "new") {
-        const yy = new Date().toISOString().slice(2, 4);
-        const { count, error: ce } = await supabase
-          .from("leave_requests")
-          .select("*", { count: "exact", head: true })
-          .like("request_no", `LR-${yy}-%`);
-        if (ce) throw new Error("문서번호 채번 실패: " + ce.message);
-        const no = `LR-${yy}-${String((count ?? 0) + 1).padStart(3, "0")}`;
+        const { data: no, error: ne } = await supabase.rpc("next_lr_no");
+        if (ne) throw new Error("문서번호 채번 실패: " + ne.message);
         const { error: ie } = await supabase.from("leave_requests").insert({ ...payload, request_no: no });
         if (ie) throw ie;
         if (submitForApproval && f.approver_id) {
@@ -332,6 +329,25 @@ export default function LeaveRequestClient() {
     finally { setSaving(false); }
   }
 
+  // 승인 요청: 검증 → 작성자 서명 모달
+  function handleApprovalRequest() {
+    if (!f.s_yr || !f.s_mo || !f.s_dy) { alert("시작 날짜를 입력해주세요."); return; }
+    if (!f.approver_id) { alert("승인자를 지정해주세요."); return; }
+    setAuthorSignPending(true);
+  }
+  async function confirmAuthorSign() {
+    if (!signCanvasRef.current) return;
+    const sig = signCanvasRef.current.toDataURL("image/png");
+    setAuthorSignPending(false);
+    await save(true, sig);
+  }
+  async function authorSignWithRegistered() {
+    const mySig = accounts.find(a => a.id === user?.id)?.signature_url;
+    if (!mySig) return;
+    setAuthorSignPending(false);
+    await save(true, mySig);
+  }
+
   async function deleteRecord(id: number, no: string) {
     if (!confirm(`${no} 문서를 삭제하시겠습니까?`)) return;
     const { error } = await supabase.from("leave_requests").delete().eq("id", id);
@@ -339,12 +355,12 @@ export default function LeaveRequestClient() {
     load();
   }
 
-  // ── 서명 ──
+  // ── 서명 캔버스 초기화 (승인자 모달 / 작성자 서명 모달 공용) ──
   useEffect(() => {
-    if (!signModal || !signCanvasRef.current) return;
+    if ((!signModal && !authorSignPending) || !signCanvasRef.current) return;
     const ctx = signCanvasRef.current.getContext("2d");
     if (ctx) ctx.clearRect(0, 0, signCanvasRef.current.width, signCanvasRef.current.height);
-  }, [signModal]);
+  }, [signModal, authorSignPending]);
 
   function signGetPos(e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) {
     const rect = canvas.getBoundingClientRect();
@@ -478,10 +494,10 @@ export default function LeaveRequestClient() {
           {editingId !== null ? (
             <>
               <button onClick={() => save(false)} disabled={saving}
-                className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded font-medium disabled:opacity-50">
+                className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-medium disabled:opacity-50">
                 {saving ? "저장중…" : "임시저장"}
               </button>
-              <button onClick={() => save(true)} disabled={saving}
+              <button onClick={handleApprovalRequest} disabled={saving}
                 className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium disabled:opacity-50">
                 {saving ? "제출중…" : "승인 요청"}
               </button>
@@ -812,6 +828,36 @@ export default function LeaveRequestClient() {
                 <button onClick={approveWithRegistered} className="flex-1 px-3 py-1.5 text-xs bg-purple-100 hover:bg-purple-200 text-purple-700 rounded">등록 서명 사용</button>
               )}
               <button onClick={confirmApprove} className="flex-1 px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded font-medium">승인 확정</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 작성자 서명 모달 (승인 요청 시) ── */}
+      {authorSignPending && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={() => setAuthorSignPending(false)}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-2xl w-80" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-bold mb-1 text-gray-800 dark:text-gray-100">승인 요청 — 작성자 서명</h3>
+            <p className="text-xs text-gray-400 mb-3">서명 후 승인자에게 전달됩니다.</p>
+            {accounts.find(a => a.id === user?.id)?.signature_url && (
+              <button onClick={authorSignWithRegistered}
+                className="w-full mb-3 py-2 text-xs bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-lg border border-blue-200 dark:border-blue-700 font-semibold">
+                ✅ 등록된 서명으로 바로 제출
+              </button>
+            )}
+            <div className="relative border-2 border-gray-300 rounded-lg overflow-hidden bg-white" style={{ touchAction:"none" }}>
+              <canvas ref={signCanvasRef} width={280} height={140}
+                className="w-full touch-none cursor-crosshair block"
+                style={{ height:"110px" }}
+                onMouseDown={signStart} onMouseMove={signMove} onMouseUp={signEnd} onMouseLeave={signEnd}
+                onTouchStart={signStart} onTouchMove={signMove} onTouchEnd={signEnd}
+              />
+              <span className="absolute bottom-1 right-2 text-[10px] text-gray-300 pointer-events-none select-none">서명란</span>
+            </div>
+            <div className="flex gap-2 mt-3">
+              <button onClick={signClear} className="px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded border border-gray-300">지우기</button>
+              <button onClick={confirmAuthorSign} className="flex-1 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium">서명 후 제출</button>
+              <button onClick={() => setAuthorSignPending(false)} className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded">취소</button>
             </div>
           </div>
         </div>
