@@ -138,6 +138,7 @@ function WorkerSearchInput({ value, onChange, accounts, placeholder, cellStyle }
           minWidth: 160,
           zIndex: 9999,
           background: "white",
+          color: "#111",
           border: "1px solid #bbb",
           borderRadius: 4,
           boxShadow: "0 6px 18px rgba(0,0,0,0.15)",
