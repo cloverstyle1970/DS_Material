@@ -1,9 +1,8 @@
 import { insertNotification } from "@/lib/notify";
 
 const LEAVE_HREF  = "/hr/leave";
-const LEDGER_HREF = "/hr/leave-ledger";
 
-/** 승인 요청 알림 → 승인자에게 */
+/** 승인 요청 알림 → 승인자에게 (링크: 년차계 목록 — 승인/반려 버튼 있는 페이지) */
 export async function notifyLeaveApprovalRequest(params: {
   approverId: number;
   authorName: string;
@@ -17,7 +16,7 @@ export async function notifyLeaveApprovalRequest(params: {
     type:    "leave_approval_request",
     title:   `년차계 승인 요청 — ${requestNo}`,
     message: `${authorName} · ${leaveType}`,
-    link:    LEDGER_HREF,
+    link:    LEAVE_HREF,
     refType: "leave_request",
     refId:   requestId,
   });

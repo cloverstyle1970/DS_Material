@@ -230,7 +230,8 @@ export default function LeaveRequestClient() {
   const load = useCallback(async () => {
     if (!user) return;
     let q = supabase.from("leave_requests").select("*").order("created_at", { ascending: false });
-    if (!isManager) q = q.eq("author_id", user.id);
+    // 관리자: 전체 / 일반 사용자: 본인이 작성자이거나 승인자인 문서
+    if (!isManager) q = q.or(`author_id.eq.${user.id},approver_id.eq.${user.id}`);
     const { data } = await q;
     setRecords((data as LeaveRequest[] | null) ?? []);
   }, [user, isManager]);
