@@ -445,6 +445,9 @@ export default function LeaveRequestClient() {
   );
   const canApprove = (r: LeaveRequest) => !!user && r.approver_id === user.id && r.approval_status === "pending";
 
+  // 승인자가 문서를 열었을 때 읽기전용 여부
+  const isReadOnly = !!(editingRecord && !canEdit(editingRecord));
+
   // 기간 자동 계산
   useEffect(() => {
     const calc = calcDurationDays(f.s_yr, f.s_mo, f.s_dy, f.s_hr, f.s_mi, f.e_yr, f.e_mo, f.e_dy, f.e_hr, f.e_mi);
@@ -510,20 +513,38 @@ export default function LeaveRequestClient() {
         <div className="flex gap-2">
           {editingId !== null ? (
             <>
-              <button onClick={() => save(false)} disabled={saving}
-                className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-medium disabled:opacity-50">
-                {saving ? "저장중…" : "임시저장"}
-              </button>
-              <button onClick={handleApprovalRequest} disabled={saving}
-                className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium disabled:opacity-50">
-                {saving ? "제출중…" : "승인 요청"}
-              </button>
+              {/* 작성자 전용 버튼 */}
+              {!isReadOnly && (
+                <>
+                  <button onClick={() => save(false)} disabled={saving}
+                    className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-medium disabled:opacity-50">
+                    {saving ? "저장중…" : "임시저장"}
+                  </button>
+                  <button onClick={handleApprovalRequest} disabled={saving}
+                    className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium disabled:opacity-50">
+                    {saving ? "제출중…" : "승인 요청"}
+                  </button>
+                </>
+              )}
+              {/* 승인자 전용 버튼 */}
+              {editingRecord && canApprove(editingRecord) && (
+                <>
+                  <button onClick={() => setSignModal(editingRecord)}
+                    className="px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded font-medium">
+                    승인
+                  </button>
+                  <button onClick={() => { setRejectModal({ id: editingRecord.id, no: editingRecord.request_no }); setRejectReason(""); }}
+                    className="px-3 py-1.5 text-xs bg-red-500 hover:bg-red-600 text-white rounded font-medium">
+                    반려
+                  </button>
+                </>
+              )}
               <button onClick={() => window.print()}
                 className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded font-medium">
                 🖨️ 인쇄
               </button>
               <button onClick={() => setEditingId(null)}
-                className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700">
+                className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                 목록으로
               </button>
             </>
@@ -546,13 +567,29 @@ export default function LeaveRequestClient() {
             {/* 보조 바 */}
             <div className="lr-print-hide sticky top-0 z-10 flex flex-wrap items-center gap-3 px-4 py-2 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800 text-xs">
               <span className="text-gray-500 font-medium whitespace-nowrap">승인자</span>
-              <AccountSearchInput
-                accountId={f.approver_id}
-                onSelect={id => sf({ approver_id: id })}
-                accounts={activeAccounts}
-                placeholder="— 승인자 검색 —"
-                className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400 w-40"
-              />
+              {isReadOnly ? (
+                <span className="px-2 py-1 text-gray-700 dark:text-gray-200 font-medium">
+                  {approverAcc?.username ?? "—"}
+                </span>
+              ) : (
+                <AccountSearchInput
+                  accountId={f.approver_id}
+                  onSelect={id => sf({ approver_id: id })}
+                  accounts={activeAccounts}
+                  placeholder="— 승인자 검색 —"
+                  className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400 w-40"
+                />
+              )}
+              {isReadOnly && editingRecord && (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  editingRecord.approval_status === "pending"  ? "bg-blue-100 text-blue-700" :
+                  editingRecord.approval_status === "approved" ? "bg-green-100 text-green-700" :
+                  editingRecord.approval_status === "rejected" ? "bg-red-100 text-red-600" :
+                  "bg-gray-100 text-gray-600"
+                }`}>
+                  {{draft:"작성중", pending:"승인 요청", approved:"승인완료", rejected:"반려"}[editingRecord.approval_status] ?? editingRecord.approval_status}
+                </span>
+              )}
             </div>
 
             {/* A4 문서 */}
@@ -636,34 +673,34 @@ export default function LeaveRequestClient() {
                     <div style={{ flex:1, minWidth:0 }}>
                       {/* 시작 행 */}
                       <div style={{ display:"flex", alignItems:"center", flexWrap:"nowrap", gap:"0.8mm", fontSize:"10pt", marginBottom:"3mm" }}>
-                        <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_yr} placeholder="YY" onFocus={e=>e.target.select()} onChange={e=>sf({ s_yr: e.target.value })} />
+                        <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.s_yr} placeholder="YY" readOnly={isReadOnly} onFocus={e=>e.target.select()} onChange={e=>sf({ s_yr: e.target.value })} />
                         <span>년</span>
-                        <input style={{ ...iPart, width:"6mm" }} maxLength={2} value={f.s_mo} placeholder="MM" onFocus={e=>e.target.select()} onChange={e=>sf({ s_mo: e.target.value })} />
+                        <input style={{ ...iPart, width:"6mm" }} maxLength={2} value={f.s_mo} placeholder="MM" readOnly={isReadOnly} onFocus={e=>e.target.select()} onChange={e=>sf({ s_mo: e.target.value })} />
                         <span>월</span>
-                        <input style={{ ...iPart, width:"6mm" }} maxLength={2} value={f.s_dy} placeholder="DD" onFocus={e=>e.target.select()} onChange={e=>sf({ s_dy: e.target.value })} />
+                        <input style={{ ...iPart, width:"6mm" }} maxLength={2} value={f.s_dy} placeholder="DD" readOnly={isReadOnly} onFocus={e=>e.target.select()} onChange={e=>sf({ s_dy: e.target.value })} />
                         <span>일(</span>
                         {sDow ? <span style={{ width:"4mm", textAlign:"center", fontWeight:"bold", color:"#1d4ed8" }}>{sDow}</span>
                               : <span className="lr-print-hide" style={{ width:"4mm", textAlign:"center", color:"#aaa" }}>?</span>}
                         <span>요일)</span>
-                        <input style={{ ...iPart, width:"6mm" }} maxLength={2} value={f.s_hr} placeholder="HH" onFocus={e=>e.target.select()} onChange={e=>sf({ s_hr: e.target.value })} />
+                        <input style={{ ...iPart, width:"6mm" }} maxLength={2} value={f.s_hr} placeholder="HH" readOnly={isReadOnly} onFocus={e=>e.target.select()} onChange={e=>sf({ s_hr: e.target.value })} />
                         <span>시</span>
-                        <input style={{ ...iPart, width:"6mm" }} maxLength={2} value={f.s_mi} placeholder="MM" onFocus={e=>e.target.select()} onChange={e=>sf({ s_mi: e.target.value })} />
+                        <input style={{ ...iPart, width:"6mm" }} maxLength={2} value={f.s_mi} placeholder="MM" readOnly={isReadOnly} onFocus={e=>e.target.select()} onChange={e=>sf({ s_mi: e.target.value })} />
                         <span>분부터</span>
                       </div>
                       {/* 종료 행 */}
                       <div style={{ display:"flex", alignItems:"center", flexWrap:"nowrap", gap:"0.8mm", fontSize:"10pt" }}>
-                        <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_yr} placeholder="YY" onFocus={e=>e.target.select()} onChange={e=>sf({ e_yr: e.target.value })} />
+                        <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.e_yr} placeholder="YY" readOnly={isReadOnly} onFocus={e=>e.target.select()} onChange={e=>sf({ e_yr: e.target.value })} />
                         <span>년</span>
-                        <input style={{ ...iPart, width:"6mm" }} maxLength={2} value={f.e_mo} placeholder="MM" onFocus={e=>e.target.select()} onChange={e=>sf({ e_mo: e.target.value })} />
+                        <input style={{ ...iPart, width:"6mm" }} maxLength={2} value={f.e_mo} placeholder="MM" readOnly={isReadOnly} onFocus={e=>e.target.select()} onChange={e=>sf({ e_mo: e.target.value })} />
                         <span>월</span>
-                        <input style={{ ...iPart, width:"6mm" }} maxLength={2} value={f.e_dy} placeholder="DD" onFocus={e=>e.target.select()} onChange={e=>sf({ e_dy: e.target.value })} />
+                        <input style={{ ...iPart, width:"6mm" }} maxLength={2} value={f.e_dy} placeholder="DD" readOnly={isReadOnly} onFocus={e=>e.target.select()} onChange={e=>sf({ e_dy: e.target.value })} />
                         <span>일(</span>
                         {eDow ? <span style={{ width:"4mm", textAlign:"center", fontWeight:"bold", color:"#1d4ed8" }}>{eDow}</span>
                               : <span className="lr-print-hide" style={{ width:"4mm", textAlign:"center", color:"#aaa" }}>?</span>}
                         <span>요일)</span>
-                        <input style={{ ...iPart, width:"6mm" }} maxLength={2} value={f.e_hr} placeholder="HH" onFocus={e=>e.target.select()} onChange={e=>sf({ e_hr: e.target.value })} />
+                        <input style={{ ...iPart, width:"6mm" }} maxLength={2} value={f.e_hr} placeholder="HH" readOnly={isReadOnly} onFocus={e=>e.target.select()} onChange={e=>sf({ e_hr: e.target.value })} />
                         <span>시</span>
-                        <input style={{ ...iPart, width:"6mm" }} maxLength={2} value={f.e_mi} placeholder="MM" onFocus={e=>e.target.select()} onChange={e=>sf({ e_mi: e.target.value })} />
+                        <input style={{ ...iPart, width:"6mm" }} maxLength={2} value={f.e_mi} placeholder="MM" readOnly={isReadOnly} onFocus={e=>e.target.select()} onChange={e=>sf({ e_mi: e.target.value })} />
                         <span>분까지</span>
                       </div>
                     </div>
@@ -678,18 +715,18 @@ export default function LeaveRequestClient() {
                   {/* ── 사유 ── */}
                   <div style={{ marginBottom:"8mm", paddingLeft:"10mm", display:"flex", alignItems:"center", gap:"4mm" }}>
                     <span style={{ fontSize:"11pt", fontWeight:"bold", whiteSpace:"nowrap" }}>사 유 :</span>
-                    <input style={{ ...iLine }} value={f.reason} onChange={e=>sf({ reason: e.target.value })} placeholder="사유를 입력하세요" />
+                    <input style={{ ...iLine }} value={f.reason} readOnly={isReadOnly} onChange={e=>sf({ reason: e.target.value })} placeholder="사유를 입력하세요" />
                   </div>
 
                   {/* ── 제출일 ── */}
                   <div style={{ marginBottom:"14mm", paddingLeft:"10mm" }}>
                     <div style={{ display:"flex", alignItems:"center", gap:"2mm", fontSize:"11pt" }}>
                       <span style={{ fontWeight:"bold" }}>제출일 :</span>
-                      <input style={{ ...iPart, width:"8mm" }} maxLength={2} value={f.sub_yr} placeholder="YY" onFocus={e=>e.target.select()} onChange={e=>sf({ sub_yr: e.target.value })} />
+                      <input style={{ ...iPart, width:"8mm" }} maxLength={2} value={f.sub_yr} placeholder="YY" readOnly={isReadOnly} onFocus={e=>e.target.select()} onChange={e=>sf({ sub_yr: e.target.value })} />
                       <span>년</span>
-                      <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.sub_mo} placeholder="MM" onFocus={e=>e.target.select()} onChange={e=>sf({ sub_mo: e.target.value })} />
+                      <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.sub_mo} placeholder="MM" readOnly={isReadOnly} onFocus={e=>e.target.select()} onChange={e=>sf({ sub_mo: e.target.value })} />
                       <span>월</span>
-                      <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.sub_dy} placeholder="DD" onFocus={e=>e.target.select()} onChange={e=>sf({ sub_dy: e.target.value })} />
+                      <input style={{ ...iPart, width:"7mm" }} maxLength={2} value={f.sub_dy} placeholder="DD" readOnly={isReadOnly} onFocus={e=>e.target.select()} onChange={e=>sf({ sub_dy: e.target.value })} />
                       <span>일</span>
                     </div>
                   </div>
@@ -712,12 +749,13 @@ export default function LeaveRequestClient() {
                   <div style={{ flex:1 }} />
                   <div style={{ display:"flex", justifyContent:"center", gap:"6mm", flexWrap:"wrap", marginBottom:"4mm", fontSize:"10pt" }}>
                     {LEAVE_TYPES.map(t => (
-                      <label key={t} style={{ display:"flex", alignItems:"center", gap:"1.5mm", cursor:"pointer", userSelect:"none" }}>
+                      <label key={t} style={{ display:"flex", alignItems:"center", gap:"1.5mm", cursor: isReadOnly ? "default" : "pointer", userSelect:"none" }}>
                         <input
                           type="checkbox"
                           checked={f.leave_type === t}
-                          onChange={() => sf({ leave_type: t })}
-                          style={{ width:"3.5mm", height:"3.5mm", accentColor:"#333", cursor:"pointer" }}
+                          readOnly={isReadOnly}
+                          onChange={() => { if (!isReadOnly) sf({ leave_type: t }); }}
+                          style={{ width:"3.5mm", height:"3.5mm", accentColor:"#333", cursor: isReadOnly ? "default" : "pointer" }}
                         />
                         <span style={{ fontWeight: f.leave_type === t ? "bold" : "normal" }}>{t}</span>
                       </label>
@@ -799,9 +837,12 @@ export default function LeaveRequestClient() {
                         <td className="px-3 py-2 text-center"><StatusBadge status={r.approval_status} /></td>
                         <td className="px-3 py-2">
                           <div className="flex gap-1 justify-center flex-wrap">
-                            {canEdit(r) && (
+                            {canEdit(r) ? (
                               <button onClick={() => openEdit(r)}
                                 className="px-2 py-0.5 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-600 dark:hover:bg-gray-500 dark:text-gray-200 rounded">수정</button>
+                            ) : (
+                              <button onClick={() => openEdit(r)}
+                                className="px-2 py-0.5 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 dark:text-blue-300 rounded">내용 확인</button>
                             )}
                             <button onClick={() => openEdit(r, true)}
                               className="px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 rounded">인쇄</button>
