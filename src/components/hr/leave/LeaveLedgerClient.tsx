@@ -42,11 +42,8 @@ export default function LeaveLedgerClient() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [query, setQuery]       = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("");
-  const [dateFrom, setDateFrom] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`;
-  });
-  const [dateTo, setDateTo]     = useState(() => new Date().toISOString().slice(0,10));
+  const [dateFrom, setDateFrom] = useState(() => `${new Date().getFullYear()}-01-01`);
+  const [dateTo, setDateTo]     = useState(() => `${new Date().getFullYear()}-12-31`);
   const [detail, setDetail]     = useState<LeaveRow|null>(null);
   const [editModal, setEditModal] = useState<LeaveRow|null>(null);
   const [editForm, setEditForm]   = useState<Partial<LeaveRow>>({});
@@ -70,8 +67,9 @@ export default function LeaveLedgerClient() {
   useReloadOnActivate(load);
 
   const filtered = rows.filter(r => {
-    // 날짜 필터 (시작일 기준)
-    const dt = r.s_yr ? `20${r.s_yr}-${r.s_mo}-${r.s_dy}` : "";
+    // 날짜 필터 (시작일 기준) — padStart로 단일자릿수 월/일 비교 오류 방지
+    const pad = (v: string|null) => (v ?? "").padStart(2, "0");
+    const dt = r.s_yr ? `20${pad(r.s_yr)}-${pad(r.s_mo)}-${pad(r.s_dy)}` : "";
     if (dateFrom && dt && dt < dateFrom) return false;
     if (dateTo   && dt && dt > dateTo)   return false;
     // 유형 필터
@@ -135,11 +133,11 @@ export default function LeaveLedgerClient() {
         <button onClick={() => {
           const d = new Date();
           setDateFrom(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`);
-          setDateTo(d.toISOString().slice(0,10));
+          setDateTo(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${new Date(d.getFullYear(), d.getMonth()+1, 0).getDate()}`);
         }} className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap">이번달</button>
         <button onClick={() => {
           setDateFrom(`${new Date().getFullYear()}-01-01`);
-          setDateTo(new Date().toISOString().slice(0,10));
+          setDateTo(`${new Date().getFullYear()}-12-31`);
         }} className="text-xs text-gray-500 dark:text-gray-400 hover:underline whitespace-nowrap">올해</button>
         <button onClick={() => { setDateFrom(""); setDateTo(""); }}
           className="text-xs text-gray-400 dark:text-gray-500 hover:underline whitespace-nowrap">전체</button>
