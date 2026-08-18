@@ -554,8 +554,6 @@ export default function OvertimeReportClient() {
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           @page { size: A4 portrait; margin: 0; }
-          /* AdminShell 전역 CSS가 탭 컨테이너를 이미 page flow로 풀어준다.
-             position:fixed / visibility:hidden 방식 대신 자연 흐름으로 인쇄한다. */
           .ot-print-hide { display: none !important; }
           /* 스크롤 래퍼 해제 */
           #ot-scroll-wrap {
@@ -563,42 +561,50 @@ export default function OvertimeReportClient() {
             height: auto !important;
             background: white !important;
           }
-          /* overflow-x-auto 래퍼 해제 */
-          #ot-scroll-wrap > div {
-            overflow: visible !important;
-            min-width: 0 !important;
-          }
-          /* flex 센터 래퍼 여백 제거 */
-          #ot-scroll-wrap > div > div {
-            padding: 0 !important;
-          }
+          #ot-scroll-wrap > div { overflow: visible !important; min-width: 0 !important; }
+          #ot-scroll-wrap > div > div { padding: 0 !important; }
+          /* A4 문서: 화면과 동일한 flex 레이아웃을 인쇄에서도 유지
+             - box-sizing:border-box → 패딩 포함 정확히 297mm
+             - height:297mm → flex:1 자식(작업내용)이 올바른 높이로 늘어남
+             - min-height:0 → inline minHeight 무력화 (중복 방지) */
           #ot-print-doc {
             box-shadow: none !important;
             width: 210mm !important;
+            height: 297mm !important;
             min-height: 0 !important;
+            box-sizing: border-box !important;
             margin: 0 auto !important;
             color: black !important;
             background: white !important;
             -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
-          /* 다크모드 글씨색이 흰 종이에서 안 보이는 문제 방지 */
           #ot-print-doc * {
             color: black !important;
             background: transparent !important;
             -webkit-text-fill-color: black !important;
           }
-          #ot-print-doc input, #ot-print-doc select, #ot-print-doc textarea {
-            border: none !important; border-bottom: none !important;
+          /* 입력 필드: border-bottom 유지하여 화면과 동일한 밑줄 표시 */
+          #ot-print-doc input, #ot-print-doc select {
+            border: none !important;
+            border-bottom: 1px solid #888 !important;
             outline: none !important; box-shadow: none !important;
           }
-          #ot-print-doc input::placeholder,
-          #ot-print-doc textarea::placeholder {
+          #ot-print-doc textarea {
+            border: none !important;
+            outline: none !important; box-shadow: none !important;
+            resize: none !important;
+          }
+          #ot-print-doc input::placeholder, #ot-print-doc textarea::placeholder {
             color: transparent !important;
             -webkit-text-fill-color: transparent !important;
           }
           #ot-print-doc th, #ot-print-doc td[data-label="true"] {
             background-color: #f0f0f0 !important;
             -webkit-print-color-adjust: exact; print-color-adjust: exact;
+          }
+          /* 테이블 셀 안의 입력: 셀 테두리가 이미 있으므로 밑줄 제거 */
+          #ot-print-doc table input, #ot-print-doc table select {
+            border-bottom: none !important;
           }
         }
       ` }} />
