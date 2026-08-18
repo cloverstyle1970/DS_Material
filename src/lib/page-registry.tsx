@@ -60,6 +60,7 @@ import ImprovementRequestsClient from "@/components/board/ImprovementRequestsCli
 import OvertimeReportClient from "@/components/hr/overtime/OvertimeReportClient";
 import OvertimeLedgerClient from "@/components/hr/overtime/OvertimeLedgerClient";
 import LeaveRequestClient from "@/components/hr/leave/LeaveRequestClient";
+import LeaveLedgerClient from "@/components/hr/leave/LeaveLedgerClient";
 
 export interface PageEntry {
   label: string;
@@ -162,6 +163,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/hr/leave": {
     label: "년차계",
     render: () => <LeaveRequestClient />,
+  },
+  "/hr/leave-ledger": {
+    label: "년차계 등록대장",
+    render: () => <LeaveLedgerClient />,
   },
   "/uniform-safety": {
     label: "근무복·안전장구 신청",

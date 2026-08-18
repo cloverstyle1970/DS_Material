@@ -370,8 +370,14 @@ export default function LeaveRequestClient() {
     setRejectModal(null); setRejectReason(""); await load();
   }
 
-  const canEdit   = (r: LeaveRequest) => !!user && r.author_id === user.id && r.approval_status !== "approved";
-  const canDelete = (r: LeaveRequest) => !!user && r.author_id === user.id && r.approval_status !== "approved";
+  const canEdit   = (r: LeaveRequest) => !!user && (
+    (r.author_id === user.id && r.approval_status !== "approved") ||
+    (isAdmin(user) && r.approval_status === "approved")
+  );
+  const canDelete = (r: LeaveRequest) => !!user && (
+    (r.author_id === user.id && r.approval_status !== "approved") ||
+    (isAdmin(user) && r.approval_status === "approved")
+  );
   const canApprove = (r: LeaveRequest) => !!user && r.approver_id === user.id && r.approval_status === "pending";
 
   // 기간 자동 계산
