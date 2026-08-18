@@ -67,7 +67,9 @@ function makeEmptyForm(): FormState {
 function reportToForm(r: OvertimeReport): FormState {
   const sp = parseDT(r.start_at?.slice(0,16) ?? "");
   const ep = parseDT(r.end_at?.slice(0,16) ?? "");
-  const ws = [...r.workers]; while (ws.length < 10) ws.push("");
+  const ws = [...r.workers];
+  const targetLen = Math.max(10, Math.ceil(ws.length / 10) * 10);
+  while (ws.length < targetLen) ws.push("");
   return {
     site_name: r.site_name, work_instructor: r.work_instructor ?? "", work_instructor_id: r.work_instructor_id,
     work_reasons: r.work_reasons, work_reason_etc: r.work_reason_etc ?? "", work_elevator: r.work_elevator ?? "",
@@ -75,7 +77,7 @@ function reportToForm(r: OvertimeReport): FormState {
     e_yr: ep.yr, e_mo: ep.mo, e_dy: ep.dy, e_hr: ep.hr, e_mi: ep.mi,
     is_holiday: r.is_holiday, holiday_type: r.holiday_type ?? "",
     workers: ws,
-    worker_notes: (() => { const ns=[...(r.worker_notes??[])]; while(ns.length<10) ns.push(""); return ns; })(),
+    worker_notes: (() => { const ns=[...(r.worker_notes??[])]; while(ns.length<targetLen) ns.push(""); return ns; })(),
     work_content: r.work_content ?? "", work_result: r.work_result ?? "", note: r.note ?? "",
     approver_id: r.approver_id, work_hours: r.work_hours, holiday_hours: r.holiday_hours, overtime_hours: r.overtime_hours,
   };
@@ -778,7 +780,7 @@ export default function OvertimeReportClient() {
                           <colgroup>
                             <col style={{ width:"12mm" }} />
                             <col />
-                            <col style={{ width:"36mm" }} />
+                            <col style={{ width:"39.6mm" }} />
                           </colgroup>
                           <tbody>
                             {/* 시작 행 */}
@@ -864,58 +866,89 @@ export default function OvertimeReportClient() {
                       </td>
                     </tr>
 
-                    {/* 작업자명 + 비고 — 성명/비고 2행 표 */}
-                    <tr style={{ borderBottom: bdr }}>
-                      <td data-label="true" style={{ ...labelCell, padding:0, verticalAlign:"top" }}>
-                        <div style={{ height:"9mm", display:"flex", alignItems:"center", justifyContent:"center", borderBottom: bdr }}>작업자명</div>
-                        <div style={{ height:"8mm", display:"flex", alignItems:"center", justifyContent:"center" }}>비 고</div>
-                      </td>
-                      <td colSpan={3} style={{ padding:0, verticalAlign:"top" }}>
-                        <table style={{ width:"100%", borderCollapse:"collapse", height:"100%" }}>
-                          <tbody>
-                            {/* 작업자명 행 */}
-                            <tr style={{ borderBottom: bdr }}>
-                              {f.workers.map((w, i) => (
-                                <td key={i} style={{
-                                  borderLeft: i === 0 ? "none" : bdr, width:"10%", height:"9mm",
-                                  textAlign:"center", verticalAlign:"middle", overflow:"visible",
-                                  padding:"0.5mm 0.5mm",
-                                }}>
-                                  <WorkerSearchInput
-                                    value={w}
-                                    placeholder={`작업자${i + 1}`}
-                                    accounts={activeAccounts}
-                                    cellStyle={{ ...iCell, textAlign:"center", padding:"0", fontSize:"8.5pt", width:"100%" }}
-                                    onChange={v => {
-                                      if (v && f.workers.some((w, j) => j !== i && w === v)) {
-                                        alert(`'${v}'은(는) 이미 등록된 작업자입니다.`); return;
-                                      }
-                                      const ws=[...f.workers]; ws[i]=v; sf({ workers: ws });
-                                    }}
-                                  />
-                                </td>
-                              ))}
-                            </tr>
-                            {/* 비고 행 */}
-                            <tr>
-                              {f.worker_notes.map((n, i) => (
-                                <td key={i} style={{
-                                  borderLeft: i === 0 ? "none" : bdr, width:"10%", height:"8mm",
-                                  textAlign:"center", verticalAlign:"middle",
-                                  padding:"1mm 0.5mm",
-                                }}>
-                                  <input
-                                    style={{ ...iCell, textAlign:"center", padding:"0", fontSize:"8.5pt" }}
-                                    value={n}
-                                    onChange={e => { const ns=[...f.worker_notes]; ns[i]=e.target.value; sf({ worker_notes: ns }); }}
-                                  />
-                                </td>
-                              ))}
-                            </tr>
-                          </tbody>
-                        </table>
-                      </td>
-                    </tr>
+                    {/* 작업자명 + 비고 — 10명씩 행 반복 */}
+                    {Array.from({ length: Math.ceil(f.workers.length / 10) }).map((_, rowIdx) => {
+                      const start = rowIdx * 10;
+                      const isLast = rowIdx === Math.ceil(f.workers.length / 10) - 1;
+                      return (
+                        <tr key={rowIdx} style={{ borderBottom: bdr }}>
+                          <td data-label="true" style={{ ...labelCell, padding:0, verticalAlign:"top" }}>
+                            <div style={{ height:"9mm", display:"flex", alignItems:"center", justifyContent:"center", borderBottom: bdr }}>작업자명</div>
+                            <div style={{ height:"11.44mm", display:"flex", alignItems:"center", justifyContent:"center" }}>비 고</div>
+                          </td>
+                          <td colSpan={3} style={{ padding:0, verticalAlign:"top", overflow:"visible" }}>
+                            <div style={{ position:"relative" }}>
+                            <table style={{ width:"100%", borderCollapse:"collapse", height:"100%" }}>
+                              <tbody>
+                                {/* 작업자명 행 */}
+                                <tr style={{ borderBottom: bdr }}>
+                                  {f.workers.slice(start, start + 10).map((w, i) => (
+                                    <td key={i} style={{
+                                      borderLeft: i === 0 ? "none" : bdr, width:"10%", height:"9mm",
+                                      textAlign:"center", verticalAlign:"middle", overflow:"visible",
+                                      padding:"0.5mm 0.5mm",
+                                    }}>
+                                      <WorkerSearchInput
+                                        value={w}
+                                        placeholder={`작업자${start + i + 1}`}
+                                        accounts={activeAccounts}
+                                        cellStyle={{ ...iCell, textAlign:"center", padding:"0", fontSize:"8.5pt", width:"100%" }}
+                                        onChange={v => {
+                                          if (v && f.workers.some((existing, j) => j !== start + i && existing === v)) {
+                                            alert(`'${v}'은(는) 이미 등록된 작업자입니다.`); return;
+                                          }
+                                          const ws=[...f.workers]; ws[start + i]=v; sf({ workers: ws });
+                                        }}
+                                      />
+                                    </td>
+                                  ))}
+                                </tr>
+                                {/* 비고 행 */}
+                                <tr>
+                                  {f.worker_notes.slice(start, start + 10).map((n, i) => (
+                                    <td key={i} style={{
+                                      borderLeft: i === 0 ? "none" : bdr, width:"10%", height:"11.44mm",
+                                      textAlign:"center", verticalAlign:"middle",
+                                      padding:"1mm 0.5mm",
+                                    }}>
+                                      <input
+                                        style={{ ...iCell, textAlign:"center", padding:"0", fontSize:"8.5pt" }}
+                                        value={n}
+                                        onChange={e => { const ns=[...f.worker_notes]; ns[start + i]=e.target.value; sf({ worker_notes: ns }); }}
+                                      />
+                                    </td>
+                                  ))}
+                                </tr>
+                              </tbody>
+                            </table>
+                            {isLast && (
+                              <div
+                                className="ot-print-hide"
+                                style={{ position:"absolute", top:0, left:"100%", marginLeft:"2mm", display:"flex", flexDirection:"column", gap:"1mm" }}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => sf({ workers: [...f.workers, ...Array(10).fill("")], worker_notes: [...f.worker_notes, ...Array(10).fill("")] })}
+                                  style={{ height:"9mm", fontSize:"8pt", padding:"0 2mm", cursor:"pointer", border:"1px solid #aaa", borderRadius:"2px", background:"#f9f9f9", whiteSpace:"nowrap" }}
+                                >
+                                  + 추가
+                                </button>
+                                {f.workers.length > 10 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => sf({ workers: f.workers.slice(0, -10), worker_notes: f.worker_notes.slice(0, -10) })}
+                                    style={{ height:"11.44mm", fontSize:"8pt", padding:"0 2mm", cursor:"pointer", border:"1px solid #f99", borderRadius:"2px", background:"#fff5f5", whiteSpace:"nowrap", color:"#c00" }}
+                                  >
+                                    - 삭제
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
 
                     {/* 작성자 / 작성일자 */}
                     <tr>
