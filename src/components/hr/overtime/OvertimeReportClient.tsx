@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { useReloadOnActivate } from "@/context/TabActivationContext";
+import { useReloadOnActivate, useTabIsActive } from "@/context/TabActivationContext";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { calcOvertimeResult, detectHoliday, dayOfWeekKr, OvertimeResult } from "./overtimeCalc";
@@ -347,6 +347,12 @@ export default function OvertimeReportClient() {
   }, []);
   useEffect(() => { load(); }, [load]);
   useReloadOnActivate(load);
+
+  // 탭이 비활성화될 때 서명 모달을 닫아 다른 탭의 승인 동작과 혼선 방지
+  const isTabActive = useTabIsActive();
+  useEffect(() => {
+    if (!isTabActive) { setSignModal(null); setRejectModal(null); }
+  }, [isTabActive]);
 
   const f  = form;
   const sf = (p: Partial<FormState>) => setForm(prev => ({ ...prev, ...p }));

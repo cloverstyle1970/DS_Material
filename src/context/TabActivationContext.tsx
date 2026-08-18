@@ -20,6 +20,12 @@ export function TabActivationProvider({
   );
 }
 
+/** 현재 탭의 활성 상태를 반환한다. 탭 시스템 밖에서는 항상 true. */
+export function useTabIsActive(): boolean {
+  const { isActive } = useContext(TabActivationContext);
+  return isActive;
+}
+
 /**
  * 숨어 있던 탭이 다시 활성화되는 순간(false→true)에만 reload를 호출한다.
  * 최초 mount 시점은 컴포넌트가 이미 자체 fetch를 하므로 중복 호출하지 않는다.

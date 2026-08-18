@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { useReloadOnActivate } from "@/context/TabActivationContext";
+import { useReloadOnActivate, useTabIsActive } from "@/context/TabActivationContext";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { notifyLeaveApprovalRequest, notifyLeaveApproved, notifyLeaveRejected } from "./leaveNotify";
 
 export const LR_MENU_HREF = "/hr/leave";
 
@@ -241,6 +242,12 @@ export default function LeaveRequestClient() {
   useEffect(() => { load(); }, [load]);
   useReloadOnActivate(load);
 
+  // 탭이 비활성화될 때 서명 모달을 닫아 다른 탭의 승인 동작과 혼선 방지
+  const isTabActive = useTabIsActive();
+  useEffect(() => {
+    if (!isTabActive) { setSignModal(null); setRejectModal(null); }
+  }, [isTabActive]);
+
   const activeAccounts = useMemo(() => accounts.filter(a => a.status !== "퇴직"), [accounts]);
   const approverAcc    = accounts.find(a => a.id === f.approver_id);
   const authorAcc      = accounts.find(a => a.id === user?.id);
@@ -293,11 +300,16 @@ export default function LeaveRequestClient() {
           .like("request_no", `LR-${yy}-%`);
         if (ce) throw new Error("문서번호 채번 실패: " + ce.message);
         const no = `LR-${yy}-${String((count ?? 0) + 1).padStart(3, "0")}`;
-        const { error: ie } = await supabase.from("leave_requests").insert({ ...payload, request_no: no });
+        const { data: ins, error: ie } = await supabase.from("leave_requests").insert({ ...payload, request_no: no }).select("id").single();
         if (ie) throw ie;
+        if (submitForApproval && f.approver_id)
+          notifyLeaveApprovalRequest({ approverId: f.approver_id, authorName: authorAcc?.username ?? user.name, requestNo: no, requestId: (ins as {id:number}).id, leaveType: f.leave_type }).catch(console.warn);
       } else {
         const { error } = await supabase.from("leave_requests").update(payload).eq("id", editingId!);
         if (error) throw error;
+        const rec = records.find(r => r.id === editingId);
+        if (submitForApproval && f.approver_id && rec)
+          notifyLeaveApprovalRequest({ approverId: f.approver_id, authorName: authorAcc?.username ?? user.name, requestNo: rec.request_no, requestId: rec.id, leaveType: f.leave_type }).catch(console.warn);
       }
       await load(); setEditingId(null);
     } catch (e: unknown) { alert("저장 실패: " + (e instanceof Error ? e.message : String(e))); }
@@ -346,12 +358,14 @@ export default function LeaveRequestClient() {
 
   async function approveWithSig(sig: string) {
     if (!signModal || !user) return;
+    const target = signModal;
     const { error } = await supabase.from("leave_requests")
       .update({ approval_status:"approved", approved_at: new Date().toISOString(), approver_signature: sig })
-      .eq("id", signModal.id);
+      .eq("id", target.id);
     if (error) { alert("오류: " + error.message); return; }
+    notifyLeaveApproved({ authorId: target.author_id, approverName: authorAcc?.username ?? user.name, requestNo: target.request_no, requestId: target.id }).catch(console.warn);
     setSignModal(null); await load();
-    if (editingId === signModal.id) setForm(prev => ({ ...prev }));
+    if (editingId === target.id) setForm(prev => ({ ...prev }));
   }
   function confirmApprove() {
     if (!signCanvasRef.current) return;
@@ -363,10 +377,12 @@ export default function LeaveRequestClient() {
     void approveWithSig(mySig);
   }
   async function rejectRecord() {
-    if (!rejectModal) return;
+    if (!rejectModal || !user) return;
     if (!rejectReason.trim()) { alert("반려 사유를 입력해주세요."); return; }
     const { error } = await supabase.from("leave_requests").update({ approval_status:"rejected", rejected_at: new Date().toISOString(), reject_reason: rejectReason.trim() }).eq("id", rejectModal.id);
     if (error) { alert("오류: " + error.message); return; }
+    const rec = records.find(r => r.id === rejectModal.id);
+    if (rec) notifyLeaveRejected({ authorId: rec.author_id, approverName: authorAcc?.username ?? user.name, requestNo: rec.request_no, requestId: rec.id, reason: rejectReason.trim() }).catch(console.warn);
     setRejectModal(null); setRejectReason(""); await load();
   }
 
@@ -547,7 +563,7 @@ export default function LeaveRequestClient() {
                   {/* ── 성명 ── */}
                   <div style={{ marginBottom:"8mm", fontSize:"11pt" }}>
                     <span style={{ fontWeight:"bold", marginRight:"6mm" }}>성 명 :</span>
-                    <span style={{ borderBottom:"1px solid #444", display:"inline-block", minWidth:"30mm", fontSize:"11pt", paddingBottom:"1mm" }}>
+                    <span style={{ borderBottom:"1px solid #444", display:"inline-block", minWidth:"16mm", fontSize:"11pt", paddingBottom:"1mm" }}>
                       {authorAcc?.username ?? user?.name ?? ""}
                     </span>
                   </div>

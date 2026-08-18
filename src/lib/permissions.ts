@@ -12,9 +12,11 @@ export const PERMISSION_MENUS: PermissionMenuGroup[] = [
   {
     group: "데이터관리",
     items: [
-      { href: "/data/users",         label: "사원 관리" },
-      { href: "/data/company-info",  label: "회사 정보 관리" },
-      { href: "/data/access-stats",  label: "시스템접속통계" },
+      { href: "/data/users",             label: "사원 관리" },
+      { href: "/data/profile",           label: "개인정보수정" },
+      { href: "/data/company-info",      label: "회사 정보 관리" },
+      { href: "/data/permission-groups", label: "사용자권한그룹" },
+      { href: "/data/access-stats",      label: "시스템접속통계" },
     ],
   },
   {
@@ -80,15 +82,17 @@ export const PERMISSION_MENUS: PermissionMenuGroup[] = [
   {
     group: "관리/인사",
     items: [
-      { href: "/hr/company-vehicles",  label: "회사차량관리" },
-      { href: "/hr/employee-register", label: "사원등록" },
-      { href: "/hr/dept-rank",         label: "부서/직급관리" },
-      { href: "/hr/team-crew",         label: "팀구성 관리" },
+      { href: "/hr/company-vehicles",   label: "회사차량관리" },
+      { href: "/hr/overtime-report",    label: "잔업보고서" },
+      { href: "/hr/overtime-ledger",    label: "잔업보고서 등록대장" },
+      { href: "/hr/leave",              label: "년차계" },
+      { href: "/hr/leave-ledger",       label: "년차계 등록대장" },
+      { href: "/hr/employee-register",  label: "사원등록" },
+      { href: "/hr/dept-rank",          label: "부서/직급관리" },
+      { href: "/hr/team-crew",          label: "팀구성 관리" },
+      { href: "/hr/transfer",           label: "인사 이동" },
+      { href: "/hr/employment-status",  label: "재직상태 관리" },
       { href: "/hr/rewards-punishments", label: "상벌사항 관리" },
-      { href: "/hr/overtime-report",   label: "잔업보고서" },
-      { href: "/hr/overtime-ledger",   label: "잔업보고서 등록대장" },
-      { href: "/hr/leave",             label: "년차계" },
-      { href: "/hr/leave-ledger",      label: "년차계 등록대장" },
     ],
   },
   {
