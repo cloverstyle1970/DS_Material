@@ -295,7 +295,8 @@ export default function LeaveRequestClient() {
     if (submitForApproval && !f.approver_id) { alert("승인자를 지정해주세요."); return; }
     setSaving(true);
     try {
-      const payload = {
+      // author_signature 는 별도 UPDATE 로 분리 — 컬럼이 아직 DB에 없어도 기본 레코드가 저장되도록
+      const corePayload = {
         author_id: user.id,
         leave_type: f.leave_type,
         s_yr: f.s_yr, s_mo: f.s_mo, s_dy: f.s_dy, s_hr: f.s_hr, s_mi: f.s_mi,
@@ -306,7 +307,6 @@ export default function LeaveRequestClient() {
         approver_id: f.approver_id,
         approval_status: submitForApproval ? "pending" : "draft",
         submitted_at: submitForApproval ? new Date().toISOString() : null,
-        author_signature: authorSig ?? null,
       };
       if (editingId === "new") {
         const yy = new Date().toISOString().slice(2, 4);
@@ -314,15 +314,29 @@ export default function LeaveRequestClient() {
           .from("leave_requests").select("*", { count:"exact", head:true }).like("request_no", `LR-${yy}-%`);
         if (ne) throw new Error("문서번호 채번 실패: " + ne.message);
         const no = `LR-${yy}-${String((count ?? 0) + 1).padStart(3, "0")}`;
-        const { error: ie } = await supabase.from("leave_requests").insert({ ...payload, request_no: no });
+        const { error: ie } = await supabase.from("leave_requests").insert({ ...corePayload, request_no: no });
         if (ie) throw ie;
+        // 서명 별도 UPDATE (컬럼 없으면 에러를 무시하고 레코드는 보존)
+        if (authorSig) {
+          const { data: newRec } = await supabase.from("leave_requests").select("id").eq("request_no", no).maybeSingle();
+          if (newRec) {
+            await supabase.from("leave_requests").update({ author_signature: authorSig }).eq("id", (newRec as {id:number}).id).then(({ error }) => {
+              if (error) console.warn("author_signature 저장 실패 (컬럼 미존재?)", error.message);
+            });
+          }
+        }
         if (submitForApproval && f.approver_id) {
           const { data: newRec } = await supabase.from("leave_requests").select("id").eq("request_no", no).maybeSingle();
           notifyLeaveApprovalRequest({ approverId: f.approver_id, authorName: authorAcc?.username ?? user.name, requestNo: no, requestId: (newRec as {id:number}|null)?.id ?? 0, leaveType: f.leave_type }).catch(console.warn);
         }
       } else {
-        const { error } = await supabase.from("leave_requests").update(payload).eq("id", editingId!);
+        const { error } = await supabase.from("leave_requests").update(corePayload).eq("id", editingId!);
         if (error) throw error;
+        if (authorSig) {
+          await supabase.from("leave_requests").update({ author_signature: authorSig }).eq("id", editingId!).then(({ error }) => {
+            if (error) console.warn("author_signature 저장 실패 (컬럼 미존재?)", error.message);
+          });
+        }
         const rec = records.find(r => r.id === editingId);
         if (submitForApproval && f.approver_id && rec)
           notifyLeaveApprovalRequest({ approverId: f.approver_id, authorName: authorAcc?.username ?? user.name, requestNo: rec.request_no, requestId: rec.id, leaveType: f.leave_type }).catch(console.warn);
