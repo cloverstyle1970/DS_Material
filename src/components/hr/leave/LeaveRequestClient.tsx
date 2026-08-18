@@ -222,18 +222,31 @@ export default function LeaveRequestClient() {
   const [signModal, setSignModal]       = useState<LeaveRequest | null>(null);
   const signCanvasRef = useRef<HTMLCanvasElement>(null);
   const signIsDrawing = useRef(false);
-  const [listQuery, setListQuery] = useState("");
+  const [listQuery, setListQuery]       = useState("");
+  const [listDateFrom, setListDateFrom] = useState(() => `${new Date().getFullYear()}-01-01`);
+  const [listDateTo, setListDateTo]     = useState(() => `${new Date().getFullYear()}-12-31`);
 
   const f  = form;
   const sf = (p: Partial<FormState>) => setForm(prev => ({ ...prev, ...p }));
 
   const load = useCallback(async () => {
     if (!user) return;
-    let q = supabase.from("leave_requests").select("*").order("created_at", { ascending: false });
-    // 관리자: 전체 / 일반 사용자: 본인이 작성자이거나 승인자인 문서
-    if (!isManager) q = q.or(`author_id.eq.${user.id},approver_id.eq.${user.id}`);
-    const { data } = await q;
-    setRecords((data as LeaveRequest[] | null) ?? []);
+    if (isManager) {
+      const { data } = await supabase.from("leave_requests").select("*").order("created_at", { ascending: false });
+      setRecords((data as LeaveRequest[] | null) ?? []);
+    } else {
+      // .or() 대신 두 쿼리 병렬 실행 후 합산 (PostgREST or 묵시적 실패 방지)
+      const [{ data: asAuthor }, { data: asApprover }] = await Promise.all([
+        supabase.from("leave_requests").select("*").eq("author_id", user.id).order("created_at", { ascending: false }),
+        supabase.from("leave_requests").select("*").eq("approver_id", user.id).order("created_at", { ascending: false }),
+      ]);
+      const merged = [...(asAuthor ?? []), ...(asApprover ?? [])];
+      const seen = new Set<number>();
+      const unique = (merged as LeaveRequest[])
+        .filter(r => { if (seen.has(r.id)) return false; seen.add(r.id); return true; })
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setRecords(unique);
+    }
   }, [user, isManager]);
 
   useEffect(() => {
@@ -410,6 +423,10 @@ export default function LeaveRequestClient() {
   const eDow = dowKr(f.e_yr, f.e_mo, f.e_dy);
 
   const filtered = records.filter(r => {
+    const pad = (v: string | null) => (v ?? "").padStart(2, "0");
+    const dt = r.s_yr ? `20${pad(r.s_yr)}-${pad(r.s_mo)}-${pad(r.s_dy)}` : "";
+    if (listDateFrom && dt && dt < listDateFrom) return false;
+    if (listDateTo   && dt && dt > listDateTo)   return false;
     if (!listQuery.trim()) return true;
     const q = listQuery.trim();
     const author = accounts.find(a => a.id === r.author_id);
@@ -691,13 +708,31 @@ export default function LeaveRequestClient() {
         ════════════════════════════ */}
         {editingId === null && (
           <div className="lr-print-hide p-4 space-y-3">
-            {/* 검색 */}
-            <div className="flex gap-2 items-center">
-              <input
-                value={listQuery} onChange={e => setListQuery(e.target.value)}
-                placeholder="문서번호·유형·사유·성명 검색"
-                className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 w-60"
-              />
+            {/* 검색 필터 */}
+            <div className="flex flex-wrap items-center gap-2 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">기간</span>
+              <input type="date" value={listDateFrom} onChange={e => setListDateFrom(e.target.value)}
+                className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400" />
+              <span className="text-xs text-gray-400">~</span>
+              <input type="date" value={listDateTo} onChange={e => setListDateTo(e.target.value)}
+                className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400" />
+              <button onClick={() => {
+                const d = new Date();
+                setListDateFrom(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`);
+                const last = new Date(d.getFullYear(), d.getMonth()+1, 0);
+                setListDateTo(`${last.getFullYear()}-${String(last.getMonth()+1).padStart(2,"0")}-${String(last.getDate()).padStart(2,"0")}`);
+              }} className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap">이번달</button>
+              <button onClick={() => {
+                const y = new Date().getFullYear();
+                setListDateFrom(`${y}-01-01`); setListDateTo(`${y}-12-31`);
+              }} className="text-xs text-gray-500 dark:text-gray-400 hover:underline whitespace-nowrap">올해</button>
+              <button onClick={() => { setListDateFrom(""); setListDateTo(""); }}
+                className="text-xs text-gray-400 dark:text-gray-500 hover:underline whitespace-nowrap">전체</button>
+              <div className="w-px h-4 bg-gray-200 dark:bg-gray-600" />
+              <input value={listQuery} onChange={e => setListQuery(e.target.value)}
+                placeholder="문서번호·유형·사유·성명"
+                className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400 w-44" />
+              <span className="text-xs text-gray-400 ml-auto">{filtered.length}건</span>
             </div>
 
             {/* 목록 테이블 */}
@@ -738,12 +773,12 @@ export default function LeaveRequestClient() {
                             <button onClick={() => openEdit(r, true)}
                               className="px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded">인쇄</button>
                             {canApprove(r) && (
-                              <button onClick={() => setSignModal(r)}
-                                className="px-2 py-0.5 text-xs bg-green-100 hover:bg-green-200 text-green-700 rounded">승인</button>
-                            )}
-                            {isManager && r.approval_status === "pending" && r.approver_id === user?.id && (
-                              <button onClick={() => { setRejectModal({ id: r.id, no: r.request_no }); setRejectReason(""); }}
-                                className="px-2 py-0.5 text-xs bg-red-100 hover:bg-red-200 text-red-700 rounded">반려</button>
+                              <>
+                                <button onClick={() => setSignModal(r)}
+                                  className="px-2 py-0.5 text-xs bg-green-100 hover:bg-green-200 text-green-700 rounded">승인</button>
+                                <button onClick={() => { setRejectModal({ id: r.id, no: r.request_no }); setRejectReason(""); }}
+                                  className="px-2 py-0.5 text-xs bg-red-100 hover:bg-red-200 text-red-700 rounded">반려</button>
+                              </>
                             )}
                             {canDelete(r) && (
                               <button onClick={() => deleteRecord(r.id, r.request_no)}
