@@ -65,8 +65,8 @@ function makeEmptyForm(): FormState {
   };
 }
 function reportToForm(r: OvertimeReport): FormState {
-  const sp = parseDT(r.start_at?.slice(0,16) ?? "");
-  const ep = parseDT(r.end_at?.slice(0,16) ?? "");
+  const sp = parseDT(r.start_at ?? "");
+  const ep = parseDT(r.end_at ?? "");
   const ws = [...r.workers];
   const targetLen = Math.max(10, Math.ceil(ws.length / 10) * 10);
   while (ws.length < targetLen) ws.push("");

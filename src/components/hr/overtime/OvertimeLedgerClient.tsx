@@ -57,6 +57,18 @@ interface EditForm {
   approver_id: number | null;
 }
 
+/** UTC ISO 문자열을 datetime-local input용 로컬 시간 문자열로 변환 */
+function toLocalDTInput(utcIso: string): string {
+  const d = new Date(utcIso);
+  if (isNaN(d.getTime())) return "";
+  const yr  = d.getFullYear();
+  const mo  = String(d.getMonth() + 1).padStart(2, "0");
+  const dy  = String(d.getDate()).padStart(2, "0");
+  const hr  = String(d.getHours()).padStart(2, "0");
+  const mi  = String(d.getMinutes()).padStart(2, "0");
+  return `${yr}-${mo}-${dy}T${hr}:${mi}`;
+}
+
 function rowToEditForm(r: OTRow): EditForm {
   const ws = [...(r.workers ?? [])];      while (ws.length < 10) ws.push("");
   const wn = [...(r.worker_notes ?? [])]; while (wn.length < 10) wn.push("");
@@ -64,7 +76,7 @@ function rowToEditForm(r: OTRow): EditForm {
     site_name: r.site_name, work_instructor: r.work_instructor ?? "",
     work_reasons: r.work_reasons, work_reason_etc: r.work_reason_etc ?? "",
     work_elevator: r.work_elevator ?? "",
-    start_at: r.start_at.slice(0, 16), end_at: r.end_at.slice(0, 16),
+    start_at: toLocalDTInput(r.start_at), end_at: toLocalDTInput(r.end_at),
     workers: ws, worker_notes: wn,
     work_content: r.work_content ?? "", work_result: r.work_result ?? "",
     note: r.note ?? "", approver_id: r.approver_id,
