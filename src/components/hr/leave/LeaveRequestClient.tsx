@@ -514,18 +514,16 @@ export default function LeaveRequestClient() {
 
                     {/* 결재란 */}
                     <table style={{ borderCollapse:"collapse", border: bdr }}>
-                      <thead>
+                      <tbody>
+                        {/* 헤더 행: [결재(rowspan3)] [담당][팀장][임원][대표][대표] */}
                         <tr>
-                          <th style={{ border: bdr, width:"6mm", height:"7mm", fontSize:"8pt", fontWeight:"bold", background:"#f0f0f0", padding:0, textAlign:"center", writingMode:"vertical-rl" }}>결</th>
-                          {["담당","팀장","임원","대표","대표"].map((r,i) => (
-                            <th key={i} style={{ border: bdr, width:"14mm", height:"7mm", textAlign:"center", fontSize:"8pt", fontWeight:"bold", background:"#f0f0f0", padding:0 }}>{r}</th>
+                          <td rowSpan={3} style={{ border: bdr, width:"6mm", fontSize:"9pt", fontWeight:"bold", background:"#f0f0f0", textAlign:"center", verticalAlign:"middle", writingMode:"vertical-rl", letterSpacing:"2px", padding:0 }}>결재</td>
+                          {["담당","팀장","임원","대표","대표"].map((lbl,i) => (
+                            <th key={i} style={{ border: bdr, width:"14mm", height:"7mm", textAlign:"center", fontSize:"8pt", fontWeight:"bold", background:"#f0f0f0", padding:0 }}>{lbl}</th>
                           ))}
                         </tr>
-                      </thead>
-                      <tbody>
-                        {/* 서명 공간 */}
+                        {/* 서명 행 */}
                         <tr>
-                          <td style={{ border: bdr, width:"6mm", fontSize:"8pt", fontWeight:"bold", background:"#f0f0f0", textAlign:"center", writingMode:"vertical-rl", padding:0 }}>재</td>
                           {[0,1,2,3,4].map(i => (
                             <td key={i} style={{ border: bdr, width:"14mm", height:"18mm", textAlign:"center", verticalAlign:"middle", padding:"1mm" }}>
                               {i === sigCol && isApproved && editingRecord?.approver_signature && (
@@ -534,9 +532,8 @@ export default function LeaveRequestClient() {
                             </td>
                           ))}
                         </tr>
-                        {/* 날짜 */}
+                        {/* 날짜 행 */}
                         <tr>
-                          <td style={{ border: bdr, background:"#f0f0f0", padding:0 }}></td>
                           {[0,1,2,3,4].map(i => (
                             <td key={i} style={{ border: bdr, textAlign:"center", fontSize:"9pt", height:"6mm", padding:0 }}>
                               {i === sigCol && approvedAtStr ? approvedAtStr : "/"}
