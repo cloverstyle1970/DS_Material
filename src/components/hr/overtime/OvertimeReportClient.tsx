@@ -571,7 +571,7 @@ export default function OvertimeReportClient() {
             box-shadow: none !important;
             width: 210mm !important;
             height: 297mm !important;
-            min-height: 0 !important;
+            overflow: hidden !important;
             box-sizing: border-box !important;
             margin: 0 auto !important;
             color: black !important;
@@ -669,13 +669,15 @@ export default function OvertimeReportClient() {
             <div className="overflow-x-auto">
             <div className="flex justify-center py-8 print:py-0" style={{ minWidth: "210mm" }}>
               <div id="ot-print-doc" style={{
-                width: "210mm", minHeight: "297mm",
+                width: "210mm", height: "297mm",
+                overflow: "visible",
                 padding: "12mm 14mm",
                 background: "white", color: "#111",
                 fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif",
                 fontSize: "10pt",
                 display: "flex", flexDirection: "column",
                 boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
+                boxSizing: "border-box",
               }}>
 
                 {/* ── 제목 + 결재란 ── */}
