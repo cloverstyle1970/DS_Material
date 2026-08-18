@@ -300,10 +300,12 @@ export default function LeaveRequestClient() {
           .like("request_no", `LR-${yy}-%`);
         if (ce) throw new Error("문서번호 채번 실패: " + ce.message);
         const no = `LR-${yy}-${String((count ?? 0) + 1).padStart(3, "0")}`;
-        const { data: ins, error: ie } = await supabase.from("leave_requests").insert({ ...payload, request_no: no }).select("id").single();
+        const { error: ie } = await supabase.from("leave_requests").insert({ ...payload, request_no: no });
         if (ie) throw ie;
-        if (submitForApproval && f.approver_id)
-          notifyLeaveApprovalRequest({ approverId: f.approver_id, authorName: authorAcc?.username ?? user.name, requestNo: no, requestId: (ins as {id:number}).id, leaveType: f.leave_type }).catch(console.warn);
+        if (submitForApproval && f.approver_id) {
+          const { data: newRec } = await supabase.from("leave_requests").select("id").eq("request_no", no).maybeSingle();
+          notifyLeaveApprovalRequest({ approverId: f.approver_id, authorName: authorAcc?.username ?? user.name, requestNo: no, requestId: (newRec as {id:number}|null)?.id ?? 0, leaveType: f.leave_type }).catch(console.warn);
+        }
       } else {
         const { error } = await supabase.from("leave_requests").update(payload).eq("id", editingId!);
         if (error) throw error;
