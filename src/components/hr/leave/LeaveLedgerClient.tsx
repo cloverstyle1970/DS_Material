@@ -175,6 +175,7 @@ export default function LeaveLedgerClient() {
                   <th className="px-3 py-2 text-left">기간</th>
                   <th className="px-3 py-2 text-center">일수</th>
                   <th className="px-3 py-2 text-left">사유</th>
+                  <th className="px-3 py-2 text-left">승인자</th>
                   <th className="px-3 py-2 text-left">승인일</th>
                   <th className="px-3 py-2 text-center">작업</th>
                 </tr>
@@ -182,9 +183,10 @@ export default function LeaveLedgerClient() {
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {filtered.map(r => {
                   const author   = accounts.find(a => a.id === r.author_id);
+                  const approver = accounts.find(a => a.id === r.approver_id);
                   const approvedAt = r.approved_at ? new Date(r.approved_at).toLocaleDateString("ko-KR") : "—";
                   return (
-                    <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                    <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors text-gray-800 dark:text-gray-200">
                       <td className="px-3 py-2 font-mono text-gray-500 dark:text-gray-400">{r.request_no}</td>
                       <td className="px-3 py-2 text-center">
                         <span className="px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
@@ -197,7 +199,16 @@ export default function LeaveLedgerClient() {
                         {r.duration_days != null ? `${r.duration_days}일` : "—"}
                       </td>
                       <td className="px-3 py-2 max-w-[120px] truncate text-gray-600 dark:text-gray-300">{r.reason ?? "—"}</td>
-                      <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{approvedAt}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-700 dark:text-gray-300 whitespace-nowrap">{approver?.username ?? "—"}</span>
+                          {r.approver_signature && (
+                            <img src={r.approver_signature} alt="서명"
+                              style={{ height: "28px", maxWidth: "64px", objectFit: "contain", background: "white", borderRadius: "2px", border: "1px solid #e5e7eb" }} />
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-gray-500 dark:text-gray-400 whitespace-nowrap">{approvedAt}</td>
                       <td className="px-3 py-2">
                         <div className="flex items-center justify-center gap-2">
                           <button onClick={() => setDetail(r)}
