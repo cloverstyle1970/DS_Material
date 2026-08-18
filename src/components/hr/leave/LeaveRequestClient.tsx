@@ -286,8 +286,13 @@ export default function LeaveRequestClient() {
         submitted_at: submitForApproval ? new Date().toISOString() : null,
       };
       if (editingId === "new") {
-        const { data: no, error: ne } = await supabase.rpc("next_lr_no");
-        if (ne) throw new Error("문서번호 채번 실패: " + ne.message);
+        const yy = new Date().toISOString().slice(2, 4);
+        const { count, error: ce } = await supabase
+          .from("leave_requests")
+          .select("*", { count: "exact", head: true })
+          .like("request_no", `LR-${yy}-%`);
+        if (ce) throw new Error("문서번호 채번 실패: " + ce.message);
+        const no = `LR-${yy}-${String((count ?? 0) + 1).padStart(3, "0")}`;
         const { error: ie } = await supabase.from("leave_requests").insert({ ...payload, request_no: no });
         if (ie) throw ie;
       } else {
@@ -539,7 +544,7 @@ export default function LeaveRequestClient() {
                   {/* ── 성명 ── */}
                   <div style={{ marginBottom:"8mm", fontSize:"11pt" }}>
                     <span style={{ fontWeight:"bold", marginRight:"6mm" }}>성 명 :</span>
-                    <span style={{ borderBottom:"1px solid #444", display:"inline-block", minWidth:"60mm", fontSize:"11pt", paddingBottom:"1mm" }}>
+                    <span style={{ borderBottom:"1px solid #444", display:"inline-block", minWidth:"30mm", fontSize:"11pt", paddingBottom:"1mm" }}>
                       {authorAcc?.username ?? user?.name ?? ""}
                     </span>
                   </div>
