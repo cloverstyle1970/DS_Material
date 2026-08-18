@@ -790,7 +790,7 @@ export default function LeaveRequestClient() {
                     const author = accounts.find(a => a.id === r.author_id);
                     const period = r.s_yr ? `20${r.s_yr}/${r.s_mo}/${r.s_dy}` : "—";
                     return (
-                      <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                      <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200">
                         <td className="px-3 py-2 font-mono text-blue-600 dark:text-blue-400">{r.request_no}</td>
                         <td className="px-3 py-2">{r.leave_type}</td>
                         {isManager && <td className="px-3 py-2">{author?.username ?? "—"}</td>}
@@ -801,10 +801,10 @@ export default function LeaveRequestClient() {
                           <div className="flex gap-1 justify-center flex-wrap">
                             {canEdit(r) && (
                               <button onClick={() => openEdit(r)}
-                                className="px-2 py-0.5 text-xs bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 rounded">수정</button>
+                                className="px-2 py-0.5 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-600 dark:hover:bg-gray-500 dark:text-gray-200 rounded">수정</button>
                             )}
                             <button onClick={() => openEdit(r, true)}
-                              className="px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded">인쇄</button>
+                              className="px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 rounded">인쇄</button>
                             {canApprove(r) && (
                               <>
                                 <button onClick={() => setSignModal(r)}
