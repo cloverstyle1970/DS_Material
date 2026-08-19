@@ -857,13 +857,13 @@ export default function OvertimeLedgerClient() {
                       </div>
                     </div>
 
-                    {/* 결재란 — 5열 */}
+                    {/* 결재란 — 6열 */}
                     <table style={{ borderCollapse: "collapse", border: bdr, marginLeft: "4mm", alignSelf: "flex-start" }}>
                       <thead>
                         <tr>
-                          {["담당", "팀장", "임원", "대표", "대표"].map((r, i) => (
+                          {["회계", "담당", "팀장", "임원", "대표", "대표"].map((r, i) => (
                             <th key={i} style={{
-                              border: bdr, width: "17mm", height: "7mm",
+                              border: bdr, width: "14mm", height: "7mm",
                               textAlign: "center", fontSize: "9pt", fontWeight: "bold",
                               background: "#f0f0f0", padding: 0,
                             }}>{r}</th>
@@ -872,12 +872,12 @@ export default function OvertimeLedgerClient() {
                       </thead>
                       <tbody>
                         {(() => {
-                          const sigCol = approverAcc?.username === "황진한" ? 0 : 1;
+                          const sigCol = approverAcc?.username === "황진한" ? 1 : 2;
                           return (
                             <tr>
-                              {[0, 1, 2, 3, 4].map(i => (
+                              {[0, 1, 2, 3, 4, 5].map(i => (
                                 <td key={i} style={{
-                                  border: bdr, width: "17mm", height: "20mm",
+                                  border: bdr, width: "14mm", height: "20mm",
                                   textAlign: "center", verticalAlign: "middle", fontSize: "8pt", color: "#444",
                                   padding: "1mm",
                                 }}>
@@ -892,10 +892,10 @@ export default function OvertimeLedgerClient() {
                           );
                         })()}
                         {(() => {
-                          const sigCol = approverAcc?.username === "황진한" ? 0 : 1;
+                          const sigCol = approverAcc?.username === "황진한" ? 1 : 2;
                           return (
                             <tr>
-                              {[0, 1, 2, 3, 4].map(i => (
+                              {[0, 1, 2, 3, 4, 5].map(i => (
                                 <td key={i} style={{
                                   border: bdr, textAlign: "center", fontSize: "9pt",
                                   color: "#555", height: "6mm", padding: 0,
