@@ -45,6 +45,18 @@ export default function MyDashboardContent() {
     d.setDate(d.getDate() + 7);
     return d.toISOString().slice(0, 10);
   }, []);
+  const twoWeeksAgo = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 14);
+    return d.toISOString().slice(0, 10);
+  }, []);
+
+  const [notifFrom, setNotifFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 14);
+    return d.toISOString().slice(0, 10);
+  });
+  const [notifTo, setNotifTo] = useState(() => new Date().toISOString().slice(0, 10));
 
   const refresh = useCallback(async () => {
     if (!user) return;
@@ -64,9 +76,9 @@ export default function MyDashboardContent() {
 
     const name = user.name;
 
-    // 알림
+    // 알림 (넉넉하게 500건 가져온 뒤 클라이언트에서 날짜 필터)
     const notifs = await safe("알림", () =>
-      api.get<NotificationItem[]>(`/api/notifications?userId=${user.id}&limit=30`), []);
+      api.get<NotificationItem[]>(`/api/notifications?userId=${user.id}&limit=500`), []);
 
     // 내 공사요청
     const allReqs = await safe("공사요청", () =>
@@ -156,6 +168,13 @@ export default function MyDashboardContent() {
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
+  const filteredNotifications = useMemo(() => {
+    return notifications.filter(n => {
+      const d = n.createdAt.slice(0, 10);
+      return d >= notifFrom && d <= notifTo;
+    });
+  }, [notifications, notifFrom, notifTo]);
+
   if (!user) {
     return (
       <>
@@ -195,6 +214,36 @@ export default function MyDashboardContent() {
                 </button>
               )}
             </div>
+
+            {/* 날짜 범위 검색 */}
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <input
+                type="date"
+                value={notifFrom}
+                max={notifTo}
+                onChange={e => setNotifFrom(e.target.value)}
+                className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100"
+              />
+              <span className="text-xs text-gray-400">~</span>
+              <input
+                type="date"
+                value={notifTo}
+                min={notifFrom}
+                max={today}
+                onChange={e => setNotifTo(e.target.value)}
+                className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100"
+              />
+              <button
+                onClick={() => { setNotifFrom(twoWeeksAgo); setNotifTo(today); }}
+                className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 rounded"
+              >
+                최근 2주
+              </button>
+              <span className="text-[11px] text-gray-400 ml-auto">
+                {filteredNotifications.length}건
+              </span>
+            </div>
+
             <div className="flex items-center justify-between py-2 px-2 -mx-2 mb-2 rounded bg-gray-50 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-700">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300">인앱 알림 받기</span>
@@ -222,11 +271,11 @@ export default function MyDashboardContent() {
             <PushNotificationToggle />
             {loading ? (
               <div className="text-sm text-gray-400 py-4">불러오는 중...</div>
-            ) : notifications.length === 0 ? (
-              <div className="text-sm text-gray-400 py-4 text-center">알림이 없습니다.</div>
+            ) : filteredNotifications.length === 0 ? (
+              <div className="text-sm text-gray-400 py-4 text-center">해당 기간의 알림이 없습니다.</div>
             ) : (
               <ul className="divide-y divide-gray-100 dark:divide-gray-700">
-                {notifications.map(n => (
+                {filteredNotifications.map(n => (
                   <li
                     key={n.id}
                     onClick={() => handleNotificationClick(n)}
