@@ -498,7 +498,8 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
     if (ordSearch.requesterName && !(o.requesterName?.toLowerCase().includes(ordSearch.requesterName.toLowerCase()))) return false;
     if (ordSearch.material) {
       const q = ordSearch.material.toLowerCase();
-      if (!o.materialName.toLowerCase().includes(q) && !o.materialId.toLowerCase().includes(q)) return false;
+      const spec = (matModelMap.get(o.materialId) ?? "").toLowerCase();
+      if (!o.materialName.toLowerCase().includes(q) && !o.materialId.toLowerCase().includes(q) && !spec.includes(q)) return false;
     }
     return true;
   });
