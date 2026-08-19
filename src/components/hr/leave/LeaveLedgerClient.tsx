@@ -290,6 +290,10 @@ export default function LeaveLedgerClient() {
   async function save(submitForApproval: boolean, authorSig?: string) {
     if (!user) return;
     if (!f.s_yr || !f.s_mo || !f.s_dy) { alert("시작 날짜를 입력해주세요."); return; }
+    if (!f.s_hr || !f.s_mi) { alert("시작 시간을 입력해주세요."); return; }
+    if (!f.e_yr || !f.e_mo || !f.e_dy) { alert("종료 날짜를 입력해주세요."); return; }
+    if (!f.e_hr || !f.e_mi) { alert("종료 시간을 입력해주세요."); return; }
+    if (!f.reason.trim()) { alert("사유를 입력해주세요."); return; }
     if (submitForApproval && !f.approver_id) { alert("승인자를 지정해주세요."); return; }
     setSaving(true);
     try {
@@ -344,6 +348,10 @@ export default function LeaveLedgerClient() {
 
   function handleApprovalRequest() {
     if (!f.s_yr || !f.s_mo || !f.s_dy) { alert("시작 날짜를 입력해주세요."); return; }
+    if (!f.s_hr || !f.s_mi) { alert("시작 시간을 입력해주세요."); return; }
+    if (!f.e_yr || !f.e_mo || !f.e_dy) { alert("종료 날짜를 입력해주세요."); return; }
+    if (!f.e_hr || !f.e_mi) { alert("종료 시간을 입력해주세요."); return; }
+    if (!f.reason.trim()) { alert("사유를 입력해주세요."); return; }
     if (!f.approver_id) { alert("승인자를 지정해주세요."); return; }
     setAuthorSignPending(true);
   }
