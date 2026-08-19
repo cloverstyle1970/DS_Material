@@ -848,11 +848,11 @@ export default function OvertimeLedgerClient() {
 
                   {/* ── 제목 + 결재란 ── */}
                   <div style={{ display: "flex", alignItems: "stretch", marginBottom: "4mm" }}>
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: "30pt", fontWeight: 900, textDecoration: "underline", letterSpacing: "10px", lineHeight: 1 }}>
                         잔업보고서
                       </div>
-                      <div style={{ marginTop: "6mm", fontSize: "9.5pt" }}>
+                      <div style={{ marginTop: "3mm", fontSize: "8.5pt" }}>
                         아래와 같이 시간외 근로(잔업) 사유가 발생하였기에 보고서를 제출합니다.
                       </div>
                     </div>
@@ -863,7 +863,7 @@ export default function OvertimeLedgerClient() {
                         <tr>
                           {["회계", "담당", "팀장", "임원", "대표", "대표"].map((r, i) => (
                             <th key={i} style={{
-                              border: bdr, width: "16mm", height: "7mm",
+                              border: bdr, width: "19mm", height: "7mm",
                               textAlign: "center", fontSize: "9pt", fontWeight: "bold",
                               background: "#f0f0f0", padding: 0,
                             }}>{r}</th>
@@ -877,7 +877,7 @@ export default function OvertimeLedgerClient() {
                             <tr>
                               {[0, 1, 2, 3, 4, 5].map(i => (
                                 <td key={i} style={{
-                                  border: bdr, width: "16mm", height: "20mm",
+                                  border: bdr, width: "19mm", height: "20mm",
                                   textAlign: "center", verticalAlign: "middle", fontSize: "8pt", color: "#444",
                                   padding: "1mm",
                                 }}>
