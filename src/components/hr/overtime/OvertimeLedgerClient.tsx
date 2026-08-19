@@ -863,7 +863,7 @@ export default function OvertimeLedgerClient() {
                         <tr>
                           {["회계", "담당", "팀장", "임원", "대표", "대표"].map((r, i) => (
                             <th key={i} style={{
-                              border: bdr, width: "14mm", height: "7mm",
+                              border: bdr, width: "16mm", height: "7mm",
                               textAlign: "center", fontSize: "9pt", fontWeight: "bold",
                               background: "#f0f0f0", padding: 0,
                             }}>{r}</th>
@@ -877,7 +877,7 @@ export default function OvertimeLedgerClient() {
                             <tr>
                               {[0, 1, 2, 3, 4, 5].map(i => (
                                 <td key={i} style={{
-                                  border: bdr, width: "14mm", height: "20mm",
+                                  border: bdr, width: "16mm", height: "20mm",
                                   textAlign: "center", verticalAlign: "middle", fontSize: "8pt", color: "#444",
                                   padding: "1mm",
                                 }}>
