@@ -533,10 +533,6 @@ export default function LeaveLedgerClient() {
             <>
               {!isReadOnly && (
                 <>
-                  <button onClick={() => save(false)} disabled={saving}
-                    className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-medium disabled:opacity-50">
-                    {saving ? "저장중…" : "임시저장"}
-                  </button>
                   <button onClick={handleApprovalRequest} disabled={saving}
                     className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium disabled:opacity-50">
                     {saving ? "제출중…" : "승인 요청"}
