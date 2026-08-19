@@ -488,9 +488,14 @@ export default function LeaveLedgerClient() {
           #lr-scroll-wrap > div { overflow: visible !important; min-width: 0 !important; }
           #lr-scroll-wrap > div > div { padding: 0 !important; }
           #lr-print-doc {
-            box-shadow: none !important; width: 210mm !important;
-            min-height: 0 !important; margin: 0 auto !important;
-            color: black !important; background: white !important;
+            box-shadow: none !important;
+            width: 210mm !important;
+            height: 297mm !important;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
+            margin: 0 auto !important;
+            color: black !important;
+            background: white !important;
             -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
           #lr-print-doc * {
@@ -599,7 +604,9 @@ export default function LeaveLedgerClient() {
             <div className="overflow-x-auto">
               <div className="flex justify-center py-8 print:py-0" style={{ minWidth: "210mm" }}>
                 <div id="lr-print-doc" style={{
-                  width: "210mm", minHeight: "297mm",
+                  width: "210mm", height: "297mm",
+                  overflow: "hidden",
+                  boxSizing: "border-box",
                   padding: "18mm 20mm",
                   background: "white", color: "#111",
                   fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif",
