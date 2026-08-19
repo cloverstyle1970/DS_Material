@@ -1,448 +1,909 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useReloadOnActivate } from "@/context/TabActivationContext";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
+import { useReloadOnActivate, useTabIsActive } from "@/context/TabActivationContext";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { calcOvertimeResult, detectHoliday, dayOfWeekKr } from "./overtimeCalc";
-
-const WORK_REASONS = ["점검", "공사", "수리·부품교체", "상주", "조출", "기타"] as const;
-const bdr = "1px solid #444";
-const labelCell: React.CSSProperties = {
-  background: "#f5f5f5", fontWeight: "bold", textAlign: "center",
-  fontSize: "9pt", borderRight: bdr, whiteSpace: "nowrap", padding: "0 2mm", verticalAlign: "middle",
-};
+import { calcOvertimeResult, detectHoliday, dayOfWeekKr, OvertimeResult } from "./overtimeCalc";
+import { notifyOvertimeApprovalRequest, notifyOvertimeApproved, notifyOvertimeRejected } from "./overtimeNotify";
 
 export const OT_LEDGER_MENU_HREF = "/hr/overtime-ledger";
+const WORK_REASONS = ["점검", "공사", "수리·부품교체", "상주", "조출", "기타"] as const;
 
 interface Account {
   id: number;
   username: string;
   dept: string | null;
+  team: string | null;
+  status: string | null;
+  signature_url: string | null;
 }
 
-interface OTRow {
-  id: number;
-  report_no: string;
-  author_id: number;
-  site_name: string;
-  work_instructor: string | null;
-  work_reasons: string[];
-  work_reason_etc: string | null;
-  work_elevator: string | null;
-  start_at: string;
-  end_at: string;
-  is_holiday: boolean;
-  holiday_type: string | null;
-  work_hours: number | null;
-  holiday_hours: number | null;
-  overtime_hours: number | null;
-  workers: string[];
-  worker_notes: string[];
-  work_content: string | null;
-  work_result: string | null;
-  note: string | null;
-  approver_id: number | null;
-  approver_signature: string | null;
-  approved_at: string | null;
-  approval_status: string;
+interface OvertimeReport {
+  id: number; report_no: string; author_id: number; site_name: string;
+  work_instructor: string | null; work_instructor_id: number | null;
+  work_reasons: string[]; work_reason_etc: string | null; work_elevator: string | null;
+  start_at: string; end_at: string; is_holiday: boolean; holiday_type: string | null;
+  work_hours: number | null; holiday_hours: number | null; overtime_hours: number | null;
+  workers: string[]; worker_notes: string[]; work_content: string | null; work_result: string | null; note: string | null;
+  approver_id: number | null; approval_status: string; approver_signature: string | null;
+  submitted_at: string | null; approved_at: string | null; rejected_at: string | null; reject_reason: string | null;
+  created_at: string; updated_at: string;
 }
 
-interface EditForm {
-  site_name: string; work_instructor: string;
+interface FormState {
+  site_name: string; work_instructor: string; work_instructor_id: number | null;
   work_reasons: string[]; work_reason_etc: string; work_elevator: string;
-  start_at: string; end_at: string;
-  workers: string[]; worker_notes: string[];
-  work_content: string; work_result: string; note: string;
+  s_yr: string; s_mo: string; s_dy: string; s_hr: string; s_mi: string;
+  e_yr: string; e_mo: string; e_dy: string; e_hr: string; e_mi: string;
+  is_holiday: boolean; holiday_type: string;
+  workers: string[]; worker_notes: string[]; work_content: string; work_result: string; note: string;
   approver_id: number | null;
+  work_hours: number | null; holiday_hours: number | null; overtime_hours: number | null;
+}
+
+// ── 유틸 함수들 ──────────────────────────────────────────────
+
+function parseDT(val: string) {
+  if (!val) return { yr: "", mo: "", dy: "", hr: "", mi: "" };
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return { yr: "", mo: "", dy: "", hr: "", mi: "" };
+  return {
+    yr: String(d.getFullYear()).slice(2),
+    mo: String(d.getMonth() + 1).padStart(2, "0"),
+    dy: String(d.getDate()).padStart(2, "0"),
+    hr: String(d.getHours()).padStart(2, "0"),
+    mi: String(d.getMinutes()).padStart(2, "0"),
+  };
+}
+
+function buildDT(yr: string, mo: string, dy: string, hr: string, mi: string): string {
+  if (!yr || !mo || !dy || !hr || !mi) return "";
+  const s = `20${yr.padStart(2, "0")}-${mo.padStart(2, "0")}-${dy.padStart(2, "0")}T${hr.padStart(2, "0")}:${mi.padStart(2, "0")}`;
+  return isNaN(new Date(s).getTime()) ? "" : s;
+}
+
+function makeEmptyForm(): FormState {
+  const n = new Date();
+  return {
+    site_name: "", work_instructor: "", work_instructor_id: null,
+    work_reasons: [], work_reason_etc: "", work_elevator: "",
+    s_yr: String(n.getFullYear()).slice(2), s_mo: String(n.getMonth() + 1).padStart(2, "0"), s_dy: String(n.getDate()).padStart(2, "0"), s_hr: "", s_mi: "",
+    e_yr: String(n.getFullYear()).slice(2), e_mo: String(n.getMonth() + 1).padStart(2, "0"), e_dy: String(n.getDate()).padStart(2, "0"), e_hr: "", e_mi: "",
+    is_holiday: false, holiday_type: "",
+    workers: Array(10).fill(""), worker_notes: Array(10).fill(""), work_content: "", work_result: "", note: "",
+    approver_id: null, work_hours: null, holiday_hours: null, overtime_hours: null,
+  };
+}
+
+function reportToForm(r: OvertimeReport): FormState {
+  const sp = parseDT(r.start_at ?? "");
+  const ep = parseDT(r.end_at ?? "");
+  const ws = [...r.workers];
+  const targetLen = Math.max(10, Math.ceil(ws.length / 10) * 10);
+  while (ws.length < targetLen) ws.push("");
+  return {
+    site_name: r.site_name, work_instructor: r.work_instructor ?? "", work_instructor_id: r.work_instructor_id,
+    work_reasons: r.work_reasons, work_reason_etc: r.work_reason_etc ?? "", work_elevator: r.work_elevator ?? "",
+    s_yr: sp.yr, s_mo: sp.mo, s_dy: sp.dy, s_hr: sp.hr, s_mi: sp.mi,
+    e_yr: ep.yr, e_mo: ep.mo, e_dy: ep.dy, e_hr: ep.hr, e_mi: ep.mi,
+    is_holiday: r.is_holiday, holiday_type: r.holiday_type ?? "",
+    workers: ws,
+    worker_notes: (() => { const ns = [...(r.worker_notes ?? [])]; while (ns.length < targetLen) ns.push(""); return ns; })(),
+    work_content: r.work_content ?? "", work_result: r.work_result ?? "", note: r.note ?? "",
+    approver_id: r.approver_id, work_hours: r.work_hours, holiday_hours: r.holiday_hours, overtime_hours: r.overtime_hours,
+  };
 }
 
 /** UTC ISO 문자열을 datetime-local input용 로컬 시간 문자열로 변환 */
 function toLocalDTInput(utcIso: string): string {
   const d = new Date(utcIso);
   if (isNaN(d.getTime())) return "";
-  const yr  = d.getFullYear();
-  const mo  = String(d.getMonth() + 1).padStart(2, "0");
-  const dy  = String(d.getDate()).padStart(2, "0");
-  const hr  = String(d.getHours()).padStart(2, "0");
-  const mi  = String(d.getMinutes()).padStart(2, "0");
+  const yr = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const dy = String(d.getDate()).padStart(2, "0");
+  const hr = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
   return `${yr}-${mo}-${dy}T${hr}:${mi}`;
 }
 
-function rowToEditForm(r: OTRow): EditForm {
-  const ws = [...(r.workers ?? [])];      while (ws.length < 10) ws.push("");
-  const wn = [...(r.worker_notes ?? [])]; while (wn.length < 10) wn.push("");
-  return {
-    site_name: r.site_name, work_instructor: r.work_instructor ?? "",
-    work_reasons: r.work_reasons, work_reason_etc: r.work_reason_etc ?? "",
-    work_elevator: r.work_elevator ?? "",
-    start_at: toLocalDTInput(r.start_at), end_at: toLocalDTInput(r.end_at),
-    workers: ws, worker_notes: wn,
-    work_content: r.work_content ?? "", work_result: r.work_result ?? "",
-    note: r.note ?? "", approver_id: r.approver_id,
-  };
+// ── 작업자 검색 인풋 ──────────────────────────────────────────────
+function WorkerSearchInput({ value, onChange, accounts, placeholder, cellStyle }: {
+  value: string;
+  onChange: (v: string) => void;
+  accounts: Account[];
+  placeholder?: string;
+  cellStyle?: React.CSSProperties;
+}) {
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dropRect, setDropRect] = useState<{ top: number; left: number } | null>(null);
+
+  const suggestions = useMemo(() => {
+    const q = value.trim();
+    const list = q
+      ? accounts.filter(a => a.username.includes(q) || (a.dept ?? "").includes(q))
+      : accounts;
+    return list.slice(0, 10);
+  }, [value, accounts]);
+
+  function updatePos() {
+    if (inputRef.current) {
+      const r = inputRef.current.getBoundingClientRect();
+      setDropRect({ top: r.bottom + 2, left: r.left });
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" && suggestions.length === 1) {
+      e.preventDefault();
+      onChange(suggestions[0].username);
+      setOpen(false);
+    }
+  }
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onFocus={() => { updatePos(); setOpen(true); }}
+        onBlur={() => setTimeout(() => {
+          setOpen(false);
+          const q = value.trim();
+          if (!q) return;
+          if (!accounts.some(a => a.username === q)) {
+            const hasSuggestions = accounts.some(
+              a => a.username.includes(q) || (a.dept ?? "").includes(q)
+            );
+            if (!hasSuggestions) alert(`'${q}'에 대한 검색 결과가 없습니다.`);
+            onChange("");
+          }
+        }, 150)}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        style={cellStyle}
+      />
+      {open && dropRect && typeof document !== "undefined" && createPortal(
+        <div style={{
+          position: "fixed",
+          top: dropRect.top,
+          left: dropRect.left,
+          minWidth: 160,
+          zIndex: 9999,
+          background: "white",
+          color: "#111",
+          border: "1px solid #bbb",
+          borderRadius: 4,
+          boxShadow: "0 6px 18px rgba(0,0,0,0.15)",
+          maxHeight: 220,
+          overflowY: "auto",
+          fontSize: "9pt",
+          fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif",
+        }}>
+          {suggestions.length === 0 ? (
+            <div style={{ padding: "6px 10px", color: "#999" }}>검색 결과 없음</div>
+          ) : suggestions.map(a => (
+            <div key={a.id}
+              onMouseDown={e => { e.preventDefault(); onChange(a.username); setOpen(false); }}
+              style={{ padding: "5px 10px", cursor: "pointer", borderBottom: "1px solid #f0f0f0" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "#eff6ff")}
+              onMouseLeave={e => (e.currentTarget.style.background = "")}>
+              {a.username}
+              {a.dept ? <span style={{ color: "#888", marginLeft: 4 }}>({a.dept})</span> : null}
+            </div>
+          ))}
+        </div>,
+        document.body
+      )}
+    </>
+  );
 }
+
+/** 계정 검색 입력 — 승인자·작업지시자 공용.
+ *  allowFreeText=true 이면 목록에 없는 이름도 허용(작업지시자).
+ *  false 이면 blur 시 미매칭 입력을 마지막 유효값으로 되돌림(승인자). */
+function AccountSearchInput({ accountId, freeText = "", onSelect, accounts, placeholder, style, className, allowFreeText = false }: {
+  accountId: number | null;
+  freeText?: string;
+  onSelect: (id: number | null, name: string) => void;
+  accounts: Account[];
+  placeholder?: string;
+  style?: React.CSSProperties;
+  className?: string;
+  allowFreeText?: boolean;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [text, setText] = useState("");
+  const [open, setOpen] = useState(false);
+  const [dropRect, setDropRect] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (accountId) {
+      const acc = accounts.find(a => a.id === accountId);
+      setText(acc?.username ?? "");
+    } else {
+      setText(freeText);
+    }
+  }, [accountId, freeText, accounts]);
+
+  const suggestions = useMemo(() => {
+    const q = text.trim();
+    if (!q) return accounts.slice(0, 15);
+    return accounts.filter(a => a.username.includes(q) || (a.dept ?? "").includes(q)).slice(0, 15);
+  }, [text, accounts]);
+
+  function pick(a: Account) {
+    onSelect(a.id, a.username);
+    setText(a.username);
+    setOpen(false);
+  }
+
+  function updatePos() {
+    if (inputRef.current) {
+      const r = inputRef.current.getBoundingClientRect();
+      setDropRect({ top: r.bottom + 2, left: r.left });
+    }
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setText(e.target.value);
+    if (!e.target.value.trim()) onSelect(null, "");
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" && suggestions.length === 1) {
+      e.preventDefault(); pick(suggestions[0]);
+    }
+    if (e.key === "Escape") setOpen(false);
+  }
+
+  function handleBlur() {
+    setTimeout(() => {
+      const q = text.trim();
+      if (!q) { onSelect(null, ""); setOpen(false); return; }
+      const exact = accounts.find(a => a.username === q);
+      if (exact) { onSelect(exact.id, exact.username); }
+      else if (allowFreeText) { onSelect(null, q); }
+      else {
+        const prev = accountId ? (accounts.find(a => a.id === accountId)?.username ?? "") : "";
+        setText(prev);
+        if (!prev) onSelect(null, "");
+      }
+      setOpen(false);
+    }, 150);
+  }
+
+  return (
+    <>
+      <input ref={inputRef} value={text}
+        onChange={handleChange}
+        onFocus={() => { updatePos(); setOpen(true); }}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        style={style} className={className}
+      />
+      {open && dropRect && typeof document !== "undefined" && createPortal(
+        <div style={{
+          position: "fixed", top: dropRect.top, left: dropRect.left,
+          minWidth: 200, zIndex: 9999,
+          background: "white", color: "#111", border: "1px solid #bbb",
+          borderRadius: 4, boxShadow: "0 6px 18px rgba(0,0,0,0.15)",
+          maxHeight: 220, overflowY: "auto",
+          fontSize: "9pt", fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif",
+        }}>
+          {suggestions.length === 0
+            ? <div style={{ padding: "6px 10px", color: "#999" }}>검색 결과 없음</div>
+            : suggestions.map(a => (
+              <div key={a.id}
+                onMouseDown={e => { e.preventDefault(); pick(a); }}
+                style={{ padding: "5px 10px", cursor: "pointer", borderBottom: "1px solid #f0f0f0" }}
+                onMouseEnter={e => (e.currentTarget.style.background = "#eff6ff")}
+                onMouseLeave={e => (e.currentTarget.style.background = "")}>
+                {a.username}
+                {a.dept ? <span style={{ color: "#888", marginLeft: 4 }}>({a.dept})</span> : null}
+              </div>
+            ))}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const m: Record<string, [string, string]> = {
+    draft: ["작성중", "bg-gray-100 text-gray-600"], pending: ["승인 요청", "bg-blue-100 text-blue-700"],
+    approved: ["승인완료", "bg-green-100 text-green-700"], rejected: ["반려", "bg-red-100 text-red-600"],
+  };
+  const [label, cls] = m[status] ?? [status, "bg-gray-100 text-gray-500"];
+  return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cls}`}>{label}</span>;
+}
+
+// ── 공통 인라인 입력 스타일 ──
+const iCell: React.CSSProperties = { width: "100%", border: "none", background: "transparent", fontSize: "10pt", color: "inherit", padding: "1mm 2mm", outline: "none", fontFamily: "inherit" };
+const iTArea: React.CSSProperties = { ...iCell, resize: "none", display: "block" };
+const iPart: React.CSSProperties = { border: "none", borderBottom: "1px solid #444", background: "transparent", fontSize: "10pt", textAlign: "center", outline: "none", fontFamily: "inherit" };
+const bdr = "1px solid #444";
+
+// 상태 탭 타입
+type StatusFilter = "all" | "draft" | "pending" | "approved" | "rejected";
 
 export default function OvertimeLedgerClient() {
   const { user } = useAuth();
+  const canCreate = user ? (isAdmin(user) || hasMenuPermission(user, OT_LEDGER_MENU_HREF, "create")) : false;
   const isManager = user ? (isAdmin(user) || hasMenuPermission(user, OT_LEDGER_MENU_HREF, "update")) : false;
 
-  const [rows, setRows] = useState<OTRow[]>([]);
+  // ── 목록 상태 ──
+  const [reports, setReports] = useState<OvertimeReport[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [query, setQuery] = useState("");
+
+  // ── 필터 ──
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
   });
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10));
-  const [detail, setDetail] = useState<OTRow | null>(null);
-  const [editingRow, setEditingRow] = useState<OTRow | null>(null);
-  const [editForm, setEditForm] = useState<EditForm | null>(null);
-  const [editSaving, setEditSaving] = useState(false);
-  const ef = (patch: Partial<EditForm>) => setEditForm(f => f ? { ...f, ...patch } : f);
+  const [listQuery, setListQuery] = useState("");
 
+  // ── 폼 상태 ──
+  const [editingId, setEditingId] = useState<number | "new" | null>(null);
+  const [form, setForm] = useState<FormState>(makeEmptyForm());
+  const [otResult, setOtResult] = useState<OvertimeResult | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [printPending, setPrintPending] = useState(false);
+
+  // ── 모달 ──
+  const [signModal, setSignModal] = useState<OvertimeReport | null>(null);
+  const [rejectModal, setRejectModal] = useState<{ id: number; reportNo: string } | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const signCanvasRef = useRef<HTMLCanvasElement>(null);
+  const signIsDrawing = useRef(false);
+
+  // ── 반응형 ──
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileStep, setMobileStep] = useState(0);
+
+  useEffect(() => {
+    function check() { setIsMobile(window.innerWidth < 768); }
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  // ── 데이터 로드 ──
   const load = useCallback(async () => {
     if (!user) return;
     if (isManager) {
-      // 관리자: 전체 승인 목록
-      const PAGE = 500;
-      const all: OTRow[] = [];
-      for (let off = 0; ; off += PAGE) {
+      // 관리자: 전체 조회 (모든 상태)
+      const all: OvertimeReport[] = [];
+      for (let off = 0; ; off += 500) {
         const { data } = await supabase
           .from("overtime_reports")
           .select("*")
-          .eq("approval_status", "approved")
-          .order("approved_at", { ascending: false })
-          .range(off, off + PAGE - 1);
-        const batch = (data as OTRow[] | null) ?? [];
+          .order("created_at", { ascending: false })
+          .range(off, off + 499);
+        const batch = (data as OvertimeReport[] | null) ?? [];
         all.push(...batch);
-        if (batch.length < PAGE) break;
+        if (batch.length < 500) break;
       }
-      setRows(all);
+      setReports(all);
     } else {
-      // 일반 사용자: 작성자이거나 승인자인 승인 완료 레코드 (or() 묵시적 실패 방지 → 두 쿼리 병렬)
+      // 일반 사용자: 작성자이거나 승인자인 레코드 (두 쿼리 병렬 → merge+dedupe)
       const [{ data: asAuthor }, { data: asApprover }] = await Promise.all([
         supabase.from("overtime_reports").select("*")
-          .eq("approval_status", "approved").eq("author_id", user.id)
-          .order("approved_at", { ascending: false }),
+          .eq("author_id", user.id)
+          .order("created_at", { ascending: false }),
         supabase.from("overtime_reports").select("*")
-          .eq("approval_status", "approved").eq("approver_id", user.id)
-          .order("approved_at", { ascending: false }),
+          .eq("approver_id", user.id)
+          .order("created_at", { ascending: false }),
       ]);
       const merged = [...(asAuthor ?? []), ...(asApprover ?? [])];
       const seen = new Set<number>();
-      const unique = (merged as OTRow[])
+      const unique = (merged as OvertimeReport[])
         .filter(r => { if (seen.has(r.id)) return false; seen.add(r.id); return true; })
-        .sort((a, b) => new Date(b.approved_at ?? b.start_at).getTime() - new Date(a.approved_at ?? a.start_at).getTime());
-      setRows(unique);
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setReports(unique);
     }
   }, [user, isManager]);
 
   useEffect(() => {
-    (async () => {
-      const { data } = await supabase.from("accounts").select("id, username, dept").order("username");
-      setAccounts((data as Account[] | null) ?? []);
-    })();
+    supabase.from("accounts").select("id,username,dept,team,status,signature_url").order("username")
+      .then(({ data }) => setAccounts((data as Account[] | null) ?? []));
   }, []);
 
   useEffect(() => { load(); }, [load]);
   useReloadOnActivate(load);
 
-  async function saveEdit() {
-    if (!editingRow || !editForm) return;
-    setEditSaving(true);
-    const s = new Date(editForm.start_at);
-    const e = new Date(editForm.end_at);
-    const { isHoliday, holidayType } = detectHoliday(s);
-    const ot = calcOvertimeResult(s, e, isHoliday);
-    const { error } = await supabase.from("overtime_reports").update({
-      site_name: editForm.site_name.trim(),
-      work_instructor: editForm.work_instructor.trim() || null,
-      work_reasons: editForm.work_reasons,
-      work_reason_etc: editForm.work_reasons.includes("기타") ? (editForm.work_reason_etc.trim() || null) : null,
-      work_elevator: editForm.work_elevator.trim() || null,
-      start_at: s.toISOString(), end_at: e.toISOString(),
-      is_holiday: isHoliday, holiday_type: isHoliday ? holidayType : null,
-      work_hours: ot.workHours, holiday_hours: ot.holidayHours, overtime_hours: ot.overtimeHours,
-      workers: editForm.workers, worker_notes: editForm.worker_notes,
-      work_content: editForm.work_content.trim() || null,
-      work_result: editForm.work_result.trim() || null,
-      note: editForm.note.trim() || null,
-      approver_id: editForm.approver_id,
-      updated_at: new Date().toISOString(),
-    }).eq("id", editingRow.id);
-    setEditSaving(false);
-    if (error) { alert("수정 실패: " + error.message); return; }
-    setEditingRow(null); setEditForm(null);
-    load();
+  // 탭이 비활성화될 때 서명/반려 모달 닫기
+  const isTabActive = useTabIsActive();
+  useEffect(() => {
+    if (!isTabActive) { setSignModal(null); setRejectModal(null); }
+  }, [isTabActive]);
+
+  // ── 폼 헬퍼 ──
+  const f = form;
+  const sf = (p: Partial<FormState>) => setForm(prev => ({ ...prev, ...p }));
+
+  const startDT = buildDT(f.s_yr, f.s_mo, f.s_dy, f.s_hr, f.s_mi);
+  const endDT = buildDT(f.e_yr, f.e_mo, f.e_dy, f.e_hr, f.e_mi);
+
+  useEffect(() => {
+    if (!startDT || !endDT) { setOtResult(null); return; }
+    const s = new Date(startDT), e = new Date(endDT);
+    if (isNaN(s.getTime()) || isNaN(e.getTime()) || e <= s) { setOtResult(null); return; }
+    const r = calcOvertimeResult(s, e, f.is_holiday);
+    setOtResult(r);
+    sf({ work_hours: r.workHours, holiday_hours: r.holidayHours, overtime_hours: r.overtimeHours });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDT, endDT, f.is_holiday]);
+
+  function detectFromStart(yr: string, mo: string, dy: string) {
+    const d = new Date(`20${yr}-${mo}-${dy}`);
+    if (!isNaN(d.getTime())) {
+      const { isHoliday, holidayType } = detectHoliday(d);
+      sf({ is_holiday: isHoliday, holiday_type: holidayType });
+    }
   }
 
-  async function deleteRow(id: number, reportNo: string) {
-    if (!confirm(`보고서 ${reportNo}을(를) 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+  function dowFromParts(yr: string, mo: string, dy: string) {
+    if (!yr || !mo || !dy) return "";
+    const d = new Date(`20${yr.padStart(2, "0")}-${mo.padStart(2, "0")}-${dy.padStart(2, "0")}`);
+    return isNaN(d.getTime()) ? "" : dayOfWeekKr(d);
+  }
+  const startDow = dowFromParts(f.s_yr, f.s_mo, f.s_dy);
+  const endDow = dowFromParts(f.e_yr, f.e_mo, f.e_dy);
+
+  const activeAccounts = useMemo(() => accounts.filter(a => a.status !== "퇴직"), [accounts]);
+  const approverAcc = accounts.find(a => a.id === f.approver_id);
+  const authorAcc = accounts.find(a => a.id === user?.id);
+  const todayStr = new Date().toLocaleDateString("ko-KR");
+  const editingReport = reports.find(r => r.id === editingId);
+  const isApproved = editingReport?.approval_status === "approved";
+  const approvedAtStr = isApproved && editingReport?.approved_at
+    ? new Date(editingReport.approved_at).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" }).replace(". ", "/").replace(".", "")
+    : null;
+
+  // ── 권한 헬퍼 ──
+  const canEdit = (r: OvertimeReport) => !!user && r.author_id === user.id && r.approval_status !== "approved";
+  const canDelete = (r: OvertimeReport) => !!user && r.author_id === user.id && r.approval_status !== "approved";
+  const canApprove = (r: OvertimeReport) => !!user && r.approver_id === user.id && r.approval_status === "pending";
+  const isReadOnly = !!(editingReport && !canEdit(editingReport));
+
+  // ── 필터링된 목록 ──
+  const filtered = useMemo(() => {
+    return reports.filter(r => {
+      const dt = r.start_at.slice(0, 10);
+      if (dateFrom && dt < dateFrom) return false;
+      if (dateTo && dt > dateTo) return false;
+      if (statusFilter !== "all" && r.approval_status !== statusFilter) return false;
+      if (listQuery) {
+        const q = listQuery.toLowerCase();
+        const author = accounts.find(a => a.id === r.author_id);
+        if (
+          !r.site_name.toLowerCase().includes(q) &&
+          !r.report_no.toLowerCase().includes(q) &&
+          !(author?.username ?? "").toLowerCase().includes(q) &&
+          !(r.work_instructor ?? "").toLowerCase().includes(q)
+        ) return false;
+      }
+      return true;
+    });
+  }, [reports, dateFrom, dateTo, statusFilter, listQuery, accounts]);
+
+  // 상태별 건수
+  const statusCounts = useMemo(() => {
+    const base = reports.filter(r => {
+      const dt = r.start_at.slice(0, 10);
+      if (dateFrom && dt < dateFrom) return false;
+      if (dateTo && dt > dateTo) return false;
+      if (listQuery) {
+        const q = listQuery.toLowerCase();
+        const author = accounts.find(a => a.id === r.author_id);
+        if (
+          !r.site_name.toLowerCase().includes(q) &&
+          !r.report_no.toLowerCase().includes(q) &&
+          !(author?.username ?? "").toLowerCase().includes(q) &&
+          !(r.work_instructor ?? "").toLowerCase().includes(q)
+        ) return false;
+      }
+      return true;
+    });
+    return {
+      all: base.length,
+      draft: base.filter(r => r.approval_status === "draft").length,
+      pending: base.filter(r => r.approval_status === "pending").length,
+      approved: base.filter(r => r.approval_status === "approved").length,
+      rejected: base.filter(r => r.approval_status === "rejected").length,
+    };
+  }, [reports, dateFrom, dateTo, listQuery, accounts]);
+
+  // 합계 (승인완료 기준)
+  const approvedFiltered = filtered.filter(r => r.approval_status === "approved");
+  const totalWork = approvedFiltered.reduce((s, r) => s + (r.work_hours ?? 0), 0);
+  const totalHoliday = approvedFiltered.reduce((s, r) => s + (r.holiday_hours ?? 0), 0);
+  const totalOvertime = approvedFiltered.reduce((s, r) => s + (r.overtime_hours ?? 0), 0);
+  function fmt(h: number) { return h % 1 === 0 ? `${h}H` : `${h.toFixed(1)}H`; }
+
+  // ── 폼 열기 ──
+  function openNew() {
+    const now = new Date();
+    const { isHoliday, holidayType } = detectHoliday(now);
+    const myAccount = accounts.find(a => a.id === user?.id);
+    const isConstructionTeam = myAccount?.team === "공사팀";
+    const hjhAccount = isConstructionTeam ? accounts.find(a => a.username === "황진한") : undefined;
+    setForm({ ...makeEmptyForm(), is_holiday: isHoliday, holiday_type: holidayType, approver_id: hjhAccount?.id ?? null });
+    setOtResult(null); setEditingId("new"); setMobileStep(0);
+  }
+
+  function openEdit(r: OvertimeReport, andPrint = false) {
+    setForm(reportToForm(r)); setOtResult(null); setEditingId(r.id); setMobileStep(0);
+    if (andPrint) setPrintPending(true);
+  }
+
+  useEffect(() => {
+    if (!printPending || editingId === null) return;
+    const t = setTimeout(() => { window.print(); setPrintPending(false); }, 350);
+    return () => clearTimeout(t);
+  }, [printPending, editingId]);
+
+  // ── 저장 ──
+  async function save(submitForApproval: boolean) {
+    if (!user) return;
+    if (!f.site_name.trim()) { alert("현장명을 입력해주세요."); return; }
+    if (!startDT || !endDT) { alert("작업일시를 입력해주세요."); return; }
+    if (submitForApproval && !f.approver_id) { alert("잔업 승인자를 지정해주세요."); return; }
+    setSaving(true);
+    try {
+      const instructorName = f.work_instructor_id
+        ? (accounts.find(a => a.id === f.work_instructor_id)?.username ?? f.work_instructor.trim())
+        : f.work_instructor.trim() || null;
+      const payload = {
+        author_id: user.id, site_name: f.site_name.trim(),
+        work_instructor: instructorName, work_instructor_id: f.work_instructor_id,
+        work_reasons: f.work_reasons, work_reason_etc: f.work_reason_etc.trim() || null,
+        work_elevator: f.work_elevator.trim() || null,
+        start_at: new Date(startDT).toISOString(), end_at: new Date(endDT).toISOString(),
+        is_holiday: f.is_holiday, holiday_type: f.holiday_type || null,
+        work_hours: f.work_hours, holiday_hours: f.holiday_hours, overtime_hours: f.overtime_hours,
+        workers: f.workers.filter(w => w.trim()),
+        worker_notes: f.worker_notes,
+        work_content: f.work_content.trim() || null, work_result: f.work_result.trim() || null,
+        note: f.note.trim() || null, approver_id: f.approver_id,
+        approval_status: submitForApproval ? "pending" : "draft",
+        submitted_at: submitForApproval ? new Date().toISOString() : null,
+      };
+      if (editingId === "new") {
+        const { data: no, error: ne } = await supabase.rpc("next_ot_no");
+        if (ne) throw new Error("문서번호 채번 실패: " + ne.message);
+        const { data: ins, error: ie } = await supabase.from("overtime_reports").insert({ ...payload, report_no: no }).select("id,report_no").single();
+        if (ie) throw ie;
+        if (submitForApproval && f.approver_id)
+          notifyOvertimeApprovalRequest({ approverId: f.approver_id, authorName: authorAcc?.username ?? user.name, reportNo: no, reportId: (ins as { id: number }).id, siteName: f.site_name, startAt: startDT }).catch(console.warn);
+      } else {
+        const { error } = await supabase.from("overtime_reports").update(payload).eq("id", editingId!);
+        if (error) throw error;
+        const rep = reports.find(r => r.id === editingId);
+        if (submitForApproval && f.approver_id && rep)
+          notifyOvertimeApprovalRequest({ approverId: f.approver_id, authorName: authorAcc?.username ?? user.name, reportNo: rep.report_no, reportId: rep.id, siteName: f.site_name, startAt: startDT }).catch(console.warn);
+      }
+      await load(); setEditingId(null);
+    } catch (e: unknown) { alert("저장 실패: " + (e instanceof Error ? e.message : String(e))); }
+    finally { setSaving(false); }
+  }
+
+  // ── 삭제 ──
+  async function deleteReport(id: number, reportNo: string) {
+    if (!confirm(`보고서 ${reportNo}을(를) 삭제하시겠습니까?`)) return;
     const { error } = await supabase.from("overtime_reports").delete().eq("id", id);
     if (error) { alert("삭제 실패: " + error.message); return; }
     load();
   }
 
-  const filtered = rows.filter(r => {
-    const dt = r.start_at.slice(0, 10); // YYYY-MM-DD
-    if (dateFrom && dt < dateFrom) return false;
-    if (dateTo   && dt > dateTo)   return false;
-    if (query) {
-      const q = query.toLowerCase();
-      const author = accounts.find(a => a.id === r.author_id);
-      if (
-        !r.site_name.toLowerCase().includes(q) &&
-        !r.report_no.toLowerCase().includes(q) &&
-        !(author?.username ?? "").toLowerCase().includes(q) &&
-        !(r.work_instructor ?? "").toLowerCase().includes(q)
-      ) return false;
+  // ── 승인 ──
+  function approve(r: OvertimeReport) {
+    setSignModal(r);
+  }
+
+  useEffect(() => {
+    if (!signModal || !signCanvasRef.current) return;
+    const ctx = signCanvasRef.current.getContext("2d");
+    if (ctx) ctx.clearRect(0, 0, signCanvasRef.current.width, signCanvasRef.current.height);
+  }, [signModal]);
+
+  function signGetPos(e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement): { x: number; y: number } {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    if ("touches" in e) {
+      return { x: (e.touches[0].clientX - rect.left) * scaleX, y: (e.touches[0].clientY - rect.top) * scaleY };
     }
-    return true;
-  });
+    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+  }
+  function signStart(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
+    e.preventDefault();
+    signIsDrawing.current = true;
+    const canvas = signCanvasRef.current!;
+    const ctx = canvas.getContext("2d")!;
+    const { x, y } = signGetPos(e, canvas);
+    ctx.beginPath(); ctx.moveTo(x, y);
+  }
+  function signMove(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
+    e.preventDefault();
+    if (!signIsDrawing.current || !signCanvasRef.current) return;
+    const canvas = signCanvasRef.current;
+    const ctx = canvas.getContext("2d")!;
+    const { x, y } = signGetPos(e, canvas);
+    ctx.lineTo(x, y);
+    ctx.strokeStyle = "#111"; ctx.lineWidth = 2.5; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.stroke();
+  }
+  function signEnd() { signIsDrawing.current = false; }
+  function signClear() {
+    if (!signCanvasRef.current) return;
+    const ctx = signCanvasRef.current.getContext("2d")!;
+    ctx.clearRect(0, 0, signCanvasRef.current.width, signCanvasRef.current.height);
+  }
 
-  // 합계 계산
-  const totalWork     = filtered.reduce((s, r) => s + (r.work_hours ?? 0), 0);
-  const totalHoliday  = filtered.reduce((s, r) => s + (r.holiday_hours ?? 0), 0);
-  const totalOvertime = filtered.reduce((s, r) => s + (r.overtime_hours ?? 0), 0);
+  async function approveWithSignature(sig: string) {
+    if (!signModal || !user) return;
+    const { error } = await supabase.from("overtime_reports")
+      .update({ approval_status: "approved", approved_at: new Date().toISOString(), approver_signature: sig })
+      .eq("id", signModal.id);
+    if (error) { alert("오류: " + error.message); return; }
+    notifyOvertimeApproved({ authorId: signModal.author_id, approverName: authorAcc?.username ?? user.name, reportNo: signModal.report_no, reportId: signModal.id }).catch(console.warn);
+    setSignModal(null); await load();
+  }
 
-  function fmt(h: number) { return h % 1 === 0 ? `${h}H` : `${h.toFixed(1)}H`; }
+  function confirmApprove() {
+    if (!signCanvasRef.current) return;
+    void approveWithSignature(signCanvasRef.current.toDataURL("image/png"));
+  }
 
+  function approveWithRegisteredSignature() {
+    const mySig = accounts.find(a => a.id === user?.id)?.signature_url;
+    if (!mySig) return;
+    void approveWithSignature(mySig);
+  }
+
+  // ── 반려 ──
+  async function reject() {
+    if (!rejectModal || !user) return;
+    if (!rejectReason.trim()) { alert("반려 사유를 입력해주세요."); return; }
+    const { error } = await supabase.from("overtime_reports").update({
+      approval_status: "rejected", rejected_at: new Date().toISOString(), reject_reason: rejectReason.trim()
+    }).eq("id", rejectModal.id);
+    if (error) { alert("오류: " + error.message); return; }
+    const rep = reports.find(r => r.id === rejectModal.id);
+    if (rep) notifyOvertimeRejected({ authorId: rep.author_id, approverName: authorAcc?.username ?? user.name, reportNo: rep.report_no, reportId: rep.id, reason: rejectReason.trim() }).catch(console.warn);
+    setRejectModal(null); setRejectReason(""); await load();
+  }
+
+  // ── 셀 배경 스타일 (라벨) ──
+  const labelCell: React.CSSProperties = {
+    background: "#f5f5f5", fontWeight: "bold", textAlign: "center",
+    fontSize: "9pt", borderRight: bdr, whiteSpace: "nowrap", padding: "0 2mm", verticalAlign: "middle",
+  };
+
+  // ── 탭 버튼 ──
+  const STATUS_TABS: { key: StatusFilter; label: string }[] = [
+    { key: "all", label: "전체" },
+    { key: "draft", label: "작성중" },
+    { key: "pending", label: "승인 요청" },
+    { key: "approved", label: "승인완료" },
+    { key: "rejected", label: "반려" },
+  ];
+
+  // ── 렌더 ──
   return (
-    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 text-sm text-gray-800 dark:text-gray-100">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0">
-        <h1 className="text-base font-bold">잔업보고서 등록대장</h1>
-        <span className="text-xs text-gray-400">{filtered.length}건</span>
-      </div>
+    <div className="flex flex-col h-full bg-gray-300 dark:bg-gray-900 text-sm print:block print:bg-white print:h-auto">
+      {/* ── 인쇄 전용 CSS ── */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          @page { size: A4 portrait; margin: 0; }
+          .ot-print-hide { display: none !important; }
+          #ot-scroll-wrap {
+            overflow: visible !important;
+            height: auto !important;
+            background: white !important;
+          }
+          #ot-scroll-wrap > div { overflow: visible !important; min-width: 0 !important; }
+          #ot-scroll-wrap > div > div { padding: 0 !important; }
+          #ot-print-doc {
+            box-shadow: none !important;
+            width: 210mm !important;
+            height: 297mm !important;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
+            margin: 0 auto !important;
+            color: black !important;
+            background: white !important;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
+          }
+          #ot-print-doc * {
+            color: black !important;
+            background: transparent !important;
+            -webkit-text-fill-color: black !important;
+          }
+          #ot-print-doc input, #ot-print-doc select {
+            border: none !important;
+            border-bottom: 1px solid #888 !important;
+            outline: none !important; box-shadow: none !important;
+          }
+          #ot-print-doc textarea {
+            border: none !important;
+            outline: none !important; box-shadow: none !important;
+            resize: none !important;
+          }
+          #ot-print-doc input::placeholder, #ot-print-doc textarea::placeholder {
+            color: transparent !important;
+            -webkit-text-fill-color: transparent !important;
+          }
+          #ot-print-doc th, #ot-print-doc td[data-label="true"] {
+            background-color: #f0f0f0 !important;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
+          }
+          #ot-print-doc table input, #ot-print-doc table select {
+            border-bottom: none !important;
+          }
+        }
+      ` }} />
 
-      {/* 필터 */}
-      <div className="flex flex-wrap items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 shrink-0">
-        <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">기간</span>
-        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-          className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400" />
-        <span className="text-xs text-gray-400">~</span>
-        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-          className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400" />
-        <button onClick={() => {
-          const d = new Date();
-          setDateFrom(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`);
-          setDateTo(d.toISOString().slice(0, 10));
-        }} className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap">이번달</button>
-        <button onClick={() => {
-          const d = new Date();
-          setDateFrom(`${d.getFullYear()}-01-01`);
-          setDateTo(d.toISOString().slice(0, 10));
-        }} className="text-xs text-gray-500 dark:text-gray-400 hover:underline whitespace-nowrap">올해</button>
-        <button onClick={() => { setDateFrom(""); setDateTo(""); }}
-          className="text-xs text-gray-400 dark:text-gray-500 hover:underline whitespace-nowrap">전체</button>
-        <div className="w-px h-4 bg-gray-200 dark:bg-gray-600" />
-        <input
-          type="text" value={query} onChange={e => setQuery(e.target.value)}
-          placeholder="현장명 / 보고서번호 / 작성자 검색"
-          className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400 w-52" />
-      </div>
-
-      {/* 합계 바 */}
-      {filtered.length > 0 && (
-        <div className="flex gap-4 px-4 py-2 bg-blue-50 dark:bg-blue-950/20 border-b border-blue-100 dark:border-blue-900 text-xs shrink-0">
-          <span>총 근무: <b className="text-blue-700 dark:text-blue-300">{fmt(totalWork)}</b></span>
-          <span>휴일근무: <b className="text-orange-600 dark:text-orange-300">{fmt(totalHoliday)}</b></span>
-          <span>잔업: <b className="text-purple-600 dark:text-purple-300">{fmt(totalOvertime)}</b></span>
+      {/* ── 상단 툴바 (인쇄 시 숨김) ── */}
+      <div className="print:hidden flex items-center justify-between px-4 py-2 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0">
+        <h1 className="text-sm font-bold text-gray-800 dark:text-gray-100">잔업보고서</h1>
+        <div className="flex gap-2">
+          {editingId !== null ? (
+            <>
+              {!isReadOnly && (
+                <>
+                  <button onClick={() => save(false)} disabled={saving}
+                    className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-medium disabled:opacity-50">
+                    {saving ? "저장중…" : "임시저장"}
+                  </button>
+                  <button onClick={() => save(true)} disabled={saving}
+                    className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium disabled:opacity-50">
+                    {saving ? "제출중…" : "승인 요청"}
+                  </button>
+                </>
+              )}
+              {editingReport && canApprove(editingReport) && (
+                <>
+                  <button onClick={() => approve(editingReport)}
+                    className="px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded font-medium">
+                    승인
+                  </button>
+                  <button onClick={() => { setRejectModal({ id: editingReport.id, reportNo: editingReport.report_no }); setRejectReason(""); }}
+                    className="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded font-medium">
+                    반려
+                  </button>
+                </>
+              )}
+              {!isMobile && (
+                <button onClick={() => window.print()}
+                  className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded font-medium">
+                  인쇄
+                </button>
+              )}
+              <button onClick={() => setEditingId(null)}
+                className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700">
+                목록으로
+              </button>
+            </>
+          ) : canCreate && (
+            <button onClick={openNew}
+              className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium">
+              + 새 보고서
+            </button>
+          )}
         </div>
-      )}
-
-      {/* 목록 */}
-      <div className="flex-1 overflow-auto p-4">
-        {filtered.length === 0 ? (
-          <div className="text-center text-sm text-gray-400 py-16">승인 완료된 잔업보고서가 없습니다.</div>
-        ) : (
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <table className="w-full text-xs">
-              <thead className="bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 uppercase text-[11px]">
-                <tr>
-                  <th className="px-3 py-2 text-left">보고서번호</th>
-                  <th className="px-3 py-2 text-left">현장명</th>
-                  <th className="px-3 py-2 text-left">작업일시</th>
-                  <th className="px-3 py-2 text-center">휴일</th>
-                  <th className="px-3 py-2 text-center">근무</th>
-                  <th className="px-3 py-2 text-center">잔업</th>
-                  <th className="px-3 py-2 text-left">작업사유</th>
-                  {isManager && <th className="px-3 py-2 text-left">작성자</th>}
-                  <th className="px-3 py-2 text-center">작업</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {filtered.map(r => {
-                  const s = new Date(r.start_at);
-                  const e = new Date(r.end_at);
-                  const author = accounts.find(a => a.id === r.author_id);
-                  const ot = calcOvertimeResult(s, e, r.is_holiday);
-                  return (
-                    <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
-                      <td className="px-3 py-2 font-mono text-gray-500">{r.report_no}</td>
-                      <td className="px-3 py-2 font-medium">{r.site_name}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <div>{s.toLocaleDateString("ko-KR")}</div>
-                        <div className="text-gray-400">
-                          {s.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
-                          {" ~ "}
-                          {e.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        {r.is_holiday
-                          ? <span className="text-orange-500 font-medium">{r.holiday_type ?? "휴일"}</span>
-                          : <span className="text-gray-300 dark:text-gray-600">—</span>}
-                      </td>
-                      <td className="px-3 py-2 text-center font-medium text-blue-600 dark:text-blue-400">
-                        {r.work_hours != null ? fmt(r.work_hours) : "-"}
-                      </td>
-                      <td className="px-3 py-2 text-center font-medium text-purple-600 dark:text-purple-400">
-                        {r.overtime_hours != null ? fmt(r.overtime_hours) : "-"}
-                      </td>
-                      <td className="px-3 py-2 text-gray-600 dark:text-gray-300">
-                        {r.work_reasons.join(", ")}
-                        {r.work_reason_etc ? ` (${r.work_reason_etc})` : ""}
-                      </td>
-                      {isManager && (
-                        <td className="px-3 py-2">{author?.username ?? "-"}</td>
-                      )}
-                      <td className="px-3 py-2 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button onClick={() => setDetail(r)}
-                            className="text-xs text-blue-600 hover:underline dark:text-blue-400">
-                            보기
-                          </button>
-                          {isManager && <>
-                            <button onClick={() => { setEditingRow(r); setEditForm(rowToEditForm(r)); }}
-                              className="text-xs text-gray-600 hover:underline dark:text-gray-300">
-                              수정
-                            </button>
-                            <button onClick={() => deleteRow(r.id, r.report_no)}
-                              className="text-xs text-red-500 hover:underline dark:text-red-400">
-                              삭제
-                            </button>
-                          </>}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
 
-      {/* 상세 모달 — A4 문서 뷰어 */}
-      {detail && (() => {
-        const s = new Date(detail.start_at);
-        const e = new Date(detail.end_at);
-        const s_yr = String(s.getFullYear()).slice(2);
-        const s_mo = String(s.getMonth() + 1).padStart(2, "0");
-        const s_dy = String(s.getDate()).padStart(2, "0");
-        const s_hr = String(s.getHours()).padStart(2, "0");
-        const s_mi = String(s.getMinutes()).padStart(2, "0");
-        const sDow = dayOfWeekKr(s);
-        const e_yr = String(e.getFullYear()).slice(2);
-        const e_mo = String(e.getMonth() + 1).padStart(2, "0");
-        const e_dy = String(e.getDate()).padStart(2, "0");
-        const e_hr = String(e.getHours()).padStart(2, "0");
-        const e_mi = String(e.getMinutes()).padStart(2, "0");
-        const eDow = dayOfWeekKr(e);
-        const ot = calcOvertimeResult(s, e, detail.is_holiday);
-        const author   = accounts.find(a => a.id === detail.author_id);
-        const approver = accounts.find(a => a.id === detail.approver_id);
-        const workers     = [...(detail.workers ?? [])];     while (workers.length < 10)     workers.push("");
-        const workerNotes = [...(detail.worker_notes ?? [])]; while (workerNotes.length < 10) workerNotes.push("");
-        const docText: React.CSSProperties = { fontSize:"10pt", fontFamily:"'Malgun Gothic','맑은 고딕',sans-serif", display:"block" };
+      <div id="ot-scroll-wrap" className="flex-1 overflow-auto">
 
-        return (
+        {/* ════════════════════════════════
+            A4 폼 뷰
+        ════════════════════════════════ */}
+        {editingId !== null && (
           <>
-            <style dangerouslySetInnerHTML={{ __html: `
-              @media print {
-                body * { visibility: hidden !important; }
-                #ot-ledger-print-doc, #ot-ledger-print-doc * { visibility: visible !important; }
-                #ot-ledger-print-doc {
-                  position: fixed !important; top: 0 !important; left: 0 !important;
-                  width: 210mm !important; box-shadow: none !important;
-                }
-              }
-            ` }} />
-            <div className="fixed inset-0 z-50 bg-black/60 overflow-auto" onClick={e => { if (e.target === e.currentTarget) setDetail(null); }}>
-              <div className="min-h-full flex flex-col items-center py-6 px-4">
-                {/* 툴바 */}
-                <div className="print:hidden flex items-center justify-between gap-3 mb-4 w-full max-w-[230mm]">
-                  <span className="text-white text-sm font-medium">잔업보고서 {detail.report_no}</span>
-                  <div className="flex gap-2">
-                    <button onClick={() => window.print()}
-                      className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded font-medium">
-                      🖨️ 인쇄
-                    </button>
-                    <button onClick={() => setDetail(null)}
-                      className="px-3 py-1.5 text-xs bg-white/10 hover:bg-white/20 text-white rounded font-medium">
-                      ✕ 닫기
-                    </button>
-                  </div>
-                </div>
+            {/* 보조 바: 잔업 승인자 + 상태 (인쇄 시 숨김) */}
+            <div className="print:hidden sticky top-0 z-10 flex flex-wrap items-center gap-3 px-4 py-2 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800 text-xs">
+              <span className="text-gray-500 whitespace-nowrap font-medium">잔업 승인자</span>
+              <AccountSearchInput
+                accountId={f.approver_id}
+                onSelect={id => sf({ approver_id: id })}
+                accounts={activeAccounts}
+                placeholder="— 승인자 검색 —"
+                className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400 w-40"
+              />
+              {otResult && (
+                <span className="font-semibold text-blue-700 dark:text-blue-300">{otResult.display}</span>
+              )}
+              {editingReport && (
+                <StatusBadge status={editingReport.approval_status} />
+              )}
+              {isReadOnly && (
+                <span className="text-orange-600 dark:text-orange-400 font-medium">읽기 전용</span>
+              )}
+            </div>
 
-                {/* A4 문서 */}
-                <div id="ot-ledger-print-doc" style={{
-                  width: "210mm", minHeight: "297mm",
+            {/* A4 문서 */}
+            <div className="overflow-x-auto">
+              <div className="flex justify-center py-8 print:py-0" style={{ minWidth: "210mm" }}>
+                <div id="ot-print-doc" style={{
+                  width: "210mm", height: "297mm",
+                  overflow: "visible",
                   padding: "12mm 14mm",
                   background: "white", color: "#111",
                   fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif",
                   fontSize: "10pt",
                   display: "flex", flexDirection: "column",
-                  boxShadow: "0 4px 24px rgba(0,0,0,0.3)",
+                  boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
+                  boxSizing: "border-box",
                 }}>
 
                   {/* ── 제목 + 결재란 ── */}
-                  <div style={{ display:"flex", alignItems:"stretch", marginBottom:"4mm" }}>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:"30pt", fontWeight:900, textDecoration:"underline", letterSpacing:"10px", lineHeight:1 }}>
+                  <div style={{ display: "flex", alignItems: "stretch", marginBottom: "4mm" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: "30pt", fontWeight: 900, textDecoration: "underline", letterSpacing: "10px", lineHeight: 1 }}>
                         잔업보고서
                       </div>
-                      <div style={{ marginTop:"6mm", fontSize:"9.5pt" }}>
+                      <div style={{ marginTop: "6mm", fontSize: "9.5pt" }}>
                         아래와 같이 시간외 근로(잔업) 사유가 발생하였기에 보고서를 제출합니다.
                       </div>
                     </div>
-                    <table style={{ borderCollapse:"collapse", border: bdr, marginLeft:"4mm", alignSelf:"flex-start" }}>
+
+                    {/* 결재란 — 5열 */}
+                    <table style={{ borderCollapse: "collapse", border: bdr, marginLeft: "4mm", alignSelf: "flex-start" }}>
                       <thead>
                         <tr>
-                          {["담당","팀장","임원","대표","대표"].map((r,i) => (
-                            <th key={i} style={{ border: bdr, width:"17mm", height:"7mm", textAlign:"center", fontSize:"9pt", fontWeight:"bold", background:"#f0f0f0", padding:0 }}>{r}</th>
+                          {["담당", "팀장", "임원", "대표", "대표"].map((r, i) => (
+                            <th key={i} style={{
+                              border: bdr, width: "17mm", height: "7mm",
+                              textAlign: "center", fontSize: "9pt", fontWeight: "bold",
+                              background: "#f0f0f0", padding: 0,
+                            }}>{r}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {(() => {
-                          const sigCol = approver?.username === "황진한" ? 0 : 1;
-                          const isApproved = detail.approval_status === "approved";
-                          const approvedAtStr = isApproved && detail.approved_at
-                            ? new Date(detail.approved_at).toLocaleDateString("ko-KR", { month:"2-digit", day:"2-digit" }).replace(". ", "/").replace(".", "")
-                            : null;
+                          const sigCol = approverAcc?.username === "황진한" ? 0 : 1;
                           return (
-                            <>
-                              <tr>
-                                {[0,1,2,3,4].map(i => (
-                                  <td key={i} style={{ border: bdr, width:"17mm", height:"20mm", textAlign:"center", verticalAlign:"middle", fontSize:"8pt", color:"#444", padding:"1mm" }}>
-                                    {i === sigCol && isApproved && detail.approver_signature && (
-                                      <img src={detail.approver_signature} alt="서명"
-                                        style={{ maxWidth:"100%", maxHeight:"17mm", objectFit:"contain" }} />
-                                    )}
-                                  </td>
-                                ))}
-                              </tr>
-                              <tr>
-                                {[0,1,2,3,4].map(i => (
-                                  <td key={i} style={{ border: bdr, textAlign:"center", fontSize:"9pt", color:"#555", height:"6mm", padding:0 }}>
-                                    {i === sigCol && approvedAtStr ? approvedAtStr : "/"}
-                                  </td>
-                                ))}
-                              </tr>
-                            </>
+                            <tr>
+                              {[0, 1, 2, 3, 4].map(i => (
+                                <td key={i} style={{
+                                  border: bdr, width: "17mm", height: "20mm",
+                                  textAlign: "center", verticalAlign: "middle", fontSize: "8pt", color: "#444",
+                                  padding: "1mm",
+                                }}>
+                                  {i === sigCol && isApproved && editingReport?.approver_signature && (
+                                    <img src={editingReport.approver_signature}
+                                      alt="서명"
+                                      style={{ maxWidth: "100%", maxHeight: "17mm", objectFit: "contain" }} />
+                                  )}
+                                </td>
+                              ))}
+                            </tr>
+                          );
+                        })()}
+                        {(() => {
+                          const sigCol = approverAcc?.username === "황진한" ? 0 : 1;
+                          return (
+                            <tr>
+                              {[0, 1, 2, 3, 4].map(i => (
+                                <td key={i} style={{
+                                  border: bdr, textAlign: "center", fontSize: "9pt",
+                                  color: "#555", height: "6mm", padding: 0,
+                                }}>
+                                  {i === sigCol && approvedAtStr ? approvedAtStr : "/"}
+                                </td>
+                              ))}
+                            </tr>
                           );
                         })()}
                       </tbody>
@@ -450,42 +911,59 @@ export default function OvertimeLedgerClient() {
                   </div>
 
                   {/* ── 본문 표 ── */}
-                  <table style={{ width:"100%", borderCollapse:"collapse", border: bdr, tableLayout:"fixed" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", border: bdr, tableLayout: "fixed" }}>
                     <colgroup>
-                      <col style={{ width:"22mm" }} />
+                      <col style={{ width: "22mm" }} />
                       <col />
-                      <col style={{ width:"22mm" }} />
+                      <col style={{ width: "22mm" }} />
                       <col />
                     </colgroup>
                     <tbody>
 
                       {/* 현장명 / 작업지시자 */}
                       <tr style={{ borderBottom: bdr }}>
-                        <td data-label="true" style={{ ...labelCell, borderBottom:"none", height:"10mm" }}>현 장 명</td>
-                        <td style={{ borderRight: bdr, padding:"0 3mm", verticalAlign:"middle" }}>
-                          <span style={docText}>{detail.site_name}</span>
+                        <td data-label="true" style={{ ...labelCell, borderBottom: "none", height: "10mm" }}>현 장 명</td>
+                        <td style={{ borderRight: bdr, padding: "0 2mm", verticalAlign: "middle" }}>
+                          <input style={iCell} value={f.site_name}
+                            readOnly={isReadOnly}
+                            onChange={e => sf({ site_name: e.target.value })} placeholder="현장명 입력" />
                         </td>
-                        <td data-label="true" style={{ ...labelCell, borderBottom:"none" }}>작업지시자</td>
-                        <td style={{ padding:"0 3mm", verticalAlign:"middle" }}>
-                          <span style={docText}>{detail.work_instructor ?? ""}</span>
+                        <td data-label="true" style={{ ...labelCell, borderBottom: "none" }}>작업지시자</td>
+                        <td style={{ verticalAlign: "middle", padding: "0 2mm" }}>
+                          {isReadOnly ? (
+                            <span style={iCell}>{f.work_instructor}</span>
+                          ) : (
+                            <AccountSearchInput
+                              accountId={f.work_instructor_id}
+                              freeText={f.work_instructor}
+                              allowFreeText
+                              onSelect={(id, name) => sf({ work_instructor_id: id, work_instructor: name })}
+                              accounts={activeAccounts}
+                              placeholder="이름 검색 또는 직접 입력"
+                              style={{ ...iCell }}
+                            />
+                          )}
                         </td>
                       </tr>
 
                       {/* 작업사유 */}
                       <tr style={{ borderBottom: bdr }}>
-                        <td data-label="true" style={{ ...labelCell, height:"10mm" }}>작업사유</td>
-                        <td colSpan={3} style={{ padding:"2mm 3mm", verticalAlign:"middle" }}>
-                          <div style={{ display:"flex", flexWrap:"wrap", gap:"0 6mm", fontSize:"10pt", alignItems:"center" }}>
+                        <td data-label="true" style={{ ...labelCell, height: "10mm" }}>작업사유</td>
+                        <td colSpan={3} style={{ padding: "2mm 3mm", verticalAlign: "middle" }}>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "0 6mm", fontSize: "10pt", alignItems: "center" }}>
                             {WORK_REASONS.map(r => (
-                              <label key={r} style={{ display:"flex", alignItems:"center", gap:"1mm", whiteSpace:"nowrap" }}>
-                                <input type="checkbox" readOnly checked={detail.work_reasons.includes(r)} style={{ accentColor:"#444" }} />
+                              <label key={r} style={{ display: "flex", alignItems: "center", gap: "1mm", cursor: isReadOnly ? "default" : "pointer", whiteSpace: "nowrap" }}>
+                                <input type="checkbox" checked={f.work_reasons.includes(r)}
+                                  readOnly={isReadOnly}
+                                  onChange={e => !isReadOnly && sf({ work_reasons: e.target.checked ? [...f.work_reasons, r] : f.work_reasons.filter(x => x !== r) })}
+                                  style={{ accentColor: "#444" }} />
                                 {r}
                               </label>
                             ))}
-                            {detail.work_reasons.includes("기타") && detail.work_reason_etc && (
-                              <span style={{ fontSize:"10pt", borderBottom:"1px solid #444", minWidth:"28mm", marginLeft:"1mm" }}>
-                                {detail.work_reason_etc}
-                              </span>
+                            {f.work_reasons.includes("기타") && (
+                              <input style={{ ...iPart, width: "28mm", marginLeft: "1mm" }} value={f.work_reason_etc}
+                                readOnly={isReadOnly}
+                                onChange={e => sf({ work_reason_etc: e.target.value })} placeholder="기타 내용" />
                             )}
                           </div>
                         </td>
@@ -493,47 +971,112 @@ export default function OvertimeLedgerClient() {
 
                       {/* 작업호기 */}
                       <tr style={{ borderBottom: bdr }}>
-                        <td data-label="true" style={{ ...labelCell, height:"9mm" }}>작업호기</td>
-                        <td colSpan={3} style={{ padding:"0 3mm", verticalAlign:"middle" }}>
-                          <span style={docText}>{detail.work_elevator ?? ""}</span>
+                        <td data-label="true" style={{ ...labelCell, height: "9mm" }}>작업호기</td>
+                        <td colSpan={3} style={{ padding: "0 2mm", verticalAlign: "middle" }}>
+                          <input style={iCell} value={f.work_elevator}
+                            readOnly={isReadOnly}
+                            onChange={e => sf({ work_elevator: e.target.value })} placeholder="예: 1호기, 2·3호기" />
                         </td>
                       </tr>
 
                       {/* 작업일시 */}
                       <tr style={{ borderBottom: bdr }}>
-                        <td data-label="true" style={{ ...labelCell, borderBottom:"none" }}>작업일시</td>
-                        <td colSpan={3} style={{ padding:0 }}>
-                          <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                        <td data-label="true" style={{ ...labelCell, borderBottom: "none" }}>작업일시</td>
+                        <td colSpan={3} style={{ padding: 0 }}>
+                          <table style={{ width: "100%", borderCollapse: "collapse" }}>
                             <colgroup>
-                              <col style={{ width:"12mm" }} />
+                              <col style={{ width: "12mm" }} />
                               <col />
-                              <col style={{ width:"36mm" }} />
+                              <col style={{ width: "39.6mm" }} />
                             </colgroup>
                             <tbody>
-                              <tr style={{ borderBottom:"1px solid #ccc" }}>
-                                <td style={{ borderRight:bdr, textAlign:"center", fontSize:"9pt", fontWeight:"bold", padding:"1.5mm 0", verticalAlign:"middle" }}>시 작</td>
-                                <td style={{ padding:"1.5mm 3mm", verticalAlign:"middle" }}>
-                                  <span style={{ fontSize:"10pt", fontFamily:"'Malgun Gothic','맑은 고딕',sans-serif" }}>
-                                    20{s_yr}년 {s_mo}월 {s_dy}일(
-                                    <span style={{ fontWeight:"bold", color:"#1d4ed8" }}>{sDow}</span>
-                                    요일) {s_hr}시 {s_mi}분부터
-                                  </span>
+                              {/* 시작 행 */}
+                              <tr style={{ borderBottom: "1px solid #ccc" }}>
+                                <td style={{ borderRight: bdr, textAlign: "center", fontSize: "9pt", fontWeight: "bold", padding: "1.5mm 0", verticalAlign: "middle" }}>시 작</td>
+                                <td style={{ padding: "1.5mm 3mm", verticalAlign: "middle" }}>
+                                  <div style={{ display: "flex", alignItems: "center", flexWrap: "nowrap", gap: "0.8mm", fontSize: "10pt" }}>
+                                    <span>20</span>
+                                    <input style={{ ...iPart, width: "7mm" }} maxLength={2} value={f.s_yr} placeholder="YY"
+                                      readOnly={isReadOnly}
+                                      onFocus={e => e.target.select()}
+                                      onChange={e => { sf({ s_yr: e.target.value }); detectFromStart(e.target.value, f.s_mo, f.s_dy); }} />
+                                    <span>년</span>
+                                    <input style={{ ...iPart, width: "7mm" }} maxLength={2} value={f.s_mo} placeholder="MM"
+                                      readOnly={isReadOnly}
+                                      onFocus={e => e.target.select()}
+                                      onChange={e => { sf({ s_mo: e.target.value }); detectFromStart(f.s_yr, e.target.value, f.s_dy); }} />
+                                    <span>월</span>
+                                    <input style={{ ...iPart, width: "7mm" }} maxLength={2} value={f.s_dy} placeholder="DD"
+                                      readOnly={isReadOnly}
+                                      onFocus={e => e.target.select()}
+                                      onChange={e => { sf({ s_dy: e.target.value }); detectFromStart(f.s_yr, f.s_mo, e.target.value); }} />
+                                    <span>일(</span>
+                                    {startDow
+                                      ? <span style={{ width: "5mm", textAlign: "center", fontWeight: "bold", color: "#1d4ed8" }}>{startDow}</span>
+                                      : <span className="ot-print-hide" style={{ width: "5mm", textAlign: "center", fontWeight: "bold", color: "#1d4ed8" }}>??</span>}
+                                    <span>요일)</span>
+                                    <input style={{ ...iPart, width: "7mm" }} maxLength={2} value={f.s_hr} placeholder="HH"
+                                      readOnly={isReadOnly}
+                                      onFocus={e => e.target.select()}
+                                      onChange={e => sf({ s_hr: e.target.value })} />
+                                    <span>시</span>
+                                    <input style={{ ...iPart, width: "7mm" }} maxLength={2} value={f.s_mi} placeholder="MM"
+                                      readOnly={isReadOnly}
+                                      onFocus={e => e.target.select()}
+                                      onChange={e => sf({ s_mi: e.target.value })} />
+                                    <span>분부터</span>
+                                  </div>
                                 </td>
-                                <td style={{ borderLeft:bdr, textAlign:"center", fontWeight:"bold", fontSize:"10pt", verticalAlign:"middle", padding:"1.5mm 2mm", color:"#1d4ed8" }}>
-                                  {ot.display}
+                                <td style={{ borderLeft: bdr, textAlign: "center", fontWeight: "bold", fontSize: "10pt", verticalAlign: "middle", padding: "1.5mm 2mm" }}>
+                                  {otResult
+                                    ? <span style={{ color: "#1d4ed8" }}>{otResult.display}</span>
+                                    : <span className="ot-print-hide" style={{ color: "#aaa" }}>—— HR</span>}
                                 </td>
                               </tr>
+                              {/* 종료 행 */}
                               <tr>
-                                <td style={{ borderRight:bdr, textAlign:"center", fontSize:"9pt", fontWeight:"bold", padding:"1.5mm 0", verticalAlign:"middle" }}>종 료</td>
-                                <td style={{ padding:"1.5mm 3mm", verticalAlign:"middle" }}>
-                                  <span style={{ fontSize:"10pt", fontFamily:"'Malgun Gothic','맑은 고딕',sans-serif" }}>
-                                    20{e_yr}년 {e_mo}월 {e_dy}일(
-                                    <span style={{ fontWeight:"bold", color:"#1d4ed8" }}>{eDow}</span>
-                                    요일) {e_hr}시 {e_mi}분까지
-                                  </span>
+                                <td style={{ borderRight: bdr, textAlign: "center", fontSize: "9pt", fontWeight: "bold", padding: "1.5mm 0", verticalAlign: "middle" }}>종 료</td>
+                                <td style={{ padding: "1.5mm 3mm", verticalAlign: "middle" }}>
+                                  <div style={{ display: "flex", alignItems: "center", flexWrap: "nowrap", gap: "0.8mm", fontSize: "10pt" }}>
+                                    <span>20</span>
+                                    <input style={{ ...iPart, width: "7mm" }} maxLength={2} value={f.e_yr} placeholder="YY"
+                                      readOnly={isReadOnly}
+                                      onFocus={e => e.target.select()}
+                                      onChange={e => sf({ e_yr: e.target.value })} />
+                                    <span>년</span>
+                                    <input style={{ ...iPart, width: "7mm" }} maxLength={2} value={f.e_mo} placeholder="MM"
+                                      readOnly={isReadOnly}
+                                      onFocus={e => e.target.select()}
+                                      onChange={e => sf({ e_mo: e.target.value })} />
+                                    <span>월</span>
+                                    <input style={{ ...iPart, width: "7mm" }} maxLength={2} value={f.e_dy} placeholder="DD"
+                                      readOnly={isReadOnly}
+                                      onFocus={e => e.target.select()}
+                                      onChange={e => sf({ e_dy: e.target.value })} />
+                                    <span>일(</span>
+                                    {endDow
+                                      ? <span style={{ width: "5mm", textAlign: "center", fontWeight: "bold", color: "#1d4ed8" }}>{endDow}</span>
+                                      : <span className="ot-print-hide" style={{ width: "5mm", textAlign: "center", fontWeight: "bold", color: "#1d4ed8" }}>??</span>}
+                                    <span>요일)</span>
+                                    <input style={{ ...iPart, width: "7mm" }} maxLength={2} value={f.e_hr} placeholder="HH"
+                                      readOnly={isReadOnly}
+                                      onFocus={e => e.target.select()}
+                                      onChange={e => sf({ e_hr: e.target.value })} />
+                                    <span>시</span>
+                                    <input style={{ ...iPart, width: "7mm" }} maxLength={2} value={f.e_mi} placeholder="MM"
+                                      readOnly={isReadOnly}
+                                      onFocus={e => e.target.select()}
+                                      onChange={e => sf({ e_mi: e.target.value })} />
+                                    <span>분까지</span>
+                                  </div>
                                 </td>
-                                <td style={{ borderLeft:bdr, padding:"1.5mm 2mm", verticalAlign:"middle", fontSize:"9pt", color:"#444" }}>
-                                  {detail.note ?? ""}
+                                <td style={{ borderLeft: bdr, padding: "1.5mm 2mm", verticalAlign: "middle" }}>
+                                  <input
+                                    style={{ ...iCell, fontSize: "9pt" }}
+                                    value={f.note}
+                                    readOnly={isReadOnly}
+                                    onChange={e => sf({ note: e.target.value })}
+                                  />
                                 </td>
                               </tr>
                             </tbody>
@@ -541,202 +1084,359 @@ export default function OvertimeLedgerClient() {
                         </td>
                       </tr>
 
-                      {/* 작업자명 + 비고 */}
-                      <tr style={{ borderBottom: bdr }}>
-                        <td data-label="true" style={{ ...labelCell, padding:0, verticalAlign:"top" }}>
-                          <div style={{ height:"9mm", display:"flex", alignItems:"center", justifyContent:"center", borderBottom: bdr }}>작업자명</div>
-                          <div style={{ height:"8mm", display:"flex", alignItems:"center", justifyContent:"center" }}>비 고</div>
-                        </td>
-                        <td colSpan={3} style={{ padding:0, verticalAlign:"top" }}>
-                          <table style={{ width:"100%", borderCollapse:"collapse", height:"100%" }}>
-                            <tbody>
-                              <tr style={{ borderBottom: bdr }}>
-                                {workers.map((w, i) => (
-                                  <td key={i} style={{ borderLeft: i === 0 ? "none" : bdr, width:"10%", height:"9mm", textAlign:"center", verticalAlign:"middle", fontSize:"8.5pt", padding:"0.5mm", overflow:"hidden" }}>
-                                    {w}
-                                  </td>
-                                ))}
-                              </tr>
-                              <tr>
-                                {workerNotes.map((n, i) => (
-                                  <td key={i} style={{ borderLeft: i === 0 ? "none" : bdr, width:"10%", height:"8mm", textAlign:"center", verticalAlign:"middle", fontSize:"8.5pt", padding:"1mm 0.5mm", overflow:"hidden" }}>
-                                    {n}
-                                  </td>
-                                ))}
-                              </tr>
-                            </tbody>
-                          </table>
-                        </td>
-                      </tr>
+                      {/* 작업자명 + 비고 — 10명씩 행 반복 */}
+                      {Array.from({ length: Math.ceil(f.workers.length / 10) }).map((_, rowIdx) => {
+                        const start = rowIdx * 10;
+                        const isLast = rowIdx === Math.ceil(f.workers.length / 10) - 1;
+                        return (
+                          <tr key={rowIdx} style={{ borderBottom: bdr }}>
+                            <td data-label="true" style={{ ...labelCell, padding: 0, verticalAlign: "top" }}>
+                              <div style={{ height: "9mm", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: bdr }}>작업자명</div>
+                              <div style={{ height: "11.44mm", display: "flex", alignItems: "center", justifyContent: "center" }}>비 고</div>
+                            </td>
+                            <td colSpan={3} style={{ padding: 0, verticalAlign: "top", overflow: "visible" }}>
+                              <div style={{ position: "relative" }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse", height: "100%" }}>
+                                  <tbody>
+                                    <tr style={{ borderBottom: bdr }}>
+                                      {f.workers.slice(start, start + 10).map((w, i) => (
+                                        <td key={i} style={{
+                                          borderLeft: i === 0 ? "none" : bdr, width: "10%", height: "9mm",
+                                          textAlign: "center", verticalAlign: "middle", overflow: "visible",
+                                          padding: "0.5mm 0.5mm",
+                                        }}>
+                                          {isReadOnly ? (
+                                            <span style={{ ...iCell, textAlign: "center", padding: "0", fontSize: "8.5pt" }}>{w}</span>
+                                          ) : (
+                                            <WorkerSearchInput
+                                              value={w}
+                                              placeholder={`작업자${start + i + 1}`}
+                                              accounts={activeAccounts}
+                                              cellStyle={{ ...iCell, textAlign: "center", padding: "0", fontSize: "8.5pt", width: "100%" }}
+                                              onChange={v => {
+                                                if (v && f.workers.some((existing, j) => j !== start + i && existing === v)) {
+                                                  alert(`'${v}'은(는) 이미 등록된 작업자입니다.`); return;
+                                                }
+                                                const ws = [...f.workers]; ws[start + i] = v; sf({ workers: ws });
+                                              }}
+                                            />
+                                          )}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                    <tr>
+                                      {f.worker_notes.slice(start, start + 10).map((n, i) => (
+                                        <td key={i} style={{
+                                          borderLeft: i === 0 ? "none" : bdr, width: "10%", height: "11.44mm",
+                                          textAlign: "center", verticalAlign: "middle",
+                                          padding: "1mm 0.5mm",
+                                        }}>
+                                          <input
+                                            style={{ ...iCell, textAlign: "center", padding: "0", fontSize: "8.5pt" }}
+                                            value={n}
+                                            readOnly={isReadOnly}
+                                            onChange={e => { const ns = [...f.worker_notes]; ns[start + i] = e.target.value; sf({ worker_notes: ns }); }}
+                                          />
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  </tbody>
+                                </table>
+                                {!isReadOnly && isLast && (
+                                  <div
+                                    className="ot-print-hide"
+                                    style={{ position: "absolute", top: 0, left: "100%", marginLeft: "2mm", display: "flex", flexDirection: "column", gap: "1mm" }}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => sf({ workers: [...f.workers, ...Array(10).fill("")], worker_notes: [...f.worker_notes, ...Array(10).fill("")] })}
+                                      style={{ height: "9mm", fontSize: "8pt", padding: "0 2mm", cursor: "pointer", border: "1px solid #aaa", borderRadius: "2px", background: "#f9f9f9", whiteSpace: "nowrap" }}
+                                    >
+                                      + 추가
+                                    </button>
+                                    {f.workers.length > 10 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => sf({ workers: f.workers.slice(0, -10), worker_notes: f.worker_notes.slice(0, -10) })}
+                                        style={{ height: "11.44mm", fontSize: "8pt", padding: "0 2mm", cursor: "pointer", border: "1px solid #f99", borderRadius: "2px", background: "#fff5f5", whiteSpace: "nowrap", color: "#c00" }}
+                                      >
+                                        - 삭제
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
 
                       {/* 작성자 / 작성일자 */}
                       <tr>
-                        <td data-label="true" style={{ ...labelCell, borderBottom:"none", height:"9mm" }}>작 성 자</td>
-                        <td style={{ borderRight: bdr, padding:"0 3mm", verticalAlign:"middle", fontWeight:"bold" }}>
-                          {author?.username ?? ""}
+                        <td data-label="true" style={{ ...labelCell, borderBottom: "none", height: "9mm" }}>작 성 자</td>
+                        <td style={{ borderRight: bdr, padding: "0 3mm", verticalAlign: "middle", fontWeight: "bold" }}>
+                          {editingReport
+                            ? (accounts.find(a => a.id === editingReport.author_id)?.username ?? "")
+                            : (authorAcc?.username ?? user?.name ?? "")}
                         </td>
-                        <td data-label="true" style={{ ...labelCell, borderBottom:"none" }}>작성일자</td>
-                        <td style={{ padding:"0 3mm", verticalAlign:"middle", color:"#444" }}>
-                          {s.toLocaleDateString("ko-KR")}
-                        </td>
+                        <td data-label="true" style={{ ...labelCell, borderBottom: "none" }}>작성일자</td>
+                        <td style={{ padding: "0 3mm", verticalAlign: "middle", color: "#444" }}>{todayStr}</td>
                       </tr>
 
                     </tbody>
                   </table>
 
                   {/* ── 작업내용 ── */}
-                  <div style={{ border: bdr, borderTop:"none", padding:"2mm 3mm", flex:1, minHeight:"74mm" }}>
-                    <div style={{ fontSize:"9pt", fontWeight:"bold", marginBottom:"1mm" }}>
+                  <div style={{ border: bdr, borderTop: "none", padding: "2mm 3mm", flex: 1, display: "flex", flexDirection: "column" }}>
+                    <div style={{ fontSize: "9pt", fontWeight: "bold", marginBottom: "1mm", flexShrink: 0 }}>
                       ※ 작업내용(점검 및 수리 경우 호기별 기록)
                     </div>
-                    <div style={{ fontSize:"10pt", fontFamily:"'Malgun Gothic','맑은 고딕',sans-serif", whiteSpace:"pre-wrap", lineHeight:1.5 }}>
-                      {detail.work_content ?? ""}
-                    </div>
+                    <textarea style={{ ...iTArea, flex: "1 1 0", minHeight: "60mm" }} value={f.work_content}
+                      readOnly={isReadOnly}
+                      onChange={e => sf({ work_content: e.target.value })} placeholder="작업내용을 입력하세요…" />
                   </div>
 
                   {/* ── 작업결과 ── */}
-                  <div style={{ border: bdr, borderTop:"none", padding:"2mm 3mm", minHeight:"44mm" }}>
-                    <div style={{ fontSize:"9pt", fontWeight:"bold", marginBottom:"1mm" }}>※ 작업결과</div>
-                    <div style={{ fontSize:"10pt", fontFamily:"'Malgun Gothic','맑은 고딕',sans-serif", whiteSpace:"pre-wrap", lineHeight:1.5 }}>
-                      {detail.work_result ?? ""}
-                    </div>
+                  <div style={{ border: bdr, borderTop: "none", padding: "2mm 3mm", display: "flex", flexDirection: "column", height: "44mm" }}>
+                    <div style={{ fontSize: "9pt", fontWeight: "bold", marginBottom: "1mm", flexShrink: 0 }}>※ 작업결과</div>
+                    <textarea style={{ ...iTArea, flex: "1 1 0" }} value={f.work_result}
+                      readOnly={isReadOnly}
+                      onChange={e => sf({ work_result: e.target.value })} placeholder="작업결과를 입력하세요…" />
                   </div>
 
                   {/* ── 회사명 ── */}
-                  <div style={{ textAlign:"right", marginTop:"2mm", fontSize:"10pt", fontWeight:"bold", color:"#333" }}>
+                  <div style={{ textAlign: "right", marginTop: "2mm", fontSize: "10pt", fontWeight: "bold", color: "#333", flexShrink: 0 }}>
                     주식회사 대솔E/L
                   </div>
 
-                </div>
+                </div>{/* /ot-print-doc */}
               </div>
-            </div>
+            </div>{/* /overflow-x-auto */}
           </>
-        );
-      })()}
+        )}
 
-      {/* 수정 모달 (관리자) */}
-      {editingRow && editForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-            {/* 헤더 */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
-              <span className="font-bold text-sm">잔업보고서 수정 — {editingRow.report_no}</span>
-              <button onClick={() => { setEditingRow(null); setEditForm(null); }}
-                className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        {/* ════════════════════════════════
+            목록 뷰
+        ════════════════════════════════ */}
+        {editingId === null && (
+          <div className="flex flex-col h-full">
+            {/* 필터 바 */}
+            <div className="print:hidden flex flex-wrap items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0">
+              <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">기간</span>
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400" />
+              <span className="text-xs text-gray-400">~</span>
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400" />
+              <button onClick={() => {
+                const d = new Date();
+                setDateFrom(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`);
+                setDateTo(d.toISOString().slice(0, 10));
+              }} className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap">이번달</button>
+              <button onClick={() => {
+                const d = new Date();
+                setDateFrom(`${d.getFullYear()}-01-01`);
+                setDateTo(d.toISOString().slice(0, 10));
+              }} className="text-xs text-gray-500 dark:text-gray-400 hover:underline whitespace-nowrap">올해</button>
+              <button onClick={() => { setDateFrom(""); setDateTo(""); }}
+                className="text-xs text-gray-400 dark:text-gray-500 hover:underline whitespace-nowrap">전체</button>
+              <div className="w-px h-4 bg-gray-200 dark:bg-gray-600" />
+              <input type="text" value={listQuery} onChange={e => setListQuery(e.target.value)}
+                placeholder="현장명 / 보고서번호 / 작성자 / 작업지시자"
+                className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400 w-52" />
             </div>
 
-            {/* 폼 */}
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 text-sm">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">현장명</label>
-                  <input className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
-                    value={editForm.site_name} onChange={e => ef({ site_name: e.target.value })} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">작업지시자</label>
-                  <input className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
-                    value={editForm.work_instructor} onChange={e => ef({ work_instructor: e.target.value })} />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">작업사유</label>
-                <div className="flex flex-wrap gap-2">
-                  {WORK_REASONS.map(r => (
-                    <label key={r} className="flex items-center gap-1.5 px-3 py-1.5 border rounded-lg cursor-pointer text-xs select-none"
-                      style={{ borderColor: editForm.work_reasons.includes(r) ? "#2563eb" : "#d1d5db", background: editForm.work_reasons.includes(r) ? "#eff6ff" : "white", color: editForm.work_reasons.includes(r) ? "#1d4ed8" : "#374151" }}>
-                      <input type="checkbox" className="hidden" checked={editForm.work_reasons.includes(r)}
-                        onChange={e => ef({ work_reasons: e.target.checked ? [...editForm.work_reasons, r] : editForm.work_reasons.filter(x => x !== r) })} />
-                      {r}
-                    </label>
-                  ))}
-                </div>
-                {editForm.work_reasons.includes("기타") && (
-                  <input className="mt-2 w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
-                    value={editForm.work_reason_etc} onChange={e => ef({ work_reason_etc: e.target.value })} placeholder="기타 내용" />
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">작업호기</label>
-                <input className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
-                  value={editForm.work_elevator} onChange={e => ef({ work_elevator: e.target.value })} placeholder="예: 1호기, 2·3호기" />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">시작일시</label>
-                  <input type="datetime-local"
-                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
-                    value={editForm.start_at} onChange={e => ef({ start_at: e.target.value })} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">종료일시</label>
-                  <input type="datetime-local"
-                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
-                    value={editForm.end_at} onChange={e => ef({ end_at: e.target.value })} />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">작업자 / 비고</label>
-                <div className="space-y-1.5">
-                  {editForm.workers.map((w, i) => (
-                    <div key={i} className="flex gap-2 items-center">
-                      <span className="text-xs text-gray-400 w-14 shrink-0">작업자{i + 1}</span>
-                      <input className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
-                        value={w} placeholder={`작업자${i + 1}`}
-                        onChange={e => { const ws = [...editForm.workers]; ws[i] = e.target.value; ef({ workers: ws }); }} />
-                      <input className="w-28 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
-                        value={editForm.worker_notes[i]} placeholder="비고"
-                        onChange={e => { const ns = [...editForm.worker_notes]; ns[i] = e.target.value; ef({ worker_notes: ns }); }} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">작업내용</label>
-                <textarea rows={4}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm resize-none bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
-                  value={editForm.work_content} onChange={e => ef({ work_content: e.target.value })} />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">작업결과</label>
-                <textarea rows={3}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm resize-none bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
-                  value={editForm.work_result} onChange={e => ef({ work_result: e.target.value })} />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">잔업승인자</label>
-                  <select className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
-                    value={editForm.approver_id ?? ""}
-                    onChange={e => ef({ approver_id: e.target.value ? Number(e.target.value) : null })}>
-                    <option value="">— 선택 —</option>
-                    {accounts.map(a => <option key={a.id} value={a.id}>{a.username}{a.dept ? ` (${a.dept})` : ""}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">메모</label>
-                  <input className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
-                    value={editForm.note} onChange={e => ef({ note: e.target.value })} />
-                </div>
-              </div>
+            {/* 상태 탭 */}
+            <div className="print:hidden flex items-center gap-1 px-4 py-2 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0 overflow-x-auto">
+              {STATUS_TABS.map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setStatusFilter(tab.key)}
+                  className={`shrink-0 px-3 py-1.5 text-xs rounded-full font-medium transition-colors ${
+                    statusFilter === tab.key
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                  }`}
+                >
+                  {tab.label}
+                  <span className="ml-1 opacity-70">({statusCounts[tab.key]})</span>
+                </button>
+              ))}
             </div>
 
-            {/* 푸터 */}
-            <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-200 dark:border-gray-700 shrink-0">
-              <button onClick={() => { setEditingRow(null); setEditForm(null); }}
-                className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg font-medium">
-                취소
+            {/* 승인완료 합계 바 */}
+            {statusFilter === "approved" && approvedFiltered.length > 0 && (
+              <div className="flex gap-4 px-4 py-2 bg-blue-50 dark:bg-blue-950/20 border-b border-blue-100 dark:border-blue-900 text-xs shrink-0">
+                <span>총 근무: <b className="text-blue-700 dark:text-blue-300">{fmt(totalWork)}</b></span>
+                <span>휴일근무: <b className="text-orange-600 dark:text-orange-300">{fmt(totalHoliday)}</b></span>
+                <span>잔업: <b className="text-purple-600 dark:text-purple-300">{fmt(totalOvertime)}</b></span>
+              </div>
+            )}
+
+            {/* 목록 테이블 */}
+            <div className="flex-1 overflow-auto p-4">
+              {filtered.length === 0 ? (
+                <div className="text-center text-sm text-gray-400 py-16">
+                  {reports.length === 0 ? "등록된 잔업보고서가 없습니다." : "검색 결과가 없습니다."}
+                </div>
+              ) : (
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 uppercase text-[11px]">
+                      <tr>
+                        <th className="px-3 py-2 text-left">보고서번호</th>
+                        <th className="px-3 py-2 text-left">현장명</th>
+                        <th className="px-3 py-2 text-left">작업일시</th>
+                        <th className="px-3 py-2 text-center">휴일</th>
+                        <th className="px-3 py-2 text-center">근무H</th>
+                        <th className="px-3 py-2 text-center">잔업H</th>
+                        <th className="px-3 py-2 text-left">상태</th>
+                        {isManager && <th className="px-3 py-2 text-left">작성자</th>}
+                        <th className="px-3 py-2 text-center">작업</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                      {filtered.map(r => {
+                        const s = new Date(r.start_at);
+                        const e = new Date(r.end_at);
+                        const author = accounts.find(a => a.id === r.author_id);
+                        return (
+                          <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                            <td className="px-3 py-2 font-mono text-gray-500">{r.report_no}</td>
+                            <td className="px-3 py-2 font-medium">{r.site_name}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              <div>{s.toLocaleDateString("ko-KR")}</div>
+                              <div className="text-gray-400">
+                                {s.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+                                {" ~ "}
+                                {e.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              {r.is_holiday
+                                ? <span className="text-orange-500 font-medium">{r.holiday_type ?? "휴일"}</span>
+                                : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                            </td>
+                            <td className="px-3 py-2 text-center font-medium text-blue-600 dark:text-blue-400">
+                              {r.work_hours != null ? fmt(r.work_hours) : "-"}
+                            </td>
+                            <td className="px-3 py-2 text-center font-medium text-purple-600 dark:text-purple-400">
+                              {r.overtime_hours != null ? fmt(r.overtime_hours) : "-"}
+                            </td>
+                            <td className="px-3 py-2">
+                              <StatusBadge status={r.approval_status} />
+                              {r.approval_status === "rejected" && r.reject_reason && (
+                                <div className="mt-0.5 text-[10px] text-red-500 max-w-[120px] truncate" title={r.reject_reason}>
+                                  {r.reject_reason}
+                                </div>
+                              )}
+                            </td>
+                            {isManager && (
+                              <td className="px-3 py-2">{author?.username ?? "-"}</td>
+                            )}
+                            <td className="px-3 py-2">
+                              <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                {canEdit(r) ? (
+                                  <button onClick={() => openEdit(r)}
+                                    className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded">
+                                    수정
+                                  </button>
+                                ) : (
+                                  <button onClick={() => openEdit(r)}
+                                    className="px-2 py-1 text-xs text-blue-600 hover:underline dark:text-blue-400">
+                                    내용 확인
+                                  </button>
+                                )}
+                                <button onClick={() => openEdit(r, true)}
+                                  className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded">
+                                  인쇄
+                                </button>
+                                {canApprove(r) && (
+                                  <>
+                                    <button onClick={() => approve(r)}
+                                      className="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded">
+                                      승인
+                                    </button>
+                                    <button onClick={() => { setRejectModal({ id: r.id, reportNo: r.report_no }); setRejectReason(""); }}
+                                      className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded">
+                                      반려
+                                    </button>
+                                  </>
+                                )}
+                                {canDelete(r) && (
+                                  <button onClick={() => deleteReport(r.id, r.report_no)}
+                                    className="px-2 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 rounded">
+                                    삭제
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+      </div>{/* /ot-scroll-wrap */}
+
+      {/* ── 반려 모달 ── */}
+      {rejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-5 w-80">
+            <h3 className="text-sm font-bold mb-2">반려 사유 입력</h3>
+            <p className="text-xs text-gray-400 mb-2">{rejectModal.reportNo}</p>
+            <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)}
+              rows={4} placeholder="반려 사유를 입력하세요"
+              className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs bg-white focus:outline-none resize-none" />
+            <div className="flex gap-2 mt-3">
+              <button onClick={reject} className="flex-1 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded font-medium">반려 처리</button>
+              <button onClick={() => setRejectModal(null)} className="flex-1 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded">취소</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 서명 모달 ── */}
+      {signModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-5 w-[340px]">
+            <h3 className="text-sm font-bold mb-1">잔업보고서 승인 — 서명 입력</h3>
+            <p className="text-xs text-gray-400 mb-3">{signModal.report_no} · 아래 영역에 서명해주세요</p>
+            {(() => {
+              const mySig = accounts.find(a => a.id === user?.id)?.signature_url;
+              if (!mySig) return null;
+              return (
+                <button onClick={approveWithRegisteredSignature}
+                  className="w-full mb-3 py-2 text-xs bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-lg border border-blue-200 dark:border-blue-700 font-semibold">
+                  등록된 서명으로 바로 승인
+                </button>
+              );
+            })()}
+            <div className="relative border-2 border-gray-300 rounded-lg overflow-hidden bg-white"
+              style={{ touchAction: "none" }}>
+              <canvas ref={signCanvasRef} width={600} height={220}
+                style={{ width: "100%", height: "110px", display: "block", cursor: "crosshair" }}
+                onMouseDown={signStart} onMouseMove={signMove} onMouseUp={signEnd} onMouseLeave={signEnd}
+                onTouchStart={signStart} onTouchMove={signMove} onTouchEnd={signEnd} />
+              <span className="absolute bottom-1 right-2 text-[10px] text-gray-300 pointer-events-none select-none">서명란</span>
+            </div>
+            <div className="flex gap-2 mt-3">
+              <button onClick={signClear}
+                className="px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded border border-gray-300">
+                지우기
               </button>
-              <button onClick={saveEdit} disabled={editSaving}
-                className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50">
-                {editSaving ? "저장중…" : "저장"}
+              <button onClick={confirmApprove}
+                className="flex-1 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium">
+                승인 완료
+              </button>
+              <button onClick={() => setSignModal(null)}
+                className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded">
+                취소
               </button>
             </div>
           </div>
@@ -745,3 +1445,6 @@ export default function OvertimeLedgerClient() {
     </div>
   );
 }
+
+// toLocalDTInput 유지 (외부 참조 대비)
+export { toLocalDTInput };

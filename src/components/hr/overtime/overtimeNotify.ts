@@ -1,6 +1,5 @@
 import { insertNotification } from "@/lib/notify";
 
-const REPORT_HREF = "/hr/overtime-report";
 const LEDGER_HREF = "/hr/overtime-ledger";
 
 /** 승인 요청 알림 → 승인자에게 */
@@ -37,7 +36,7 @@ export async function notifyOvertimeApproved(params: {
     type:    "overtime_approved",
     title:   `잔업보고서 승인 완료 — ${reportNo}`,
     message: `${approverName}님이 승인하였습니다.`,
-    link:    REPORT_HREF,
+    link:    LEDGER_HREF,
     refType: "overtime_report",
     refId:   reportId,
   });
@@ -57,7 +56,7 @@ export async function notifyOvertimeRejected(params: {
     type:    "overtime_rejected",
     title:   `잔업보고서 반려 — ${reportNo}`,
     message: `${approverName}님이 반려하였습니다. 사유: ${reason}`,
-    link:    REPORT_HREF,
+    link:    LEDGER_HREF,
     refType: "overtime_report",
     refId:   reportId,
   });
