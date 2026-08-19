@@ -103,22 +103,39 @@ export default function OvertimeLedgerClient() {
 
   const load = useCallback(async () => {
     if (!user) return;
-    const PAGE = 500;
-    const all: OTRow[] = [];
-    for (let off = 0; ; off += PAGE) {
-      let q = supabase
-        .from("overtime_reports")
-        .select("*")
-        .eq("approval_status", "approved")
-        .order("approved_at", { ascending: false })
-        .range(off, off + PAGE - 1);
-      if (!isManager) q = q.eq("author_id", user.id);
-      const { data } = await q;
-      const batch = (data as OTRow[] | null) ?? [];
-      all.push(...batch);
-      if (batch.length < PAGE) break;
+    if (isManager) {
+      // 관리자: 전체 승인 목록
+      const PAGE = 500;
+      const all: OTRow[] = [];
+      for (let off = 0; ; off += PAGE) {
+        const { data } = await supabase
+          .from("overtime_reports")
+          .select("*")
+          .eq("approval_status", "approved")
+          .order("approved_at", { ascending: false })
+          .range(off, off + PAGE - 1);
+        const batch = (data as OTRow[] | null) ?? [];
+        all.push(...batch);
+        if (batch.length < PAGE) break;
+      }
+      setRows(all);
+    } else {
+      // 일반 사용자: 작성자이거나 승인자인 승인 완료 레코드 (or() 묵시적 실패 방지 → 두 쿼리 병렬)
+      const [{ data: asAuthor }, { data: asApprover }] = await Promise.all([
+        supabase.from("overtime_reports").select("*")
+          .eq("approval_status", "approved").eq("author_id", user.id)
+          .order("approved_at", { ascending: false }),
+        supabase.from("overtime_reports").select("*")
+          .eq("approval_status", "approved").eq("approver_id", user.id)
+          .order("approved_at", { ascending: false }),
+      ]);
+      const merged = [...(asAuthor ?? []), ...(asApprover ?? [])];
+      const seen = new Set<number>();
+      const unique = (merged as OTRow[])
+        .filter(r => { if (seen.has(r.id)) return false; seen.add(r.id); return true; })
+        .sort((a, b) => new Date(b.approved_at ?? b.start_at).getTime() - new Date(a.approved_at ?? a.start_at).getTime());
+      setRows(unique);
     }
-    setRows(all);
   }, [user, isManager]);
 
   useEffect(() => {
