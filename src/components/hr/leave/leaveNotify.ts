@@ -1,6 +1,6 @@
 import { insertNotification } from "@/lib/notify";
 
-const LEAVE_HREF  = "/hr/leave";
+const LEAVE_HREF  = "/hr/leave-ledger";
 
 /** 승인 요청 알림 → 승인자에게 (링크: 년차계 목록 — 승인/반려 버튼 있는 페이지) */
 export async function notifyLeaveApprovalRequest(params: {

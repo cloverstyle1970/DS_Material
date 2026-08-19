@@ -1,312 +1,647 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useReloadOnActivate } from "@/context/TabActivationContext";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
+import { useReloadOnActivate, useTabIsActive } from "@/context/TabActivationContext";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { notifyLeaveApprovalRequest, notifyLeaveApproved, notifyLeaveRejected } from "./leaveNotify";
 
 export const LR_LEDGER_MENU_HREF = "/hr/leave-ledger";
 
 const LEAVE_TYPES = ["조퇴", "결근", "경조", "연차", "훈련", "교육", "휴가"] as const;
-const bdr = "1px solid #444";
+type LeaveType = typeof LEAVE_TYPES[number];
 
-interface Account { id: number; username: string; dept: string | null; signature_url: string | null; }
-interface LeaveRow {
-  id: number; request_no: string; author_id: number; leave_type: string;
-  s_yr: string|null; s_mo: string|null; s_dy: string|null; s_hr: string|null; s_mi: string|null;
-  e_yr: string|null; e_mo: string|null; e_dy: string|null; e_hr: string|null; e_mi: string|null;
-  duration_days: number|null; reason: string|null;
-  sub_yr: string|null; sub_mo: string|null; sub_dy: string|null;
-  approver_id: number|null; approval_status: string;
-  approver_signature: string|null; author_signature: string|null;
-  approved_at: string|null; submitted_at: string|null; created_at: string;
+interface Account {
+  id: number;
+  username: string;
+  dept: string | null;
+  team: string | null;
+  status: string | null;
+  signature_url: string | null;
+}
+interface LeaveRequest {
+  id: number;
+  request_no: string;
+  author_id: number;
+  leave_type: string;
+  s_yr: string | null; s_mo: string | null; s_dy: string | null; s_hr: string | null; s_mi: string | null;
+  e_yr: string | null; e_mo: string | null; e_dy: string | null; e_hr: string | null; e_mi: string | null;
+  duration_days: number | null;
+  reason: string | null;
+  sub_yr: string | null; sub_mo: string | null; sub_dy: string | null;
+  approver_id: number | null;
+  approval_status: string;
+  approver_signature: string | null;
+  author_signature: string | null;
+  submitted_at: string | null;
+  approved_at: string | null;
+  rejected_at: string | null;
+  reject_reason: string | null;
+  created_at: string;
+}
+interface FormState {
+  leave_type: LeaveType;
+  s_yr: string; s_mo: string; s_dy: string; s_hr: string; s_mi: string;
+  e_yr: string; e_mo: string; e_dy: string; e_hr: string; e_mi: string;
+  duration_days: string;
+  reason: string;
+  sub_yr: string; sub_mo: string; sub_dy: string;
+  approver_id: number | null;
 }
 
-function dowKr(yr: string|null, mo: string|null, dy: string|null) {
+function makeEmptyForm(): FormState {
+  const n = new Date();
+  const yr = String(n.getFullYear()).slice(2);
+  const mo = String(n.getMonth() + 1).padStart(2, "0");
+  const dy = String(n.getDate()).padStart(2, "0");
+  return {
+    leave_type: "연차",
+    s_yr: yr, s_mo: mo, s_dy: dy, s_hr: "", s_mi: "",
+    e_yr: yr, e_mo: mo, e_dy: dy, e_hr: "", e_mi: "",
+    duration_days: "",
+    reason: "",
+    sub_yr: yr, sub_mo: mo, sub_dy: dy,
+    approver_id: null,
+  };
+}
+
+function recordToForm(r: LeaveRequest): FormState {
+  return {
+    leave_type: (LEAVE_TYPES.includes(r.leave_type as LeaveType) ? r.leave_type : "연차") as LeaveType,
+    s_yr: r.s_yr ?? "", s_mo: r.s_mo ?? "", s_dy: r.s_dy ?? "", s_hr: r.s_hr ?? "", s_mi: r.s_mi ?? "",
+    e_yr: r.e_yr ?? "", e_mo: r.e_mo ?? "", e_dy: r.e_dy ?? "", e_hr: r.e_hr ?? "", e_mi: r.e_mi ?? "",
+    duration_days: r.duration_days != null ? String(r.duration_days) : "",
+    reason: r.reason ?? "",
+    sub_yr: r.sub_yr ?? "", sub_mo: r.sub_mo ?? "", sub_dy: r.sub_dy ?? "",
+    approver_id: r.approver_id,
+  };
+}
+
+function dowKr(yr: string, mo: string, dy: string) {
   if (!yr || !mo || !dy) return "";
-  const d = new Date(`20${yr.padStart(2,"0")}-${mo.padStart(2,"0")}-${dy.padStart(2,"0")}`);
-  return isNaN(d.getTime()) ? "" : ["일","월","화","수","목","금","토"][d.getDay()];
+  const d = new Date(`20${yr.padStart(2, "0")}-${mo.padStart(2, "0")}-${dy.padStart(2, "0")}`);
+  if (isNaN(d.getTime())) return "";
+  return ["일", "월", "화", "수", "목", "금", "토"][d.getDay()];
 }
-function periodStr(r: LeaveRow) {
-  if (!r.s_yr) return "—";
-  const s = `20${r.s_yr}/${r.s_mo}/${r.s_dy}`;
-  if (!r.e_yr || (r.s_yr===r.e_yr && r.s_mo===r.e_mo && r.s_dy===r.e_dy)) return s;
-  return `${s} ~ 20${r.e_yr}/${r.e_mo}/${r.e_dy}`;
+
+const WORK_HOURS_PER_DAY = 9;
+
+function calcDurationDays(
+  sYr: string, sMo: string, sDy: string, sHr: string, sMi: string,
+  eYr: string, eMo: string, eDy: string, eHr: string, eMi: string,
+): string {
+  if (!sYr || !sMo || !sDy || !eYr || !eMo || !eDy) return "";
+  const pad = (v: string) => v.padStart(2, "0");
+  const sDateStr = `20${pad(sYr)}-${pad(sMo)}-${pad(sDy)}`;
+  const eDateStr = `20${pad(eYr)}-${pad(eMo)}-${pad(eDy)}`;
+
+  if (sHr && sMi && eHr && eMi) {
+    const sMs = new Date(`${sDateStr}T${pad(sHr)}:${pad(sMi)}`).getTime();
+    const eMs = new Date(`${eDateStr}T${pad(eHr)}:${pad(eMi)}`).getTime();
+    if (isNaN(sMs) || isNaN(eMs) || eMs < sMs) return "";
+    const diffHours = (eMs - sMs) / (1000 * 60 * 60);
+    const days = Math.round((diffHours / WORK_HOURS_PER_DAY) * 2) / 2;
+    return days % 1 === 0 ? String(days) : days.toFixed(1);
+  }
+
+  const sMs = new Date(sDateStr).getTime();
+  const eMs = new Date(eDateStr).getTime();
+  if (isNaN(sMs) || isNaN(eMs) || eMs < sMs) return "";
+  return String(Math.round((eMs - sMs) / (1000 * 60 * 60 * 24)) + 1);
 }
+
+// ── 승인자 검색 인풋 ──────────────────────────────────────────
+function AccountSearchInput({ accountId, onSelect, accounts, placeholder, style, className }: {
+  accountId: number | null;
+  onSelect: (id: number | null) => void;
+  accounts: Account[];
+  placeholder?: string;
+  style?: React.CSSProperties;
+  className?: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [text, setText] = useState("");
+  const [open, setOpen] = useState(false);
+  const [dropRect, setDropRect] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    const acc = accounts.find(a => a.id === accountId);
+    setText(acc?.username ?? "");
+  }, [accountId, accounts]);
+
+  const suggestions = useMemo(() => {
+    const q = text.trim();
+    if (!q) return accounts.slice(0, 15);
+    return accounts.filter(a => a.username.includes(q) || (a.dept ?? "").includes(q)).slice(0, 15);
+  }, [text, accounts]);
+
+  function pick(a: Account) { onSelect(a.id); setText(a.username); setOpen(false); }
+  function updatePos() {
+    if (ref.current) {
+      const r = ref.current.getBoundingClientRect();
+      setDropRect({ top: r.bottom + 2, left: r.left });
+    }
+  }
+  function handleBlur() {
+    setTimeout(() => {
+      const q = text.trim();
+      if (!q) { onSelect(null); setOpen(false); return; }
+      const exact = accounts.find(a => a.username === q);
+      if (exact) { onSelect(exact.id); }
+      else {
+        const prev = accountId ? (accounts.find(a => a.id === accountId)?.username ?? "") : "";
+        setText(prev);
+        if (!prev) onSelect(null);
+      }
+      setOpen(false);
+    }, 150);
+  }
+
+  return (
+    <>
+      <input ref={ref} value={text}
+        onChange={e => { setText(e.target.value); if (!e.target.value) onSelect(null); }}
+        onFocus={() => { updatePos(); setOpen(true); }}
+        onBlur={handleBlur}
+        onKeyDown={e => { if (e.key === "Enter" && suggestions.length === 1) { e.preventDefault(); pick(suggestions[0]); } }}
+        placeholder={placeholder} style={style} className={className}
+      />
+      {open && dropRect && typeof document !== "undefined" && createPortal(
+        <div style={{ position: "fixed", top: dropRect.top, left: dropRect.left, minWidth: 200, zIndex: 9999, background: "white", color: "#111", border: "1px solid #bbb", borderRadius: 4, boxShadow: "0 6px 18px rgba(0,0,0,0.15)", maxHeight: 220, overflowY: "auto", fontSize: "9pt", fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif" }}>
+          {suggestions.length === 0
+            ? <div style={{ padding: "6px 10px", color: "#999" }}>검색 결과 없음</div>
+            : suggestions.map(a => (
+              <div key={a.id}
+                onMouseDown={e => { e.preventDefault(); pick(a); }}
+                style={{ padding: "5px 10px", cursor: "pointer", borderBottom: "1px solid #f0f0f0" }}
+                onMouseEnter={e => (e.currentTarget.style.background = "#eff6ff")}
+                onMouseLeave={e => (e.currentTarget.style.background = "")}>
+                {a.username}
+                {a.dept ? <span style={{ color: "#888", marginLeft: 4 }}>({a.dept})</span> : null}
+              </div>
+            ))}
+        </div>, document.body
+      )}
+    </>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const m: Record<string, [string, string]> = {
+    draft: ["작성중", "bg-gray-100 text-gray-600"],
+    pending: ["승인 요청", "bg-blue-100 text-blue-700"],
+    approved: ["승인완료", "bg-green-100 text-green-700"],
+    rejected: ["반려", "bg-red-100 text-red-600"],
+  };
+  const [label, cls] = m[status] ?? [status, "bg-gray-100 text-gray-500"];
+  return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cls}`}>{label}</span>;
+}
+
+// ── 공통 스타일 ──
+const bdr = "1px solid #444";
+const iPart: React.CSSProperties = { border: "none", borderBottom: "1px solid #444", background: "transparent", fontSize: "10pt", textAlign: "center", outline: "none", fontFamily: "inherit" };
+const iLine: React.CSSProperties = { border: "none", borderBottom: "1px solid #444", background: "transparent", fontSize: "10pt", outline: "none", fontFamily: "inherit", width: "100%" };
+
+type StatusFilter = "all" | "draft" | "pending" | "approved" | "rejected";
 
 export default function LeaveLedgerClient() {
   const { user } = useAuth();
+  const canCreate = user ? (isAdmin(user) || hasMenuPermission(user, LR_LEDGER_MENU_HREF, "create")) : false;
   const isManager = user ? (isAdmin(user) || hasMenuPermission(user, LR_LEDGER_MENU_HREF, "update")) : false;
 
-  const [rows, setRows]         = useState<LeaveRow[]>([]);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [query, setQuery]       = useState("");
-  const [typeFilter, setTypeFilter] = useState<string>("");
-  const [dateFrom, setDateFrom] = useState(() => `${new Date().getFullYear()}-01-01`);
-  const [dateTo, setDateTo]     = useState(() => `${new Date().getFullYear()}-12-31`);
-  const [detail, setDetail]     = useState<LeaveRow|null>(null);
-  const [editModal, setEditModal] = useState<LeaveRow|null>(null);
-  const [editForm, setEditForm]   = useState<Partial<LeaveRow>>({});
-  const [editSaving, setEditSaving] = useState(false);
+  const [accounts, setAccounts]   = useState<Account[]>([]);
+  const [records, setRecords]     = useState<LeaveRequest[]>([]);
+  const [editingId, setEditingId] = useState<number | "new" | null>(null);
+  const [form, setForm]           = useState<FormState>(makeEmptyForm());
+  const [saving, setSaving]       = useState(false);
+  const [printPending, setPrintPending]     = useState(false);
+  const [rejectModal, setRejectModal]       = useState<{ id: number; no: string } | null>(null);
+  const [rejectReason, setRejectReason]     = useState("");
+  const [signModal, setSignModal]           = useState<LeaveRequest | null>(null);
+  const [authorSignPending, setAuthorSignPending] = useState(false);
+  const signCanvasRef = useRef<HTMLCanvasElement>(null);
+  const signIsDrawing = useRef(false);
+  const [listQuery, setListQuery]           = useState("");
+  const [listDateFrom, setListDateFrom]     = useState(() => `${new Date().getFullYear()}-01-01`);
+  const [listDateTo, setListDateTo]         = useState(() => `${new Date().getFullYear()}-12-31`);
+  const [statusFilter, setStatusFilter]     = useState<StatusFilter>("all");
+
+  const f  = form;
+  const sf = (p: Partial<FormState>) => setForm(prev => ({ ...prev, ...p }));
 
   const load = useCallback(async () => {
     if (!user) return;
-    let q = supabase.from("leave_requests").select("*")
-      .eq("approval_status","approved")
-      .order("approved_at",{ascending:false});
-    if (!isManager) q = q.eq("author_id", user.id);
-    const { data } = await q;
-    setRows((data as LeaveRow[]|null) ?? []);
+    if (isManager) {
+      const { data } = await supabase.from("leave_requests").select("*").order("created_at", { ascending: false });
+      setRecords((data as LeaveRequest[] | null) ?? []);
+    } else {
+      const [{ data: asAuthor }, { data: asApprover }] = await Promise.all([
+        supabase.from("leave_requests").select("*").eq("author_id", user.id).order("created_at", { ascending: false }),
+        supabase.from("leave_requests").select("*").eq("approver_id", user.id).order("created_at", { ascending: false }),
+      ]);
+      const merged = [...(asAuthor ?? []), ...(asApprover ?? [])];
+      const seen = new Set<number>();
+      const unique = (merged as LeaveRequest[])
+        .filter(r => { if (seen.has(r.id)) return false; seen.add(r.id); return true; })
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setRecords(unique);
+    }
   }, [user, isManager]);
 
   useEffect(() => {
-    supabase.from("accounts").select("id,username,dept,signature_url").order("username")
-      .then(({ data }) => setAccounts((data as Account[]|null) ?? []));
+    supabase.from("accounts").select("id,username,dept,team,status,signature_url").order("username")
+      .then(({ data }) => setAccounts((data as Account[] | null) ?? []));
   }, []);
   useEffect(() => { load(); }, [load]);
   useReloadOnActivate(load);
 
-  const filtered = rows.filter(r => {
-    // 날짜 필터 (시작일 기준) — padStart로 단일자릿수 월/일 비교 오류 방지
-    const pad = (v: string|null) => (v ?? "").padStart(2, "0");
-    const dt = r.s_yr ? `20${pad(r.s_yr)}-${pad(r.s_mo)}-${pad(r.s_dy)}` : "";
-    if (dateFrom && dt && dt < dateFrom) return false;
-    if (dateTo   && dt && dt > dateTo)   return false;
-    // 유형 필터
-    if (typeFilter && r.leave_type !== typeFilter) return false;
-    // 키워드 검색
-    if (query) {
-      const q2 = query.toLowerCase();
-      const author = accounts.find(a => a.id === r.author_id);
-      if (
-        !r.request_no.toLowerCase().includes(q2) &&
-        !(author?.username ?? "").toLowerCase().includes(q2) &&
-        !(r.reason ?? "").toLowerCase().includes(q2)
-      ) return false;
-    }
-    return true;
-  });
+  const isTabActive = useTabIsActive();
+  useEffect(() => {
+    if (!isTabActive) { setSignModal(null); setRejectModal(null); setAuthorSignPending(false); }
+  }, [isTabActive]);
 
-  const totalDays = filtered.reduce((s,r) => s + (r.duration_days ?? 0), 0);
+  const activeAccounts = useMemo(() => accounts.filter(a => a.status !== "퇴직"), [accounts]);
+  const approverAcc    = accounts.find(a => a.id === f.approver_id);
+  const authorAcc      = accounts.find(a => a.id === user?.id);
+  const editingRecord  = records.find(r => r.id === editingId);
+  const isApproved     = editingRecord?.approval_status === "approved";
+  const approvedAtStr  = isApproved && editingRecord?.approved_at
+    ? new Date(editingRecord.approved_at).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" }).replace(". ", "\/").replace(".", "")
+    : null;
 
-  async function saveEdit() {
-    if (!editModal) return;
-    setEditSaving(true);
-    const { error } = await supabase.from("leave_requests").update({
-      leave_type:    editForm.leave_type ?? editModal.leave_type,
-      s_yr: editForm.s_yr, s_mo: editForm.s_mo, s_dy: editForm.s_dy,
-      s_hr: editForm.s_hr, s_mi: editForm.s_mi,
-      e_yr: editForm.e_yr, e_mo: editForm.e_mo, e_dy: editForm.e_dy,
-      e_hr: editForm.e_hr, e_mi: editForm.e_mi,
-      duration_days: editForm.duration_days,
-      reason: editForm.reason,
-      sub_yr: editForm.sub_yr, sub_mo: editForm.sub_mo, sub_dy: editForm.sub_dy,
-    }).eq("id", editModal.id);
-    setEditSaving(false);
-    if (error) { alert("수정 실패: " + error.message); return; }
-    setEditModal(null); load();
+  useEffect(() => {
+    if (!printPending || editingId === null) return;
+    const t = setTimeout(() => { window.print(); setPrintPending(false); }, 350);
+    return () => clearTimeout(t);
+  }, [printPending, editingId]);
+
+  function openNew() {
+    const hjhAccount = accounts.find(a => a.username === "황진한");
+    setForm({ ...makeEmptyForm(), approver_id: hjhAccount?.id ?? null });
+    setEditingId("new");
+  }
+  function openEdit(r: LeaveRequest, andPrint = false) {
+    setForm(recordToForm(r));
+    setEditingId(r.id);
+    if (andPrint) setPrintPending(true);
   }
 
-  async function deleteRow(id: number, no: string) {
-    if (!confirm(`${no} 문서를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+  async function save(submitForApproval: boolean, authorSig?: string) {
+    if (!user) return;
+    if (!f.s_yr || !f.s_mo || !f.s_dy) { alert("시작 날짜를 입력해주세요."); return; }
+    if (submitForApproval && !f.approver_id) { alert("승인자를 지정해주세요."); return; }
+    setSaving(true);
+    try {
+      const corePayload = {
+        author_id: user.id,
+        leave_type: f.leave_type,
+        s_yr: f.s_yr, s_mo: f.s_mo, s_dy: f.s_dy, s_hr: f.s_hr, s_mi: f.s_mi,
+        e_yr: f.e_yr, e_mo: f.e_mo, e_dy: f.e_dy, e_hr: f.e_hr, e_mi: f.e_mi,
+        duration_days: f.duration_days ? parseFloat(f.duration_days) : null,
+        reason: f.reason.trim() || null,
+        sub_yr: f.sub_yr, sub_mo: f.sub_mo, sub_dy: f.sub_dy,
+        approver_id: f.approver_id,
+        approval_status: submitForApproval ? "pending" : "draft",
+        submitted_at: submitForApproval ? new Date().toISOString() : null,
+      };
+      if (editingId === "new") {
+        const yy = new Date().toISOString().slice(2, 4);
+        const { count, error: ne } = await supabase
+          .from("leave_requests").select("*", { count: "exact", head: true }).like("request_no", `LR-${yy}-%`);
+        if (ne) throw new Error("문서번호 채번 실패: " + ne.message);
+        const no = `LR-${yy}-${String((count ?? 0) + 1).padStart(3, "0")}`;
+        const { error: ie } = await supabase.from("leave_requests").insert({ ...corePayload, request_no: no });
+        if (ie) throw ie;
+        if (authorSig) {
+          const { data: newRec } = await supabase.from("leave_requests").select("id").eq("request_no", no).maybeSingle();
+          if (newRec) {
+            await supabase.from("leave_requests").update({ author_signature: authorSig }).eq("id", (newRec as { id: number }).id).then(({ error }) => {
+              if (error) console.warn("author_signature 저장 실패 (컬럼 미존재?)", error.message);
+            });
+          }
+        }
+        if (submitForApproval && f.approver_id) {
+          const { data: newRec } = await supabase.from("leave_requests").select("id").eq("request_no", no).maybeSingle();
+          notifyLeaveApprovalRequest({ approverId: f.approver_id, authorName: authorAcc?.username ?? user.name, requestNo: no, requestId: (newRec as { id: number } | null)?.id ?? 0, leaveType: f.leave_type }).catch(console.warn);
+        }
+      } else {
+        const { error } = await supabase.from("leave_requests").update(corePayload).eq("id", editingId!);
+        if (error) throw error;
+        if (authorSig) {
+          await supabase.from("leave_requests").update({ author_signature: authorSig }).eq("id", editingId!).then(({ error }) => {
+            if (error) console.warn("author_signature 저장 실패 (컬럼 미존재?)", error.message);
+          });
+        }
+        const rec = records.find(r => r.id === editingId);
+        if (submitForApproval && f.approver_id && rec)
+          notifyLeaveApprovalRequest({ approverId: f.approver_id, authorName: authorAcc?.username ?? user.name, requestNo: rec.request_no, requestId: rec.id, leaveType: f.leave_type }).catch(console.warn);
+      }
+      await load(); setEditingId(null);
+    } catch (e: unknown) { alert("저장 실패: " + (e instanceof Error ? e.message : String(e))); }
+    finally { setSaving(false); }
+  }
+
+  function handleApprovalRequest() {
+    if (!f.s_yr || !f.s_mo || !f.s_dy) { alert("시작 날짜를 입력해주세요."); return; }
+    if (!f.approver_id) { alert("승인자를 지정해주세요."); return; }
+    setAuthorSignPending(true);
+  }
+  async function confirmAuthorSign() {
+    if (!signCanvasRef.current) return;
+    const sig = signCanvasRef.current.toDataURL("image/png");
+    setAuthorSignPending(false);
+    await save(true, sig);
+  }
+  async function authorSignWithRegistered() {
+    const mySig = accounts.find(a => a.id === user?.id)?.signature_url;
+    if (!mySig) return;
+    setAuthorSignPending(false);
+    await save(true, mySig);
+  }
+
+  async function deleteRecord(id: number, no: string) {
+    if (!confirm(`${no} 문서를 삭제하시겠습니까?`)) return;
     const { error } = await supabase.from("leave_requests").delete().eq("id", id);
     if (error) { alert("삭제 실패: " + error.message); return; }
     load();
   }
 
+  useEffect(() => {
+    if ((!signModal && !authorSignPending) || !signCanvasRef.current) return;
+    const ctx = signCanvasRef.current.getContext("2d");
+    if (ctx) ctx.clearRect(0, 0, signCanvasRef.current.width, signCanvasRef.current.height);
+  }, [signModal, authorSignPending]);
+
+  function signGetPos(e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) {
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width, sy = canvas.height / rect.height;
+    if ("touches" in e) return { x: (e.touches[0].clientX - rect.left) * sx, y: (e.touches[0].clientY - rect.top) * sy };
+    return { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy };
+  }
+  function signStart(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
+    e.preventDefault(); signIsDrawing.current = true;
+    const canvas = signCanvasRef.current!;
+    const { x, y } = signGetPos(e, canvas);
+    canvas.getContext("2d")!.beginPath(); canvas.getContext("2d")!.moveTo(x, y);
+  }
+  function signMove(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
+    e.preventDefault();
+    if (!signIsDrawing.current || !signCanvasRef.current) return;
+    const canvas = signCanvasRef.current;
+    const ctx = canvas.getContext("2d")!;
+    const { x, y } = signGetPos(e, canvas);
+    ctx.lineTo(x, y); ctx.strokeStyle = "#111"; ctx.lineWidth = 2.5; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.stroke();
+  }
+  function signEnd() { signIsDrawing.current = false; }
+  function signClear() {
+    if (!signCanvasRef.current) return;
+    signCanvasRef.current.getContext("2d")!.clearRect(0, 0, signCanvasRef.current.width, signCanvasRef.current.height);
+  }
+
+  async function approveWithSig(sig: string) {
+    if (!signModal || !user) return;
+    const target = signModal;
+    const { error } = await supabase.from("leave_requests")
+      .update({ approval_status: "approved", approved_at: new Date().toISOString(), approver_signature: sig })
+      .eq("id", target.id);
+    if (error) { alert("오류: " + error.message); return; }
+    notifyLeaveApproved({ authorId: target.author_id, approverName: authorAcc?.username ?? user.name, requestNo: target.request_no, requestId: target.id }).catch(console.warn);
+    setSignModal(null); await load();
+    if (editingId === target.id) setForm(prev => ({ ...prev }));
+  }
+  function confirmApprove() {
+    if (!signCanvasRef.current) return;
+    void approveWithSig(signCanvasRef.current.toDataURL("image/png"));
+  }
+  function approveWithRegistered() {
+    const mySig = accounts.find(a => a.id === user?.id)?.signature_url;
+    if (!mySig) return;
+    void approveWithSig(mySig);
+  }
+  async function rejectRecord() {
+    if (!rejectModal || !user) return;
+    if (!rejectReason.trim()) { alert("반려 사유를 입력해주세요."); return; }
+    const { error } = await supabase.from("leave_requests").update({ approval_status: "rejected", rejected_at: new Date().toISOString(), reject_reason: rejectReason.trim() }).eq("id", rejectModal.id);
+    if (error) { alert("오류: " + error.message); return; }
+    const rec = records.find(r => r.id === rejectModal.id);
+    if (rec) notifyLeaveRejected({ authorId: rec.author_id, approverName: authorAcc?.username ?? user.name, requestNo: rec.request_no, requestId: rec.id, reason: rejectReason.trim() }).catch(console.warn);
+    setRejectModal(null); setRejectReason(""); await load();
+  }
+
+  const canEdit    = (r: LeaveRequest) => !!user && r.author_id === user.id && r.approval_status !== "approved";
+  const canDelete  = (r: LeaveRequest) => canEdit(r);
+  const canApprove = (r: LeaveRequest) => !!user && r.approver_id === user.id && r.approval_status === "pending";
+
+  const isReadOnly = !!(editingRecord && !canEdit(editingRecord));
+
+  useEffect(() => {
+    const calc = calcDurationDays(f.s_yr, f.s_mo, f.s_dy, f.s_hr, f.s_mi, f.e_yr, f.e_mo, f.e_dy, f.e_hr, f.e_mi);
+    sf({ duration_days: calc });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [f.s_yr, f.s_mo, f.s_dy, f.s_hr, f.s_mi, f.e_yr, f.e_mo, f.e_dy, f.e_hr, f.e_mi]);
+
+  const sDow = dowKr(f.s_yr, f.s_mo, f.s_dy);
+  const eDow = dowKr(f.e_yr, f.e_mo, f.e_dy);
+
+  // 상태 탭 건수
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: records.length, draft: 0, pending: 0, approved: 0, rejected: 0 };
+    records.forEach(r => { if (r.approval_status in counts) counts[r.approval_status]++; });
+    return counts;
+  }, [records]);
+
+  const filtered = useMemo(() => records.filter(r => {
+    if (statusFilter !== "all" && r.approval_status !== statusFilter) return false;
+    const pad = (v: string | null) => (v ?? "").padStart(2, "0");
+    const dt = r.s_yr ? `20${pad(r.s_yr)}-${pad(r.s_mo)}-${pad(r.s_dy)}` : "";
+    if (listDateFrom && dt && dt < listDateFrom) return false;
+    if (listDateTo   && dt && dt > listDateTo)   return false;
+    if (!listQuery.trim()) return true;
+    const q = listQuery.trim();
+    const author = accounts.find(a => a.id === r.author_id);
+    return r.request_no.includes(q) || r.leave_type.includes(q) || (r.reason ?? "").includes(q) || (author?.username ?? "").includes(q);
+  }), [records, statusFilter, listDateFrom, listDateTo, listQuery, accounts]);
+
+  const totalDays = useMemo(() =>
+    filtered.filter(r => r.approval_status === "approved").reduce((s, r) => s + (r.duration_days ?? 0), 0),
+    [filtered]);
+
+  const sigCol = approverAcc?.username === "황진한" ? 0 : 1;
+
+  const STATUS_TABS: { key: StatusFilter; label: string }[] = [
+    { key: "all",      label: "전체" },
+    { key: "draft",    label: "작성중" },
+    { key: "pending",  label: "승인요청" },
+    { key: "approved", label: "승인완료" },
+    { key: "rejected", label: "반려" },
+  ];
+
   return (
-    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 text-sm text-gray-800 dark:text-gray-100">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0">
-        <h1 className="text-base font-bold">년차계 등록대장</h1>
-        <span className="text-xs text-gray-400">{filtered.length}건</span>
-      </div>
+    <div className="flex flex-col h-full bg-gray-300 dark:bg-gray-900 text-sm print:block print:bg-white print:h-auto">
+      {/* ── 인쇄 CSS ── */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          @page { size: A4 portrait; margin: 0; }
+          .lr-print-hide { display: none !important; }
+          #lr-scroll-wrap { overflow: visible !important; height: auto !important; background: white !important; }
+          #lr-scroll-wrap > div { overflow: visible !important; min-width: 0 !important; }
+          #lr-scroll-wrap > div > div { padding: 0 !important; }
+          #lr-print-doc {
+            box-shadow: none !important; width: 210mm !important;
+            min-height: 0 !important; margin: 0 auto !important;
+            color: black !important; background: white !important;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
+          }
+          #lr-print-doc * {
+            color: black !important; background: transparent !important;
+            -webkit-text-fill-color: black !important;
+          }
+          #lr-print-doc input, #lr-print-doc select, #lr-print-doc textarea {
+            border: none !important; border-bottom: 1px solid #444 !important;
+            outline: none !important; box-shadow: none !important;
+          }
+          #lr-print-doc input::placeholder, #lr-print-doc textarea::placeholder {
+            color: transparent !important; -webkit-text-fill-color: transparent !important;
+          }
+          #lr-print-doc th, #lr-print-doc td[data-label="true"] {
+            background-color: #f0f0f0 !important;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
+          }
+          #lr-print-doc input[type="checkbox"] { width: 3.5mm !important; height: 3.5mm !important; }
+        }
+      ` }} />
 
-      {/* 필터 */}
-      <div className="flex flex-wrap items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 shrink-0">
-        <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">기간</span>
-        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-          className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400" />
-        <span className="text-xs text-gray-400">~</span>
-        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-          className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400" />
-        <button onClick={() => {
-          const d = new Date();
-          setDateFrom(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`);
-          setDateTo(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${new Date(d.getFullYear(), d.getMonth()+1, 0).getDate()}`);
-        }} className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap">이번달</button>
-        <button onClick={() => {
-          setDateFrom(`${new Date().getFullYear()}-01-01`);
-          setDateTo(`${new Date().getFullYear()}-12-31`);
-        }} className="text-xs text-gray-500 dark:text-gray-400 hover:underline whitespace-nowrap">올해</button>
-        <button onClick={() => { setDateFrom(""); setDateTo(""); }}
-          className="text-xs text-gray-400 dark:text-gray-500 hover:underline whitespace-nowrap">전체</button>
-        <div className="w-px h-4 bg-gray-200 dark:bg-gray-600" />
-        <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
-          className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400">
-          <option value="">전체 유형</option>
-          {LEAVE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
-        <input type="text" value={query} onChange={e => setQuery(e.target.value)}
-          placeholder="문서번호 / 작성자 / 사유 검색"
-          className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400 w-48" />
-      </div>
-
-      {/* 합계 바 */}
-      {filtered.length > 0 && (
-        <div className="flex gap-4 px-4 py-2 bg-blue-50 dark:bg-blue-950/20 border-b border-blue-100 dark:border-blue-900 text-xs shrink-0">
-          <span>총 일수: <b className="text-blue-700 dark:text-blue-300">{totalDays % 1 === 0 ? totalDays : totalDays.toFixed(1)}일</b></span>
-          <span className="text-gray-400">({filtered.length}건)</span>
+      {/* ── 상단 툴바 ── */}
+      <div className="lr-print-hide flex items-center justify-between px-4 py-2 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0">
+        <h1 className="text-sm font-bold text-gray-800 dark:text-gray-100">연차계</h1>
+        <div className="flex gap-2">
+          {editingId !== null ? (
+            <>
+              {!isReadOnly && (
+                <>
+                  <button onClick={() => save(false)} disabled={saving}
+                    className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-medium disabled:opacity-50">
+                    {saving ? "저장중…" : "임시저장"}
+                  </button>
+                  <button onClick={handleApprovalRequest} disabled={saving}
+                    className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium disabled:opacity-50">
+                    {saving ? "제출중…" : "승인 요청"}
+                  </button>
+                </>
+              )}
+              {editingRecord && canApprove(editingRecord) && (
+                <>
+                  <button onClick={() => setSignModal(editingRecord)}
+                    className="px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded font-medium">
+                    승인
+                  </button>
+                  <button onClick={() => { setRejectModal({ id: editingRecord.id, no: editingRecord.request_no }); setRejectReason(""); }}
+                    className="px-3 py-1.5 text-xs bg-red-500 hover:bg-red-600 text-white rounded font-medium">
+                    반려
+                  </button>
+                </>
+              )}
+              <button onClick={() => window.print()}
+                className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded font-medium">
+                🖨️ 인쇄
+              </button>
+              <button onClick={() => setEditingId(null)}
+                className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                목록으로
+              </button>
+            </>
+          ) : canCreate && (
+            <button onClick={openNew}
+              className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium">
+              + 새 문서
+            </button>
+          )}
         </div>
-      )}
-
-      {/* 목록 */}
-      <div className="flex-1 overflow-auto p-4">
-        {filtered.length === 0 ? (
-          <div className="text-center text-sm text-gray-400 py-16">승인 완료된 년차계가 없습니다.</div>
-        ) : (
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <table className="w-full text-xs">
-              <thead className="bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 text-[11px]">
-                <tr>
-                  <th className="px-3 py-2 text-left">문서번호</th>
-                  <th className="px-3 py-2 text-center">유형</th>
-                  {isManager && <th className="px-3 py-2 text-left">작성자</th>}
-                  <th className="px-3 py-2 text-left">기간</th>
-                  <th className="px-3 py-2 text-center">일수</th>
-                  <th className="px-3 py-2 text-left">사유</th>
-                  <th className="px-3 py-2 text-left">승인자</th>
-                  <th className="px-3 py-2 text-left">승인일</th>
-                  <th className="px-3 py-2 text-center">작업</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {filtered.map(r => {
-                  const author   = accounts.find(a => a.id === r.author_id);
-                  const approver = accounts.find(a => a.id === r.approver_id);
-                  const approvedAt = r.approved_at ? new Date(r.approved_at).toLocaleDateString("ko-KR") : "—";
-                  return (
-                    <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors text-gray-800 dark:text-gray-200">
-                      <td className="px-3 py-2 font-mono text-gray-500 dark:text-gray-400">{r.request_no}</td>
-                      <td className="px-3 py-2 text-center">
-                        <span className="px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
-                          {r.leave_type}
-                        </span>
-                      </td>
-                      {isManager && <td className="px-3 py-2 font-medium">{author?.username ?? "—"}</td>}
-                      <td className="px-3 py-2 whitespace-nowrap">{periodStr(r)}</td>
-                      <td className="px-3 py-2 text-center font-bold text-blue-600 dark:text-blue-400">
-                        {r.duration_days != null ? `${r.duration_days}일` : "—"}
-                      </td>
-                      <td className="px-3 py-2 max-w-[120px] truncate text-gray-600 dark:text-gray-300">{r.reason ?? "—"}</td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-700 dark:text-gray-300 whitespace-nowrap">{approver?.username ?? "—"}</span>
-                          {r.approver_signature && (
-                            <img src={r.approver_signature} alt="서명"
-                              style={{ height: "28px", maxWidth: "64px", objectFit: "contain", background: "white", borderRadius: "2px", border: "1px solid #e5e7eb" }} />
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 text-gray-500 dark:text-gray-400 whitespace-nowrap">{approvedAt}</td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center justify-center gap-2">
-                          <button onClick={() => setDetail(r)}
-                            className="text-xs text-blue-600 hover:underline dark:text-blue-400">보기</button>
-                          {user && isAdmin(user) && <>
-                            <button onClick={() => { setEditModal(r); setEditForm({ ...r }); }}
-                              className="text-xs text-gray-600 hover:underline dark:text-gray-300">수정</button>
-                            <button onClick={() => deleteRow(r.id, r.request_no)}
-                              className="text-xs text-red-500 hover:underline dark:text-red-400">삭제</button>
-                          </>}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
 
-      {/* ── 상세 모달 (A4 뷰어) ── */}
-      {detail && (() => {
-        const author   = accounts.find(a => a.id === detail.author_id);
-        const approver = accounts.find(a => a.id === detail.approver_id);
-        const isApproved = detail.approval_status === "approved";
-        const sigCol = approver?.username === "황진한" ? 0 : 1;
-        const approvedAtStr = isApproved && detail.approved_at
-          ? new Date(detail.approved_at).toLocaleDateString("ko-KR", { month:"2-digit", day:"2-digit" }).replace(". ","/").replace(".","")
-          : null;
-        const sDow = dowKr(detail.s_yr, detail.s_mo, detail.s_dy);
-        const eDow = dowKr(detail.e_yr, detail.e_mo, detail.e_dy);
-        const iPart: React.CSSProperties = { fontFamily:"'Malgun Gothic','맑은 고딕',sans-serif", fontSize:"10.5pt" };
-        return (
+      <div id="lr-scroll-wrap" className="flex-1 overflow-auto">
+
+        {/* ════════════════════════════
+            문서 뷰 (A4)
+        ════════════════════════════ */}
+        {editingId !== null && (
           <>
-            <style dangerouslySetInnerHTML={{ __html: `
-              @media print {
-                body * { visibility: hidden !important; }
-                #lr-ledger-doc, #lr-ledger-doc * { visibility: visible !important; }
-                #lr-ledger-doc { position: fixed !important; top: 0 !important; left: 0 !important; width: 210mm !important; box-shadow: none !important; }
-              }
-            ` }} />
-            <div className="fixed inset-0 z-50 bg-black/60 overflow-auto" onClick={e => { if (e.target === e.currentTarget) setDetail(null); }}>
-              <div className="min-h-full flex flex-col items-center py-6 px-4">
-                {/* 툴바 */}
-                <div className="print:hidden flex items-center justify-between gap-3 mb-4 w-full max-w-[230mm]">
-                  <span className="text-white text-sm font-medium">{detail.leave_type}계 — {detail.request_no}</span>
-                  <div className="flex gap-2">
-                    <button onClick={() => window.print()}
-                      className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded font-medium">
-                      🖨️ 인쇄
-                    </button>
-                    <button onClick={() => setDetail(null)}
-                      className="px-3 py-1.5 text-xs bg-white/10 hover:bg-white/20 text-white rounded font-medium">
-                      ✕ 닫기
-                    </button>
-                  </div>
-                </div>
+            {/* 보조 바 */}
+            <div className="lr-print-hide sticky top-0 z-10 flex flex-wrap items-center gap-3 px-4 py-2 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800 text-xs">
+              <span className="text-gray-500 font-medium whitespace-nowrap">승인자</span>
+              {isReadOnly ? (
+                <span className="px-2 py-1 text-gray-700 dark:text-gray-200 font-medium">
+                  {approverAcc?.username ?? "—"}
+                </span>
+              ) : (
+                <AccountSearchInput
+                  accountId={f.approver_id}
+                  onSelect={id => sf({ approver_id: id })}
+                  accounts={activeAccounts}
+                  placeholder="— 승인자 검색 —"
+                  className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400 w-40"
+                />
+              )}
+              {isReadOnly && editingRecord && (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  editingRecord.approval_status === "pending"  ? "bg-blue-100 text-blue-700" :
+                  editingRecord.approval_status === "approved" ? "bg-green-100 text-green-700" :
+                  editingRecord.approval_status === "rejected" ? "bg-red-100 text-red-600" :
+                  "bg-gray-100 text-gray-600"
+                }`}>
+                  {{ draft: "작성중", pending: "승인 요청", approved: "승인완료", rejected: "반려" }[editingRecord.approval_status] ?? editingRecord.approval_status}
+                </span>
+              )}
+            </div>
 
-                {/* A4 문서 */}
-                <div id="lr-ledger-doc" style={{
-                  width:"210mm", minHeight:"297mm", padding:"18mm 20mm",
-                  background:"white", color:"#111",
-                  fontFamily:"'Malgun Gothic','맑은 고딕',sans-serif", fontSize:"10pt",
-                  display:"flex", flexDirection:"column",
-                  boxShadow:"0 4px 24px rgba(0,0,0,0.3)",
+            {/* A4 문서 */}
+            <div className="overflow-x-auto">
+              <div className="flex justify-center py-8 print:py-0" style={{ minWidth: "210mm" }}>
+                <div id="lr-print-doc" style={{
+                  width: "210mm", minHeight: "297mm",
+                  padding: "18mm 20mm",
+                  background: "white", color: "#111",
+                  fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif",
+                  fontSize: "10pt",
+                  display: "flex", flexDirection: "column",
+                  boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
                 }}>
-                  <div style={{ border:"2px solid #333", flex:1, padding:"12mm 14mm", display:"flex", flexDirection:"column" }}>
+                  {/* ── 외곽 테두리 박스 ── */}
+                  <div style={{ border: "2px solid #333", flex: 1, padding: "12mm 14mm", display: "flex", flexDirection: "column" }}>
 
-                    {/* 제목 + 결재란 */}
-                    <div style={{ display:"flex", alignItems:"flex-start", marginBottom:"12mm" }}>
-                      <div style={{ flex:1 }}>
-                        <div style={{ fontSize:"40pt", fontWeight:900, letterSpacing:"4px", lineHeight:1 }}>
+                    {/* ── 제목 + 결재란 ── */}
+                    <div style={{ display: "flex", alignItems: "flex-start", marginBottom: "12mm" }}>
+                      {/* 제목 */}
+                      <div style={{ flex: 1, display: "flex", alignItems: "center" }}>
+                        <div style={{ fontSize: "40pt", fontWeight: 900, letterSpacing: "4px", lineHeight: 1 }}>
                           <span>(</span>
-                          <span style={{ display:"inline-block", minWidth:"80px", textAlign:"center" }}>{detail.leave_type}</span>
+                          <span style={{ display: "inline-block", minWidth: "80px", textAlign: "center" }}>{f.leave_type}</span>
                           <span>)계</span>
                         </div>
                       </div>
-                      <table style={{ borderCollapse:"collapse", border: bdr }}>
+
+                      {/* 결재란 */}
+                      <table style={{ borderCollapse: "collapse", border: bdr }}>
                         <tbody>
                           <tr>
-                            <td rowSpan={3} style={{ border: bdr, width:"6mm", fontSize:"9pt", fontWeight:"bold", background:"#f0f0f0", textAlign:"center", verticalAlign:"middle", writingMode:"vertical-rl", letterSpacing:"2px", padding:0 }}>결재</td>
-                            {["담당","팀장","임원","대표","대표"].map((lbl,i) => (
-                              <th key={i} style={{ border: bdr, width:"14mm", height:"7mm", textAlign:"center", fontSize:"8pt", fontWeight:"bold", background:"#f0f0f0", padding:0 }}>{lbl}</th>
+                            <td rowSpan={3} style={{ border: bdr, width: "6mm", fontSize: "9pt", fontWeight: "bold", background: "#f0f0f0", textAlign: "center", verticalAlign: "middle", writingMode: "vertical-rl", letterSpacing: "2px", padding: 0 }}>결재</td>
+                            {["담당", "팀장", "임원", "대표", "대표"].map((lbl, i) => (
+                              <th key={i} style={{ border: bdr, width: "14mm", height: "7mm", textAlign: "center", fontSize: "8pt", fontWeight: "bold", background: "#f0f0f0", padding: 0 }}>{lbl}</th>
                             ))}
                           </tr>
                           <tr>
-                            {[0,1,2,3,4].map(i => (
-                              <td key={i} style={{ border: bdr, width:"14mm", height:"18mm", textAlign:"center", verticalAlign:"middle", padding:"1mm" }}>
-                                {i === sigCol && isApproved && detail.approver_signature && (
-                                  <img src={detail.approver_signature} alt="서명" style={{ maxWidth:"100%", maxHeight:"15mm", objectFit:"contain" }} />
+                            {[0, 1, 2, 3, 4].map(i => (
+                              <td key={i} style={{ border: bdr, width: "14mm", height: "18mm", textAlign: "center", verticalAlign: "middle", padding: "1mm" }}>
+                                {i === sigCol && isApproved && editingRecord?.approver_signature && (
+                                  <img src={editingRecord.approver_signature} alt="서명" style={{ maxWidth: "100%", maxHeight: "15mm", objectFit: "contain" }} />
                                 )}
                               </td>
                             ))}
                           </tr>
                           <tr>
-                            {[0,1,2,3,4].map(i => (
-                              <td key={i} style={{ border: bdr, textAlign:"center", fontSize:"9pt", height:"6mm", padding:0 }}>
+                            {[0, 1, 2, 3, 4].map(i => (
+                              <td key={i} style={{ border: bdr, textAlign: "center", fontSize: "9pt", height: "6mm", padding: 0 }}>
                                 {i === sigCol && approvedAtStr ? approvedAtStr : "/"}
                               </td>
                             ))}
@@ -315,189 +650,312 @@ export default function LeaveLedgerClient() {
                       </table>
                     </div>
 
-                    {/* 성명 */}
-                    <div style={{ marginBottom:"8mm", fontSize:"11pt" }}>
-                      <span style={{ fontWeight:"bold", marginRight:"6mm" }}>성 명 :</span>
-                      <span style={{ borderBottom:"1px solid #444", display:"inline-block", minWidth:"30mm", paddingBottom:"1mm" }}>
-                        {author?.username ?? ""}
+                    {/* ── 성명 ── */}
+                    <div style={{ marginBottom: "8mm", fontSize: "11pt" }}>
+                      <span style={{ fontWeight: "bold", marginRight: "6mm" }}>성 명 :</span>
+                      <span style={{ borderBottom: "1px solid #444", display: "inline-block", minWidth: "16mm", fontSize: "11pt", paddingBottom: "1mm" }}>
+                        {authorAcc?.username ?? user?.name ?? ""}
                       </span>
                     </div>
 
-                    {/* 본문 */}
-                    <div style={{ marginBottom:"10mm", fontSize:"10.5pt", lineHeight:1.8 }}>
+                    {/* ── 본문 ── */}
+                    <div style={{ marginBottom: "10mm", fontSize: "10.5pt", lineHeight: 1.8 }}>
                       상기 본인은 아래와 같은 사유로 인하여 (
-                      <span style={{ fontWeight:"bold", margin:"0 2mm" }}>{detail.leave_type}</span>
+                      <span style={{ fontWeight: "bold", margin: "0 2mm" }}>{f.leave_type}</span>
                       )계를 제출하오니 재가 바랍니다.
                     </div>
 
-                    {/* 기간 박스 */}
-                    <div style={{ border: bdr, padding:"5mm 6mm", marginBottom:"10mm", display:"flex", alignItems:"center", gap:"3mm" }}>
-                      <span style={{ fontWeight:"bold", fontSize:"11pt", whiteSpace:"nowrap" }}>기 간 :</span>
-                      <div style={{ flex:1 }}>
-                        <div style={{ display:"flex", alignItems:"center", flexWrap:"nowrap", gap:"0.8mm", marginBottom:"3mm", ...iPart }}>
-                          <span>{detail.s_yr ? `20${detail.s_yr}` : ""}</span><span>년</span>
-                          <span>{detail.s_mo}</span><span>월</span>
-                          <span>{detail.s_dy}</span>
+                    {/* ── 기간 박스 ── */}
+                    <div style={{ border: bdr, padding: "5mm 6mm", marginBottom: "10mm", display: "flex", alignItems: "center", gap: "3mm" }}>
+                      <span style={{ fontWeight: "bold", fontSize: "11pt", whiteSpace: "nowrap" }}>기 간 :</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        {/* 시작 행 */}
+                        <div style={{ display: "flex", alignItems: "center", flexWrap: "nowrap", gap: "0.8mm", fontSize: "10pt", marginBottom: "3mm" }}>
+                          <input style={{ ...iPart, width: "7mm" }} maxLength={2} value={f.s_yr} placeholder="YY" readOnly={isReadOnly} onFocus={e => e.target.select()} onChange={e => sf({ s_yr: e.target.value })} />
+                          <span>년</span>
+                          <input style={{ ...iPart, width: "6mm" }} maxLength={2} value={f.s_mo} placeholder="MM" readOnly={isReadOnly} onFocus={e => e.target.select()} onChange={e => sf({ s_mo: e.target.value })} />
+                          <span>월</span>
+                          <input style={{ ...iPart, width: "6mm" }} maxLength={2} value={f.s_dy} placeholder="DD" readOnly={isReadOnly} onFocus={e => e.target.select()} onChange={e => sf({ s_dy: e.target.value })} />
                           <span>일(</span>
-                          <span style={{ fontWeight:"bold", color:"#1d4ed8" }}>{sDow}</span>
+                          {sDow ? <span style={{ width: "4mm", textAlign: "center", fontWeight: "bold", color: "#1d4ed8" }}>{sDow}</span>
+                                : <span className="lr-print-hide" style={{ width: "4mm", textAlign: "center", color: "#aaa" }}>?</span>}
                           <span>요일)</span>
-                          {detail.s_hr && <><span>{detail.s_hr}</span><span>시</span></>}
-                          {detail.s_mi && <><span>{detail.s_mi}</span><span>분부터</span></>}
-                          {!detail.s_hr && <span>부터</span>}
+                          <input style={{ ...iPart, width: "6mm" }} maxLength={2} value={f.s_hr} placeholder="HH" readOnly={isReadOnly} onFocus={e => e.target.select()} onChange={e => sf({ s_hr: e.target.value })} />
+                          <span>시</span>
+                          <input style={{ ...iPart, width: "6mm" }} maxLength={2} value={f.s_mi} placeholder="MM" readOnly={isReadOnly} onFocus={e => e.target.select()} onChange={e => sf({ s_mi: e.target.value })} />
+                          <span>분부터</span>
                         </div>
-                        <div style={{ display:"flex", alignItems:"center", flexWrap:"nowrap", gap:"0.8mm", ...iPart }}>
-                          <span>{detail.e_yr ? `20${detail.e_yr}` : ""}</span><span>년</span>
-                          <span>{detail.e_mo}</span><span>월</span>
-                          <span>{detail.e_dy}</span>
+                        {/* 종료 행 */}
+                        <div style={{ display: "flex", alignItems: "center", flexWrap: "nowrap", gap: "0.8mm", fontSize: "10pt" }}>
+                          <input style={{ ...iPart, width: "7mm" }} maxLength={2} value={f.e_yr} placeholder="YY" readOnly={isReadOnly} onFocus={e => e.target.select()} onChange={e => sf({ e_yr: e.target.value })} />
+                          <span>년</span>
+                          <input style={{ ...iPart, width: "6mm" }} maxLength={2} value={f.e_mo} placeholder="MM" readOnly={isReadOnly} onFocus={e => e.target.select()} onChange={e => sf({ e_mo: e.target.value })} />
+                          <span>월</span>
+                          <input style={{ ...iPart, width: "6mm" }} maxLength={2} value={f.e_dy} placeholder="DD" readOnly={isReadOnly} onFocus={e => e.target.select()} onChange={e => sf({ e_dy: e.target.value })} />
                           <span>일(</span>
-                          <span style={{ fontWeight:"bold", color:"#1d4ed8" }}>{eDow}</span>
+                          {eDow ? <span style={{ width: "4mm", textAlign: "center", fontWeight: "bold", color: "#1d4ed8" }}>{eDow}</span>
+                                : <span className="lr-print-hide" style={{ width: "4mm", textAlign: "center", color: "#aaa" }}>?</span>}
                           <span>요일)</span>
-                          {detail.e_hr && <><span>{detail.e_hr}</span><span>시</span></>}
-                          {detail.e_mi && <><span>{detail.e_mi}</span><span>분까지</span></>}
-                          {!detail.e_hr && <span>까지</span>}
+                          <input style={{ ...iPart, width: "6mm" }} maxLength={2} value={f.e_hr} placeholder="HH" readOnly={isReadOnly} onFocus={e => e.target.select()} onChange={e => sf({ e_hr: e.target.value })} />
+                          <span>시</span>
+                          <input style={{ ...iPart, width: "6mm" }} maxLength={2} value={f.e_mi} placeholder="MM" readOnly={isReadOnly} onFocus={e => e.target.select()} onChange={e => sf({ e_mi: e.target.value })} />
+                          <span>분까지</span>
                         </div>
                       </div>
-                      <div style={{ display:"flex", alignItems:"center", gap:"0.8mm", whiteSpace:"nowrap", ...iPart }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.8mm", fontSize: "10pt", whiteSpace: "nowrap" }}>
                         <span>(</span>
-                        <span style={{ minWidth:"10mm", textAlign:"center", fontWeight:"bold" }}>
-                          {detail.duration_days ?? ""}
-                        </span>
+                        <input style={{ ...iPart, width: "10mm", textAlign: "center", cursor: "default" }} value={f.duration_days} readOnly placeholder="자동" />
                         <span>)일간</span>
                       </div>
                     </div>
 
-                    {/* 사유 */}
-                    <div style={{ marginBottom:"8mm", paddingLeft:"10mm", display:"flex", alignItems:"center", gap:"4mm" }}>
-                      <span style={{ fontSize:"11pt", fontWeight:"bold", whiteSpace:"nowrap" }}>사 유 :</span>
-                      <span style={{ borderBottom:"1px solid #444", flex:1, paddingBottom:"1mm", fontSize:"11pt" }}>
-                        {detail.reason ?? ""}
-                      </span>
+                    {/* ── 사유 ── */}
+                    <div style={{ marginBottom: "8mm", paddingLeft: "10mm", display: "flex", alignItems: "center", gap: "4mm" }}>
+                      <span style={{ fontSize: "11pt", fontWeight: "bold", whiteSpace: "nowrap" }}>사 유 :</span>
+                      <input style={{ ...iLine }} value={f.reason} readOnly={isReadOnly} onChange={e => sf({ reason: e.target.value })} placeholder="사유를 입력하세요" />
                     </div>
 
-                    {/* 제출일 */}
-                    <div style={{ marginBottom:"14mm", paddingLeft:"10mm", fontSize:"11pt" }}>
-                      <span style={{ fontWeight:"bold" }}>제출일 : </span>
-                      {detail.sub_yr ? `20${detail.sub_yr}년 ${detail.sub_mo}월 ${detail.sub_dy}일` : ""}
-                    </div>
-
-                    {/* 작성자 */}
-                    <div style={{ display:"flex", justifyContent:"flex-end", alignItems:"center", marginBottom:"10mm", gap:"2mm" }}>
-                      <span style={{ fontSize:"11pt", fontWeight:"bold", whiteSpace:"nowrap" }}>작성자 :</span>
-                      <span style={{ borderBottom:"1px solid #444", minWidth:"36mm", fontSize:"11pt", paddingBottom:"1mm", display:"inline-block", textAlign:"center" }}>
-                        {author?.username ?? ""}
-                      </span>
-                      <div style={{ width:"14mm", height:"14mm", border: bdr, display:"flex", alignItems:"center", justifyContent:"center", position:"relative", marginLeft:"1mm" }}>
-                        {detail.author_signature
-                          ? <img src={detail.author_signature} alt="서명" style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"contain" }} />
-                          : <span style={{ fontSize:"8pt", color:"#aaa" }}>(인)</span>}
+                    {/* ── 제출일 ── */}
+                    <div style={{ marginBottom: "14mm", paddingLeft: "10mm" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "2mm", fontSize: "11pt" }}>
+                        <span style={{ fontWeight: "bold" }}>제출일 :</span>
+                        <input style={{ ...iPart, width: "8mm" }} maxLength={2} value={f.sub_yr} placeholder="YY" readOnly={isReadOnly} onFocus={e => e.target.select()} onChange={e => sf({ sub_yr: e.target.value })} />
+                        <span>년</span>
+                        <input style={{ ...iPart, width: "7mm" }} maxLength={2} value={f.sub_mo} placeholder="MM" readOnly={isReadOnly} onFocus={e => e.target.select()} onChange={e => sf({ sub_mo: e.target.value })} />
+                        <span>월</span>
+                        <input style={{ ...iPart, width: "7mm" }} maxLength={2} value={f.sub_dy} placeholder="DD" readOnly={isReadOnly} onFocus={e => e.target.select()} onChange={e => sf({ sub_dy: e.target.value })} />
+                        <span>일</span>
                       </div>
                     </div>
 
-                    {/* 구분 체크박스 */}
-                    <div style={{ flex:1 }} />
-                    <div style={{ display:"flex", justifyContent:"center", gap:"6mm", flexWrap:"wrap", marginBottom:"4mm", fontSize:"10pt" }}>
+                    {/* ── 작성자 + 서명 ── */}
+                    <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: "10mm", gap: "2mm" }}>
+                      <span style={{ fontSize: "11pt", fontWeight: "bold", whiteSpace: "nowrap" }}>작성자 :</span>
+                      <span style={{ borderBottom: "1px solid #444", minWidth: "36mm", fontSize: "11pt", paddingBottom: "1mm", display: "inline-block", textAlign: "center" }}>
+                        {authorAcc?.username ?? user?.name ?? ""}
+                      </span>
+                      <div style={{ width: "14mm", height: "14mm", border: bdr, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", marginLeft: "1mm" }}>
+                        <span style={{ fontSize: "8pt", color: "#999" }} className="lr-print-hide">(인)</span>
+                        {editingRecord?.author_signature && (
+                          <img src={editingRecord.author_signature} alt="작성자 서명" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }} />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* ── 구분 체크박스 ── */}
+                    <div style={{ flex: 1 }} />
+                    <div style={{ display: "flex", justifyContent: "center", gap: "6mm", flexWrap: "wrap", marginBottom: "4mm", fontSize: "10pt" }}>
                       {LEAVE_TYPES.map(t => (
-                        <label key={t} style={{ display:"flex", alignItems:"center", gap:"1.5mm" }}>
-                          <input type="checkbox" readOnly checked={detail.leave_type === t}
-                            style={{ width:"3.5mm", height:"3.5mm", accentColor:"#333" }} />
-                          <span style={{ fontWeight: detail.leave_type === t ? "bold" : "normal" }}>{t}</span>
+                        <label key={t} style={{ display: "flex", alignItems: "center", gap: "1.5mm", cursor: isReadOnly ? "default" : "pointer", userSelect: "none" }}>
+                          <input
+                            type="checkbox"
+                            checked={f.leave_type === t}
+                            readOnly={isReadOnly}
+                            onChange={() => { if (!isReadOnly) sf({ leave_type: t }); }}
+                            style={{ width: "3.5mm", height: "3.5mm", accentColor: "#333", cursor: isReadOnly ? "default" : "pointer" }}
+                          />
+                          <span style={{ fontWeight: f.leave_type === t ? "bold" : "normal" }}>{t}</span>
                         </label>
                       ))}
                     </div>
+
                   </div>
 
-                  {/* 회사명 */}
-                  <div style={{ textAlign:"right", fontSize:"11pt", fontWeight:"bold", marginTop:"5mm" }}>
+                  {/* ── 회사명 (테두리 박스 아래) ── */}
+                  <div style={{ textAlign: "right", fontSize: "11pt", fontWeight: "bold", marginTop: "5mm" }}>
                     주식회사 대솔E/L
                   </div>
                 </div>
               </div>
             </div>
           </>
-        );
-      })()}
+        )}
 
-      {/* ── 수정 모달 ── */}
-      {editModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
-              <span className="font-bold text-sm">년차계 수정 — {editModal.request_no}</span>
-              <button onClick={() => setEditModal(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        {/* ════════════════════════════
+            목록 뷰
+        ════════════════════════════ */}
+        {editingId === null && (
+          <div className="lr-print-hide p-4 space-y-3">
+
+            {/* 상태 탭 */}
+            <div className="flex gap-1 flex-wrap">
+              {STATUS_TABS.map(tab => (
+                <button key={tab.key}
+                  onClick={() => setStatusFilter(tab.key)}
+                  className={`px-3 py-1.5 text-xs rounded-full font-medium transition-colors ${
+                    statusFilter === tab.key
+                      ? "bg-blue-600 text-white"
+                      : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  }`}>
+                  {tab.label}
+                  <span className={`ml-1.5 text-[10px] ${statusFilter === tab.key ? "text-blue-200" : "text-gray-400"}`}>
+                    {statusCounts[tab.key] ?? 0}
+                  </span>
+                </button>
+              ))}
             </div>
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 text-sm">
-              {/* 유형 */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">휴가 유형</label>
-                <div className="flex flex-wrap gap-2">
-                  {LEAVE_TYPES.map(t => (
-                    <label key={t} className="flex items-center gap-1.5 px-3 py-1.5 border rounded-lg cursor-pointer text-xs select-none"
-                      style={{ borderColor: editForm.leave_type === t ? "#7c3aed" : "#d1d5db", background: editForm.leave_type === t ? "#f5f3ff" : "white", color: editForm.leave_type === t ? "#7c3aed" : "#374151" }}>
-                      <input type="radio" className="hidden" checked={editForm.leave_type === t} onChange={() => setEditForm(f => ({ ...f, leave_type: t }))} />
-                      {t}
-                    </label>
-                  ))}
-                </div>
-              </div>
-              {/* 시작 */}
-              <div className="grid grid-cols-5 gap-2">
-                {[["s_yr","YY","시작년"],["s_mo","MM","월"],["s_dy","DD","일"],["s_hr","HH","시(선택)"],["s_mi","MM","분(선택)"]].map(([k,ph,lbl]) => (
-                  <div key={k}>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">{lbl}</label>
-                    <input maxLength={2} placeholder={ph}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400 text-center"
-                      value={(editForm as Record<string,unknown>)[k] as string ?? ""}
-                      onChange={e => setEditForm(f => ({ ...f, [k]: e.target.value }))} />
-                  </div>
-                ))}
-              </div>
-              {/* 종료 */}
-              <div className="grid grid-cols-5 gap-2">
-                {[["e_yr","YY","종료년"],["e_mo","MM","월"],["e_dy","DD","일"],["e_hr","HH","시(선택)"],["e_mi","MM","분(선택)"]].map(([k,ph,lbl]) => (
-                  <div key={k}>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">{lbl}</label>
-                    <input maxLength={2} placeholder={ph}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400 text-center"
-                      value={(editForm as Record<string,unknown>)[k] as string ?? ""}
-                      onChange={e => setEditForm(f => ({ ...f, [k]: e.target.value }))} />
-                  </div>
-                ))}
-              </div>
-              {/* 일수 */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">일수</label>
-                <input type="number" step="0.5" min="0"
-                  className="w-32 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
-                  value={editForm.duration_days ?? ""}
-                  onChange={e => setEditForm(f => ({ ...f, duration_days: e.target.value ? parseFloat(e.target.value) : undefined }))} />
-              </div>
-              {/* 사유 */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">사유</label>
-                <input className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400"
-                  value={editForm.reason ?? ""}
-                  onChange={e => setEditForm(f => ({ ...f, reason: e.target.value }))} />
-              </div>
-              {/* 제출일 */}
-              <div className="grid grid-cols-3 gap-2">
-                {[["sub_yr","YY","제출년"],["sub_mo","MM","월"],["sub_dy","DD","일"]].map(([k,ph,lbl]) => (
-                  <div key={k}>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">{lbl}</label>
-                    <input maxLength={2} placeholder={ph}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-400 text-center"
-                      value={(editForm as Record<string,unknown>)[k] as string ?? ""}
-                      onChange={e => setEditForm(f => ({ ...f, [k]: e.target.value }))} />
-                  </div>
-                ))}
-              </div>
+
+            {/* 검색 필터 */}
+            <div className="flex flex-wrap items-center gap-2 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">기간</span>
+              <input type="date" value={listDateFrom} onChange={e => setListDateFrom(e.target.value)}
+                className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400" />
+              <span className="text-xs text-gray-400">~</span>
+              <input type="date" value={listDateTo} onChange={e => setListDateTo(e.target.value)}
+                className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400" />
+              <button onClick={() => {
+                const d = new Date();
+                setListDateFrom(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`);
+                const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+                setListDateTo(`${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, "0")}-${String(last.getDate()).padStart(2, "0")}`);
+              }} className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap">이번달</button>
+              <button onClick={() => {
+                const y = new Date().getFullYear();
+                setListDateFrom(`${y}-01-01`); setListDateTo(`${y}-12-31`);
+              }} className="text-xs text-gray-500 dark:text-gray-400 hover:underline whitespace-nowrap">올해</button>
+              <button onClick={() => { setListDateFrom(""); setListDateTo(""); }}
+                className="text-xs text-gray-400 dark:text-gray-500 hover:underline whitespace-nowrap">전체</button>
+              <div className="w-px h-4 bg-gray-200 dark:bg-gray-600" />
+              <input value={listQuery} onChange={e => setListQuery(e.target.value)}
+                placeholder="문서번호·유형·사유·성명"
+                className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400 w-44" />
+              <span className="text-xs text-gray-400 ml-auto">{filtered.length}건</span>
             </div>
-            <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-200 dark:border-gray-700 shrink-0">
-              <button onClick={() => setEditModal(null)}
-                className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-lg font-medium">취소</button>
-              <button onClick={saveEdit} disabled={editSaving}
-                className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50">
-                {editSaving ? "저장중…" : "저장"}
+
+            {/* 합계 바 (승인완료 탭에서만) */}
+            {statusFilter === "approved" && filtered.length > 0 && (
+              <div className="flex gap-4 px-4 py-2 bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900 rounded-lg text-xs">
+                <span>총 일수: <b className="text-blue-700 dark:text-blue-300">{totalDays % 1 === 0 ? totalDays : totalDays.toFixed(1)}일</b></span>
+                <span className="text-gray-400">({filtered.length}건)</span>
+              </div>
+            )}
+
+            {/* 목록 테이블 */}
+            <div className="bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                    <th className="px-3 py-2 text-left font-medium">문서번호</th>
+                    <th className="px-3 py-2 text-left font-medium">유형</th>
+                    {isManager && <th className="px-3 py-2 text-left font-medium">작성자</th>}
+                    <th className="px-3 py-2 text-left font-medium">기간</th>
+                    <th className="px-3 py-2 text-left font-medium">사유</th>
+                    <th className="px-3 py-2 text-center font-medium">상태</th>
+                    <th className="px-3 py-2 text-center font-medium">작업</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {filtered.length === 0 && (
+                    <tr><td colSpan={isManager ? 7 : 6} className="text-center py-8 text-gray-400">문서가 없습니다.</td></tr>
+                  )}
+                  {filtered.map(r => {
+                    const author = accounts.find(a => a.id === r.author_id);
+                    const period = r.s_yr ? `20${r.s_yr}/${r.s_mo}/${r.s_dy}` : "—";
+                    return (
+                      <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200">
+                        <td className="px-3 py-2 font-mono text-blue-600 dark:text-blue-400">{r.request_no}</td>
+                        <td className="px-3 py-2">{r.leave_type}</td>
+                        {isManager && <td className="px-3 py-2">{author?.username ?? "—"}</td>}
+                        <td className="px-3 py-2">{period}</td>
+                        <td className="px-3 py-2 max-w-[120px] truncate">{r.reason ?? "—"}</td>
+                        <td className="px-3 py-2 text-center"><StatusBadge status={r.approval_status} /></td>
+                        <td className="px-3 py-2">
+                          <div className="flex gap-1 justify-center flex-wrap">
+                            {canEdit(r) ? (
+                              <button onClick={() => openEdit(r)}
+                                className="px-2 py-0.5 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-600 dark:hover:bg-gray-500 dark:text-gray-200 rounded">수정</button>
+                            ) : (
+                              <button onClick={() => openEdit(r)}
+                                className="px-2 py-0.5 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 dark:text-blue-300 rounded">내용 확인</button>
+                            )}
+                            <button onClick={() => openEdit(r, true)}
+                              className="px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 rounded">인쇄</button>
+                            {canApprove(r) && (
+                              <>
+                                <button onClick={() => setSignModal(r)}
+                                  className="px-2 py-0.5 text-xs bg-green-100 hover:bg-green-200 text-green-700 rounded">승인</button>
+                                <button onClick={() => { setRejectModal({ id: r.id, no: r.request_no }); setRejectReason(""); }}
+                                  className="px-2 py-0.5 text-xs bg-red-100 hover:bg-red-200 text-red-700 rounded">반려</button>
+                              </>
+                            )}
+                            {canDelete(r) && (
+                              <button onClick={() => deleteRecord(r.id, r.request_no)}
+                                className="px-2 py-0.5 text-xs text-red-500 hover:text-red-700">삭제</button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── 서명 모달 ── */}
+      {signModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={() => setSignModal(null)}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-2xl w-80" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-bold mb-3 text-gray-800 dark:text-gray-100">승인 서명</h3>
+            <canvas ref={signCanvasRef} width={280} height={140}
+              className="border border-gray-300 rounded w-full touch-none cursor-crosshair bg-white"
+              onMouseDown={signStart} onMouseMove={signMove} onMouseUp={signEnd} onMouseLeave={signEnd}
+              onTouchStart={signStart} onTouchMove={signMove} onTouchEnd={signEnd}
+            />
+            <div className="flex gap-2 mt-3">
+              <button onClick={signClear} className="flex-1 px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded">지우기</button>
+              {accounts.find(a => a.id === user?.id)?.signature_url && (
+                <button onClick={approveWithRegistered} className="flex-1 px-3 py-1.5 text-xs bg-purple-100 hover:bg-purple-200 text-purple-700 rounded">등록 서명 사용</button>
+              )}
+              <button onClick={confirmApprove} className="flex-1 px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded font-medium">승인 확정</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 작성자 서명 모달 (승인 요청 시) ── */}
+      {authorSignPending && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={() => setAuthorSignPending(false)}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-2xl w-80" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-bold mb-1 text-gray-800 dark:text-gray-100">승인 요청 — 작성자 서명</h3>
+            <p className="text-xs text-gray-400 mb-3">서명 후 승인자에게 전달됩니다.</p>
+            {accounts.find(a => a.id === user?.id)?.signature_url && (
+              <button onClick={authorSignWithRegistered}
+                className="w-full mb-3 py-2 text-xs bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-lg border border-blue-200 dark:border-blue-700 font-semibold">
+                ✅ 등록된 서명으로 바로 제출
               </button>
+            )}
+            <div className="relative border-2 border-gray-300 rounded-lg overflow-hidden bg-white" style={{ touchAction: "none" }}>
+              <canvas ref={signCanvasRef} width={280} height={140}
+                className="w-full touch-none cursor-crosshair block"
+                style={{ height: "110px" }}
+                onMouseDown={signStart} onMouseMove={signMove} onMouseUp={signEnd} onMouseLeave={signEnd}
+                onTouchStart={signStart} onTouchMove={signMove} onTouchEnd={signEnd}
+              />
+              <span className="absolute bottom-1 right-2 text-[10px] text-gray-300 pointer-events-none select-none">서명란</span>
+            </div>
+            <div className="flex gap-2 mt-3">
+              <button onClick={signClear} className="px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded border border-gray-300">지우기</button>
+              <button onClick={confirmAuthorSign} className="flex-1 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium">서명 후 제출</button>
+              <button onClick={() => setAuthorSignPending(false)} className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded">취소</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 반려 모달 ── */}
+      {rejectModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={() => setRejectModal(null)}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-2xl w-80" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-bold mb-3 text-gray-800 dark:text-gray-100">반려 사유</h3>
+            <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} rows={3}
+              placeholder="반려 사유를 입력하세요"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 resize-none" />
+            <div className="flex gap-2 mt-3">
+              <button onClick={() => setRejectModal(null)} className="flex-1 px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded">취소</button>
+              <button onClick={rejectRecord} className="flex-1 px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded font-medium">반려</button>
             </div>
           </div>
         </div>
