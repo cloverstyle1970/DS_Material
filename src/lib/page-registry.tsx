@@ -156,11 +156,11 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
     render: () => <OvertimeLedgerClient />,
   },
   "/hr/leave": {
-    label: "년차계",
+    label: "연차계",
     render: () => <LeaveRequestClient />,
   },
   "/hr/leave-ledger": {
-    label: "년차계 등록대장",
+    label: "연차계 등록대장",
     render: () => <LeaveLedgerClient />,
   },
   "/uniform-safety": {
