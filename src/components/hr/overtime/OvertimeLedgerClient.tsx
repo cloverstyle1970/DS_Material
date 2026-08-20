@@ -343,6 +343,7 @@ export default function OvertimeLedgerClient() {
 
   // ── 필터 ──
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const pendingAutoFiltered = useRef(false);
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
@@ -419,6 +420,15 @@ export default function OvertimeLedgerClient() {
   useEffect(() => { load(); }, [load]);
   useReloadOnActivate(load);
 
+  // 순수 승인자(관리자 아님)로 첫 진입 시 승인 대기 탭 자동 선택
+  useEffect(() => {
+    if (pendingAutoFiltered.current || isManager || reports.length === 0 || !user) return;
+    if (reports.some(r => r.approver_id === user.id && r.approval_status === "pending")) {
+      setStatusFilter("pending");
+    }
+    pendingAutoFiltered.current = true;
+  }, [reports, isManager, user]);
+
   // 탭이 비활성화될 때 서명/반려 모달 닫기
   const isTabActive = useTabIsActive();
   useEffect(() => {
@@ -467,6 +477,10 @@ export default function OvertimeLedgerClient() {
   const approvedAtStr = isApproved && editingReport?.approved_at
     ? new Date(editingReport.approved_at).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" }).replace(". ", "/").replace(".", "")
     : null;
+
+  // 승인자이면 작성자 컬럼도 표시
+  const isApproverOfAny = !!user && reports.some(r => r.approver_id === user.id);
+  const showAuthorCol = isManager || isApproverOfAny;
 
   // ── 권한 헬퍼 ──
   const canEdit = (r: OvertimeReport) => {
@@ -821,13 +835,19 @@ export default function OvertimeLedgerClient() {
             {/* 보조 바: 잔업 승인자 + 상태 (인쇄 시 숨김) */}
             <div className="print:hidden sticky top-0 z-10 flex flex-wrap items-center gap-3 px-4 py-2 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800 text-xs">
               <span className="text-gray-500 whitespace-nowrap font-medium">잔업 승인자</span>
-              <AccountSearchInput
-                accountId={f.approver_id}
-                onSelect={id => sf({ approver_id: id })}
-                accounts={activeAccounts}
-                placeholder="— 승인자 검색 —"
-                className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400 w-40"
-              />
+              {isReadOnly ? (
+                <span className="font-medium text-gray-800 dark:text-gray-200">
+                  {approverAcc?.username ?? "—"}
+                </span>
+              ) : (
+                <AccountSearchInput
+                  accountId={f.approver_id}
+                  onSelect={id => sf({ approver_id: id })}
+                  accounts={activeAccounts}
+                  placeholder="— 승인자 검색 —"
+                  className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400 w-40"
+                />
+              )}
               {otResult && (
                 <span className="font-semibold text-blue-700 dark:text-blue-300">{otResult.display}</span>
               )}
@@ -1299,7 +1319,7 @@ export default function OvertimeLedgerClient() {
                         <th className="px-3 py-2 text-center">근무H</th>
                         <th className="px-3 py-2 text-center">잔업H</th>
                         <th className="px-3 py-2 text-left">상태</th>
-                        {isManager && <th className="px-3 py-2 text-left">작성자</th>}
+                        {showAuthorCol && <th className="px-3 py-2 text-left">작성자</th>}
                         <th className="px-3 py-2 text-center">작업</th>
                       </tr>
                     </thead>
@@ -1339,7 +1359,7 @@ export default function OvertimeLedgerClient() {
                                 </div>
                               )}
                             </td>
-                            {isManager && (
+                            {showAuthorCol && (
                               <td className="px-3 py-2">{author?.username ?? "-"}</td>
                             )}
                             <td className="px-3 py-2">
