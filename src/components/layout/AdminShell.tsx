@@ -8,9 +8,16 @@ import { PAGE_REGISTRY } from "@/lib/page-registry";
 import { TabsProvider, useTabs, MAX_TABS } from "@/context/TabsContext";
 import { TabActivationProvider } from "@/context/TabActivationContext";
 import { useViewMode } from "@/context/ViewModeContext";
+import { supabase } from "@/lib/supabase";
 import Sidebar from "./Sidebar";
 import TabBar from "./TabBar";
 import SidebarContext from "@/context/SidebarContext";
+
+// 권한 없이도 승인자로 지정된 경우 접근 허용할 페이지
+const APPROVER_GATED: Record<string, string> = {
+  "/hr/overtime-ledger": "overtime_reports",
+  "/hr/leave-ledger":    "leave_requests",
+};
 
 function AdminShellInner({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -21,6 +28,9 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
   const isPc = viewMode === "pc";
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // 메뉴 권한 없이도 승인자로 지정돼 접근이 허용된 href 목록
+  const [approverGranted, setApproverGranted] = useState<Set<string>>(new Set());
+  const approverCheckingRef = useRef<Set<string>>(new Set());
 
   // 화면 모드(pc/mobile)에 따라 사이드바 기본 상태를 강제 설정.
   // PC: 펼침(고정), 모바일: 접힘(오버레이). 모드 전환 시에도 재적용.
@@ -39,10 +49,30 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
     if (isLoading || !isAuthenticated || !user) return;
     if (isAdmin(user)) return;
     const canonicalHref = matchMenuHref(pathname);
-    if (canonicalHref && !hasMenuPermission(user, canonicalHref, "read")) {
-      router.replace("/dashboard");
-    }
-  }, [pathname, user, isLoading, isAuthenticated, router]);
+    if (!canonicalHref) return;
+    if (hasMenuPermission(user, canonicalHref, "read")) return;
+    if (approverGranted.has(canonicalHref)) return;
+
+    const table = APPROVER_GATED[canonicalHref];
+    if (!table) { router.replace("/dashboard"); return; }
+
+    // 승인자 여부 비동기 확인 (중복 요청 방지)
+    if (approverCheckingRef.current.has(canonicalHref)) return;
+    approverCheckingRef.current.add(canonicalHref);
+    supabase
+      .from(table)
+      .select("id", { count: "exact", head: true })
+      .eq("approver_id", user.id)
+      .limit(1)
+      .then(({ count }) => {
+        approverCheckingRef.current.delete(canonicalHref);
+        if ((count ?? 0) > 0) {
+          setApproverGranted(prev => new Set([...prev, canonicalHref]));
+        } else {
+          router.replace("/dashboard");
+        }
+      });
+  }, [pathname, user, isLoading, isAuthenticated, router, approverGranted]);
 
   // Service Worker 메시지 수신: push 알림 클릭 → SPA 라우팅
   useEffect(() => {
@@ -80,7 +110,7 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
     if (wasJustClosed) return;
     // me/dashboard/settings/profile/manual는 메뉴 외 공통 페이지 — 권한 체크 우회
     const isAlwaysAllowed = pathname === "/me" || pathname === "/me/notifications" || pathname === "/dashboard" || pathname === "/settings" || pathname === "/data/profile" || pathname === "/manual";
-    const allowed = isAlwaysAllowed || isAdmin(user) || hasMenuPermission(user, pathname, "read");
+    const allowed = isAlwaysAllowed || isAdmin(user) || hasMenuPermission(user, pathname, "read") || approverGranted.has(pathname);
     if (!allowed) return;
     if (isLimitReached) {
       alert(`탭은 최대 ${MAX_TABS}개까지 열 수 있습니다. 다른 탭을 닫고 다시 시도해주세요.`);
@@ -89,7 +119,7 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
     }
     openTab(pathname, entry.label);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, isAuthenticated, user, tabs, activeHref]);
+  }, [pathname, isAuthenticated, user, tabs, activeHref, approverGranted]);
 
   // activeHref → URL 동기화 (TabBar 탭 클릭으로 활성이 바뀐 경우)
   useEffect(() => {
@@ -112,7 +142,9 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
   const blockedByPermission = (() => {
     if (!user || isAdmin(user)) return false;
     const canonical = matchMenuHref(pathname);
-    return !!canonical && !hasMenuPermission(user, canonical, "read");
+    if (!canonical) return false;
+    if (hasMenuPermission(user, canonical, "read")) return false;
+    return !approverGranted.has(canonical);
   })();
 
   const showShell = !isLoading && isAuthenticated;
