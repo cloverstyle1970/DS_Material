@@ -812,7 +812,7 @@ export default function OvertimeLedgerClient() {
                 </button>
               )}
               <button onClick={() => setEditingId(null)}
-                className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700">
+                className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded font-medium">
                 목록으로
               </button>
             </>
