@@ -1334,7 +1334,7 @@ export default function OvertimeLedgerClient() {
                         const author = accounts.find(a => a.id === r.author_id);
                         return (
                           <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
-                            <td className="px-3 py-2 font-mono text-gray-500">{r.report_no}</td>
+                            <td className="px-3 py-2 font-mono text-gray-800 dark:text-gray-200">{r.report_no}</td>
                             <td className="px-3 py-2 font-medium">{r.site_name}</td>
                             <td className="px-3 py-2 whitespace-nowrap">
                               <div>{s.toLocaleDateString("ko-KR")}</div>
