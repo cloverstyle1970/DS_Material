@@ -226,6 +226,7 @@ export default function LeaveLedgerClient() {
   const [listDateFrom, setListDateFrom]     = useState(() => `${new Date().getFullYear()}-01-01`);
   const [listDateTo, setListDateTo]         = useState(() => `${new Date().getFullYear()}-12-31`);
   const [statusFilter, setStatusFilter]     = useState<StatusFilter>("all");
+  const pendingAutoFiltered = useRef(false);
 
   const f  = form;
   const sf = (p: Partial<FormState>) => setForm(prev => ({ ...prev, ...p }));
@@ -255,6 +256,15 @@ export default function LeaveLedgerClient() {
   }, []);
   useEffect(() => { load(); }, [load]);
   useReloadOnActivate(load);
+
+  // 순수 승인자(관리자 아님)로 첫 진입 시 승인 대기 탭 자동 선택
+  useEffect(() => {
+    if (pendingAutoFiltered.current || isManager || records.length === 0 || !user) return;
+    if (records.some(r => r.approver_id === user.id && r.approval_status === "pending")) {
+      setStatusFilter("pending");
+    }
+    pendingAutoFiltered.current = true;
+  }, [records, isManager, user]);
 
   const isTabActive = useTabIsActive();
   useEffect(() => {
