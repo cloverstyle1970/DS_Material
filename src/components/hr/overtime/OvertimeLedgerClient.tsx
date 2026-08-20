@@ -1369,6 +1369,11 @@ export default function OvertimeLedgerClient() {
                                     className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded">
                                     수정
                                   </button>
+                                ) : canApprove(r) ? (
+                                  <button onClick={() => openEdit(r)}
+                                    className="px-2 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium">
+                                    보기
+                                  </button>
                                 ) : (
                                   <button onClick={() => openEdit(r)}
                                     className="px-2 py-1 text-xs text-blue-600 hover:underline dark:text-blue-400">
