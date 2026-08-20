@@ -1428,7 +1428,7 @@ export default function OvertimeLedgerClient() {
               className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs bg-white focus:outline-none resize-none" />
             <div className="flex gap-2 mt-3">
               <button onClick={reject} className="flex-1 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded font-medium">반려 처리</button>
-              <button onClick={() => setRejectModal(null)} className="flex-1 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded">취소</button>
+              <button onClick={() => setRejectModal(null)} className="flex-1 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded font-medium">취소</button>
             </div>
           </div>
         </div>
@@ -1468,7 +1468,7 @@ export default function OvertimeLedgerClient() {
                 승인 완료
               </button>
               <button onClick={() => setSignModal(null)}
-                className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded">
+                className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded font-medium">
                 취소
               </button>
             </div>
