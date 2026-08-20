@@ -447,6 +447,9 @@ export default function LeaveLedgerClient() {
     setRejectModal(null); setRejectReason(""); await load();
   }
 
+  const isApproverOfAny = !!user && records.some(r => r.approver_id === user.id);
+  const showAuthorCol   = isManager || isApproverOfAny;
+
   const canEdit    = (r: LeaveRequest) => !!user && r.author_id === user.id && r.approval_status !== "approved";
   const canDelete  = (r: LeaveRequest) => canEdit(r);
   const canApprove = (r: LeaveRequest) => !!user && r.approver_id === user.id && r.approval_status === "pending";
@@ -858,7 +861,7 @@ export default function LeaveLedgerClient() {
                   <tr className="bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
                     <th className="px-3 py-2 text-left font-medium">문서번호</th>
                     <th className="px-3 py-2 text-left font-medium">유형</th>
-                    {isManager && <th className="px-3 py-2 text-left font-medium">작성자</th>}
+                    {showAuthorCol && <th className="px-3 py-2 text-left font-medium">작성자</th>}
                     <th className="px-3 py-2 text-left font-medium">기간</th>
                     <th className="px-3 py-2 text-left font-medium">사유</th>
                     <th className="px-3 py-2 text-center font-medium">상태</th>
@@ -867,7 +870,7 @@ export default function LeaveLedgerClient() {
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                   {filtered.length === 0 && (
-                    <tr><td colSpan={isManager ? 7 : 6} className="text-center py-8 text-gray-400">문서가 없습니다.</td></tr>
+                    <tr><td colSpan={showAuthorCol ? 7 : 6} className="text-center py-8 text-gray-400">문서가 없습니다.</td></tr>
                   )}
                   {filtered.map(r => {
                     const author = accounts.find(a => a.id === r.author_id);
@@ -876,7 +879,7 @@ export default function LeaveLedgerClient() {
                       <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200">
                         <td className="px-3 py-2 font-mono text-blue-600 dark:text-blue-400">{r.request_no}</td>
                         <td className="px-3 py-2">{r.leave_type}</td>
-                        {isManager && <td className="px-3 py-2">{author?.username ?? "—"}</td>}
+                        {showAuthorCol && <td className="px-3 py-2">{author?.username ?? "—"}</td>}
                         <td className="px-3 py-2">{period}</td>
                         <td className="px-3 py-2 max-w-[120px] truncate">{r.reason ?? "—"}</td>
                         <td className="px-3 py-2 text-center"><StatusBadge status={r.approval_status} /></td>
