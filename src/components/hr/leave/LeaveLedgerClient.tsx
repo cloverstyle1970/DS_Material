@@ -450,7 +450,11 @@ export default function LeaveLedgerClient() {
   const isApproverOfAny = !!user && records.some(r => r.approver_id === user.id);
   const showAuthorCol   = isManager || isApproverOfAny;
 
-  const canEdit    = (r: LeaveRequest) => !!user && r.author_id === user.id && r.approval_status !== "approved";
+  const canEdit = (r: LeaveRequest) => {
+    if (!user) return false;
+    if (isAdmin(user)) return true;
+    return r.author_id === user.id && r.approval_status !== "approved";
+  };
   const canDelete  = (r: LeaveRequest) => canEdit(r);
   const canApprove = (r: LeaveRequest) => !!user && r.approver_id === user.id && r.approval_status === "pending";
 
