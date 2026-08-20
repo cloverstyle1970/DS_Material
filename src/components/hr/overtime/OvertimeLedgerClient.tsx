@@ -488,7 +488,11 @@ export default function OvertimeLedgerClient() {
     if (isAdmin(user)) return true;
     return r.author_id === user.id && r.approval_status !== "approved";
   };
-  const canDelete = (r: OvertimeReport) => !!user && r.author_id === user.id && r.approval_status !== "approved";
+  const canDelete = (r: OvertimeReport) => {
+    if (!user) return false;
+    if (isAdmin(user)) return true;
+    return r.author_id === user.id && r.approval_status !== "approved";
+  };
   const canApprove = (r: OvertimeReport) => !!user && r.approver_id === user.id && r.approval_status === "pending";
   const isReadOnly = !!(editingReport && !canEdit(editingReport));
 
