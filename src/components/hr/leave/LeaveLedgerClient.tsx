@@ -556,7 +556,7 @@ export default function LeaveLedgerClient() {
                 🖨️ 인쇄
               </button>
               <button onClick={() => setEditingId(null)}
-                className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded font-medium">
                 목록으로
               </button>
             </>
@@ -872,7 +872,10 @@ export default function LeaveLedgerClient() {
                         <td className="px-3 py-2 text-center"><StatusBadge status={r.approval_status} /></td>
                         <td className="px-3 py-2">
                           <div className="flex gap-1 justify-center flex-wrap">
-                            {canEdit(r) ? (
+                            {canApprove(r) ? (
+                              <button onClick={() => openEdit(r)}
+                                className="px-2 py-0.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium">보기</button>
+                            ) : canEdit(r) ? (
                               <button onClick={() => openEdit(r)}
                                 className="px-2 py-0.5 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-600 dark:hover:bg-gray-500 dark:text-gray-200 rounded">수정</button>
                             ) : (
@@ -950,7 +953,7 @@ export default function LeaveLedgerClient() {
             <div className="flex gap-2 mt-3">
               <button onClick={signClear} className="px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded border border-gray-300">지우기</button>
               <button onClick={confirmAuthorSign} className="flex-1 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium">서명 후 제출</button>
-              <button onClick={() => setAuthorSignPending(false)} className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded">취소</button>
+              <button onClick={() => setAuthorSignPending(false)} className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded font-medium">취소</button>
             </div>
           </div>
         </div>
@@ -965,7 +968,7 @@ export default function LeaveLedgerClient() {
               placeholder="반려 사유를 입력하세요"
               className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 resize-none" />
             <div className="flex gap-2 mt-3">
-              <button onClick={() => setRejectModal(null)} className="flex-1 px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded">취소</button>
+              <button onClick={() => setRejectModal(null)} className="flex-1 px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded font-medium">취소</button>
               <button onClick={rejectRecord} className="flex-1 px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded font-medium">반려</button>
             </div>
           </div>
