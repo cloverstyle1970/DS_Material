@@ -21,6 +21,7 @@ interface OvertimeReport {
   workers: string[]; worker_notes: string[]; work_content: string | null; work_result: string | null; note: string | null;
   approver_id: number | null; approval_status: string; approver_signature: string | null;
   submitted_at: string | null; approved_at: string | null; rejected_at: string | null; reject_reason: string | null;
+  printed_at: string | null;
   created_at: string; updated_at: string;
 }
 interface FormState {
@@ -421,10 +422,22 @@ export default function OvertimeReportClient() {
     setForm(reportToForm(r)); setOtResult(null); setEditingId(r.id); setMobileStep(0);
     if (andPrint) setPrintPending(true);
   }
+  async function markPrinted(id: number) {
+    const now = new Date().toISOString();
+    await supabase.from("overtime_reports").update({ printed_at: now }).eq("id", id);
+    setMyReports(prev => prev.map(r => r.id === id ? { ...r, printed_at: now } : r));
+  }
+
   useEffect(() => {
     if (!printPending || editingId === null) return;
-    const t = setTimeout(() => { window.print(); setPrintPending(false); }, 350);
+    const id = editingId;
+    const t = setTimeout(() => {
+      window.print();
+      setPrintPending(false);
+      if (typeof id === "number") markPrinted(id);
+    }, 350);
     return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [printPending, editingId]);
 
   async function save(submitForApproval: boolean) {
@@ -636,7 +649,7 @@ export default function OvertimeReportClient() {
                   className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium disabled:opacity-50">
                   {saving ? "제출중…" : "승인 요청"}
                 </button>
-                {!isMobile && <button onClick={() => window.print()}
+                {!isMobile && <button onClick={() => { window.print(); if (typeof editingId === "number") markPrinted(editingId); }}
                   className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded font-medium">
                   🖨️ 인쇄
                 </button>}
@@ -1113,6 +1126,7 @@ export default function OvertimeReportClient() {
                             <span className="text-xs font-mono text-gray-400">{r.report_no}</span>
                             <StatusBadge status={r.approval_status} />
                             {r.is_holiday && <span className="text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">{r.holiday_type ?? "휴일"}</span>}
+                            {r.printed_at && <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">🖨️ {new Date(r.printed_at).toLocaleDateString("ko-KR")}</span>}
                           </div>
                           <p className="mt-1 font-medium">{r.site_name}</p>
                           <div className="mt-0.5 text-xs text-gray-500 space-y-0.5">

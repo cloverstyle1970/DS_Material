@@ -83,13 +83,13 @@ export function calcOvertimeResult(start: Date, end: Date, isHoliday: boolean): 
     };
   }
 
-  // 평일: 17:30 이후 시작 → 전체 잔업 / 이전 시작 → 기존 방식(근무시간 - 8h)
+  // 평일: 17:30 이후 시작 또는 총 근무시간 8h 미만 → 전체 잔업 / 그 외 → 초과분만 잔업
   const threshold = new Date(start);
   threshold.setHours(17, 30, 0, 0);
 
-  const overtimeH = start >= threshold
+  const overtimeH = start >= threshold || workH < 8
     ? roundOT(workH)
-    : roundOT(Math.max(0, workH - 8));
+    : roundOT(workH - 8);
   return {
     workHours:     workH,
     holidayHours:  0,
