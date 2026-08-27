@@ -85,7 +85,10 @@ function dowKr(yr: string, mo: string, dy: string) {
   return ["일", "월", "화", "수", "목", "금", "토"][d.getDay()];
 }
 
-const WORK_HOURS_PER_DAY = 9;
+// 표준 근무시간: 08:30~17:30 = 9시간 (4시간마다 30분 휴게 포함)
+const WORK_START_MINUTES = 8 * 60 + 30;   // 510분 (08:30)
+const WORK_END_MINUTES   = 17 * 60 + 30;  // 1050분 (17:30)
+const WORK_SLOT_MINUTES  = WORK_END_MINUTES - WORK_START_MINUTES; // 540분
 
 function calcDurationDays(
   sYr: string, sMo: string, sDy: string, sHr: string, sMi: string,
@@ -95,20 +98,30 @@ function calcDurationDays(
   const pad = (v: string) => v.padStart(2, "0");
   const sDateStr = `20${pad(sYr)}-${pad(sMo)}-${pad(sDy)}`;
   const eDateStr = `20${pad(eYr)}-${pad(eMo)}-${pad(eDy)}`;
+  const sDate = new Date(sDateStr);
+  const eDate = new Date(eDateStr);
+  if (isNaN(sDate.getTime()) || isNaN(eDate.getTime()) || eDate < sDate) return "";
 
-  if (sHr && sMi && eHr && eMi) {
-    const sMs = new Date(`${sDateStr}T${pad(sHr)}:${pad(sMi)}`).getTime();
-    const eMs = new Date(`${eDateStr}T${pad(eHr)}:${pad(eMi)}`).getTime();
-    if (isNaN(sMs) || isNaN(eMs) || eMs < sMs) return "";
-    const diffHours = (eMs - sMs) / (1000 * 60 * 60);
-    const days = Math.round((diffHours / WORK_HOURS_PER_DAY) * 2) / 2;
-    return days % 1 === 0 ? String(days) : days.toFixed(1);
+  const diffDays = Math.round((eDate.getTime() - sDate.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (sHr !== "" && sMi !== "" && eHr !== "" && eMi !== "") {
+    // 시분 입력 시: 날짜별로 근무슬롯(08:30~17:30)과 겹치는 분 합산 후 0.5일 단위 반올림
+    const sTimeMi = parseInt(sHr, 10) * 60 + parseInt(sMi, 10);
+    const eTimeMi = parseInt(eHr, 10) * 60 + parseInt(eMi, 10);
+    let totalDays = 0;
+    for (let d = 0; d <= diffDays; d++) {
+      const dayStartMi = d === 0        ? sTimeMi          : WORK_START_MINUTES;
+      const dayEndMi   = d === diffDays ? eTimeMi          : WORK_END_MINUTES;
+      const effStart   = Math.max(dayStartMi, WORK_START_MINUTES);
+      const effEnd     = Math.min(dayEndMi,   WORK_END_MINUTES);
+      if (effEnd > effStart) totalDays += (effEnd - effStart) / WORK_SLOT_MINUTES;
+    }
+    const rounded = Math.round(totalDays * 2) / 2;
+    return rounded % 1 === 0 ? String(rounded) : rounded.toFixed(1);
   }
 
-  const sMs = new Date(sDateStr).getTime();
-  const eMs = new Date(eDateStr).getTime();
-  if (isNaN(sMs) || isNaN(eMs) || eMs < sMs) return "";
-  return String(Math.round((eMs - sMs) / (1000 * 60 * 60 * 24)) + 1);
+  // 날짜만 입력 시: 달력 일수 (종료일 포함)
+  return String(diffDays + 1);
 }
 
 // ── 승인자 검색 인풋 ──────────────────────────────────────────
