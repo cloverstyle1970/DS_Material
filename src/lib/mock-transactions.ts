@@ -25,6 +25,7 @@ export interface TransactionRecord {
   createdAt: string;
   batchId?: string | null;
   unitPrice: number;
+  requesterName: string | null;
 }
 
 const transactions: TransactionRecord[] = [];
@@ -91,6 +92,7 @@ export function addTransaction(data: AddTransactionInput): { record?: Transactio
     createdAt:          new Date().toISOString(),
     batchId:            data.batchId ?? null,
     unitPrice,
+    requesterName:      null,
   };
   transactions.push(record);
   return { record };

@@ -390,6 +390,7 @@ function dbToTransaction(r: any): TransactionRecord {
     createdAt:          r.created_at,
     batchId:            r.batch_id               ?? null,
     unitPrice:          r.unit_price             ?? 0,
+  requesterName:      r.requester_name         ?? null,
   };
 }
 
@@ -404,6 +405,7 @@ async function supabaseAddTransaction(data: {
   batchId?: string | null;
   unitPrice?: number | null;
   transactionNo?: string | null;
+  requesterName?: string | null;
 }): Promise<{ records?: TransactionRecord[]; error?: string }> {
   const { data: result, error } = await supabase.rpc("add_transaction", {
     p_type:            data.type,
@@ -434,6 +436,10 @@ async function supabaseAddTransaction(data: {
   if (data.transactionNo && records.length > 0) {
     await supabase.from("transactions").update({ transaction_no: data.transactionNo }).in("id", ids);
     records.forEach(r => { r.transactionNo = data.transactionNo as string; });
+  }
+  if (data.requesterName != null && records.length > 0) {
+    await supabase.from("transactions").update({ requester_name: data.requesterName }).in("id", ids);
+    records.forEach(r => { r.requesterName = data.requesterName as string; });
   }
   return { records };
 }

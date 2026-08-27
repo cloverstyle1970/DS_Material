@@ -1174,7 +1174,7 @@ export default function OvertimeReportClient() {
             <p className="text-xs text-gray-400 mb-2">{rejectModal.reportNo}</p>
             <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)}
               rows={4} placeholder="반려 사유를 입력하세요"
-              className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs bg-white focus:outline-none resize-none" />
+              className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none resize-none placeholder:text-gray-400 dark:placeholder:text-gray-500" />
             <div className="flex gap-2 mt-3">
               <button onClick={reject} className="flex-1 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded font-medium">반려 처리</button>
               <button onClick={() => setRejectModal(null)} className="flex-1 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded">취소</button>

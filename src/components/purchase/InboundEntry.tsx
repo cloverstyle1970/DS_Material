@@ -288,6 +288,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
           transactionNo,
           unitPrice: r.unitPrice || 0,
           createdAt: inboundDate,
+          requesterName: requesterName || null,
         });
       }
       // 발주 라인 상태 및 헤더 상태 갱신은 mock-router의 POST /api/transactions
