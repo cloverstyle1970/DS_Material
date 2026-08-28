@@ -438,8 +438,12 @@ async function supabaseAddTransaction(data: {
     records.forEach(r => { r.transactionNo = data.transactionNo as string; });
   }
   if (data.requesterName != null && records.length > 0) {
-    await supabase.from("transactions").update({ requester_name: data.requesterName }).in("id", ids);
-    records.forEach(r => { r.requesterName = data.requesterName as string; });
+    const { error: rErr } = await supabase.from("transactions").update({ requester_name: data.requesterName }).in("id", ids);
+    if (rErr) {
+      console.error("[supabaseAddTransaction] requester_name 저장 실패 — migration-add-transaction-requester.sql 적용 여부 확인:", rErr.message);
+    } else {
+      records.forEach(r => { r.requesterName = data.requesterName as string; });
+    }
   }
   return { records };
 }
@@ -1520,7 +1524,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
         .eq("id", lineId).maybeSingle();
       if (!line) throw new MockApiError("line not found", 404);
       const { data: header } = await supabase.from("purchase_orders")
-        .select("id, site_name, user_id").eq("id", line.order_id).maybeSingle();
+        .select("id, site_name, user_id, requester_name").eq("id", line.order_id).maybeSingle();
       if (!header) throw new MockApiError("header not found", 404);
 
       if (action === "입고완료") {
@@ -1544,6 +1548,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
           note: `발주 #${lineId} 입고완료`,
           userId,
           userName,
+          requesterName: header.requester_name ?? null,
         });
         if (txErr) throw new MockApiError(txErr, 400);
         if (inputReceivedAt && txs && txs.length > 0) {
@@ -1646,6 +1651,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
           note: `발주 #${l.id} 입고완료`,
           userId,
           userName,
+          requesterName: header.requester_name ?? null,
         });
         if (txErr) throw new MockApiError(txErr, 400);
         if (inputReceivedAt && txs && txs.length > 0) {

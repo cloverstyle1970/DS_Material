@@ -118,6 +118,12 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
   const [rows,        setRows]        = useState<Row[]>(() =>
     isEdit ? [] : [newRow(), newRow(), newRow(), newRow(), newRow()]
   );
+
+  // 모든 유효 라인이 입고완료인 경우 → 전체 조회 전용 모드
+  const isFullyReceived = isEdit && !editLoading &&
+    rows.some(r => r.lineId != null) &&
+    rows.filter(r => r.lineId != null && r.status !== "취소").every(r => r.status === "입고완료");
+  const isReadOnly = isFullyReceived;
   const [saving,      setSaving]      = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [company,     setCompany]     = useState<POPrintCompany | null>(null);
@@ -345,8 +351,10 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
 
       <div className="flex items-center justify-between px-5 py-2.5 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0">
         <h1 className="text-sm font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-          <span className="text-indigo-500">📑</span> {isEdit ? "발주서 수정" : "발주서입력"}
+          <span className="text-indigo-500">📑</span>
+          {isEdit ? (isReadOnly ? "발주서 조회" : "발주서 수정") : "발주서입력"}
           {isEdit && editLoading && <span className="text-xs text-gray-400 ml-2">불러오는 중...</span>}
+          {isReadOnly && <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 font-semibold">입고완료</span>}
         </h1>
       </div>
 
@@ -354,7 +362,8 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
         <MatTypeToggle value={matType} onChange={setMatType} />
         <span className="text-xs text-gray-500 dark:text-gray-400">양식</span>
         <select value={formType} onChange={e => setFormType(e.target.value as typeof formType)}
-          className="text-xs px-2 py-1 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-gray-200">
+          disabled={isReadOnly}
+          className="text-xs px-2 py-1 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-gray-200 disabled:opacity-60 disabled:cursor-not-allowed">
           <option value="기본">기본발주서</option>
           <option value="긴급">긴급발주서</option>
           <option value="수리">수리부품 발주서</option>
@@ -369,63 +378,75 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-5 py-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <FormField label="일자" required className="w-44">
-            <input type="date" value={orderDate} onChange={e => setOrderDate(e.target.value)} className={inputCls} />
+            <input type="date" value={orderDate} onChange={e => setOrderDate(e.target.value)} readOnly={isReadOnly}
+              className={`${inputCls}${isReadOnly ? " bg-gray-50 dark:bg-gray-900/30 cursor-not-allowed text-gray-500 dark:text-gray-500" : ""}`} />
           </FormField>
           <FormField label="거래처" required className="w-64">
-            <VendorInlineSearch value={vendorName} onChange={setVendorName} vendors={vendors} />
+            <VendorInlineSearch value={vendorName} onChange={setVendorName} vendors={vendors} readOnly={isReadOnly} />
           </FormField>
           <FormField label="신청자" className="w-48">
-            <RequesterInlineSearch value={managerName} onChange={setManagerName} names={requesterNames} phones={requesterPhones} />
+            <RequesterInlineSearch value={managerName} onChange={setManagerName} names={requesterNames} phones={requesterPhones} readOnly={isReadOnly} />
           </FormField>
           <FormField label="무상" className="w-20">
             <input
               type="checkbox"
               checked={freeOfCharge}
+              disabled={isReadOnly}
               onChange={e => {
                 const on = e.target.checked;
                 setFreeOfCharge(on);
                 // 무상 체크 시 모든 행의 구매단가를 0원으로
                 if (on) setRows(prev => prev.map(r => ({ ...r, unitPrice: 0 })));
               }}
-              className="h-4 w-4 rounded cursor-pointer accent-blue-600"
+              className={`h-4 w-4 rounded accent-blue-600 ${isReadOnly ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
             />
           </FormField>
           <FormField label="현장" className="w-80 flex-1 min-w-[280px]">
-            <SiteInlineSearch value={siteName} onChange={setSiteName} sites={sites} />
+            <SiteInlineSearch value={siteName} onChange={setSiteName} sites={sites} readOnly={isReadOnly} />
           </FormField>
           <FormField label="발주참조번호" className="w-56">
-            <div className="flex items-center w-full border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-200">
+            <div className={`flex items-center w-full border border-gray-300 dark:border-gray-600 rounded ${isReadOnly ? "bg-gray-50 dark:bg-gray-900/30" : "bg-white dark:bg-gray-700 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-200"}`}>
               <span className="pl-2 pr-0.5 text-xs font-medium text-gray-500 dark:text-gray-400 select-none whitespace-nowrap">MNG</span>
               <input
                 type="text"
                 value={orderRefNo.startsWith("MNG") ? orderRefNo.slice(3) : orderRefNo}
                 onChange={e => setOrderRefNo("MNG" + e.target.value)}
+                readOnly={isReadOnly}
                 placeholder="숫자 10자리"
                 maxLength={10}
-                className="flex-1 min-w-0 py-1 pr-2 text-xs font-medium text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:font-normal"
+                className={`flex-1 min-w-0 py-1 pr-2 text-xs font-medium bg-transparent focus:outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:font-normal ${isReadOnly ? "text-gray-500 dark:text-gray-500 cursor-not-allowed" : "text-gray-900 dark:text-gray-100"}`}
               />
             </div>
           </FormField>
           <FormField label="참조" className="flex-1 min-w-[280px]">
-            <input type="text" value={reference} onChange={e => setReference(e.target.value)} className={`${inputCls} w-full`} />
+            <input type="text" value={reference} onChange={e => setReference(e.target.value)} readOnly={isReadOnly}
+              className={`${inputCls} w-full${isReadOnly ? " bg-gray-50 dark:bg-gray-900/30 cursor-not-allowed text-gray-500 dark:text-gray-500" : ""}`} />
           </FormField>
         </div>
-        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
-          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5">첨부파일</label>
-          <label className="flex items-center justify-center gap-2 w-full border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-lg py-3 text-xs text-gray-400 dark:text-gray-500 hover:border-blue-300 hover:bg-blue-50/30 dark:hover:bg-blue-900/10 cursor-pointer transition-colors">
-            <span className="text-base">+</span>
-            <span>{files.length === 0 ? "파일을 추가하려면 클릭하거나 드래그하세요" : `${files.length}개 파일`}</span>
-            <input type="file" multiple className="hidden" onChange={e => setFiles(Array.from(e.target.files ?? []))} />
-          </label>
-        </div>
+        {!isReadOnly && (
+          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5">첨부파일</label>
+            <label className="flex items-center justify-center gap-2 w-full border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-lg py-3 text-xs text-gray-400 dark:text-gray-500 hover:border-blue-300 hover:bg-blue-50/30 dark:hover:bg-blue-900/10 cursor-pointer transition-colors">
+              <span className="text-base">+</span>
+              <span>{files.length === 0 ? "파일을 추가하려면 클릭하거나 드래그하세요" : `${files.length}개 파일`}</span>
+              <input type="file" multiple className="hidden" onChange={e => setFiles(Array.from(e.target.files ?? []))} />
+            </label>
+          </div>
+        )}
       </div>
 
       <div className="bg-[#f0f2f5] dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 px-5 py-2 flex items-center gap-2 flex-wrap text-xs shrink-0">
-        <button type="button" onClick={() => setPopup("request")}
-          className="px-4 py-1.5 rounded-md bg-blue-600 text-white font-bold hover:bg-blue-700 shadow-sm transition-colors flex items-center gap-1.5 text-xs ring-2 ring-blue-600 ring-offset-1 dark:ring-offset-gray-700">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-          자재신청 참조 (불러오기)
-        </button>
+        {isReadOnly ? (
+          <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-semibold">
+            🔒 입고완료 — 조회 전용 (수정 불가)
+          </span>
+        ) : (
+          <button type="button" onClick={() => setPopup("request")}
+            className="px-4 py-1.5 rounded-md bg-blue-600 text-white font-bold hover:bg-blue-700 shadow-sm transition-colors flex items-center gap-1.5 text-xs ring-2 ring-blue-600 ring-offset-1 dark:ring-offset-gray-700">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            자재신청 참조 (불러오기)
+          </button>
+        )}
         <span className="ml-auto text-gray-500 dark:text-gray-400">{rows.filter(r => r.materialId).length} / {rows.length} 행</span>
       </div>
 
@@ -504,22 +525,24 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
                 <Td right>
                   <input
                     type="text" inputMode="numeric"
-                    readOnly={isReceived}
+                    readOnly={isReceived || isReadOnly}
                     title={isReceived ? "이미 입고가 시작된 라인은 수량 변경 불가" : undefined}
                     value={r.qty === 0 ? "" : String(r.qty)}
                     onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); patchRow(r.id, { qty: v === "" ? 0 : Number(v) }); }}
-                    className={cellInput + " text-right" + (isReceived ? " text-gray-400 cursor-not-allowed" : "")}
+                    className={cellInput + " text-right" + ((isReceived || isReadOnly) ? " text-gray-400 cursor-not-allowed" : "")}
                   />
                 </Td>
                 <Td right>
-                  <input type="text" inputMode="numeric" readOnly={freeOfCharge}
+                  <input type="text" inputMode="numeric" readOnly={freeOfCharge || isReadOnly}
                     value={freeOfCharge ? "0" : (r.unitPrice === 0 ? "" : fmtNum(r.unitPrice))}
                     onChange={e => patchRow(r.id, { unitPrice: parseNum(e.target.value) })}
-                    className={cellInput + " text-right" + (freeOfCharge ? " text-gray-400 cursor-not-allowed" : "")} />
+                    className={cellInput + " text-right" + ((freeOfCharge || isReadOnly) ? " text-gray-400 cursor-not-allowed" : "")} />
                 </Td>
                 <Td right className="text-gray-700 dark:text-gray-300 tabular-nums">{fmtNum(r.qty * r.unitPrice)}</Td>
                 <Td>
-                  {elevators.length > 0 ? (
+                  {isReadOnly ? (
+                    <div className="px-1.5 py-1 text-xs text-gray-600 dark:text-gray-400">{r.elevatorName}</div>
+                  ) : elevators.length > 0 ? (
                     <ElevatorPicker value={r.elevatorName} elevators={elevators}
                       onChange={v => patchRow(r.id, { elevatorName: v })} />
                   ) : (
@@ -527,10 +550,13 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
                   )}
                 </Td>
                 <Td>
-                  <input type="text" value={r.remark} onChange={e => patchRow(r.id, { remark: e.target.value })} className={cellInput} />
+                  <input type="text" value={r.remark} readOnly={isReadOnly} onChange={e => patchRow(r.id, { remark: e.target.value })}
+                    className={cellInput + (isReadOnly ? " cursor-not-allowed text-gray-500 dark:text-gray-500" : "")} />
                 </Td>
                 <Td center>
-                  <button type="button" onClick={() => removeRow(r.id)} className="text-gray-300 hover:text-red-400 leading-none">×</button>
+                  {!isReadOnly && (
+                    <button type="button" onClick={() => removeRow(r.id)} className="text-gray-300 hover:text-red-400 leading-none">×</button>
+                  )}
                 </Td>
               </tr>
               );
@@ -546,13 +572,15 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
             </tr>
           </tfoot>
         </table>
-        <div className="px-5 py-2">
-          <button type="button" onClick={addRow} className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600">+ 행 추가</button>
-        </div>
+        {!isReadOnly && (
+          <div className="px-5 py-2">
+            <button type="button" onClick={addRow} className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600">+ 행 추가</button>
+          </div>
+        )}
       </div>
 
       <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-5 py-3 flex items-center justify-end gap-2">
-        <button type="button" onClick={() => router.push("/purchase-orders")} className="text-xs px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">{isEdit ? "취소" : "리스트"}</button>
+        <button type="button" onClick={() => router.push("/purchase-orders")} className="text-xs px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">{isEdit ? (isReadOnly ? "목록" : "취소") : "리스트"}</button>
         {!isEdit && (
           <>
             <button type="button" onClick={clearAll} className="text-xs px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">다시 작성</button>
@@ -562,9 +590,11 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
         <button type="button" onClick={() => setPreviewOpen(true)} className="text-xs px-4 py-2 rounded border border-blue-300 text-blue-700 hover:bg-blue-50">
           🖨 발주서
         </button>
-        <button type="button" disabled={saving || editLoading} onClick={() => save(false)} className="text-xs px-5 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50 shadow-sm">
-          {saving ? "저장 중..." : isEdit ? "변경 저장" : "저장"}
-        </button>
+        {!isReadOnly && (
+          <button type="button" disabled={saving || editLoading} onClick={() => save(false)} className="text-xs px-5 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50 shadow-sm">
+            {saving ? "저장 중..." : isEdit ? "변경 저장" : "저장"}
+          </button>
+        )}
       </div>
 
       {popup === "request" && (
@@ -684,7 +714,7 @@ function Td({ children, right, center, className = "", colSpan }: { children?: R
 }
 
 // ── 인라인 자동완성 ─────────────────────────────────────────────
-function SiteInlineSearch({ value, onChange, sites }: { value: string; onChange: (v: string) => void; sites: SiteOption[] }) {
+function SiteInlineSearch({ value, onChange, sites, readOnly }: { value: string; onChange: (v: string) => void; sites: SiteOption[]; readOnly?: boolean }) {
   const [open, setOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
@@ -726,8 +756,12 @@ function SiteInlineSearch({ value, onChange, sites }: { value: string; onChange:
 
   return (
     <div ref={ref} className="relative">
-      <input type="text" lang="ko" value={value} onChange={e => { onChange(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onKeyDown={handleKeyDown} className={inputCls} />
-      {open && suggestions.length > 0 && (
+      <input type="text" lang="ko" value={value} readOnly={readOnly}
+        onChange={e => { if (!readOnly) { onChange(e.target.value); setOpen(true); } }}
+        onFocus={() => { if (!readOnly) setOpen(true); }}
+        onKeyDown={handleKeyDown}
+        className={`${inputCls}${readOnly ? " bg-gray-50 dark:bg-gray-900/30 cursor-not-allowed text-gray-500 dark:text-gray-500" : ""}`} />
+      {!readOnly && open && suggestions.length > 0 && (
         <ul ref={ulRef} className="absolute z-50 top-full left-0 mt-0.5 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-52 overflow-y-auto">
           {suggestions.map((s, idx) => (
             <li key={s.id}>
@@ -746,8 +780,8 @@ function SiteInlineSearch({ value, onChange, sites }: { value: string; onChange:
   );
 }
 
-function RequesterInlineSearch({ value, onChange, names, phones }: {
-  value: string; onChange: (v: string) => void; names: string[]; phones?: Record<string, string>;
+function RequesterInlineSearch({ value, onChange, names, phones, readOnly }: {
+  value: string; onChange: (v: string) => void; names: string[]; phones?: Record<string, string>; readOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
@@ -786,10 +820,13 @@ function RequesterInlineSearch({ value, onChange, names, phones }: {
 
   return (
     <div ref={ref} className="relative">
-      <input type="text" lang="ko" value={value} placeholder="입력 또는 선택"
-        onChange={e => { onChange(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)} onKeyDown={handleKeyDown} className={inputCls} />
-      {open && suggestions.length > 0 && (
+      <input type="text" lang="ko" value={value} placeholder={readOnly ? "" : "입력 또는 선택"}
+        readOnly={readOnly}
+        onChange={e => { if (!readOnly) { onChange(e.target.value); setOpen(true); } }}
+        onFocus={() => { if (!readOnly) setOpen(true); }}
+        onKeyDown={handleKeyDown}
+        className={`${inputCls}${readOnly ? " bg-gray-50 dark:bg-gray-900/30 cursor-not-allowed text-gray-500 dark:text-gray-500" : ""}`} />
+      {!readOnly && open && suggestions.length > 0 && (
         <ul ref={ulRef} className="absolute z-50 top-full left-0 mt-0.5 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-52 overflow-y-auto">
           {suggestions.map((name, idx) => (
             <li key={name}>
@@ -806,7 +843,7 @@ function RequesterInlineSearch({ value, onChange, names, phones }: {
   );
 }
 
-function VendorInlineSearch({ value, onChange, vendors }: { value: string; onChange: (v: string) => void; vendors: { id: number; name: string }[] }) {
+function VendorInlineSearch({ value, onChange, vendors, readOnly }: { value: string; onChange: (v: string) => void; vendors: { id: number; name: string }[]; readOnly?: boolean }) {
   const [open, setOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
@@ -855,8 +892,12 @@ function VendorInlineSearch({ value, onChange, vendors }: { value: string; onCha
 
   return (
     <div ref={ref} className="relative">
-      <input type="text" lang="ko" value={value} onChange={e => { onChange(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onKeyDown={handleKeyDown} className={inputCls} />
-      {open && suggestions.length > 0 && (
+      <input type="text" lang="ko" value={value} readOnly={readOnly}
+        onChange={e => { if (!readOnly) { onChange(e.target.value); setOpen(true); } }}
+        onFocus={() => { if (!readOnly) setOpen(true); }}
+        onKeyDown={handleKeyDown}
+        className={`${inputCls}${readOnly ? " bg-gray-50 dark:bg-gray-900/30 cursor-not-allowed text-gray-500 dark:text-gray-500" : ""}`} />
+      {!readOnly && open && suggestions.length > 0 && (
         <ul ref={ulRef} className="absolute z-50 top-full left-0 mt-0.5 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-52 overflow-y-auto">
           {suggestions.map((v, idx) => (
             <li key={v.id}>

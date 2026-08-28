@@ -286,8 +286,11 @@ export default function LeaveLedgerClient() {
 
   const activeAccounts = useMemo(() => accounts.filter(a => a.status !== "퇴직"), [accounts]);
   const approverAcc    = accounts.find(a => a.id === f.approver_id);
-  const authorAcc      = accounts.find(a => a.id === user?.id);
+  const authorAcc      = accounts.find(a => a.id === user?.id);  // 현재 로그인 사용자 (알림용)
   const editingRecord  = records.find(r => r.id === editingId);
+  const documentAuthorAcc = editingRecord
+    ? accounts.find(a => a.id === editingRecord.author_id)
+    : authorAcc;
   const isApproved     = editingRecord?.approval_status === "approved";
   const approvedAtStr  = isApproved && editingRecord?.approved_at
     ? new Date(editingRecord.approved_at).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" }).replace(". ", "\/").replace(".", "")
@@ -695,7 +698,7 @@ export default function LeaveLedgerClient() {
                     <div style={{ marginBottom: "8mm", fontSize: "11pt" }}>
                       <span style={{ fontWeight: "bold", marginRight: "6mm" }}>성 명 :</span>
                       <span style={{ borderBottom: "1px solid #444", display: "inline-block", minWidth: "16mm", fontSize: "11pt", paddingBottom: "1mm" }}>
-                        {authorAcc?.username ?? user?.name ?? ""}
+                        {documentAuthorAcc?.username ?? user?.name ?? ""}
                       </span>
                     </div>
 
@@ -773,7 +776,7 @@ export default function LeaveLedgerClient() {
                     <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: "10mm", gap: "2mm" }}>
                       <span style={{ fontSize: "11pt", fontWeight: "bold", whiteSpace: "nowrap" }}>작성자 :</span>
                       <span style={{ borderBottom: "1px solid #444", minWidth: "36mm", fontSize: "11pt", paddingBottom: "1mm", display: "inline-block", textAlign: "center" }}>
-                        {authorAcc?.username ?? user?.name ?? ""}
+                        {documentAuthorAcc?.username ?? user?.name ?? ""}
                       </span>
                       <div style={{ width: "14mm", height: "14mm", border: bdr, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", marginLeft: "1mm" }}>
                         <span style={{ fontSize: "8pt", color: "#999" }} className="lr-print-hide">(인)</span>

@@ -299,9 +299,6 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
   }
 
   async function applyInbound(t: TransactionRecord) {
-    // remark는 사용자 메모 자리이므로 비워둠. 입고 식별은 inboundRef로,
-    // transaction note의 '입고 #N 출고완료' 패턴은 save() 단에서 자동 prepend.
-    // 수령인(=자재신청자)는 t.note의 '발주 #N 입고완료' 패턴 → purchase_orders.requester_name 으로 역추적.
     const row = newRow({
       materialId: t.materialId, materialName: t.materialName,
       qty: t.qty, inboundRef: t.id, remark: "",
@@ -315,14 +312,26 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
     });
     setPopup(null);
     if (t.materialId) refreshRowStock(row.id, t.materialId);
-    // 수령인 자동 채움: 입고 transaction의 note '발주 #N' → purchase_orders.requester_name 역추적.
+    // 수령인 자동 채움: transaction.requester_name 직접 사용.
+    // 없으면 note의 '발주 #N' (N = purchase_order_lines.id) → 해당 라인의
+    // purchase_orders.requester_name 역추적(구형 입고 데이터 호환).
     // 채워진 후에도 사용자가 헤더 입력란에서 직접 수정 가능.
-    const orderMatch = t.note?.match(/발주\s*#(\d+)/);
-    if (orderMatch) {
-      const orderId = Number(orderMatch[1]);
-      const { data } = await supabase.from("purchase_orders")
-        .select("requester_name").eq("id", orderId).maybeSingle();
-      if (data?.requester_name) setReceiverName(data.requester_name);
+    if (t.requesterName) {
+      setReceiverName(t.requesterName);
+    } else {
+      const lineMatch = t.note?.match(/발주\s*#(\d+)/);
+      if (lineMatch) {
+        const lineId = Number(lineMatch[1]);
+        // note의 N은 purchase_order_lines.id임. purchase_orders.id가 아님에 주의.
+        const { data } = await supabase
+          .from("purchase_order_lines")
+          .select("purchase_orders(requester_name)")
+          .eq("id", lineId)
+          .maybeSingle();
+        const rName = (data as unknown as { purchase_orders: { requester_name: string | null } | null } | null)
+          ?.purchase_orders?.requester_name;
+        if (rName) setReceiverName(rName);
+      }
     }
   }
 
@@ -343,7 +352,6 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
       const next = [...prev];
       let cursor = 0;
       for (const row of newRows) {
-        // 앞에서부터 비어있는 행을 채우고, 부족하면 뒤에 추가
         const emptyIdx = next.findIndex((r, i) => i >= cursor && !r.materialId);
         if (emptyIdx >= 0) { next[emptyIdx] = row; cursor = emptyIdx + 1; }
         else { next.push(row); cursor = next.length; }
@@ -355,14 +363,27 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
     // 자재 정보 백필 (병렬)
     await Promise.all(newRows.map(r => r.materialId ? refreshRowStock(r.id, r.materialId) : Promise.resolve()));
 
-    // 수령인 자동 채움: 첫 유효 항목의 발주 → requester_name
+    // 수령인 자동 채움 (기존 값이 있으면 보존)
     if (!receiverName) {
-      const firstWithOrder = list.map(t => ({ t, m: t.note?.match(/발주\s*#(\d+)/) })).find(x => !!x.m);
-      if (firstWithOrder?.m) {
-        const orderId = Number(firstWithOrder.m[1]);
-        const { data } = await supabase.from("purchase_orders")
-          .select("requester_name").eq("id", orderId).maybeSingle();
-        if (data?.requester_name) setReceiverName(data.requester_name);
+      // 1순위: 입고 transaction에 requester_name이 직접 저장된 경우
+      const firstWithRequester = list.find(t => t.requesterName);
+      if (firstWithRequester?.requesterName) {
+        setReceiverName(firstWithRequester.requesterName);
+      } else {
+        // 2순위: note의 '발주 #N' (N = purchase_order_lines.id) 역추적 (구형 입고 데이터 호환)
+        const firstWithLine = list.map(t => ({ t, m: t.note?.match(/발주\s*#(\d+)/) })).find(x => !!x.m);
+        if (firstWithLine?.m) {
+          const lineId = Number(firstWithLine.m[1]);
+          // note의 N은 purchase_order_lines.id임. purchase_orders.id가 아님에 주의.
+          const { data } = await supabase
+            .from("purchase_order_lines")
+            .select("purchase_orders(requester_name)")
+            .eq("id", lineId)
+            .maybeSingle();
+          const rName = (data as unknown as { purchase_orders: { requester_name: string | null } | null } | null)
+            ?.purchase_orders?.requester_name;
+          if (rName) setReceiverName(rName);
+        }
       }
     }
   }
@@ -1193,7 +1214,7 @@ function InboundRefPopup({
                     title={allChecked ? "표시된 항목 전체 선택 해제" : "표시된 항목 전체 선택"}
                   />
                 </th>
-                {["발주참조번호","입고일","자재명 / 규격","코드","수량","현재재고","현장","호기"].map(h =>
+                {["발주참조번호","입고일","신청자","자재명 / 규격","코드","수량","현재재고","현장","호기"].map(h =>
                   <th key={h} className="px-2 py-2 text-left border-b-2 border-gray-300 dark:border-gray-600 font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap">{h}</th>)}
               </tr>
             </thead>
@@ -1211,6 +1232,7 @@ function InboundRefPopup({
                     </td>
                     <td className="px-2 py-2 text-blue-700 dark:text-blue-300 font-bold whitespace-nowrap">{refForRecord(t) || "—"}</td>
                     <td className="px-2 py-2 text-gray-700 dark:text-gray-200 font-medium whitespace-nowrap">{t.createdAt.slice(0, 10)}</td>
+                    <td className="px-2 py-2 text-orange-700 dark:text-orange-300 font-semibold whitespace-nowrap">{t.requesterName || "—"}</td>
                     <td className="px-2 py-2 max-w-[220px]">
                       <div className={`flex items-center gap-1 font-semibold whitespace-nowrap ${isTkMaterial(t.materialId) ? TK_TEXT_CLASS : "text-gray-900 dark:text-gray-100"}`}>
                         {t.materialName}
