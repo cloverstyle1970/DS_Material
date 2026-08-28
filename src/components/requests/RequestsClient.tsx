@@ -1074,8 +1074,10 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                                 입고 {o.receivedQty}/{o.qty}
                               </span>
                             )}
-                            <button type="button" disabled={actionLoading === o.id} onClick={() => router.push(`/purchase-orders/edit?id=${o.orderId}`)}
-                              className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 whitespace-nowrap">수정</button>
+                            {o.headerStatus !== "입고완료" && (
+                              <button type="button" disabled={actionLoading === o.id} onClick={() => router.push(`/purchase-orders/edit?id=${o.orderId}`)}
+                                className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 whitespace-nowrap">수정</button>
+                            )}
                             <button type="button" disabled={actionLoading === o.id} onClick={() => handleOrdLineAction(o.id, "입고완료")}
                               className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 whitespace-nowrap">입고완료</button>
                             {o.receivedQty === 0 && (
@@ -1190,8 +1192,10 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                       <td className="px-2 py-3">
                         {(o.status === "발주" || o.status === "부분입고") ? (
                           <div className="flex gap-1">
-                            <button type="button" disabled={actionLoading === o.id} onClick={() => router.push(`/purchase-orders/edit?id=${o.orderId}`)}
-                              className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 whitespace-nowrap">수정</button>
+                            {o.headerStatus !== "입고완료" && (
+                              <button type="button" disabled={actionLoading === o.id} onClick={() => router.push(`/purchase-orders/edit?id=${o.orderId}`)}
+                                className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 whitespace-nowrap">수정</button>
+                            )}
                             <button type="button" disabled={actionLoading === o.id} onClick={() => handleOrdLineAction(o.id, "입고완료")}
                               className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 whitespace-nowrap">
                               {o.status === "부분입고" ? "잔량입고" : "입고완료"}
