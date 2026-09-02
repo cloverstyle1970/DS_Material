@@ -110,14 +110,19 @@ function calcDurationDays(
     const d = new Date(base.getTime() + offsetDays * 86400000);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   };
+  const isOffDay = (base: Date, offsetDays: number) => {
+    const d = new Date(base.getTime() + offsetDays * 86400000);
+    const dow = d.getDay(); // 0=일, 6=토
+    return dow === 0 || dow === 6 || holidays.has(toDateStr(base, offsetDays));
+  };
 
   if (sHr !== "" && sMi !== "" && eHr !== "" && eMi !== "") {
-    // 시분 입력 시: 날짜별로 근무슬롯(08:30~17:30)과 겹치는 분 합산, 공휴일 제외, 0.5일 단위 반올림
+    // 시분 입력 시: 날짜별로 근무슬롯(08:30~17:30)과 겹치는 분 합산, 주말·공휴일 제외, 0.5일 단위 반올림
     const sTimeMi = parseInt(sHr, 10) * 60 + parseInt(sMi, 10);
     const eTimeMi = parseInt(eHr, 10) * 60 + parseInt(eMi, 10);
     let totalDays = 0;
     for (let d = 0; d <= diffDays; d++) {
-      if (holidays.has(toDateStr(sDate, d))) continue;
+      if (isOffDay(sDate, d)) continue;
       const dayStartMi = d === 0        ? sTimeMi          : WORK_START_MINUTES;
       const dayEndMi   = d === diffDays ? eTimeMi          : WORK_END_MINUTES;
       const effStart   = Math.max(dayStartMi, WORK_START_MINUTES);
@@ -128,10 +133,10 @@ function calcDurationDays(
     return rounded % 1 === 0 ? String(rounded) : rounded.toFixed(1);
   }
 
-  // 날짜만 입력 시: 공휴일 제외한 달력 일수 (종료일 포함)
+  // 날짜만 입력 시: 주말·공휴일 제외한 영업일 수 (종료일 포함)
   let count = 0;
   for (let d = 0; d <= diffDays; d++) {
-    if (!holidays.has(toDateStr(sDate, d))) count++;
+    if (!isOffDay(sDate, d)) count++;
   }
   return count > 0 ? String(count) : "0";
 }
@@ -750,7 +755,7 @@ export default function LeaveLedgerClient() {
               {holidaysInRange.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2 px-4 pb-2">
                   <span className="text-red-600 dark:text-red-400 font-medium whitespace-nowrap">🎌 기간 내 공휴일</span>
-                  <span className="text-gray-400 dark:text-gray-500 text-[10px]">(자동계산 제외)</span>
+                  <span className="text-gray-400 dark:text-gray-500 text-[10px]">(주말·공휴일 자동계산 제외)</span>
                   <div className="flex flex-wrap gap-1.5">
                     {holidaysInRange.map(h => {
                       const [, m, d] = h.date.split("-");
