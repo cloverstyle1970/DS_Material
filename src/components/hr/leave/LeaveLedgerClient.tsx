@@ -93,6 +93,7 @@ const WORK_SLOT_MINUTES  = WORK_END_MINUTES - WORK_START_MINUTES; // 540분
 function calcDurationDays(
   sYr: string, sMo: string, sDy: string, sHr: string, sMi: string,
   eYr: string, eMo: string, eDy: string, eHr: string, eMi: string,
+  holidays: Set<string>,
 ): string {
   if (!sYr || !sMo || !sDy || !eYr || !eMo || !eDy) return "";
   const pad = (v: string) => v.padStart(2, "0");
@@ -104,12 +105,19 @@ function calcDurationDays(
 
   const diffDays = Math.round((eDate.getTime() - sDate.getTime()) / (1000 * 60 * 60 * 24));
 
+  // 날짜 문자열 헬퍼 (로컬 기준)
+  const toDateStr = (base: Date, offsetDays: number) => {
+    const d = new Date(base.getTime() + offsetDays * 86400000);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+
   if (sHr !== "" && sMi !== "" && eHr !== "" && eMi !== "") {
-    // 시분 입력 시: 날짜별로 근무슬롯(08:30~17:30)과 겹치는 분 합산 후 0.5일 단위 반올림
+    // 시분 입력 시: 날짜별로 근무슬롯(08:30~17:30)과 겹치는 분 합산, 공휴일 제외, 0.5일 단위 반올림
     const sTimeMi = parseInt(sHr, 10) * 60 + parseInt(sMi, 10);
     const eTimeMi = parseInt(eHr, 10) * 60 + parseInt(eMi, 10);
     let totalDays = 0;
     for (let d = 0; d <= diffDays; d++) {
+      if (holidays.has(toDateStr(sDate, d))) continue;
       const dayStartMi = d === 0        ? sTimeMi          : WORK_START_MINUTES;
       const dayEndMi   = d === diffDays ? eTimeMi          : WORK_END_MINUTES;
       const effStart   = Math.max(dayStartMi, WORK_START_MINUTES);
@@ -120,8 +128,12 @@ function calcDurationDays(
     return rounded % 1 === 0 ? String(rounded) : rounded.toFixed(1);
   }
 
-  // 날짜만 입력 시: 달력 일수 (종료일 포함)
-  return String(diffDays + 1);
+  // 날짜만 입력 시: 공휴일 제외한 달력 일수 (종료일 포함)
+  let count = 0;
+  for (let d = 0; d <= diffDays; d++) {
+    if (!holidays.has(toDateStr(sDate, d))) count++;
+  }
+  return count > 0 ? String(count) : "0";
 }
 
 // ── 승인자 검색 인풋 ──────────────────────────────────────────
@@ -244,6 +256,7 @@ export default function LeaveLedgerClient() {
   const [defaultApproverId, setDefaultApproverId] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen]     = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
+  const [holidays, setHolidays]             = useState<Set<string>>(new Set());
 
   const f  = form;
   const sf = (p: Partial<FormState>) => setForm(prev => ({ ...prev, ...p }));
@@ -278,6 +291,13 @@ export default function LeaveLedgerClient() {
     supabase.from("system_settings").select("value").eq("key", "leave_default_approver_id").maybeSingle()
       .then(({ data }) => {
         if (data?.value) setDefaultApproverId(Number(data.value));
+      });
+  }, []);
+
+  useEffect(() => {
+    supabase.from("public_holidays").select("date")
+      .then(({ data }) => {
+        if (data) setHolidays(new Set(data.map((r: { date: string }) => r.date)));
       });
   }, []);
 
@@ -518,10 +538,10 @@ export default function LeaveLedgerClient() {
   const isReadOnly = !!(editingRecord && !canEdit(editingRecord));
 
   useEffect(() => {
-    const calc = calcDurationDays(f.s_yr, f.s_mo, f.s_dy, f.s_hr, f.s_mi, f.e_yr, f.e_mo, f.e_dy, f.e_hr, f.e_mi);
+    const calc = calcDurationDays(f.s_yr, f.s_mo, f.s_dy, f.s_hr, f.s_mi, f.e_yr, f.e_mo, f.e_dy, f.e_hr, f.e_mi, holidays);
     sf({ duration_days: calc });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [f.s_yr, f.s_mo, f.s_dy, f.s_hr, f.s_mi, f.e_yr, f.e_mo, f.e_dy, f.e_hr, f.e_mi]);
+  }, [f.s_yr, f.s_mo, f.s_dy, f.s_hr, f.s_mi, f.e_yr, f.e_mo, f.e_dy, f.e_hr, f.e_mi, holidays]);
 
   const sDow = dowKr(f.s_yr, f.s_mo, f.s_dy);
   const eDow = dowKr(f.e_yr, f.e_mo, f.e_dy);
