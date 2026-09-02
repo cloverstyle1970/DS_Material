@@ -256,7 +256,7 @@ export default function LeaveLedgerClient() {
   const [defaultApproverId, setDefaultApproverId] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen]     = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
-  const [holidays, setHolidays]             = useState<Set<string>>(new Set());
+  const [holidays, setHolidays]             = useState<Map<string, string>>(new Map());
 
   const f  = form;
   const sf = (p: Partial<FormState>) => setForm(prev => ({ ...prev, ...p }));
@@ -295,9 +295,9 @@ export default function LeaveLedgerClient() {
   }, []);
 
   useEffect(() => {
-    supabase.from("public_holidays").select("date")
+    supabase.from("public_holidays").select("date,name")
       .then(({ data }) => {
-        if (data) setHolidays(new Set(data.map((r: { date: string }) => r.date)));
+        if (data) setHolidays(new Map(data.map((r: { date: string; name: string }) => [r.date, r.name])));
       });
   }, []);
 
@@ -538,13 +538,26 @@ export default function LeaveLedgerClient() {
   const isReadOnly = !!(editingRecord && !canEdit(editingRecord));
 
   useEffect(() => {
-    const calc = calcDurationDays(f.s_yr, f.s_mo, f.s_dy, f.s_hr, f.s_mi, f.e_yr, f.e_mo, f.e_dy, f.e_hr, f.e_mi, holidays);
+    const calc = calcDurationDays(f.s_yr, f.s_mo, f.s_dy, f.s_hr, f.s_mi, f.e_yr, f.e_mo, f.e_dy, f.e_hr, f.e_mi, new Set(holidays.keys()));
     sf({ duration_days: calc });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [f.s_yr, f.s_mo, f.s_dy, f.s_hr, f.s_mi, f.e_yr, f.e_mo, f.e_dy, f.e_hr, f.e_mi, holidays]);
 
   const sDow = dowKr(f.s_yr, f.s_mo, f.s_dy);
   const eDow = dowKr(f.e_yr, f.e_mo, f.e_dy);
+
+  // 선택 기간 내 공휴일 목록
+  const holidaysInRange = useMemo(() => {
+    const pad = (v: string) => v.padStart(2, "0");
+    if (!f.s_yr || !f.s_mo || !f.s_dy || !f.e_yr || !f.e_mo || !f.e_dy) return [];
+    const from = `20${pad(f.s_yr)}-${pad(f.s_mo)}-${pad(f.s_dy)}`;
+    const to   = `20${pad(f.e_yr)}-${pad(f.e_mo)}-${pad(f.e_dy)}`;
+    const result: { date: string; name: string }[] = [];
+    holidays.forEach((name, date) => {
+      if (date >= from && date <= to) result.push({ date, name });
+    });
+    return result.sort((a, b) => a.date.localeCompare(b.date));
+  }, [f.s_yr, f.s_mo, f.s_dy, f.e_yr, f.e_mo, f.e_dy, holidays]);
 
   // 상태 탭 건수
   const statusCounts = useMemo(() => {
@@ -705,30 +718,51 @@ export default function LeaveLedgerClient() {
         {editingId !== null && (
           <>
             {/* 보조 바 */}
-            <div className="lr-print-hide sticky top-0 z-10 flex flex-wrap items-center gap-3 px-4 py-2 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800 text-xs">
-              <span className="text-gray-500 font-medium whitespace-nowrap">승인자</span>
-              {isReadOnly ? (
-                <span className="px-2 py-1 text-gray-700 dark:text-gray-200 font-medium">
-                  {approverAcc?.username ?? "—"}
-                </span>
-              ) : (
-                <AccountSearchInput
-                  accountId={f.approver_id}
-                  onSelect={id => sf({ approver_id: id })}
-                  accounts={activeAccounts}
-                  placeholder="— 승인자 검색 —"
-                  className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400 w-40"
-                />
-              )}
-              {isReadOnly && editingRecord && (
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  editingRecord.approval_status === "pending"  ? "bg-blue-100 text-blue-700" :
-                  editingRecord.approval_status === "approved" ? "bg-green-100 text-green-700" :
-                  editingRecord.approval_status === "rejected" ? "bg-red-100 text-red-600" :
-                  "bg-gray-100 text-gray-600"
-                }`}>
-                  {{ draft: "작성중", pending: "승인 요청", approved: "승인완료", rejected: "반려" }[editingRecord.approval_status] ?? editingRecord.approval_status}
-                </span>
+            <div className="lr-print-hide sticky top-0 z-10 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800 text-xs">
+              {/* 승인자 행 */}
+              <div className="flex flex-wrap items-center gap-3 px-4 py-2">
+                <span className="text-gray-500 font-medium whitespace-nowrap">승인자</span>
+                {isReadOnly ? (
+                  <span className="px-2 py-1 text-gray-700 dark:text-gray-200 font-medium">
+                    {approverAcc?.username ?? "—"}
+                  </span>
+                ) : (
+                  <AccountSearchInput
+                    accountId={f.approver_id}
+                    onSelect={id => sf({ approver_id: id })}
+                    accounts={activeAccounts}
+                    placeholder="— 승인자 검색 —"
+                    className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400 w-40"
+                  />
+                )}
+                {isReadOnly && editingRecord && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    editingRecord.approval_status === "pending"  ? "bg-blue-100 text-blue-700" :
+                    editingRecord.approval_status === "approved" ? "bg-green-100 text-green-700" :
+                    editingRecord.approval_status === "rejected" ? "bg-red-100 text-red-600" :
+                    "bg-gray-100 text-gray-600"
+                  }`}>
+                    {{ draft: "작성중", pending: "승인 요청", approved: "승인완료", rejected: "반려" }[editingRecord.approval_status] ?? editingRecord.approval_status}
+                  </span>
+                )}
+              </div>
+              {/* 기간 내 공휴일 행 */}
+              {holidaysInRange.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 px-4 pb-2">
+                  <span className="text-red-600 dark:text-red-400 font-medium whitespace-nowrap">🎌 기간 내 공휴일</span>
+                  <span className="text-gray-400 dark:text-gray-500 text-[10px]">(자동계산 제외)</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {holidaysInRange.map(h => {
+                      const [, m, d] = h.date.split("-");
+                      return (
+                        <span key={h.date}
+                          className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-[10px] font-medium whitespace-nowrap">
+                          {parseInt(m)}/{parseInt(d)} {h.name}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
             </div>
 
