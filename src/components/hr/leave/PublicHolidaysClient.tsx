@@ -64,12 +64,17 @@ export default function PublicHolidaysClient() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("public_holidays")
       .select("id,date,name")
       .gte("date", `${selectedYear}-01-01`)
       .lte("date", `${selectedYear}-12-31`)
       .order("date");
+    if (error) {
+      alert("공휴일 로드 실패: " + error.message);
+      setLoading(false);
+      return;
+    }
     setHolidays((data as Holiday[] | null) ?? []);
     setLoading(false);
   }, [selectedYear]);
@@ -108,7 +113,13 @@ export default function PublicHolidaysClient() {
     setAddSaving(false);
     if (error) { alert("추가 실패: " + error.message); return; }
     setAddOpen(false); setAddDate(""); setAddName("");
-    await load();
+    // 입력 날짜 연도가 현재 선택 연도와 다르면 해당 연도로 전환 (useEffect가 load 자동 호출)
+    const addedYear = parseInt(addDate.slice(0, 4));
+    if (addedYear !== selectedYear) {
+      setSelectedYear(addedYear);
+    } else {
+      await load();
+    }
   }
 
   async function addSingleFixed(date: string, name: string) {
