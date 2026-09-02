@@ -28,7 +28,8 @@ type NavItem = {
   href: string;
   label: string;
   icon: string;
-  section?: string;  // 그룹 내 서브섹션 라벨 (선택)
+  section?: string;
+  adminOnly?: boolean;
 };
 
 type NavGroup = {
@@ -128,6 +129,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/hr/company-vehicles",    label: "회사차량관리",      icon: "🚗", section: "관리" },
       { href: "/hr/overtime-ledger",    label: "잔업보고서",        icon: "🕐", section: "관리" },
       { href: "/hr/leave-ledger",       label: "연차계",            icon: "📅", section: "관리" },
+      { href: "/hr/public-holidays",    label: "공휴일 관리",        icon: "🗓", section: "관리", adminOnly: true },
       { href: "/hr/employee-register",  label: "사원등록",          icon: "🧑‍💼", section: "인사" },
       { href: "/hr/dept-rank",          label: "부서/직급관리", icon: "🏢", section: "인사" },
       { href: "/hr/team-crew",          label: "팀구성 관리",    icon: "🧑‍🤝‍🧑", section: "인사" },
@@ -353,14 +355,12 @@ export default function Sidebar({ open, isPc, onToggle, onClose }: Props) {
           {NAV_GROUPS.map((group, gi) => {
             const visibleItems = group.items
               .filter(item => {
-                // 외부/플레이스홀더 링크(#로 시작: 위험성평가·준비중 등 페이지 없는 자리표시)는
-                // 권한 체크박스가 없으므로 admin에게만 노출. 비관리자는 조회 권한과 무관하게 숨김.
-                if (item.href.startsWith("#")) return user ? isAdmin(user) : false;
-                // 그 외 모든 메뉴는 권한 그룹 설정의 체크박스(menu:{href}:read)를 따른다.
-                // admin이면 모두 허용, 아니면 read 권한 보유한 메뉴만 노출.
-                // 권한 목록에 없는 하위 라우트(예: .../mobile)는 matchMenuHref 로 부모 권한을
-                // 따르게 한다. AdminShell 라우트 가드와 동일한 기준이라 노출/접근이 어긋나지 않는다.
                 if (!user) return false;
+                // adminOnly 항목은 시스템 관리자만 노출
+                if (item.adminOnly && !isAdmin(user)) return false;
+                // 외부/플레이스홀더 링크(#로 시작)는 admin에게만 노출
+                if (item.href.startsWith("#")) return isAdmin(user);
+                // 그 외 모든 메뉴는 권한 그룹의 read 권한을 따른다
                 const canonical = matchMenuHref(item.href) ?? item.href;
                 return hasMenuPermission(user, canonical, "read");
               });

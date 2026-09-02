@@ -59,6 +59,7 @@ import ManualCenterClient from "@/components/manual/ManualCenterClient";
 import ImprovementRequestsClient from "@/components/board/ImprovementRequestsClient";
 import OvertimeLedgerClient from "@/components/hr/overtime/OvertimeLedgerClient";
 import LeaveLedgerClient from "@/components/hr/leave/LeaveLedgerClient";
+import PublicHolidaysClient from "@/components/hr/leave/PublicHolidaysClient";
 
 export interface PageEntry {
   label: string;
@@ -157,6 +158,10 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/hr/leave-ledger": {
     label: "연차계",
     render: () => <LeaveLedgerClient />,
+  },
+  "/hr/public-holidays": {
+    label: "공휴일 관리",
+    render: () => <PublicHolidaysClient />,
   },
   "/uniform-safety": {
     label: "근무복·안전장구 신청",
