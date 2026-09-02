@@ -41,6 +41,27 @@ export async function notifyLeaveApproved(params: {
   });
 }
 
+/** 승인 완료 알림 → 연차계 담당자에게 */
+export async function notifyLeaveApprovedToManager(params: {
+  managerId: number;
+  authorName: string;
+  approverName: string;
+  requestNo: string;
+  requestId: number;
+  leaveType: string;
+}): Promise<void> {
+  const { managerId, authorName, approverName, requestNo, requestId, leaveType } = params;
+  await insertNotification({
+    userId:  managerId,
+    type:    "leave_approved_manager",
+    title:   `년차계 승인 완료 — ${requestNo}`,
+    message: `${authorName} · ${leaveType} / 승인: ${approverName}`,
+    link:    LEAVE_HREF,
+    refType: "leave_request",
+    refId:   requestId,
+  });
+}
+
 /** 반려 알림 → 작성자에게 */
 export async function notifyLeaveRejected(params: {
   authorId: number;

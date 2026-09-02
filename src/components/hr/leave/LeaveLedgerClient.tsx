@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useReloadOnActivate, useTabIsActive } from "@/context/TabActivationContext";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { notifyLeaveApprovalRequest, notifyLeaveApproved, notifyLeaveRejected } from "./leaveNotify";
+import { notifyLeaveApprovalRequest, notifyLeaveApproved, notifyLeaveApprovedToManager, notifyLeaveRejected } from "./leaveNotify";
 
 export const LR_LEDGER_MENU_HREF = "/hr/leave-ledger";
 
@@ -235,11 +235,15 @@ export default function LeaveLedgerClient() {
   const [authorSignPending, setAuthorSignPending] = useState(false);
   const signCanvasRef = useRef<HTMLCanvasElement>(null);
   const signIsDrawing = useRef(false);
-  const [listQuery, setListQuery]           = useState("");
   const [listDateFrom, setListDateFrom]     = useState(() => `${new Date().getFullYear()}-01-01`);
   const [listDateTo, setListDateTo]         = useState(() => `${new Date().getFullYear()}-12-31`);
+  const [leaveTypeFilter, setLeaveTypeFilter] = useState("");
+  const [authorFilter, setAuthorFilter]     = useState("");
   const [statusFilter, setStatusFilter]     = useState<StatusFilter>("all");
   const pendingAutoFiltered = useRef(false);
+  const [defaultApproverId, setDefaultApproverId] = useState<number | null>(null);
+  const [settingsOpen, setSettingsOpen]     = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
 
   const f  = form;
   const sf = (p: Partial<FormState>) => setForm(prev => ({ ...prev, ...p }));
@@ -269,6 +273,32 @@ export default function LeaveLedgerClient() {
   }, []);
   useEffect(() => { load(); }, [load]);
   useReloadOnActivate(load);
+
+  useEffect(() => {
+    supabase.from("system_settings").select("value").eq("key", "leave_default_approver_id").maybeSingle()
+      .then(({ data }) => {
+        if (data?.value) setDefaultApproverId(Number(data.value));
+      });
+  }, []);
+
+  async function saveDefaultApprover() {
+    setSettingsSaving(true);
+    try {
+      if (defaultApproverId == null) {
+        await supabase.from("system_settings").delete().eq("key", "leave_default_approver_id");
+      } else {
+        await supabase.from("system_settings").upsert(
+          { key: "leave_default_approver_id", value: String(defaultApproverId), updated_at: new Date().toISOString() },
+          { onConflict: "key" }
+        );
+      }
+      setSettingsOpen(false);
+    } catch (e: unknown) {
+      alert("저장 실패: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setSettingsSaving(false);
+    }
+  }
 
   // 순수 승인자(관리자 아님)로 첫 진입 시 승인 대기 탭 자동 선택
   useEffect(() => {
@@ -303,8 +333,7 @@ export default function LeaveLedgerClient() {
   }, [printPending, editingId]);
 
   function openNew() {
-    const hjhAccount = accounts.find(a => a.username === "황진한");
-    setForm({ ...makeEmptyForm(), approver_id: hjhAccount?.id ?? null });
+    setForm({ ...makeEmptyForm(), approver_id: defaultApproverId });
     setEditingId("new");
   }
   function openEdit(r: LeaveRequest, andPrint = false) {
@@ -324,7 +353,7 @@ export default function LeaveLedgerClient() {
     setSaving(true);
     try {
       const corePayload = {
-        author_id: user.id,
+        author_id: editingId === "new" ? user.id : (editingRecord?.author_id ?? user.id),
         leave_type: f.leave_type,
         s_yr: f.s_yr, s_mo: f.s_mo, s_dy: f.s_dy, s_hr: f.s_hr, s_mi: f.s_mi,
         e_yr: f.e_yr, e_mo: f.e_mo, e_dy: f.e_dy, e_hr: f.e_hr, e_mi: f.e_mi,
@@ -440,7 +469,19 @@ export default function LeaveLedgerClient() {
       .update({ approval_status: "approved", approved_at: new Date().toISOString(), approver_signature: sig })
       .eq("id", target.id);
     if (error) { alert("오류: " + error.message); return; }
-    notifyLeaveApproved({ authorId: target.author_id, approverName: authorAcc?.username ?? user.name, requestNo: target.request_no, requestId: target.id }).catch(console.warn);
+    const approverName = authorAcc?.username ?? user.name;
+    const authorName   = accounts.find(a => a.id === target.author_id)?.username ?? "";
+    notifyLeaveApproved({ authorId: target.author_id, approverName, requestNo: target.request_no, requestId: target.id }).catch(console.warn);
+    if (defaultApproverId && defaultApproverId !== user.id) {
+      notifyLeaveApprovedToManager({
+        managerId:    defaultApproverId,
+        authorName,
+        approverName,
+        requestNo:    target.request_no,
+        requestId:    target.id,
+        leaveType:    target.leave_type,
+      }).catch(console.warn);
+    }
     setSignModal(null); await load();
     if (editingId === target.id) setForm(prev => ({ ...prev }));
   }
@@ -498,17 +539,19 @@ export default function LeaveLedgerClient() {
     const dt = r.s_yr ? `20${pad(r.s_yr)}-${pad(r.s_mo)}-${pad(r.s_dy)}` : "";
     if (listDateFrom && dt && dt < listDateFrom) return false;
     if (listDateTo   && dt && dt > listDateTo)   return false;
-    if (!listQuery.trim()) return true;
-    const q = listQuery.trim();
-    const author = accounts.find(a => a.id === r.author_id);
-    return r.request_no.includes(q) || r.leave_type.includes(q) || (r.reason ?? "").includes(q) || (author?.username ?? "").includes(q);
-  }), [records, statusFilter, listDateFrom, listDateTo, listQuery, accounts]);
+    if (leaveTypeFilter && r.leave_type !== leaveTypeFilter) return false;
+    if (authorFilter.trim()) {
+      const author = accounts.find(a => a.id === r.author_id);
+      if (!(author?.username ?? "").includes(authorFilter.trim())) return false;
+    }
+    return true;
+  }), [records, statusFilter, listDateFrom, listDateTo, leaveTypeFilter, authorFilter, accounts]);
 
   const totalDays = useMemo(() =>
     filtered.filter(r => r.approval_status === "approved").reduce((s, r) => s + (r.duration_days ?? 0), 0),
     [filtered]);
 
-  const sigCol = approverAcc?.username === "황진한" ? 0 : 1;
+  const sigCol = 1; // 팀장 결재란 고정
 
   const STATUS_TABS: { key: StatusFilter; label: string }[] = [
     { key: "all",      label: "전체" },
@@ -560,7 +603,16 @@ export default function LeaveLedgerClient() {
 
       {/* ── 상단 툴바 ── */}
       <div className="lr-print-hide flex items-center justify-between px-4 py-2 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0">
-        <h1 className="text-sm font-bold text-gray-800 dark:text-gray-100">연차계</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-sm font-bold text-gray-800 dark:text-gray-100">연차계</h1>
+          {user && isAdmin(user) && editingId === null && (
+            <button onClick={() => setSettingsOpen(v => !v)}
+              title="담당자 설정"
+              className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded transition-colors">
+              ⚙
+            </button>
+          )}
+        </div>
         <div className="flex gap-2">
           {editingId !== null ? (
             <>
@@ -601,6 +653,29 @@ export default function LeaveLedgerClient() {
           )}
         </div>
       </div>
+
+      {/* ── 담당자 설정 패널 (관리자 전용) ── */}
+      {settingsOpen && user && isAdmin(user) && editingId === null && (
+        <div className="lr-print-hide flex items-center gap-3 px-4 py-2.5 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 text-xs shrink-0">
+          <span className="font-medium text-amber-800 dark:text-amber-300 whitespace-nowrap">기본 담당자</span>
+          <AccountSearchInput
+            accountId={defaultApproverId}
+            onSelect={setDefaultApproverId}
+            accounts={activeAccounts}
+            placeholder="— 담당자 선택 —"
+            className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400 w-40"
+          />
+          <button onClick={saveDefaultApprover} disabled={settingsSaving}
+            className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded font-medium disabled:opacity-50">
+            {settingsSaving ? "저장중…" : "저장"}
+          </button>
+          <button onClick={() => setSettingsOpen(false)}
+            className="px-3 py-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded font-medium">
+            닫기
+          </button>
+          <span className="text-gray-400 dark:text-gray-500">새 문서 작성 시 승인자 기본값으로 적용됩니다.</span>
+        </div>
+      )}
 
       <div id="lr-scroll-wrap" className="flex-1 overflow-auto">
 
@@ -847,22 +922,18 @@ export default function LeaveLedgerClient() {
               <span className="text-xs text-gray-400">~</span>
               <input type="date" value={listDateTo} onChange={e => setListDateTo(e.target.value)}
                 className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400" />
-              <button onClick={() => {
-                const d = new Date();
-                setListDateFrom(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`);
-                const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-                setListDateTo(`${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, "0")}-${String(last.getDate()).padStart(2, "0")}`);
-              }} className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap">이번달</button>
-              <button onClick={() => {
-                const y = new Date().getFullYear();
-                setListDateFrom(`${y}-01-01`); setListDateTo(`${y}-12-31`);
-              }} className="text-xs text-gray-500 dark:text-gray-400 hover:underline whitespace-nowrap">올해</button>
-              <button onClick={() => { setListDateFrom(""); setListDateTo(""); }}
-                className="text-xs text-gray-400 dark:text-gray-500 hover:underline whitespace-nowrap">전체</button>
               <div className="w-px h-4 bg-gray-200 dark:bg-gray-600" />
-              <input value={listQuery} onChange={e => setListQuery(e.target.value)}
-                placeholder="문서번호·유형·사유·성명"
-                className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400 w-44" />
+              <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">유형</span>
+              <select value={leaveTypeFilter} onChange={e => setLeaveTypeFilter(e.target.value)}
+                className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400">
+                <option value="">전체</option>
+                {LEAVE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <div className="w-px h-4 bg-gray-200 dark:bg-gray-600" />
+              <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">작성자</span>
+              <input value={authorFilter} onChange={e => setAuthorFilter(e.target.value)}
+                placeholder="이름 입력"
+                className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400 w-28" />
               <span className="text-xs text-gray-400 ml-auto">{filtered.length}건</span>
             </div>
 
