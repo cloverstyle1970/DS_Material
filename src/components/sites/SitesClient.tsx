@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, FormEvent, useMemo, useEffect } from "react";
+import { useState, FormEvent, useMemo, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import { SiteRecord } from "@/lib/mock-sites";
 import { ElevatorRecord } from "@/lib/mock-elevators";
-import { useAuth, isViewOnly, isAdmin } from "@/context/AuthContext";
+import { useAuth, isViewOnly, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useViewMode } from "@/context/ViewModeContext";
@@ -151,11 +151,82 @@ function normalizeDateInput(s: string): string {
   return trimmed;
 }
 
+// ── 사원 검색 자동완성 ─────────────────────────────────────────
+interface Employee { id: number; username: string; dept?: string | null; position?: string | null }
+
+function EmployeeSelect({
+  value, onChange, employees, placeholder, className,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  employees: Employee[];
+  placeholder?: string;
+  className?: string;
+}) {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const [inputText, setInputText] = useState(value);
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setInputText(value); }, [value]);
+
+  const filtered = useMemo(() => {
+    const q = inputText.trim().toLowerCase();
+    if (!q) return employees.slice(0, 30);
+    return employees.filter(e => e.username.toLowerCase().includes(q)).slice(0, 30);
+  }, [inputText, employees]);
+
+  function select(emp: Employee) {
+    onChange(emp.username);
+    setInputText(emp.username);
+    setOpen(false);
+  }
+
+  function handleBlur(e: React.FocusEvent) {
+    if (containerRef.current?.contains(e.relatedTarget as Node)) return;
+    setInputText(value);
+    setOpen(false);
+  }
+
+  return (
+    <div ref={containerRef} className="relative" onBlur={handleBlur}>
+      <input
+        value={inputText}
+        onChange={e => { setInputText(e.target.value); setOpen(true); if (!e.target.value) onChange(""); }}
+        onFocus={() => setOpen(true)}
+        placeholder={placeholder ?? "사원 검색…"}
+        className={className}
+        autoComplete="off"
+      />
+      {open && filtered.length > 0 && (
+        <ul className={`absolute z-50 top-full left-0 right-0 mt-1 rounded-lg border shadow-lg max-h-48 overflow-y-auto ${isDark ? "bg-gray-800 border-gray-600" : "bg-white border-gray-200"}`}>
+          {filtered.map(emp => (
+            <li key={emp.id}>
+              <button
+                type="button"
+                onMouseDown={e => { e.preventDefault(); select(emp); }}
+                className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2 transition-colors ${isDark ? "hover:bg-gray-700 text-gray-200" : "hover:bg-gray-50 text-gray-800"}`}>
+                <span className="font-medium">{emp.username}</span>
+                {(emp.dept || emp.position) && (
+                  <span className={`text-xs shrink-0 ${isDark ? "text-gray-400" : "text-gray-400"}`}>
+                    {[emp.dept, emp.position].filter(Boolean).join(" · ")}
+                  </span>
+                )}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 // ── 현장 등록 모달 ─────────────────────────────────────────────
 
-interface AddSiteModalProps { onClose: () => void; onSaved: () => void; editSite?: SiteRecord; existingElevators?: ElevatorRecord[]; }
+interface AddSiteModalProps { onClose: () => void; onSaved: () => void; editSite?: SiteRecord; existingElevators?: ElevatorRecord[]; limitedEdit?: boolean; }
 
-function AddSiteModal({ onClose, onSaved, editSite, existingElevators }: AddSiteModalProps) {
+function AddSiteModal({ onClose, onSaved, editSite, existingElevators, limitedEdit = false }: AddSiteModalProps) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const { viewMode } = useViewMode();
@@ -196,6 +267,12 @@ function AddSiteModal({ onClose, onSaved, editSite, existingElevators }: AddSite
   );
   const [saving,           setSaving]            = useState(false);
   const [error,            setError]             = useState("");
+  const [employees,        setEmployees]         = useState<Employee[]>([]);
+
+  useEffect(() => {
+    supabase.from("accounts").select("id, username, dept, position").order("username")
+      .then(({ data }) => { if (data) setEmployees(data); });
+  }, []);
 
   function searchAddress() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -276,89 +353,108 @@ function AddSiteModal({ onClose, onSaved, editSite, existingElevators }: AddSite
       panelClassName="w-full max-w-lg mx-4 max-h-[90vh]"
       header={
         <div className={`flex items-center justify-between px-6 py-4 border-b shrink-0 ${isDark ? "border-gray-700" : "border-gray-200"}`}>
-          <h2 className={`text-base font-semibold ${isDark ? "text-gray-100" : "text-gray-800"}`}>{isEdit ? "현장 수정" : "현장 등록"}</h2>
+          <h2 className={`text-base font-semibold ${isDark ? "text-gray-100" : "text-gray-800"}`}>{isEdit ? (limitedEdit ? "현장 수정 (제한)" : "현장 수정") : "현장 등록"}</h2>
           <button onClick={onClose} className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg transition-colors ${isDark ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"}`}>×</button>
         </div>
       }
     >
         <form onSubmit={handleSubmit} className={`px-6 py-5 space-y-3 overflow-y-auto flex-1 ${isMobile ? "force-mobile" : ""}`}>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2">
-              <label className={labelCls}>현장명 <span className="text-red-500">*</span></label>
-              <input value={name} onChange={e => setName(e.target.value)} required className={fieldCls} />
+          {limitedEdit && (
+            <div className={`rounded-lg px-4 py-3 text-sm ${isDark ? "bg-blue-900/20 border border-blue-800 text-blue-300" : "bg-blue-50 border border-blue-200 text-blue-700"}`}>
+              <p className="font-medium mb-0.5">제한 편집 모드</p>
+              <p className="text-xs opacity-80">주점검자·보조점검자·비상통화장치·비고 필드만 수정할 수 있습니다.</p>
             </div>
+          )}
+          {limitedEdit ? (
             <div>
-              <label className={labelCls}>회사구분</label>
-              <select value={companyType} onChange={e => setCompanyType(e.target.value)} className={fieldCls}>
-                <option value="TK">TK</option>
-                <option value="DS">DS</option>
-                <option value="">기타</option>
-              </select>
+              <label className={labelCls}>현장명</label>
+              <input value={name} readOnly className={fieldCls + (isDark ? " !bg-gray-900/40 !text-gray-400" : " !bg-gray-50 !text-gray-500")} />
             </div>
-          </div>
-          <div>
-            <label className={labelCls}>현장 별칭</label>
-            <input value={alias} onChange={e => setAlias(e.target.value)} placeholder="짧게 부르는 이름 (선택)" className={fieldCls} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>계약구분</label>
-              <input value={contractType} onChange={e => setContractType(e.target.value)} placeholder="유지보수, 하자 등" className={fieldCls} />
+          ) : (
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-2">
+                <label className={labelCls}>현장명 <span className="text-red-500">*</span></label>
+                <input value={name} onChange={e => setName(e.target.value)} required className={fieldCls} />
+              </div>
+              <div>
+                <label className={labelCls}>회사구분</label>
+                <select value={companyType} onChange={e => setCompanyType(e.target.value)} className={fieldCls}>
+                  <option value="TK">TK</option>
+                  <option value="DS">DS</option>
+                  <option value="">기타</option>
+                </select>
+              </div>
             </div>
-            <div>
-              <label className={labelCls}>계약일자</label>
-              <input type="text" inputMode="numeric" maxLength={10}
-                value={contractDate}
-                onChange={e => setContractDate(e.target.value)}
-                onBlur={e => setContractDate(normalizeDateInput(e.target.value))}
-                placeholder="YYYY-MM-DD (예: 20260512)"
-                className={fieldCls} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>계약시작</label>
-              <input type="text" inputMode="numeric" maxLength={10}
-                value={contractStart}
-                onChange={e => setContractStart(e.target.value)}
-                onBlur={e => setContractStart(normalizeDateInput(e.target.value))}
-                placeholder="YYYY-MM-DD (예: 20260512)"
-                className={fieldCls} />
-            </div>
-            <div>
-              <label className={labelCls}>계약만료</label>
-              <input type="text" inputMode="numeric" maxLength={10}
-                value={contractEnd}
-                onChange={e => setContractEnd(e.target.value)}
-                onBlur={e => setContractEnd(normalizeDateInput(e.target.value))}
-                placeholder="YYYY-MM-DD (예: 20260512)"
-                className={fieldCls} />
-            </div>
-          </div>
+          )}
+          {!limitedEdit && (
+            <>
+              <div>
+                <label className={labelCls}>현장 별칭</label>
+                <input value={alias} onChange={e => setAlias(e.target.value)} placeholder="짧게 부르는 이름 (선택)" className={fieldCls} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>계약구분</label>
+                  <input value={contractType} onChange={e => setContractType(e.target.value)} placeholder="유지보수, 하자 등" className={fieldCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>계약일자</label>
+                  <input type="text" inputMode="numeric" maxLength={10}
+                    value={contractDate}
+                    onChange={e => setContractDate(e.target.value)}
+                    onBlur={e => setContractDate(normalizeDateInput(e.target.value))}
+                    placeholder="YYYY-MM-DD (예: 20260512)"
+                    className={fieldCls} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>계약시작</label>
+                  <input type="text" inputMode="numeric" maxLength={10}
+                    value={contractStart}
+                    onChange={e => setContractStart(e.target.value)}
+                    onBlur={e => setContractStart(normalizeDateInput(e.target.value))}
+                    placeholder="YYYY-MM-DD (예: 20260512)"
+                    className={fieldCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>계약만료</label>
+                  <input type="text" inputMode="numeric" maxLength={10}
+                    value={contractEnd}
+                    onChange={e => setContractEnd(e.target.value)}
+                    onBlur={e => setContractEnd(normalizeDateInput(e.target.value))}
+                    placeholder="YYYY-MM-DD (예: 20260512)"
+                    className={fieldCls} />
+                </div>
+              </div>
+            </>
+          )}
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className={labelCls}>주점검자</label>
-              <input value={primaryInspector} onChange={e => setPrimaryInspector(e.target.value)} className={fieldCls} />
+              <EmployeeSelect value={primaryInspector} onChange={setPrimaryInspector} employees={employees} className={fieldCls} />
             </div>
             <div>
               <label className={labelCls}>보조점검자1</label>
-              <input value={subInspector} onChange={e => setSubInspector(e.target.value)} className={fieldCls} />
+              <EmployeeSelect value={subInspector} onChange={setSubInspector} employees={employees} className={fieldCls} />
             </div>
             <div>
               <label className={labelCls}>보조점검자2</label>
-              <input value={subInspector2} onChange={e => setSubInspector2(e.target.value)} className={fieldCls} />
+              <EmployeeSelect value={subInspector2} onChange={setSubInspector2} employees={employees} className={fieldCls} />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>현장전화</label>
-              <input value={sitePhone} onChange={e => setSitePhone(formatPhone(e.target.value))} placeholder="031-000-0000" inputMode="tel" maxLength={14} className={fieldCls + " font-mono"} />
+          {!limitedEdit && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>현장전화</label>
+                <input value={sitePhone} onChange={e => setSitePhone(formatPhone(e.target.value))} placeholder="031-000-0000" inputMode="tel" maxLength={14} className={fieldCls + " font-mono"} />
+              </div>
+              <div>
+                <label className={labelCls}>현장핸드폰</label>
+                <input value={siteMobile} onChange={e => setSiteMobile(formatPhone(e.target.value))} placeholder="010-0000-0000" inputMode="tel" maxLength={14} className={fieldCls + " font-mono"} />
+              </div>
             </div>
-            <div>
-              <label className={labelCls}>현장핸드폰</label>
-              <input value={siteMobile} onChange={e => setSiteMobile(formatPhone(e.target.value))} placeholder="010-0000-0000" inputMode="tel" maxLength={14} className={fieldCls + " font-mono"} />
-            </div>
-          </div>
+          )}
           {/* 비상통화장치 */}
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -374,7 +470,34 @@ function AddSiteModal({ onClose, onSaved, editSite, existingElevators }: AddSite
                 const unitOptions = isEdit
                   ? (existingElevators ?? []).map(e => e.unitName ?? "")
                   : elevatorsToAdd.map(e => e.unitName).filter(u => u.trim());
-                return (
+                return limitedEdit ? (
+                  <div key={i} className={`space-y-2 ${i > 0 ? `pt-2 border-t ${isDark ? "border-gray-700" : "border-gray-100"}` : ""}`}>
+                    <div>
+                      <label className={labelCls}>호기</label>
+                      <select value={d.unit ?? ""}
+                        onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, unit: e.target.value } : x))}
+                        className={fieldCls}>
+                        <option value="">현장공통</option>
+                        {Array.from(new Set(unitOptions)).map(u => (
+                          <option key={u} value={u}>{u || "-"}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1">
+                        <label className={labelCls}>전화번호</label>
+                        <input value={d.number}
+                          onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, number: formatPhone(e.target.value) } : x))}
+                          placeholder="전화번호" inputMode="tel" maxLength={14} className={`${fieldCls} font-mono`} />
+                      </div>
+                      {emergencyDevices.length > 1 && (
+                        <button type="button"
+                          onClick={() => setEmergencyDevices(prev => prev.filter((_, j) => j !== i))}
+                          className={`mb-0.5 text-xl hover:text-red-400 ${isDark ? "text-gray-500" : "text-gray-300"}`}>×</button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
                   <div key={i} className={`flex items-center gap-2 ${isMobile ? "flex-wrap" : ""}`}>
                     <select value={d.unit ?? ""}
                       onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, unit: e.target.value } : x))}
@@ -400,64 +523,68 @@ function AddSiteModal({ onClose, onSaved, editSite, existingElevators }: AddSite
               })}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>담당자 HP</label>
-              <input value={managerPhone} onChange={e => setManagerPhone(formatPhone(e.target.value))} placeholder="010-0000-0000 또는 02-000-0000" inputMode="tel" maxLength={14} className={fieldCls + " font-mono"} />
-            </div>
-            <div>
-              <label className={labelCls}>담당자 메일</label>
-              <input type="email" value={managerEmail} onChange={e => setManagerEmail(e.target.value)} className={fieldCls} />
-            </div>
-          </div>
-          <div>
-            <label className={labelCls}>소재지 (도로명주소)</label>
-            <div className="flex gap-2">
-              <input value={address} onChange={e => setAddress(e.target.value)}
-                placeholder="도로명주소 검색 또는 직접 입력" className={`${fieldCls} flex-1`} />
-              <button type="button" onClick={searchAddress}
-                className={`shrink-0 px-3 py-2 rounded-lg border text-xs whitespace-nowrap transition-colors ${isDark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
-                🔍 주소 검색
-              </button>
-            </div>
-            {postalCode && <p className={`mt-1 text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>우편번호: {postalCode}</p>}
-          </div>
-          {/* 하자 정보 */}
-          <div className={`border-t pt-3 ${isDark ? "border-gray-700" : "border-gray-200"}`}>
-            <p className={`text-xs font-semibold uppercase tracking-wide mb-2.5 ${isDark ? "text-gray-500" : "text-gray-500"}`}>하자 정보</p>
-            <div className="space-y-3">
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className={labelCls}>하자기 대수</label>
-                  <input type="number" min={0} value={warrantyCount} onChange={e => setWarrantyCount(e.target.value)} placeholder="0" className={fieldCls} />
-                </div>
-                <div className="col-span-2">
-                  <label className={labelCls}>하자기 호기정보</label>
-                  <input value={warrantyUnits} onChange={e => setWarrantyUnits(e.target.value)} placeholder="예: 1호기, 3호기" className={fieldCls} />
-                </div>
-              </div>
+          {!limitedEdit && (
+            <>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>하자기간 시작</label>
-                  <input type="text" inputMode="numeric" maxLength={10}
-                    value={warrantyStart}
-                    onChange={e => setWarrantyStart(e.target.value)}
-                    onBlur={e => setWarrantyStart(normalizeDateInput(e.target.value))}
-                    placeholder="YYYY-MM-DD (예: 20260512)"
-                    className={fieldCls} />
+                  <label className={labelCls}>담당자 HP</label>
+                  <input value={managerPhone} onChange={e => setManagerPhone(formatPhone(e.target.value))} placeholder="010-0000-0000 또는 02-000-0000" inputMode="tel" maxLength={14} className={fieldCls + " font-mono"} />
                 </div>
                 <div>
-                  <label className={labelCls}>하자기간 종료</label>
-                  <input type="text" inputMode="numeric" maxLength={10}
-                    value={warrantyEnd}
-                    onChange={e => setWarrantyEnd(e.target.value)}
-                    onBlur={e => setWarrantyEnd(normalizeDateInput(e.target.value))}
-                    placeholder="YYYY-MM-DD (예: 20260512)"
-                    className={fieldCls} />
+                  <label className={labelCls}>담당자 메일</label>
+                  <input type="email" value={managerEmail} onChange={e => setManagerEmail(e.target.value)} className={fieldCls} />
                 </div>
               </div>
-            </div>
-          </div>
+              <div>
+                <label className={labelCls}>소재지 (도로명주소)</label>
+                <div className="flex gap-2">
+                  <input value={address} onChange={e => setAddress(e.target.value)}
+                    placeholder="도로명주소 검색 또는 직접 입력" className={`${fieldCls} flex-1`} />
+                  <button type="button" onClick={searchAddress}
+                    className={`shrink-0 px-3 py-2 rounded-lg border text-xs whitespace-nowrap transition-colors ${isDark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
+                    🔍 주소 검색
+                  </button>
+                </div>
+                {postalCode && <p className={`mt-1 text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>우편번호: {postalCode}</p>}
+              </div>
+              {/* 하자 정보 */}
+              <div className={`border-t pt-3 ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+                <p className={`text-xs font-semibold uppercase tracking-wide mb-2.5 ${isDark ? "text-gray-500" : "text-gray-500"}`}>하자 정보</p>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className={labelCls}>하자기 대수</label>
+                      <input type="number" min={0} value={warrantyCount} onChange={e => setWarrantyCount(e.target.value)} placeholder="0" className={fieldCls} />
+                    </div>
+                    <div className="col-span-2">
+                      <label className={labelCls}>하자기 호기정보</label>
+                      <input value={warrantyUnits} onChange={e => setWarrantyUnits(e.target.value)} placeholder="예: 1호기, 3호기" className={fieldCls} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>하자기간 시작</label>
+                      <input type="text" inputMode="numeric" maxLength={10}
+                        value={warrantyStart}
+                        onChange={e => setWarrantyStart(e.target.value)}
+                        onBlur={e => setWarrantyStart(normalizeDateInput(e.target.value))}
+                        placeholder="YYYY-MM-DD (예: 20260512)"
+                        className={fieldCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>하자기간 종료</label>
+                      <input type="text" inputMode="numeric" maxLength={10}
+                        value={warrantyEnd}
+                        onChange={e => setWarrantyEnd(e.target.value)}
+                        onBlur={e => setWarrantyEnd(normalizeDateInput(e.target.value))}
+                        placeholder="YYYY-MM-DD (예: 20260512)"
+                        className={fieldCls} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
           {/* 호기 정보 — 신규 등록 시에만 표시 */}
           {!isEdit && (
             <div className={`border-t pt-3 ${isDark ? "border-gray-700" : "border-gray-200"}`}>
@@ -492,10 +619,12 @@ function AddSiteModal({ onClose, onSaved, editSite, existingElevators }: AddSite
               </div>
             </div>
           )}
-          <div>
-            <label className={labelCls}>거래처</label>
-            <input value={vendor} onChange={e => setVendor(e.target.value)} className={fieldCls} />
-          </div>
+          {!limitedEdit && (
+            <div>
+              <label className={labelCls}>거래처</label>
+              <input value={vendor} onChange={e => setVendor(e.target.value)} className={fieldCls} />
+            </div>
+          )}
           <div>
             <label className={labelCls}>비고</label>
             <textarea value={note} onChange={e => setNote(e.target.value)} rows={5}
@@ -546,6 +675,7 @@ export default function SitesClient({ initial, elevators }: Props) {
   const [showElevatorForm, setShowElevatorForm]     = useState(false);
   const [editElevator, setEditElevator]             = useState<ElevatorRecord | null>(null);
   const [deleteElevatorTarget, setDeleteElevatorTarget] = useState<ElevatorRecord | null>(null);
+  const [editLimited, setEditLimited] = useState(false);
   const [page, setPage] = useState(1);
   const [checkedSiteIds, setCheckedSiteIds] = useState<Set<number>>(new Set());
 
@@ -558,8 +688,9 @@ export default function SitesClient({ initial, elevators }: Props) {
   }
 
   const { user } = useAuth();
-  const viewOnly = user ? isViewOnly(user) : true;
-  const canEdit  = user ? !viewOnly : false;
+  const canEditFull = user ? (isAdmin(user) || hasMenuPermission(user, "/site/units", "create")) : false;
+  const canEditLimited = user ? (!canEditFull && hasMenuPermission(user, "/site/units", "update")) : false;
+  const canEdit = canEditFull;
   const canDownload = user ? !isViewOnly(user) : false;
   const canBackup = user ? isAdmin(user) : false;
 
@@ -1068,8 +1199,8 @@ export default function SitesClient({ initial, elevators }: Props) {
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {canEdit && (
-                      <button onClick={() => setEditTarget(selected)}
+                    {(canEditFull || canEditLimited) && (
+                      <button onClick={() => { setEditTarget(selected); setEditLimited(canEditLimited); }}
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${isDark ? "bg-blue-900/40 text-blue-300 hover:bg-blue-900/60" : "bg-blue-50 text-blue-600 hover:bg-blue-100"}`}>
                         수정
                       </button>
@@ -1273,8 +1404,9 @@ export default function SitesClient({ initial, elevators }: Props) {
         <AddSiteModal
           editSite={editTarget}
           existingElevators={allElevators.filter(e => e.siteName === editTarget.name)}
-          onClose={() => setEditTarget(null)}
+          onClose={() => { setEditTarget(null); setEditLimited(false); }}
           onSaved={reload}
+          limitedEdit={editLimited}
         />
       )}
 
