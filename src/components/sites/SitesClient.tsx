@@ -453,74 +453,6 @@ function AddSiteModal({ onClose, onSaved, editSite, existingElevators, limitedEd
               </div>
             </div>
           )}
-          {/* 비상통화장치 */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className={labelCls}>비상통화장치</label>
-              <button type="button"
-                onClick={() => setEmergencyDevices(prev => [...prev, { number: "", unit: "", note: "" }])}
-                className={`text-xs px-2.5 py-1 rounded-lg transition-colors ${isDark ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-                + 추가
-              </button>
-            </div>
-            <div className="space-y-2">
-              {emergencyDevices.map((d, i) => {
-                const unitOptions = isEdit
-                  ? (existingElevators ?? []).map(e => e.unitName ?? "")
-                  : elevatorsToAdd.map(e => e.unitName).filter(u => u.trim());
-                return limitedEdit ? (
-                  <div key={i} className={`space-y-2 ${i > 0 ? `pt-2 border-t ${isDark ? "border-gray-700" : "border-gray-100"}` : ""}`}>
-                    <div>
-                      <label className={labelCls}>호기</label>
-                      <select value={d.unit ?? ""}
-                        onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, unit: e.target.value } : x))}
-                        className={fieldCls}>
-                        <option value="">현장공통</option>
-                        {Array.from(new Set(unitOptions)).map(u => (
-                          <option key={u} value={u}>{u || "-"}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex items-end gap-2">
-                      <div className="flex-1">
-                        <label className={labelCls}>전화번호</label>
-                        <input value={d.number}
-                          onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, number: formatPhone(e.target.value) } : x))}
-                          placeholder="전화번호" inputMode="tel" maxLength={14} className={`${fieldCls} font-mono`} />
-                      </div>
-                      {emergencyDevices.length > 1 && (
-                        <button type="button"
-                          onClick={() => setEmergencyDevices(prev => prev.filter((_, j) => j !== i))}
-                          className={`mb-0.5 text-xl hover:text-red-400 ${isDark ? "text-gray-500" : "text-gray-300"}`}>×</button>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div key={i} className={`flex items-center gap-2 ${isMobile ? "flex-wrap" : ""}`}>
-                    <select value={d.unit ?? ""}
-                      onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, unit: e.target.value } : x))}
-                      className={`${fieldCls} w-24 shrink-0`}>
-                      <option value="">현장공통</option>
-                      {Array.from(new Set(unitOptions)).map(u => (
-                        <option key={u} value={u}>{u || "-"}</option>
-                      ))}
-                    </select>
-                    <input value={d.number}
-                      onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, number: formatPhone(e.target.value) } : x))}
-                      placeholder="전화번호" inputMode="tel" maxLength={14} className={`${fieldCls} w-36 shrink-0 font-mono`} />
-                    <input value={d.note ?? ""}
-                      onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, note: e.target.value } : x))}
-                      placeholder="비고" className={`${fieldCls} flex-1`} />
-                    {emergencyDevices.length > 1 && (
-                      <button type="button"
-                        onClick={() => setEmergencyDevices(prev => prev.filter((_, j) => j !== i))}
-                        className={`text-xl hover:text-red-400 ${isDark ? "text-gray-500" : "text-gray-300"}`}>×</button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
           {!limitedEdit && (
             <>
               <div className="grid grid-cols-2 gap-3">
@@ -617,6 +549,74 @@ function AddSiteModal({ onClose, onSaved, editSite, existingElevators, limitedEd
               </div>
             </div>
           )}
+          {/* 비상통화장치 — 호기정보 바로 아래 배치 (호기명 입력 후 연결 편의) */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className={labelCls}>비상통화장치</label>
+              <button type="button"
+                onClick={() => setEmergencyDevices(prev => [...prev, { number: "", unit: "", note: "" }])}
+                className={`text-xs px-2.5 py-1 rounded-lg transition-colors ${isDark ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                + 추가
+              </button>
+            </div>
+            <div className="space-y-2">
+              {emergencyDevices.map((d, i) => {
+                const unitOptions = isEdit
+                  ? (existingElevators ?? []).map(e => e.unitName ?? "")
+                  : elevatorsToAdd.map(e => e.unitName).filter(u => u.trim());
+                return limitedEdit ? (
+                  <div key={i} className={`space-y-2 ${i > 0 ? `pt-2 border-t ${isDark ? "border-gray-700" : "border-gray-100"}` : ""}`}>
+                    <div>
+                      <label className={labelCls}>호기</label>
+                      <select value={d.unit ?? ""}
+                        onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, unit: e.target.value } : x))}
+                        className={fieldCls}>
+                        <option value="">현장공통</option>
+                        {Array.from(new Set(unitOptions)).map(u => (
+                          <option key={u} value={u}>{u || "-"}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1">
+                        <label className={labelCls}>전화번호</label>
+                        <input value={d.number}
+                          onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, number: formatPhone(e.target.value) } : x))}
+                          placeholder="전화번호" inputMode="tel" maxLength={14} className={`${fieldCls} font-mono`} />
+                      </div>
+                      {emergencyDevices.length > 1 && (
+                        <button type="button"
+                          onClick={() => setEmergencyDevices(prev => prev.filter((_, j) => j !== i))}
+                          className={`mb-0.5 text-xl hover:text-red-400 ${isDark ? "text-gray-500" : "text-gray-300"}`}>×</button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div key={i} className={`flex items-center gap-2 ${isMobile ? "flex-wrap" : ""}`}>
+                    <select value={d.unit ?? ""}
+                      onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, unit: e.target.value } : x))}
+                      className={`${fieldCls} w-24 shrink-0`}>
+                      <option value="">현장공통</option>
+                      {Array.from(new Set(unitOptions)).map(u => (
+                        <option key={u} value={u}>{u || "-"}</option>
+                      ))}
+                    </select>
+                    <input value={d.number}
+                      onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, number: formatPhone(e.target.value) } : x))}
+                      placeholder="전화번호" inputMode="tel" maxLength={14} className={`${fieldCls} w-36 shrink-0 font-mono`} />
+                    <input value={d.note ?? ""}
+                      onChange={e => setEmergencyDevices(prev => prev.map((x, j) => j === i ? { ...x, note: e.target.value } : x))}
+                      placeholder="비고" className={`${fieldCls} flex-1`} />
+                    {emergencyDevices.length > 1 && (
+                      <button type="button"
+                        onClick={() => setEmergencyDevices(prev => prev.filter((_, j) => j !== i))}
+                        className={`text-xl hover:text-red-400 ${isDark ? "text-gray-500" : "text-gray-300"}`}>×</button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
           {!limitedEdit && (
             <>
               <div>
