@@ -160,12 +160,12 @@ function dbToSite(r: any): SiteRecord {
     fax:               r.fax                ?? null,
     managerPhone:      r.manager_phone      ?? null,
     managerEmail:      r.manager_email      ?? null,
-    address:           r.address            ?? null,
+    address:           r.elevator_address   ?? r.address ?? null,
     entryInfo:         r.entry_info         ?? null,
     vendor:            r.vendor             ?? null,
     customerEmail:     r.customer_email     ?? null,
     jobNo:             r.job_no             ?? null,
-    note:              r.note               ?? null,
+    note:              r.notes              ?? r.note ?? null,
     emergencyDevice:   r.emergency_device   ?? null,
     emergencyDevices:  r.emergency_devices  ?? [],
     warrantyCount:     r.warranty_count     ?? null,
@@ -187,7 +187,10 @@ function siteToDb(d: any): Record<string, unknown> {
   if (d.contractDate      !== undefined) obj.contract_date      = d.contractDate;
   if (d.contractStart     !== undefined) obj.contract_start     = d.contractStart;
   if (d.contractEnd       !== undefined) obj.contract_end       = d.contractEnd;
-  if (d.primaryInspector  !== undefined) obj.main_inspector     = d.primaryInspector;
+  if (d.primaryInspector  !== undefined) {
+    obj.main_inspector    = d.primaryInspector; // 레거시 컬럼 동기화
+    obj.primary_inspector = d.primaryInspector; // 현행 컬럼 동기화
+  }
   if (d.subInspector      !== undefined) obj.sub_inspector      = d.subInspector;
   if (d.subInspector2     !== undefined) obj.sub_inspector2     = d.subInspector2;
   if (d.sitePhone         !== undefined) obj.site_phone         = d.sitePhone;
@@ -195,7 +198,10 @@ function siteToDb(d: any): Record<string, unknown> {
   if (d.fax               !== undefined) obj.fax                = d.fax;
   if (d.managerPhone      !== undefined) obj.manager_phone      = d.managerPhone;
   if (d.managerEmail      !== undefined) obj.manager_email      = d.managerEmail;
-  if (d.address           !== undefined) obj.address            = d.address;
+  if (d.address           !== undefined) {
+    obj.address           = d.address; // 도로명주소
+    obj.elevator_address  = d.address; // 유지보수 측 주소 컬럼 동기화
+  }
   if (d.entryInfo         !== undefined) obj.entry_info         = d.entryInfo;
   if (d.vendor            !== undefined) obj.vendor             = d.vendor;
   if (d.customerEmail     !== undefined) obj.customer_email     = d.customerEmail;
@@ -210,19 +216,55 @@ function siteToDb(d: any): Record<string, unknown> {
   return obj;
 }
 
+// 전화번호 문자열에서 ???-????-???? 패턴만 추출. "1호: 012-2438-1097" → "012-2438-1097"
+function extractPhoneNumber(raw: string | null): string | null {
+  if (!raw) return null;
+  const m = raw.match(/\d{2,4}-\d{3,4}-\d{4}/);
+  return m ? m[0] : null;
+}
+
+// managed_sites.emergency_devices 에서 비통번호 조회. 우선순위:
+//   1순위: installation_place === unit 정확 일치 항목 (호기별 개별 번호)
+//   2순위: unit="" 현장공통 항목 (한 번호가 전 호기에 공유되는 경우)
+// slot:99 는 현장 공통 관리자 연락처이므로 제외. 동일 unit 복수 항목은 마지막(최근 추가)을 반환.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function dbToElevator(r: any, siteName?: string): ElevatorRecord {
+function resolveEmergencyFromDevices(installationPlace: string | null, devices: any[] | null): string | null {
+  if (!devices?.length) return null;
+  const relevant = devices.filter(d => (d.slot ?? 1) !== 99);
+  if (!relevant.length) return null;
+  // 1순위: 호기별 개별 번호 (installation_place 정확 일치)
+  if (installationPlace) {
+    const matched = relevant.filter(d => d.unit === installationPlace);
+    if (matched.length) return matched[matched.length - 1].number ?? null;
+  }
+  // 2순위: 현장공통 번호 (unit 비어있는 항목)
+  const common = relevant.filter(d => !d.unit || d.unit === "");
+  if (common.length) return common[common.length - 1].number ?? null;
+  return null;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function dbToElevator(r: any, siteName?: string, siteDevices?: any[] | null, sitePhone?: string | null): ElevatorRecord {
   // site_elevators 스키마: site_id(FK), installation_place(호기 식별 기준), unit_name, elevator_number, elevator_model
   // 호기 표시·선택값은 installation_place 를 기준으로 함 (unit_name 은 빈 값일 때만 fallback)
+  // 비통번호 우선순위: managed_sites.emergency_phone(레거시, 유지보수 표시 기준) → emergency_devices → site_elevators.emergency_phone
+  // extractPhoneNumber 로 "1호: " 같은 접두어를 제거하고 전화번호 패턴만 사용
+  const emergencyPhone =
+    extractPhoneNumber(sitePhone ?? null) ??
+    resolveEmergencyFromDevices(r.installation_place, siteDevices ?? null) ??
+    extractPhoneNumber(r.emergency_phone ?? null) ??
+    null;
   return {
-    id:             r.id,
-    siteName:       siteName ?? r.site_name ?? "",
-    unitName:       r.installation_place ?? r.unit_name ?? null,
-    elevatorNo:     r.elevator_number  ?? null,
-    emergencyPhone: r.emergency_phone  ?? null, // site_elevators.emergency_phone (호기 단위 비통번호)
-    modelName:      r.elevator_model   ?? null,
-    ledgerNo:       r.ledger_no        ?? null,
-    jobNo:          r.job_no           ?? null,
+    id:                   r.id,
+    siteName:             siteName ?? r.site_name ?? "",
+    unitName:             r.installation_place ?? r.unit_name ?? null,
+    elevatorNo:           r.elevator_number     ?? null,
+    emergencyPhone,
+    modelName:            r.elevator_model      ?? null,
+    inspectionDueDate:    r.inspection_due_date ?? null,
+    lastInspectionResult: r.last_inspection_result ?? null,
+    ledgerNo:             r.ledger_no           ?? null,
+    jobNo:                r.job_no              ?? null,
   };
 }
 
@@ -794,10 +836,17 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
   }
   if (path === "/api/elevators") {
     const site = params.get("site");
-    // site_elevators 는 site_id(FK→managed_sites.id) 로 연결 → 현장명 맵 구성
-    const { data: msRows } = await supabase.from("managed_sites").select("id, site_name");
+    // site_elevators 는 site_id(FK→managed_sites.id) 로 연결 → 현장명·비통번호 맵 구성
+    // emergency_phone: 유지보수 측 레거시 컬럼. 유지보수 앱과 동일 번호를 표시하기 위해 최우선 사용.
+    const { data: msRows } = await supabase.from("managed_sites").select("id, site_name, emergency_phone, emergency_devices");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const idToName = new Map<number, string>((msRows ?? []).map((s: any) => [s.id, s.site_name]));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const nameToId = new Map<string, number>((msRows ?? []).map((s: any) => [s.site_name, s.id]));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const idToDevices = new Map<number, any[]>((msRows ?? []).filter((s: any) => Array.isArray(s.emergency_devices)).map((s: any) => [s.id, s.emergency_devices]));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const idToSitePhone = new Map<number, string>((msRows ?? []).filter((s: any) => s.emergency_phone).map((s: any) => [s.id, s.emergency_phone as string]));
     const siteId = site ? nameToId.get(site) : undefined;
     if (site && siteId === undefined) return []; // 해당 현장 없음
 
@@ -811,7 +860,7 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
       if (error) throw new MockApiError(error.message, 500);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rows = (data ?? []) as any[];
-      all.push(...rows.map(r => dbToElevator(r, idToName.get(r.site_id))));
+      all.push(...rows.map(r => dbToElevator(r, idToName.get(r.site_id), idToDevices.get(r.site_id), idToSitePhone.get(r.site_id))));
       if (rows.length < PAGE) break;
     }
     return all;

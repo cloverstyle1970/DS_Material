@@ -252,6 +252,8 @@ function AddSiteModal({ onClose, onSaved, editSite, existingElevators, limitedEd
   const [address,          setAddress]           = useState(editSite?.address ?? "");
   const [postalCode,       setPostalCode]        = useState("");
   const [vendor,           setVendor]            = useState(editSite?.vendor ?? "");
+  const [siteLedgerNo,     setSiteLedgerNo]      = useState(editSite?.ledgerNo ?? "");
+  const [siteJobNo,        setSiteJobNo]         = useState(editSite?.jobNo ?? "");
   const [entryInfo]                              = useState(editSite?.entryInfo ?? "");
   const [note,             setNote]              = useState(editSite?.note ?? "");
   const [warrantyCount,    setWarrantyCount]     = useState<string>(editSite?.warrantyCount != null ? String(editSite.warrantyCount) : "");
@@ -298,7 +300,9 @@ function AddSiteModal({ onClose, onSaved, editSite, existingElevators, limitedEd
       siteMobile: siteMobile || null, fax: fax || null,
       managerPhone: managerPhone || null, managerEmail: managerEmail || null,
       address: address || null, entryInfo: entryInfo || null,
-      vendor: vendor || null, customerEmail: null, jobNo: null, note: note || null,
+      vendor: vendor || null, customerEmail: null,
+      ledgerNo: siteLedgerNo || null, jobNo: siteJobNo || null,
+      note: note || null,
       emergencyDevice: null,
       emergencyDevices: (() => {
         const filtered = emergencyDevices.filter(d => d.number.trim());
@@ -620,10 +624,22 @@ function AddSiteModal({ onClose, onSaved, editSite, existingElevators, limitedEd
             </div>
           )}
           {!limitedEdit && (
-            <div>
-              <label className={labelCls}>거래처</label>
-              <input value={vendor} onChange={e => setVendor(e.target.value)} className={fieldCls} />
-            </div>
+            <>
+              <div>
+                <label className={labelCls}>거래처</label>
+                <input value={vendor} onChange={e => setVendor(e.target.value)} className={fieldCls} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>원장번호 (현장)</label>
+                  <input value={siteLedgerNo} onChange={e => setSiteLedgerNo(e.target.value)} placeholder="예: 338946" className={fieldCls + " font-mono"} />
+                </div>
+                <div>
+                  <label className={labelCls}>잡번호 (현장)</label>
+                  <input value={siteJobNo} onChange={e => setSiteJobNo(e.target.value)} placeholder="예: T20152079" className={fieldCls + " font-mono"} />
+                </div>
+              </div>
+            </>
           )}
           <div>
             <label className={labelCls}>비고</label>
@@ -893,6 +909,125 @@ export default function SitesClient({ initial, elevators }: Props) {
     URL.revokeObjectURL(url);
   }
 
+  async function downloadSchemaExcel() {
+    // 두 테이블의 컬럼 구조 정의
+    const MANAGED_SITES_SCHEMA = [
+      { field: "id",                  label: "ID",                      type: "bigint",    note: "현장 고유 식별자 (PK)" },
+      { field: "site_name",           label: "현장명",                  type: "text",      note: "현장 고유 이름 (NOT NULL)" },
+      { field: "alias",               label: "현장 별칭",               type: "text",      note: "짧게 부르는 이름" },
+      { field: "company_type",        label: "회사구분",                 type: "text",      note: "TK / DS / 기타" },
+      { field: "site_type",           label: "현장유형",                 type: "text",      note: "무상 / 상실 등" },
+      { field: "site_kind",           label: "현장유형2",                type: "text",      note: "레거시. site_type 우선 사용" },
+      { field: "contract_type",       label: "계약구분",                 type: "text",      note: "유지보수, POG, FM, 하자 등" },
+      { field: "contract_date",       label: "계약일자",                 type: "date",      note: "" },
+      { field: "contract_start",      label: "계약시작",                 type: "date",      note: "" },
+      { field: "contract_end",        label: "계약만료",                 type: "date",      note: "" },
+      { field: "primary_inspector",   label: "주점검자",                 type: "text",      note: "현재 사용 컬럼" },
+      { field: "main_inspector",      label: "주점검자(레거시)",          type: "text",      note: "레거시. primary_inspector 사용 권장" },
+      { field: "sub_inspector",       label: "보조점검자1",              type: "text",      note: "" },
+      { field: "sub_inspector2",      label: "보조점검자2",              type: "text",      note: "" },
+      { field: "site_phone",          label: "현장전화",                 type: "text",      note: "" },
+      { field: "site_phone2",         label: "현장전화2",                type: "text",      note: "" },
+      { field: "site_mobile",         label: "현장핸드폰",               type: "text",      note: "" },
+      { field: "manager_phone",       label: "담당자HP",                 type: "text",      note: "" },
+      { field: "manager_mobile",      label: "담당자핸드폰(레거시)",      type: "text",      note: "레거시" },
+      { field: "manager_email",       label: "담당자이메일",              type: "text",      note: "" },
+      { field: "customer_email",      label: "고객이메일",               type: "text",      note: "" },
+      { field: "fax",                 label: "팩스",                    type: "text",      note: "" },
+      { field: "address",             label: "소재지(도로명)",            type: "text",      note: "" },
+      { field: "elevator_address",    label: "승강기소재지(레거시)",       type: "text",      note: "레거시. address 사용 권장" },
+      { field: "entry_info",          label: "출입정보",                 type: "text",      note: "" },
+      { field: "emergency_devices",   label: "비상통화장치목록",          type: "jsonb",     note: "[{slot,unit,number,note}] 배열. unit=호기식별. slot=99는 관리자연락처" },
+      { field: "emergency_device",    label: "비상통화장치(레거시단일)",   type: "text",      note: "레거시. emergency_devices 사용" },
+      { field: "emergency_phone",     label: "비상통화1(레거시)",         type: "text",      note: "레거시 컬럼군" },
+      { field: "emergency_phone2",    label: "비상통화2(레거시)",         type: "text",      note: "레거시 컬럼군" },
+      { field: "emergency_phone3",    label: "비상통화3(레거시)",         type: "text",      note: "레거시 컬럼군" },
+      { field: "emergency_phone4",    label: "비상통화4~10(레거시)",      type: "text",      note: "레거시 컬럼군 (4~10 동일 구조)" },
+      { field: "ledger_no",           label: "원장번호",                 type: "text",      note: "" },
+      { field: "job_no",              label: "잡번호",                   type: "text",      note: "" },
+      { field: "vendor",              label: "거래처",                   type: "text",      note: "" },
+      { field: "warranty_count",      label: "하자기 대수",              type: "integer",   note: "" },
+      { field: "warranty_units",      label: "하자기 호기정보",           type: "text",      note: "" },
+      { field: "warranty_start",      label: "하자기간 시작",             type: "text",      note: "" },
+      { field: "warranty_end",        label: "하자기간 종료",             type: "text",      note: "" },
+      { field: "elevator_number",     label: "승강기번호(레거시단일)",     type: "text",      note: "레거시. site_elevators 사용" },
+      { field: "elevator_model",      label: "승강기모델(레거시단일)",     type: "text",      note: "레거시. site_elevators 사용" },
+      { field: "elevator_location",   label: "승강기위치(레거시)",        type: "text",      note: "레거시" },
+      { field: "note",                label: "비고",                    type: "text",      note: "현재 사용 비고" },
+      { field: "notes",               label: "비고(레거시)",              type: "text",      note: "레거시. note 사용 권장" },
+      { field: "created_at",          label: "등록일시",                 type: "timestamptz", note: "" },
+    ];
+
+    const SITE_ELEVATORS_SCHEMA = [
+      { field: "id",                      label: "ID",                    type: "bigint",    note: "호기 고유 식별자 (PK)" },
+      { field: "site_id",                 label: "현장ID",                type: "bigint",    note: "FK → managed_sites.id (NOT NULL)" },
+      { field: "installation_place",      label: "호기명(설치위치)",       type: "text",      note: "기준 키. emergency_devices.unit 과 일치해야 비통번호 매핑됨" },
+      { field: "unit_name",               label: "호기명(레거시)",         type: "text",      note: "레거시. installation_place 사용 권장 (NOT NULL, 빈값 허용)" },
+      { field: "elevator_number",         label: "승강기번호",              type: "text",      note: "행안부 승강기 고유 번호" },
+      { field: "elevator_model",          label: "승강기모델",              type: "text",      note: "" },
+      { field: "kind_name",               label: "기종명",                 type: "text",      note: "승객용, 화물용, 에스컬레이터 등" },
+      { field: "emergency_phone",         label: "비상통화장치번호",        type: "text",      note: "호기 단위 비통번호. managed_sites.emergency_devices 와 동기화 필요" },
+      { field: "ledger_no",               label: "원장번호",               type: "text",      note: "" },
+      { field: "job_no",                  label: "잡번호",                 type: "text",      note: "" },
+      { field: "assign_no",               label: "배정번호",               type: "integer",   note: "" },
+      { field: "inspection_due_date",     label: "검사만료일",              type: "date",      note: "" },
+      { field: "last_inspection_result",  label: "최근검사결과",            type: "text",      note: "합격 / 조건부합격 / 불합격 등" },
+      { field: "next_inspection_scheduled", label: "차기검사예정",          type: "text",      note: "" },
+      { field: "install_date",            label: "설치일",                 type: "date",      note: "" },
+      { field: "warranty_period",         label: "하자기간",               type: "text",      note: "" },
+      { field: "elevator_location",       label: "승강기위치",              type: "text",      note: "" },
+      { field: "notes",                   label: "비고",                   type: "text",      note: "" },
+      { field: "created_at",             label: "등록일시",                type: "timestamptz", note: "" },
+    ];
+
+    // Supabase에서 샘플 데이터 조회
+    const [{ data: msSamples }, { data: seSamples }] = await Promise.all([
+      supabase.from("managed_sites").select("*").limit(3),
+      supabase.from("site_elevators").select("*").limit(3),
+    ]);
+
+    function buildSchemaSheet(schema: typeof MANAGED_SITES_SCHEMA, samples: Record<string, unknown>[] | null) {
+      const sampleData = samples ?? [];
+      const header = ["필드명(DB)", "한국어명", "데이터타입", "설명",
+        ...sampleData.map((_, i) => `샘플${i + 1}`),
+      ];
+      const rows = schema.map(col => [
+        col.field,
+        col.label,
+        col.type,
+        col.note,
+        ...sampleData.map(row => {
+          const v = row[col.field];
+          if (v === null || v === undefined) return "";
+          if (typeof v === "object") return JSON.stringify(v);
+          return String(v);
+        }),
+      ]);
+      return [header, ...rows];
+    }
+
+    const msSheet = XLSX.utils.aoa_to_sheet(buildSchemaSheet(MANAGED_SITES_SCHEMA, msSamples as Record<string, unknown>[] | null));
+    const seSheet = XLSX.utils.aoa_to_sheet(buildSchemaSheet(SITE_ELEVATORS_SCHEMA, seSamples as Record<string, unknown>[] | null));
+
+    // 열 너비 설정
+    msSheet["!cols"] = [{ wch: 28 }, { wch: 22 }, { wch: 14 }, { wch: 55 }, { wch: 30 }, { wch: 30 }, { wch: 30 }];
+    seSheet["!cols"] = [{ wch: 28 }, { wch: 22 }, { wch: 14 }, { wch: 55 }, { wch: 30 }, { wch: 30 }, { wch: 30 }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, msSheet, "유지보수_managed_sites");
+    XLSX.utils.book_append_sheet(wb, seSheet, "자재관리_site_elevators");
+
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([buf], { type: "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `현장호기_DB구조_${stamp}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function reload() {
     const updated = await api.get<SiteRecord[]>("/api/sites").catch(() => null);
     if (!updated) { alert("현장 목록 조회에 실패했습니다."); return; }
@@ -963,6 +1098,13 @@ export default function SitesClient({ initial, elevators }: Props) {
               </button>
             );
           })()}
+          {canBackup && (
+            <button onClick={downloadSchemaExcel} disabled={backupRunning}
+              title="유지보수(managed_sites) · 자재관리(site_elevators) 두 테이블의 DB 컬럼 구조 + 샘플 데이터를 엑셀로 내보냅니다"
+              className="px-4 py-2 rounded-lg border border-indigo-200 text-sm text-indigo-700 hover:bg-indigo-50 transition-colors flex items-center gap-1.5 disabled:opacity-60">
+              <span className="text-xs">🗂️</span> DB 구조 내보내기
+            </button>
+          )}
           {canEdit && (
             <button onClick={() => setShowAdd(true)} disabled={backupRunning}
               className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-1.5 disabled:opacity-60">
@@ -1235,6 +1377,7 @@ export default function SitesClient({ initial, elevators }: Props) {
                   } dark={isDark} />
                   <InfoRow label="하자종료"   value={selected.warrantyEnd} dark={isDark} />
                   <InfoRow label="거래처"     value={selected.vendor} dark={isDark} />
+                  <InfoRow label="담당자이메일" value={selected.managerEmail} dark={isDark} />
                   <InfoRow label="비고"       value={selected.note} dark={isDark} />
                 </div>
 
@@ -1310,6 +1453,9 @@ export default function SitesClient({ initial, elevators }: Props) {
                             <p className={`font-medium ${isDark ? "text-gray-100" : "text-gray-800"}`}>{idx + 1}. {e.unitName ?? "—"}</p>
                             <div className="mt-1.5 space-y-0.5 text-xs text-gray-600 dark:text-gray-300">
                               <div><span className="text-gray-400">승강기번호 </span><span className={`font-mono ${isDark ? "text-blue-400" : "text-blue-600"}`}>{e.elevatorNo ?? "—"}</span></div>
+                              <div><span className="text-gray-400">기종명 </span><span>{e.modelName ?? "—"}</span></div>
+                              <div><span className="text-gray-400">검사만료일 </span><span>{e.inspectionDueDate ?? "—"}</span></div>
+                              <div><span className="text-gray-400">최근검사결과 </span><span>{e.lastInspectionResult ?? "—"}</span></div>
                               <div><span className="text-gray-400">비상통화 </span><span className="font-mono">{e.emergencyPhone ?? "—"}</span></div>
                               <div><span className="text-gray-400">원장번호 </span><span className="font-mono">{e.ledgerNo ?? "—"}</span></div>
                               <div><span className="text-gray-400">잡번호 </span><span className="font-mono">{e.jobNo ?? "—"}</span></div>
@@ -1335,6 +1481,9 @@ export default function SitesClient({ initial, elevators }: Props) {
                           <th className={`px-4 py-3 text-left text-xs font-medium w-8 ${isDark ? "text-gray-400" : "text-gray-500"}`}>#</th>
                           <th className={`px-4 py-3 text-left text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>호기명</th>
                           <th className={`px-4 py-3 text-left text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>승강기 번호</th>
+                          <th className={`px-4 py-3 text-left text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>기종명</th>
+                          <th className={`px-4 py-3 text-left text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>검사만료일</th>
+                          <th className={`px-4 py-3 text-left text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>최근검사결과</th>
                           <th className={`px-4 py-3 text-left text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>비상통화장치</th>
                           <th className={`px-4 py-3 text-left text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>원장번호</th>
                           <th className={`px-4 py-3 text-left text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>잡번호</th>
@@ -1354,6 +1503,9 @@ export default function SitesClient({ initial, elevators }: Props) {
                             <td className={`px-4 py-3 text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>{idx + 1}</td>
                             <td className={`px-4 py-3 font-medium whitespace-nowrap ${isDark ? "text-gray-200" : "text-gray-800"}`}>{e.unitName ?? "—"}</td>
                             <td className={`px-4 py-3 font-mono text-xs whitespace-nowrap ${isDark ? "text-blue-400" : "text-blue-600"}`}>{e.elevatorNo ?? "—"}</td>
+                            <td className={`px-4 py-3 text-xs whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"}`}>{e.modelName ?? "—"}</td>
+                            <td className={`px-4 py-3 text-xs whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"}`}>{e.inspectionDueDate ?? "—"}</td>
+                            <td className={`px-4 py-3 text-xs whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"}`}>{e.lastInspectionResult ?? "—"}</td>
                             <td className={`px-4 py-3 font-mono text-xs ${isDark ? "text-gray-300" : "text-gray-600"}`}>
                               {sameAsAbove ? "" : (e.emergencyPhone ?? "—")}
                             </td>
