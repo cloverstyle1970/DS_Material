@@ -53,11 +53,10 @@ function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: Elevato
   const fieldCls = `w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 ${isDark ? "border-gray-600 bg-gray-700 text-gray-100 placeholder:text-gray-400" : "border-gray-200 bg-white text-gray-900"}`;
   const labelCls = `block text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`;
   const isEdit = !!editElevator;
-  const [unitName,       setUnitName]       = useState(editElevator?.unitName       ?? "");
-  const [elevatorNo,     setElevatorNo]     = useState(editElevator?.elevatorNo     ?? "");
-  const [emergencyPhone, setEmergencyPhone] = useState(editElevator?.emergencyPhone ?? "");
-  const [ledgerNo,       setLedgerNo]       = useState(editElevator?.ledgerNo       ?? "");
-  const [jobNo,          setJobNo]          = useState(editElevator?.jobNo          ?? "");
+  const [unitName,   setUnitName]   = useState(editElevator?.unitName   ?? "");
+  const [elevatorNo, setElevatorNo] = useState(editElevator?.elevatorNo ?? "");
+  const [ledgerNo,   setLedgerNo]   = useState(editElevator?.ledgerNo   ?? "");
+  const [jobNo,      setJobNo]      = useState(editElevator?.jobNo      ?? "");
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState("");
 
@@ -67,11 +66,10 @@ function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: Elevato
     setSaving(true);
     const body = {
       siteName,
-      unitName: unitName.trim(),
+      unitName:   unitName.trim(),
       elevatorNo: elevatorNo.trim() || null,
-      emergencyPhone: emergencyPhone.trim() || null,
-      ledgerNo: ledgerNo.trim() || null,
-      jobNo:    jobNo.trim()    || null,
+      ledgerNo:   ledgerNo.trim()   || null,
+      jobNo:      jobNo.trim()      || null,
     };
     try {
       if (isEdit) await api.patch(`/api/elevators/${editElevator!.id}`, body);
@@ -108,10 +106,6 @@ function ElevatorFormModal({ siteName, editElevator, onClose, onSaved }: Elevato
           <div>
             <label className={labelCls}>승강기 번호</label>
             <input value={elevatorNo} onChange={e => setElevatorNo(e.target.value)} placeholder="예: 2163209" className={fieldCls} />
-          </div>
-          <div>
-            <label className={labelCls}>비상통화장치</label>
-            <input value={emergencyPhone} onChange={e => setEmergencyPhone(e.target.value)} placeholder="예: 012-2080-3565" className={fieldCls} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

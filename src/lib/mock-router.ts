@@ -206,7 +206,10 @@ function siteToDb(d: any): Record<string, unknown> {
   if (d.vendor            !== undefined) obj.vendor             = d.vendor;
   if (d.customerEmail     !== undefined) obj.customer_email     = d.customerEmail;
   if (d.jobNo             !== undefined) obj.job_no             = d.jobNo;
-  if (d.note              !== undefined) obj.note               = d.note;
+  if (d.note              !== undefined) {
+    obj.note  = d.note; // 자재관리 컬럼
+    obj.notes = d.note; // 유지보수 컬럼 동기화
+  }
   if (d.emergencyDevice   !== undefined) obj.emergency_device   = d.emergencyDevice;
   if (d.emergencyDevices  !== undefined) obj.emergency_devices  = d.emergencyDevices;
   if (d.warrantyCount     !== undefined) obj.warranty_count     = d.warrantyCount;
