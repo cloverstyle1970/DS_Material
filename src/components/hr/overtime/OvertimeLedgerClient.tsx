@@ -351,6 +351,11 @@ export default function OvertimeLedgerClient() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
   });
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [appliedFrom, setAppliedFrom] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+  });
+  const [appliedTo, setAppliedTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [listQuery, setListQuery] = useState("");
 
   // ── 폼 상태 ──
@@ -519,8 +524,8 @@ export default function OvertimeLedgerClient() {
   const filtered = useMemo(() => {
     return reports.filter(r => {
       const dt = r.start_at.slice(0, 10);
-      if (dateFrom && dt < dateFrom) return false;
-      if (dateTo && dt > dateTo) return false;
+      if (appliedFrom && dt < appliedFrom) return false;
+      if (appliedTo && dt > appliedTo) return false;
       if (statusFilter !== "all" && r.approval_status !== statusFilter) return false;
       if (listQuery) {
         const q = listQuery.toLowerCase();
@@ -534,14 +539,14 @@ export default function OvertimeLedgerClient() {
       }
       return true;
     });
-  }, [reports, dateFrom, dateTo, statusFilter, listQuery, accounts]);
+  }, [reports, appliedFrom, appliedTo, statusFilter, listQuery, accounts]);
 
   // 상태별 건수
   const statusCounts = useMemo(() => {
     const base = reports.filter(r => {
       const dt = r.start_at.slice(0, 10);
-      if (dateFrom && dt < dateFrom) return false;
-      if (dateTo && dt > dateTo) return false;
+      if (appliedFrom && dt < appliedFrom) return false;
+      if (appliedTo && dt > appliedTo) return false;
       if (listQuery) {
         const q = listQuery.toLowerCase();
         const author = accounts.find(a => a.id === r.author_id);
@@ -561,7 +566,7 @@ export default function OvertimeLedgerClient() {
       approved: base.filter(r => r.approval_status === "approved").length,
       rejected: base.filter(r => r.approval_status === "rejected").length,
     };
-  }, [reports, dateFrom, dateTo, listQuery, accounts]);
+  }, [reports, appliedFrom, appliedTo, listQuery, accounts]);
 
   // 합계 (승인완료 기준)
   const approvedFiltered = filtered.filter(r => r.approval_status === "approved");
@@ -1316,21 +1321,27 @@ export default function OvertimeLedgerClient() {
             <div className="print:hidden flex flex-wrap items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0">
               <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">기간</span>
               <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { setAppliedFrom(dateFrom); setAppliedTo(dateTo); } }}
                 className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400" />
               <span className="text-xs text-gray-400">~</span>
               <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { setAppliedFrom(dateFrom); setAppliedTo(dateTo); } }}
                 className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400" />
+              <button onClick={() => { setAppliedFrom(dateFrom); setAppliedTo(dateTo); }}
+                className="text-xs px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium whitespace-nowrap">검색</button>
               <button onClick={() => {
                 const d = new Date();
-                setDateFrom(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`);
-                setDateTo(d.toISOString().slice(0, 10));
+                const from = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+                const to = d.toISOString().slice(0, 10);
+                setDateFrom(from); setDateTo(to); setAppliedFrom(from); setAppliedTo(to);
               }} className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap">이번달</button>
               <button onClick={() => {
                 const d = new Date();
-                setDateFrom(`${d.getFullYear()}-01-01`);
-                setDateTo(d.toISOString().slice(0, 10));
+                const from = `${d.getFullYear()}-01-01`;
+                const to = d.toISOString().slice(0, 10);
+                setDateFrom(from); setDateTo(to); setAppliedFrom(from); setAppliedTo(to);
               }} className="text-xs text-gray-500 dark:text-gray-400 hover:underline whitespace-nowrap">올해</button>
-              <button onClick={() => { setDateFrom(""); setDateTo(""); }}
+              <button onClick={() => { setDateFrom(""); setDateTo(""); setAppliedFrom(""); setAppliedTo(""); }}
                 className="text-xs text-gray-400 dark:text-gray-500 hover:underline whitespace-nowrap">전체</button>
               <div className="w-px h-4 bg-gray-200 dark:bg-gray-600" />
               <input type="text" value={listQuery} onChange={e => setListQuery(e.target.value)}
