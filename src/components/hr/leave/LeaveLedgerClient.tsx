@@ -256,6 +256,8 @@ export default function LeaveLedgerClient() {
   const signIsDrawing = useRef(false);
   const [listDateFrom, setListDateFrom]     = useState(() => `${new Date().getFullYear()}-01-01`);
   const [listDateTo, setListDateTo]         = useState(() => `${new Date().getFullYear()}-12-31`);
+  const [appliedFrom, setAppliedFrom]       = useState(() => `${new Date().getFullYear()}-01-01`);
+  const [appliedTo, setAppliedTo]           = useState(() => `${new Date().getFullYear()}-12-31`);
   const [leaveTypeFilter, setLeaveTypeFilter] = useState("");
   const [authorFilter, setAuthorFilter]     = useState("");
   const [statusFilter, setStatusFilter]     = useState<StatusFilter>("all");
@@ -620,15 +622,15 @@ export default function LeaveLedgerClient() {
     if (statusFilter !== "all" && r.approval_status !== statusFilter) return false;
     const pad = (v: string | null) => (v ?? "").padStart(2, "0");
     const dt = r.s_yr ? `20${pad(r.s_yr)}-${pad(r.s_mo)}-${pad(r.s_dy)}` : "";
-    if (listDateFrom && dt && dt < listDateFrom) return false;
-    if (listDateTo   && dt && dt > listDateTo)   return false;
+    if (appliedFrom && dt && dt < appliedFrom) return false;
+    if (appliedTo   && dt && dt > appliedTo)   return false;
     if (leaveTypeFilter && r.leave_type !== leaveTypeFilter) return false;
     if (authorFilter.trim()) {
       const author = accounts.find(a => a.id === r.author_id);
       if (!(author?.username ?? "").includes(authorFilter.trim())) return false;
     }
     return true;
-  }), [records, statusFilter, listDateFrom, listDateTo, leaveTypeFilter, authorFilter, accounts]);
+  }), [records, statusFilter, appliedFrom, appliedTo, leaveTypeFilter, authorFilter, accounts]);
 
   const totalDays = useMemo(() =>
     filtered.filter(r => r.approval_status === "approved").reduce((s, r) => s + (r.duration_days ?? 0), 0),
@@ -1027,10 +1029,28 @@ export default function LeaveLedgerClient() {
             <div className="flex flex-wrap items-center gap-2 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
               <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">기간</span>
               <input type="date" value={listDateFrom} onChange={e => setListDateFrom(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { setAppliedFrom(listDateFrom); setAppliedTo(listDateTo); } }}
                 className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400" />
               <span className="text-xs text-gray-400">~</span>
               <input type="date" value={listDateTo} onChange={e => setListDateTo(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { setAppliedFrom(listDateFrom); setAppliedTo(listDateTo); } }}
                 className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400" />
+              <button onClick={() => { setAppliedFrom(listDateFrom); setAppliedTo(listDateTo); }}
+                className="text-xs px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium whitespace-nowrap">검색</button>
+              <button onClick={() => {
+                const d = new Date();
+                const from = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`;
+                const last = new Date(d.getFullYear(), d.getMonth()+1, 0);
+                const to = `${last.getFullYear()}-${String(last.getMonth()+1).padStart(2,"0")}-${String(last.getDate()).padStart(2,"0")}`;
+                setListDateFrom(from); setListDateTo(to); setAppliedFrom(from); setAppliedTo(to);
+              }} className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap">이번달</button>
+              <button onClick={() => {
+                const y = new Date().getFullYear();
+                setListDateFrom(`${y}-01-01`); setListDateTo(`${y}-12-31`);
+                setAppliedFrom(`${y}-01-01`); setAppliedTo(`${y}-12-31`);
+              }} className="text-xs text-gray-500 dark:text-gray-400 hover:underline whitespace-nowrap">올해</button>
+              <button onClick={() => { setListDateFrom(""); setListDateTo(""); setAppliedFrom(""); setAppliedTo(""); }}
+                className="text-xs text-gray-400 dark:text-gray-500 hover:underline whitespace-nowrap">전체</button>
               <div className="w-px h-4 bg-gray-200 dark:bg-gray-600" />
               <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">유형</span>
               <select value={leaveTypeFilter} onChange={e => setLeaveTypeFilter(e.target.value)}
