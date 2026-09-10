@@ -20,6 +20,7 @@ interface Account {
   status: string | null;
   signature_url: string | null;
 }
+interface PrintLog { id: number; doc_type: string; doc_id: number; printed_by: number | null; printed_at: string; }
 interface LeaveRequest {
   id: number;
   request_no: string;
@@ -224,6 +225,7 @@ export default function LeaveRequestClient() {
 
   const [accounts, setAccounts]   = useState<Account[]>([]);
   const [records, setRecords]     = useState<LeaveRequest[]>([]);
+  const [printLogs, setPrintLogs] = useState<PrintLog[]>([]);
   const [editingId, setEditingId] = useState<number | "new" | null>(null);
   const [form, setForm]           = useState<FormState>(makeEmptyForm());
   const [saving, setSaving]       = useState(false);
@@ -237,15 +239,19 @@ export default function LeaveRequestClient() {
   const [listQuery, setListQuery]       = useState("");
   const [listDateFrom, setListDateFrom] = useState(() => `${new Date().getFullYear()}-01-01`);
   const [listDateTo, setListDateTo]     = useState(() => `${new Date().getFullYear()}-12-31`);
+  const [appliedFrom, setAppliedFrom]   = useState(() => `${new Date().getFullYear()}-01-01`);
+  const [appliedTo, setAppliedTo]       = useState(() => `${new Date().getFullYear()}-12-31`);
 
   const f  = form;
   const sf = (p: Partial<FormState>) => setForm(prev => ({ ...prev, ...p }));
 
   const load = useCallback(async () => {
     if (!user) return;
+    let loaded: LeaveRequest[] = [];
     if (isManager) {
       const { data } = await supabase.from("leave_requests").select("*").order("created_at", { ascending: false });
-      setRecords((data as LeaveRequest[] | null) ?? []);
+      loaded = (data as LeaveRequest[] | null) ?? [];
+      setRecords(loaded);
     } else {
       // .or() 대신 두 쿼리 병렬 실행 후 합산 (PostgREST or 묵시적 실패 방지)
       const [{ data: asAuthor }, { data: asApprover }] = await Promise.all([
@@ -254,11 +260,20 @@ export default function LeaveRequestClient() {
       ]);
       const merged = [...(asAuthor ?? []), ...(asApprover ?? [])];
       const seen = new Set<number>();
-      const unique = (merged as LeaveRequest[])
+      loaded = (merged as LeaveRequest[])
         .filter(r => { if (seen.has(r.id)) return false; seen.add(r.id); return true; })
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setRecords(unique);
+      setRecords(loaded);
     }
+    const ids = loaded.map(r => r.id);
+    if (ids.length > 0) {
+      const { data: logs } = await supabase.from("print_logs")
+        .select("id,doc_type,doc_id,printed_by,printed_at")
+        .eq("doc_type", "leave")
+        .in("doc_id", ids)
+        .order("printed_at", { ascending: false });
+      setPrintLogs((logs as PrintLog[] | null) ?? []);
+    } else { setPrintLogs([]); }
   }, [user, isManager]);
 
   useEffect(() => {
@@ -275,6 +290,11 @@ export default function LeaveRequestClient() {
   }, [isTabActive]);
 
   const activeAccounts = useMemo(() => accounts.filter(a => a.status !== "퇴직"), [accounts]);
+  const printCountMap  = useMemo(() => {
+    const m: Record<number, number> = {};
+    for (const l of printLogs) m[l.doc_id] = (m[l.doc_id] ?? 0) + 1;
+    return m;
+  }, [printLogs]);
   const approverAcc    = accounts.find(a => a.id === f.approver_id);
   const authorAcc      = accounts.find(a => a.id === user?.id);
   const editingRecord  = records.find(r => r.id === editingId);
@@ -283,10 +303,35 @@ export default function LeaveRequestClient() {
     ? new Date(editingRecord.approved_at).toLocaleDateString("ko-KR", { month:"2-digit", day:"2-digit" }).replace(". ","\/").replace(".","")
     : null;
 
+  function confirmReprint(docId: number): boolean {
+    const existing = printLogs.filter(l => l.doc_id === docId);
+    if (existing.length === 0) return true;
+    const last = existing[0];
+    const printerName = accounts.find(a => a.id === last.printed_by)?.username ?? "알 수 없음";
+    const lastDate = new Date(last.printed_at).toLocaleString("ko-KR");
+    return window.confirm(
+      `이미 ${existing.length}회 출력된 문서입니다.\n마지막 출력: ${lastDate} (${printerName})\n\n재출력하시겠습니까?`
+    );
+  }
+  async function recordPrint(docId: number) {
+    if (!user) return;
+    const { data } = await supabase.from("print_logs")
+      .insert({ doc_type: "leave", doc_id: docId, printed_by: user.id })
+      .select("id,doc_type,doc_id,printed_by,printed_at")
+      .single();
+    if (data) setPrintLogs(prev => [data as PrintLog, ...prev]);
+  }
+
   useEffect(() => {
     if (!printPending || editingId === null) return;
-    const t = setTimeout(() => { window.print(); setPrintPending(false); }, 350);
+    const id = typeof editingId === "number" ? editingId : null;
+    const t = setTimeout(() => {
+      window.print();
+      setPrintPending(false);
+      if (id !== null) recordPrint(id).catch(console.warn);
+    }, 350);
     return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [printPending, editingId]);
 
   function openNew() {
@@ -294,10 +339,12 @@ export default function LeaveRequestClient() {
     setForm({ ...makeEmptyForm(), approver_id: hjhAccount?.id ?? null });
     setEditingId("new");
   }
-  function openEdit(r: LeaveRequest, andPrint = false) {
+  async function openEdit(r: LeaveRequest, andPrint = false) {
     setForm(recordToForm(r));
     setEditingId(r.id);
-    if (andPrint) setPrintPending(true);
+    if (!andPrint) return;
+    if (!confirmReprint(r.id)) return;
+    setPrintPending(true);
   }
 
   async function save(submitForApproval: boolean, authorSig?: string) {
@@ -472,8 +519,8 @@ export default function LeaveRequestClient() {
   const filtered = records.filter(r => {
     const pad = (v: string | null) => (v ?? "").padStart(2, "0");
     const dt = r.s_yr ? `20${pad(r.s_yr)}-${pad(r.s_mo)}-${pad(r.s_dy)}` : "";
-    if (listDateFrom && dt && dt < listDateFrom) return false;
-    if (listDateTo   && dt && dt > listDateTo)   return false;
+    if (appliedFrom && dt && dt < appliedFrom) return false;
+    if (appliedTo   && dt && dt > appliedTo)   return false;
     if (!listQuery.trim()) return true;
     const q = listQuery.trim();
     const author = accounts.find(a => a.id === r.author_id);
@@ -550,8 +597,13 @@ export default function LeaveRequestClient() {
                   </button>
                 </>
               )}
-              <button onClick={() => window.print()}
-                className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded font-medium">
+              <button onClick={async () => {
+                if (typeof editingId === "number") {
+                  if (!confirmReprint(editingId)) return;
+                  window.print();
+                  await recordPrint(editingId);
+                } else { window.print(); }
+              }} className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded font-medium">
                 🖨️ 인쇄
               </button>
               <button onClick={() => setEditingId(null)}
@@ -794,21 +846,28 @@ export default function LeaveRequestClient() {
             <div className="flex flex-wrap items-center gap-2 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
               <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">기간</span>
               <input type="date" value={listDateFrom} onChange={e => setListDateFrom(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { setAppliedFrom(listDateFrom); setAppliedTo(listDateTo); } }}
                 className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400" />
               <span className="text-xs text-gray-400">~</span>
               <input type="date" value={listDateTo} onChange={e => setListDateTo(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { setAppliedFrom(listDateFrom); setAppliedTo(listDateTo); } }}
                 className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-400" />
+              <button onClick={() => { setAppliedFrom(listDateFrom); setAppliedTo(listDateTo); }}
+                className="text-xs px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium whitespace-nowrap">검색</button>
+              <div className="w-px h-4 bg-gray-200 dark:bg-gray-600" />
               <button onClick={() => {
                 const d = new Date();
-                setListDateFrom(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`);
+                const from = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`;
                 const last = new Date(d.getFullYear(), d.getMonth()+1, 0);
-                setListDateTo(`${last.getFullYear()}-${String(last.getMonth()+1).padStart(2,"0")}-${String(last.getDate()).padStart(2,"0")}`);
+                const to = `${last.getFullYear()}-${String(last.getMonth()+1).padStart(2,"0")}-${String(last.getDate()).padStart(2,"0")}`;
+                setListDateFrom(from); setListDateTo(to); setAppliedFrom(from); setAppliedTo(to);
               }} className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap">이번달</button>
               <button onClick={() => {
                 const y = new Date().getFullYear();
                 setListDateFrom(`${y}-01-01`); setListDateTo(`${y}-12-31`);
+                setAppliedFrom(`${y}-01-01`); setAppliedTo(`${y}-12-31`);
               }} className="text-xs text-gray-500 dark:text-gray-400 hover:underline whitespace-nowrap">올해</button>
-              <button onClick={() => { setListDateFrom(""); setListDateTo(""); }}
+              <button onClick={() => { setListDateFrom(""); setListDateTo(""); setAppliedFrom(""); setAppliedTo(""); }}
                 className="text-xs text-gray-400 dark:text-gray-500 hover:underline whitespace-nowrap">전체</button>
               <div className="w-px h-4 bg-gray-200 dark:bg-gray-600" />
               <input value={listQuery} onChange={e => setListQuery(e.target.value)}
@@ -845,7 +904,14 @@ export default function LeaveRequestClient() {
                         {isManager && <td className="px-3 py-2">{author?.username ?? "—"}</td>}
                         <td className="px-3 py-2">{period}</td>
                         <td className="px-3 py-2 max-w-[120px] truncate">{r.reason ?? "—"}</td>
-                        <td className="px-3 py-2 text-center"><StatusBadge status={r.approval_status} /></td>
+                        <td className="px-3 py-2 text-center">
+                          <div className="inline-flex items-center gap-1 flex-wrap justify-center">
+                            <StatusBadge status={r.approval_status} />
+                            {(printCountMap[r.id] ?? 0) > 0 && (
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">🖨️ {printCountMap[r.id]}회</span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-3 py-2">
                           <div className="flex gap-1 justify-center flex-wrap">
                             {canEdit(r) ? (

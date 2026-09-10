@@ -12,6 +12,7 @@ export const OT_MENU_HREF = "/hr/overtime-report";
 const WORK_REASONS = ["점검", "공사", "수리·부품교체", "상주", "조출", "기타"] as const;
 
 interface Account { id: number; username: string; dept: string | null; team: string | null; status: string | null; signature_url: string | null; }
+interface PrintLog { id: number; doc_type: string; doc_id: number; printed_by: number | null; printed_at: string; }
 interface OvertimeReport {
   id: number; report_no: string; author_id: number; site_name: string;
   work_instructor: string | null; work_instructor_id: number | null;
@@ -315,6 +316,7 @@ export default function OvertimeReportClient() {
 
   const [accounts, setAccounts]   = useState<Account[]>([]);
   const [myReports, setMyReports] = useState<OvertimeReport[]>([]);
+  const [printLogs, setPrintLogs] = useState<PrintLog[]>([]);
   const [editingId, setEditingId] = useState<number | "new" | null>(null);
   const [form, setForm]           = useState<FormState>(makeEmptyForm());
   const [otResult, setOtResult]   = useState<OvertimeResult | null>(null);
@@ -352,6 +354,17 @@ export default function OvertimeReportClient() {
       all.push(...b); if (b.length < 500) break;
     }
     setMyReports(all);
+    const ids = all.map(r => r.id);
+    if (ids.length > 0) {
+      const { data: logs } = await supabase.from("print_logs")
+        .select("id,doc_type,doc_id,printed_by,printed_at")
+        .eq("doc_type", "overtime")
+        .in("doc_id", ids)
+        .order("printed_at", { ascending: false });
+      setPrintLogs((logs as PrintLog[] | null) ?? []);
+    } else {
+      setPrintLogs([]);
+    }
   }, [user, isManager]);
 
   useEffect(() => {
@@ -399,6 +412,11 @@ export default function OvertimeReportClient() {
   const startDow = dowFromParts(f.s_yr, f.s_mo, f.s_dy);
   const endDow   = dowFromParts(f.e_yr, f.e_mo, f.e_dy);
   const activeAccounts  = useMemo(() => accounts.filter(a => a.status !== "퇴직"), [accounts]);
+  const printCountMap   = useMemo(() => {
+    const m: Record<number, number> = {};
+    for (const l of printLogs) m[l.doc_id] = (m[l.doc_id] ?? 0) + 1;
+    return m;
+  }, [printLogs]);
   const approverAcc     = accounts.find(a => a.id === f.approver_id);
   const authorAcc       = accounts.find(a => a.id === user?.id);
   const todayStr        = new Date().toLocaleDateString("ko-KR");
@@ -418,23 +436,39 @@ export default function OvertimeReportClient() {
       approver_id: hjhAccount?.id ?? null });
     setOtResult(null); setEditingId("new"); setMobileStep(0);
   }
-  function openEdit(r: OvertimeReport, andPrint = false) {
-    setForm(reportToForm(r)); setOtResult(null); setEditingId(r.id); setMobileStep(0);
-    if (andPrint) setPrintPending(true);
+  function confirmReprint(docId: number): boolean {
+    const existing = printLogs.filter(l => l.doc_id === docId);
+    if (existing.length === 0) return true;
+    const last = existing[0];
+    const printerName = accounts.find(a => a.id === last.printed_by)?.username ?? "알 수 없음";
+    const lastDate = new Date(last.printed_at).toLocaleString("ko-KR");
+    return window.confirm(
+      `이미 ${existing.length}회 출력된 문서입니다.\n마지막 출력: ${lastDate} (${printerName})\n\n재출력하시겠습니까?`
+    );
   }
-  async function markPrinted(id: number) {
-    const now = new Date().toISOString();
-    await supabase.from("overtime_reports").update({ printed_at: now }).eq("id", id);
-    setMyReports(prev => prev.map(r => r.id === id ? { ...r, printed_at: now } : r));
+  async function recordPrint(docId: number) {
+    if (!user) return;
+    const { data } = await supabase.from("print_logs")
+      .insert({ doc_type: "overtime", doc_id: docId, printed_by: user.id })
+      .select("id,doc_type,doc_id,printed_by,printed_at")
+      .single();
+    if (data) setPrintLogs(prev => [data as PrintLog, ...prev]);
+  }
+
+  async function openEdit(r: OvertimeReport, andPrint = false) {
+    setForm(reportToForm(r)); setOtResult(null); setEditingId(r.id); setMobileStep(0);
+    if (!andPrint) return;
+    if (!confirmReprint(r.id)) return;
+    setPrintPending(true);
   }
 
   useEffect(() => {
     if (!printPending || editingId === null) return;
-    const id = editingId;
+    const id = typeof editingId === "number" ? editingId : null;
     const t = setTimeout(() => {
       window.print();
       setPrintPending(false);
-      if (typeof id === "number") markPrinted(id);
+      if (id !== null) recordPrint(id).catch(console.warn);
     }, 350);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -649,8 +683,13 @@ export default function OvertimeReportClient() {
                   className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium disabled:opacity-50">
                   {saving ? "제출중…" : "승인 요청"}
                 </button>
-                {!isMobile && <button onClick={() => { window.print(); if (typeof editingId === "number") markPrinted(editingId); }}
-                  className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded font-medium">
+                {!isMobile && <button onClick={async () => {
+                  if (typeof editingId === "number") {
+                    if (!confirmReprint(editingId)) return;
+                    window.print();
+                    await recordPrint(editingId);
+                  } else { window.print(); }
+                }} className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded font-medium">
                   🖨️ 인쇄
                 </button>}
               </>
@@ -1126,7 +1165,7 @@ export default function OvertimeReportClient() {
                             <span className="text-xs font-mono text-gray-400">{r.report_no}</span>
                             <StatusBadge status={r.approval_status} />
                             {r.is_holiday && <span className="text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">{r.holiday_type ?? "휴일"}</span>}
-                            {r.printed_at && <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">🖨️ {new Date(r.printed_at).toLocaleDateString("ko-KR")}</span>}
+                            {(printCountMap[r.id] ?? 0) > 0 && <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">🖨️ {printCountMap[r.id]}회</span>}
                           </div>
                           <p className="mt-1 font-medium">{r.site_name}</p>
                           <div className="mt-0.5 text-xs text-gray-500 space-y-0.5">

@@ -19,6 +19,7 @@ interface Account {
   status: string | null;
   signature_url: string | null;
 }
+interface PrintLog { id: number; doc_type: string; doc_id: number; printed_by: number | null; printed_at: string; }
 
 interface OvertimeReport {
   id: number; report_no: string; author_id: number; site_name: string;
@@ -339,6 +340,7 @@ export default function OvertimeLedgerClient() {
 
   // ── 목록 상태 ──
   const [reports, setReports] = useState<OvertimeReport[]>([]);
+  const [printLogs, setPrintLogs] = useState<PrintLog[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
 
   // ── 필터 ──
@@ -379,6 +381,7 @@ export default function OvertimeLedgerClient() {
   // ── 데이터 로드 ──
   const load = useCallback(async () => {
     if (!user) return;
+    let loaded: OvertimeReport[] = [];
     if (isManager) {
       // 관리자: 전체 조회 (모든 상태)
       const all: OvertimeReport[] = [];
@@ -393,6 +396,7 @@ export default function OvertimeLedgerClient() {
         if (batch.length < 500) break;
       }
       setReports(all);
+      loaded = all;
     } else {
       // 일반 사용자: 작성자이거나 승인자인 레코드 (두 쿼리 병렬 → merge+dedupe)
       const [{ data: asAuthor }, { data: asApprover }] = await Promise.all([
@@ -409,7 +413,17 @@ export default function OvertimeLedgerClient() {
         .filter(r => { if (seen.has(r.id)) return false; seen.add(r.id); return true; })
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setReports(unique);
+      loaded = unique;
     }
+    const ids = loaded.map(r => r.id);
+    if (ids.length > 0) {
+      const { data: logs } = await supabase.from("print_logs")
+        .select("id,doc_type,doc_id,printed_by,printed_at")
+        .eq("doc_type", "overtime")
+        .in("doc_id", ids)
+        .order("printed_at", { ascending: false });
+      setPrintLogs((logs as PrintLog[] | null) ?? []);
+    } else { setPrintLogs([]); }
   }, [user, isManager]);
 
   useEffect(() => {
@@ -469,6 +483,11 @@ export default function OvertimeLedgerClient() {
   const endDow = dowFromParts(f.e_yr, f.e_mo, f.e_dy);
 
   const activeAccounts = useMemo(() => accounts.filter(a => a.status !== "퇴직"), [accounts]);
+  const printCountMap  = useMemo(() => {
+    const m: Record<number, number> = {};
+    for (const l of printLogs) m[l.doc_id] = (m[l.doc_id] ?? 0) + 1;
+    return m;
+  }, [printLogs]);
   const approverAcc = accounts.find(a => a.id === f.approver_id);
   const authorAcc = accounts.find(a => a.id === user?.id);
   const todayStr = new Date().toLocaleDateString("ko-KR");
@@ -551,6 +570,34 @@ export default function OvertimeLedgerClient() {
   const totalOvertime = approvedFiltered.reduce((s, r) => s + (r.overtime_hours ?? 0), 0);
   function fmt(h: number) { return h % 1 === 0 ? `${h}H` : `${h.toFixed(1)}H`; }
 
+  async function loadPrintLogs(ids: number[]) {
+    if (ids.length === 0) { setPrintLogs([]); return; }
+    const { data: logs } = await supabase.from("print_logs")
+      .select("id,doc_type,doc_id,printed_by,printed_at")
+      .eq("doc_type", "overtime")
+      .in("doc_id", ids)
+      .order("printed_at", { ascending: false });
+    setPrintLogs((logs as PrintLog[] | null) ?? []);
+  }
+  function confirmReprint(docId: number): boolean {
+    const existing = printLogs.filter(l => l.doc_id === docId);
+    if (existing.length === 0) return true;
+    const last = existing[0];
+    const printerName = accounts.find(a => a.id === last.printed_by)?.username ?? "알 수 없음";
+    const lastDate = new Date(last.printed_at).toLocaleString("ko-KR");
+    return window.confirm(
+      `이미 ${existing.length}회 출력된 문서입니다.\n마지막 출력: ${lastDate} (${printerName})\n\n재출력하시겠습니까?`
+    );
+  }
+  async function recordPrint(docId: number) {
+    if (!user) return;
+    const { data } = await supabase.from("print_logs")
+      .insert({ doc_type: "overtime", doc_id: docId, printed_by: user.id })
+      .select("id,doc_type,doc_id,printed_by,printed_at")
+      .single();
+    if (data) setPrintLogs(prev => [data as PrintLog, ...prev]);
+  }
+
   // ── 폼 열기 ──
   function openNew() {
     const now = new Date();
@@ -562,15 +609,23 @@ export default function OvertimeLedgerClient() {
     setOtResult(null); setEditingId("new"); setMobileStep(0);
   }
 
-  function openEdit(r: OvertimeReport, andPrint = false) {
+  async function openEdit(r: OvertimeReport, andPrint = false) {
     setForm(reportToForm(r)); setOtResult(null); setEditingId(r.id); setMobileStep(0);
-    if (andPrint) setPrintPending(true);
+    if (!andPrint) return;
+    if (!confirmReprint(r.id)) return;
+    setPrintPending(true);
   }
 
   useEffect(() => {
     if (!printPending || editingId === null) return;
-    const t = setTimeout(() => { window.print(); setPrintPending(false); }, 350);
+    const id = typeof editingId === "number" ? editingId : null;
+    const t = setTimeout(() => {
+      window.print();
+      setPrintPending(false);
+      if (id !== null) recordPrint(id).catch(console.warn);
+    }, 350);
     return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [printPending, editingId]);
 
   // ── 저장 ──
@@ -810,8 +865,13 @@ export default function OvertimeLedgerClient() {
                 </>
               )}
               {!isMobile && (
-                <button onClick={() => window.print()}
-                  className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded font-medium">
+                <button onClick={async () => {
+                  if (typeof editingId === "number") {
+                    if (!confirmReprint(editingId)) return;
+                    window.print();
+                    await recordPrint(editingId);
+                  } else { window.print(); }
+                }} className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded font-medium">
                   인쇄
                 </button>
               )}
@@ -1356,7 +1416,12 @@ export default function OvertimeLedgerClient() {
                               {r.overtime_hours != null ? fmt(r.overtime_hours) : "-"}
                             </td>
                             <td className="px-3 py-2">
-                              <StatusBadge status={r.approval_status} />
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <StatusBadge status={r.approval_status} />
+                                {(printCountMap[r.id] ?? 0) > 0 && (
+                                  <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">🖨️ {printCountMap[r.id]}회</span>
+                                )}
+                              </div>
                               {r.approval_status === "rejected" && r.reject_reason && (
                                 <div className="mt-0.5 text-[10px] text-red-500 max-w-[120px] truncate" title={r.reject_reason}>
                                   {r.reject_reason}

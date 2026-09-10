@@ -20,6 +20,7 @@ interface Account {
   status: string | null;
   signature_url: string | null;
 }
+interface PrintLog { id: number; doc_type: string; doc_id: number; printed_by: number | null; printed_at: string; }
 interface LeaveRequest {
   id: number;
   request_no: string;
@@ -242,6 +243,7 @@ export default function LeaveLedgerClient() {
 
   const [accounts, setAccounts]   = useState<Account[]>([]);
   const [records, setRecords]     = useState<LeaveRequest[]>([]);
+  const [printLogs, setPrintLogs] = useState<PrintLog[]>([]);
   const [editingId, setEditingId] = useState<number | "new" | null>(null);
   const [form, setForm]           = useState<FormState>(makeEmptyForm());
   const [saving, setSaving]       = useState(false);
@@ -268,9 +270,11 @@ export default function LeaveLedgerClient() {
 
   const load = useCallback(async () => {
     if (!user) return;
+    let loaded: LeaveRequest[] = [];
     if (isManager) {
       const { data } = await supabase.from("leave_requests").select("*").order("created_at", { ascending: false });
-      setRecords((data as LeaveRequest[] | null) ?? []);
+      loaded = (data as LeaveRequest[] | null) ?? [];
+      setRecords(loaded);
     } else {
       const [{ data: asAuthor }, { data: asApprover }] = await Promise.all([
         supabase.from("leave_requests").select("*").eq("author_id", user.id).order("created_at", { ascending: false }),
@@ -278,11 +282,20 @@ export default function LeaveLedgerClient() {
       ]);
       const merged = [...(asAuthor ?? []), ...(asApprover ?? [])];
       const seen = new Set<number>();
-      const unique = (merged as LeaveRequest[])
+      loaded = (merged as LeaveRequest[])
         .filter(r => { if (seen.has(r.id)) return false; seen.add(r.id); return true; })
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setRecords(unique);
+      setRecords(loaded);
     }
+    const ids = loaded.map(r => r.id);
+    if (ids.length > 0) {
+      const { data: logs } = await supabase.from("print_logs")
+        .select("id,doc_type,doc_id,printed_by,printed_at")
+        .eq("doc_type", "leave")
+        .in("doc_id", ids)
+        .order("printed_at", { ascending: false });
+      setPrintLogs((logs as PrintLog[] | null) ?? []);
+    } else { setPrintLogs([]); }
   }, [user, isManager]);
 
   useEffect(() => {
@@ -340,6 +353,11 @@ export default function LeaveLedgerClient() {
   }, [isTabActive]);
 
   const activeAccounts = useMemo(() => accounts.filter(a => a.status !== "퇴직"), [accounts]);
+  const printCountMap  = useMemo(() => {
+    const m: Record<number, number> = {};
+    for (const l of printLogs) m[l.doc_id] = (m[l.doc_id] ?? 0) + 1;
+    return m;
+  }, [printLogs]);
   const approverAcc    = accounts.find(a => a.id === f.approver_id);
   const authorAcc      = accounts.find(a => a.id === user?.id);  // 현재 로그인 사용자 (알림용)
   const editingRecord  = records.find(r => r.id === editingId);
@@ -351,20 +369,47 @@ export default function LeaveLedgerClient() {
     ? new Date(editingRecord.approved_at).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" }).replace(". ", "\/").replace(".", "")
     : null;
 
+  function confirmReprint(docId: number): boolean {
+    const existing = printLogs.filter(l => l.doc_id === docId);
+    if (existing.length === 0) return true;
+    const last = existing[0];
+    const printerName = accounts.find(a => a.id === last.printed_by)?.username ?? "알 수 없음";
+    const lastDate = new Date(last.printed_at).toLocaleString("ko-KR");
+    return window.confirm(
+      `이미 ${existing.length}회 출력된 문서입니다.\n마지막 출력: ${lastDate} (${printerName})\n\n재출력하시겠습니까?`
+    );
+  }
+  async function recordPrint(docId: number) {
+    if (!user) return;
+    const { data } = await supabase.from("print_logs")
+      .insert({ doc_type: "leave", doc_id: docId, printed_by: user.id })
+      .select("id,doc_type,doc_id,printed_by,printed_at")
+      .single();
+    if (data) setPrintLogs(prev => [data as PrintLog, ...prev]);
+  }
+
   useEffect(() => {
     if (!printPending || editingId === null) return;
-    const t = setTimeout(() => { window.print(); setPrintPending(false); }, 350);
+    const id = typeof editingId === "number" ? editingId : null;
+    const t = setTimeout(() => {
+      window.print();
+      setPrintPending(false);
+      if (id !== null) recordPrint(id).catch(console.warn);
+    }, 350);
     return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [printPending, editingId]);
 
   function openNew() {
     setForm({ ...makeEmptyForm(), approver_id: defaultApproverId });
     setEditingId("new");
   }
-  function openEdit(r: LeaveRequest, andPrint = false) {
+  async function openEdit(r: LeaveRequest, andPrint = false) {
     setForm(recordToForm(r));
     setEditingId(r.id);
-    if (andPrint) setPrintPending(true);
+    if (!andPrint) return;
+    if (!confirmReprint(r.id)) return;
+    setPrintPending(true);
   }
 
   async function save(submitForApproval: boolean, authorSig?: string) {
@@ -674,8 +719,13 @@ export default function LeaveLedgerClient() {
                   </button>
                 </>
               )}
-              <button onClick={() => window.print()}
-                className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded font-medium">
+              <button onClick={async () => {
+                if (typeof editingId === "number") {
+                  if (!confirmReprint(editingId)) return;
+                  window.print();
+                  await recordPrint(editingId);
+                } else { window.print(); }
+              }} className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded font-medium">
                 🖨️ 인쇄
               </button>
               <button onClick={() => setEditingId(null)}
@@ -1032,7 +1082,14 @@ export default function LeaveLedgerClient() {
                         {showAuthorCol && <td className="px-3 py-2">{author?.username ?? "—"}</td>}
                         <td className="px-3 py-2">{period}</td>
                         <td className="px-3 py-2 max-w-[120px] truncate">{r.reason ?? "—"}</td>
-                        <td className="px-3 py-2 text-center"><StatusBadge status={r.approval_status} /></td>
+                        <td className="px-3 py-2 text-center">
+                          <div className="inline-flex items-center gap-1 flex-wrap justify-center">
+                            <StatusBadge status={r.approval_status} />
+                            {(printCountMap[r.id] ?? 0) > 0 && (
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">🖨️ {printCountMap[r.id]}회</span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-3 py-2">
                           <div className="flex gap-1 justify-center flex-wrap">
                             {canApprove(r) ? (
