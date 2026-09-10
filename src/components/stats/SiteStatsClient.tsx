@@ -80,6 +80,7 @@ export default function SiteStatsClient() {
   const [loading, setLoading] = useState(true);
   // 자재별 투입현황에서 '입고 이력이 없고 출고만 있는' 자재의 차변(입고)을 buy_price로 채우기 위한 맵.
   const [materialBuyPrices, setMaterialBuyPrices] = useState<Record<string, number>>({});
+  const [matSpecMap, setMatSpecMap] = useState<Record<string, string>>({});
 
   const loadStats = () => {
     setLoading(true);
@@ -109,12 +110,15 @@ export default function SiteStatsClient() {
       let offset = 0;
       while (true) {
         const { data, error } = await supabase.from("materials")
-          .select("id, buy_price")
+          .select("id, buy_price, model_no")
           .range(offset, offset + pageSize - 1);
         if (error || !data || data.length === 0) break;
-        for (const m of data as { id: string; buy_price: number | null }[]) {
+        const specMap: Record<string, string> = {};
+        for (const m of data as { id: string; buy_price: number | null; model_no: string | null }[]) {
           map[m.id] = m.buy_price ?? 0;
+          if (m.model_no) specMap[m.id] = m.model_no;
         }
+        setMatSpecMap(prev => ({ ...prev, ...specMap }));
         if (data.length < pageSize) break;
         offset += pageSize;
       }
@@ -532,7 +536,12 @@ export default function SiteStatsClient() {
                   return (
                     <tr key={`${t.type}-${t.id}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                       <td className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(t.createdAt)}</td>
-                      <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[180px] truncate">{t.materialName}</td>
+                      <td className="px-4 py-3 text-center font-medium text-gray-800 dark:text-gray-200 max-w-[200px]">
+                        <div className="truncate">{t.materialName}</div>
+                        {matSpecMap[t.materialId] && (
+                          <div className="text-xs text-gray-400 dark:text-gray-500 truncate">{matSpecMap[t.materialId]}</div>
+                        )}
+                      </td>
                       
                       {/* 차변 (입고) */}
                       <td className="px-2 py-3 text-center text-blue-600 font-medium tabular-nums border-r border-gray-200/20 dark:border-gray-700/20">
