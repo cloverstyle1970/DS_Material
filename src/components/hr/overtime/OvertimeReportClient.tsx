@@ -489,8 +489,9 @@ export default function OvertimeReportClient() {
       const instructorName = f.work_instructor_id
         ? (accounts.find(a => a.id === f.work_instructor_id)?.username ?? f.work_instructor.trim())
         : f.work_instructor.trim() || null;
+      const authorId = editingId === "new" ? user.id : (editingReport?.author_id ?? user.id);
       const payload = {
-        author_id: user.id, site_name: f.site_name.trim(),
+        author_id: authorId, site_name: f.site_name.trim(),
         work_instructor: instructorName, work_instructor_id: f.work_instructor_id,
         work_reasons: f.work_reasons, work_reason_etc: f.work_reason_etc.trim() || null,
         work_elevator: f.work_elevator.trim() || null,

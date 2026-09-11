@@ -354,8 +354,9 @@ export default function LeaveRequestClient() {
     setSaving(true);
     try {
       // author_signature 는 별도 UPDATE 로 분리 — 컬럼이 아직 DB에 없어도 기본 레코드가 저장되도록
+      const authorId = editingId === "new" ? user.id : (editingRecord?.author_id ?? user.id);
       const corePayload = {
-        author_id: user.id,
+        author_id: authorId,
         leave_type: f.leave_type,
         s_yr: f.s_yr, s_mo: f.s_mo, s_dy: f.s_dy, s_hr: f.s_hr, s_mi: f.s_mi,
         e_yr: f.e_yr, e_mo: f.e_mo, e_dy: f.e_dy, e_hr: f.e_hr, e_mi: f.e_mi,
