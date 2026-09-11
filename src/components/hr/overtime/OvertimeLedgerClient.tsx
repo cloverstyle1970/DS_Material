@@ -934,6 +934,9 @@ export default function OvertimeLedgerClient() {
               {editingReport && (
                 <StatusBadge status={editingReport.approval_status} />
               )}
+              {editingReport?.approval_status === "rejected" && editingReport.reject_reason && (
+                <span className="text-red-600 dark:text-red-400 font-medium">반려 사유: {editingReport.reject_reason}</span>
+              )}
               {isReadOnly && (
                 <span className="text-orange-600 dark:text-orange-400 font-medium">읽기 전용</span>
               )}

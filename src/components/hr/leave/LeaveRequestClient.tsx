@@ -656,6 +656,9 @@ export default function LeaveRequestClient() {
                   {{draft:"작성중", pending:"승인 요청", approved:"승인완료", rejected:"반려"}[editingRecord.approval_status] ?? editingRecord.approval_status}
                 </span>
               )}
+              {editingRecord?.approval_status === "rejected" && editingRecord.reject_reason && (
+                <span className="text-red-600 dark:text-red-400 font-medium">반려 사유: {editingRecord.reject_reason}</span>
+              )}
             </div>
 
             {/* A4 문서 */}

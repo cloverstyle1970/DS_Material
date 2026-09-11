@@ -739,6 +739,9 @@ export default function OvertimeReportClient() {
               {otResult && (
                 <span className="font-semibold text-blue-700 dark:text-blue-300">{otResult.display}</span>
               )}
+              {editingReport?.approval_status === "rejected" && editingReport.reject_reason && (
+                <span className="text-red-600 dark:text-red-400 font-medium">반려 사유: {editingReport.reject_reason}</span>
+              )}
             </div>
 
             {/* A4 문서 */}
