@@ -1024,10 +1024,9 @@ export default function OvertimeReportClient() {
                                         style={{ ...iCell, textAlign:"center", padding:"0", fontSize:"7.5pt", cursor:"pointer" }}
                                       >
                                         <option value=""></option>
+                                        <option value="휴가">휴가</option>
                                         <option value="연차">연차</option>
                                         <option value="대체휴무">대체휴무</option>
-                                        <option value="교육">교육</option>
-                                        <option value="출장">출장</option>
                                         <option value="기타">기타</option>
                                       </select>
                                     </td>
