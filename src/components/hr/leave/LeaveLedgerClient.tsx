@@ -443,7 +443,7 @@ export default function LeaveLedgerClient() {
         if (ne) throw new Error("문서번호 채번 실패: " + ne.message);
         const no = `LR-${yy}-${String((count ?? 0) + 1).padStart(3, "0")}`;
         const { error: ie } = await supabase.from("leave_requests").insert({ ...corePayload, request_no: no });
-        if (ie) throw ie;
+        if (ie) throw new Error(ie.message);
         if (authorSig) {
           const { data: newRec } = await supabase.from("leave_requests").select("id").eq("request_no", no).maybeSingle();
           if (newRec) {
@@ -458,7 +458,7 @@ export default function LeaveLedgerClient() {
         }
       } else {
         const { error } = await supabase.from("leave_requests").update(corePayload).eq("id", editingId!);
-        if (error) throw error;
+        if (error) throw new Error(error.message);
         if (authorSig) {
           await supabase.from("leave_requests").update({ author_signature: authorSig }).eq("id", editingId!).then(({ error }) => {
             if (error) console.warn("author_signature 저장 실패 (컬럼 미존재?)", error.message);
@@ -469,8 +469,12 @@ export default function LeaveLedgerClient() {
           notifyLeaveApprovalRequest({ approverId: f.approver_id, authorName: authorAcc?.username ?? user.name, requestNo: rec.request_no, requestId: rec.id, leaveType: f.leave_type }).catch(console.warn);
       }
       await load(); setEditingId(null);
-    } catch (e: unknown) { alert("저장 실패: " + (e instanceof Error ? e.message : String(e))); }
-    finally { setSaving(false); }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message
+        : (e != null && typeof e === "object" && "message" in e) ? String((e as { message: unknown }).message)
+        : String(e);
+      alert("저장 실패: " + msg);
+    } finally { setSaving(false); }
   }
 
   function handleApprovalRequest() {

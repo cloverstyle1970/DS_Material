@@ -667,19 +667,23 @@ export default function OvertimeLedgerClient() {
         const { data: no, error: ne } = await supabase.rpc("next_ot_no");
         if (ne) throw new Error("문서번호 채번 실패: " + ne.message);
         const { data: ins, error: ie } = await supabase.from("overtime_reports").insert({ ...payload, report_no: no }).select("id,report_no").single();
-        if (ie) throw ie;
+        if (ie) throw new Error(ie.message);
         if (submitForApproval && f.approver_id)
           notifyOvertimeApprovalRequest({ approverId: f.approver_id, authorName: authorAcc?.username ?? user.name, reportNo: no, reportId: (ins as { id: number }).id, siteName: f.site_name, startAt: startDT }).catch(console.warn);
       } else {
         const { error } = await supabase.from("overtime_reports").update(payload).eq("id", editingId!);
-        if (error) throw error;
+        if (error) throw new Error(error.message);
         const rep = reports.find(r => r.id === editingId);
         if (submitForApproval && f.approver_id && rep)
           notifyOvertimeApprovalRequest({ approverId: f.approver_id, authorName: authorAcc?.username ?? user.name, reportNo: rep.report_no, reportId: rep.id, siteName: f.site_name, startAt: startDT }).catch(console.warn);
       }
       await load(); setEditingId(null);
-    } catch (e: unknown) { alert("저장 실패: " + (e instanceof Error ? e.message : String(e))); }
-    finally { setSaving(false); }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message
+        : (e != null && typeof e === "object" && "message" in e) ? String((e as { message: unknown }).message)
+        : String(e);
+      alert("저장 실패: " + msg);
+    } finally { setSaving(false); }
   }
 
   // ── 삭제 ──
