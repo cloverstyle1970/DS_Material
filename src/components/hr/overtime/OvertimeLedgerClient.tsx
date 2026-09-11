@@ -461,16 +461,17 @@ export default function OvertimeLedgerClient() {
 
   const startDT = buildDT(f.s_yr, f.s_mo, f.s_dy, f.s_hr, f.s_mi);
   const endDT = buildDT(f.e_yr, f.e_mo, f.e_dy, f.e_hr, f.e_mi);
+  const hasWorkerHoliday = f.worker_holiday_types.some(h => !!h);
 
   useEffect(() => {
     if (!startDT || !endDT) { setOtResult(null); return; }
     const s = new Date(startDT), e = new Date(endDT);
     if (isNaN(s.getTime()) || isNaN(e.getTime()) || e <= s) { setOtResult(null); return; }
-    const r = calcOvertimeResult(s, e, f.is_holiday);
+    const r = calcOvertimeResult(s, e, f.is_holiday || hasWorkerHoliday);
     setOtResult(r);
     sf({ work_hours: r.workHours, holiday_hours: r.holidayHours, overtime_hours: r.overtimeHours });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startDT, endDT, f.is_holiday]);
+  }, [startDT, endDT, f.is_holiday, hasWorkerHoliday]);
 
   function detectFromStart(yr: string, mo: string, dy: string) {
     const d = new Date(`20${yr}-${mo}-${dy}`);
