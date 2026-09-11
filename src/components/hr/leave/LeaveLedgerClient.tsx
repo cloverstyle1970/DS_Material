@@ -437,11 +437,8 @@ export default function LeaveLedgerClient() {
         submitted_at: submitForApproval ? new Date().toISOString() : null,
       };
       if (editingId === "new") {
-        const yy = new Date().toISOString().slice(2, 4);
-        const { count, error: ne } = await supabase
-          .from("leave_requests").select("*", { count: "exact", head: true }).like("request_no", `LR-${yy}-%`);
+        const { data: no, error: ne } = await supabase.rpc("next_doc_no", { p_prefix: "LR" });
         if (ne) throw new Error("문서번호 채번 실패: " + ne.message);
-        const no = `LR-${yy}-${String((count ?? 0) + 1).padStart(3, "0")}`;
         const { error: ie } = await supabase.from("leave_requests").insert({ ...corePayload, request_no: no });
         if (ie) throw new Error(ie.message);
         if (authorSig) {
