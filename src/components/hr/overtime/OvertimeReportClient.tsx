@@ -386,17 +386,16 @@ export default function OvertimeReportClient() {
 
   const startDT = buildDT(f.s_yr, f.s_mo, f.s_dy, f.s_hr, f.s_mi);
   const endDT   = buildDT(f.e_yr, f.e_mo, f.e_dy, f.e_hr, f.e_mi);
-  const hasWorkerHoliday = f.worker_holiday_types.some(h => !!h);
 
   useEffect(() => {
     if (!startDT || !endDT) { setOtResult(null); return; }
     const s = new Date(startDT), e = new Date(endDT);
     if (isNaN(s.getTime()) || isNaN(e.getTime()) || e <= s) { setOtResult(null); return; }
-    const r = calcOvertimeResult(s, e, f.is_holiday || hasWorkerHoliday);
+    const r = calcOvertimeResult(s, e, f.is_holiday);
     setOtResult(r);
     sf({ work_hours: r.workHours, holiday_hours: r.holidayHours, overtime_hours: r.overtimeHours });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startDT, endDT, f.is_holiday, hasWorkerHoliday]);
+  }, [startDT, endDT, f.is_holiday]);
 
   function detectFromStart(yr: string, mo: string, dy: string) {
     const d = new Date(`20${yr}-${mo}-${dy}`);
@@ -1186,7 +1185,7 @@ export default function OvertimeReportClient() {
                   const author   = accounts.find(a => a.id === r.author_id);
                   const approver = accounts.find(a => a.id === r.approver_id);
                   const s = new Date(r.start_at), e = new Date(r.end_at);
-                  const ot = calcOvertimeResult(s, e, r.is_holiday || (r.worker_holiday_types ?? []).some(h => !!h));
+                  const ot = calcOvertimeResult(s, e, r.is_holiday);
                   return (
                     <div key={r.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
                       <div className="flex items-start justify-between gap-2">
