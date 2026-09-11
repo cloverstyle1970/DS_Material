@@ -373,7 +373,7 @@ export default function LeaveRequestClient() {
         if (ne) throw new Error("문서번호 채번 실패: " + ne.message);
         const no = `LR-${yy}-${String((count ?? 0) + 1).padStart(3, "0")}`;
         const { error: ie } = await supabase.from("leave_requests").insert({ ...corePayload, request_no: no });
-        if (ie) throw ie;
+        if (ie) throw new Error(ie.message);
         // 서명 별도 UPDATE (컬럼 없으면 에러를 무시하고 레코드는 보존)
         if (authorSig) {
           const { data: newRec } = await supabase.from("leave_requests").select("id").eq("request_no", no).maybeSingle();
@@ -389,7 +389,7 @@ export default function LeaveRequestClient() {
         }
       } else {
         const { error } = await supabase.from("leave_requests").update(corePayload).eq("id", editingId!);
-        if (error) throw error;
+        if (error) throw new Error(error.message);
         if (authorSig) {
           await supabase.from("leave_requests").update({ author_signature: authorSig }).eq("id", editingId!).then(({ error }) => {
             if (error) console.warn("author_signature 저장 실패 (컬럼 미존재?)", error.message);
