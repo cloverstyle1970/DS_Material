@@ -514,7 +514,12 @@ export default function OvertimeReportClient() {
           notifyOvertimeApprovalRequest({ approverId: f.approver_id, authorName: authorAcc?.username ?? user.name, reportNo: rep.report_no, reportId: rep.id, siteName: f.site_name, startAt: startDT }).catch(console.warn);
       }
       await load(); setEditingId(null);
-    } catch (e: unknown) { alert("저장 실패: " + (e instanceof Error ? e.message : String(e))); }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message
+        : (e != null && typeof e === "object" && "message" in e) ? String((e as { message: unknown }).message)
+        : String(e);
+      alert("저장 실패: " + msg);
+    }
     finally { setSaving(false); }
   }
 

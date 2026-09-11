@@ -400,7 +400,12 @@ export default function LeaveRequestClient() {
           notifyLeaveApprovalRequest({ approverId: f.approver_id, authorName: authorAcc?.username ?? user.name, requestNo: rec.request_no, requestId: rec.id, leaveType: f.leave_type }).catch(console.warn);
       }
       await load(); setEditingId(null);
-    } catch (e: unknown) { alert("저장 실패: " + (e instanceof Error ? e.message : String(e))); }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message
+        : (e != null && typeof e === "object" && "message" in e) ? String((e as { message: unknown }).message)
+        : String(e);
+      alert("저장 실패: " + msg);
+    }
     finally { setSaving(false); }
   }
 
