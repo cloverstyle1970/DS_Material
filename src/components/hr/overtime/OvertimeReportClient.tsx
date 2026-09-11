@@ -386,16 +386,20 @@ export default function OvertimeReportClient() {
 
   const startDT = buildDT(f.s_yr, f.s_mo, f.s_dy, f.s_hr, f.s_mi);
   const endDT   = buildDT(f.e_yr, f.e_mo, f.e_dy, f.e_hr, f.e_mi);
+  // 이름 있는 작업자 전원이 휴일구분 설정된 경우 → 휴일 계산 적용
+  const activeIdxs = f.workers.map((w, i) => w.trim() ? i : -1).filter(i => i >= 0);
+  const allWorkersOnHoliday = activeIdxs.length > 0 && activeIdxs.every(i => !!f.worker_holiday_types[i]);
+  const effectiveIsHoliday = f.is_holiday || allWorkersOnHoliday;
 
   useEffect(() => {
     if (!startDT || !endDT) { setOtResult(null); return; }
     const s = new Date(startDT), e = new Date(endDT);
     if (isNaN(s.getTime()) || isNaN(e.getTime()) || e <= s) { setOtResult(null); return; }
-    const r = calcOvertimeResult(s, e, f.is_holiday);
+    const r = calcOvertimeResult(s, e, effectiveIsHoliday);
     setOtResult(r);
     sf({ work_hours: r.workHours, holiday_hours: r.holidayHours, overtime_hours: r.overtimeHours });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startDT, endDT, f.is_holiday]);
+  }, [startDT, endDT, effectiveIsHoliday]);
 
   function detectFromStart(yr: string, mo: string, dy: string) {
     const d = new Date(`20${yr}-${mo}-${dy}`);
@@ -1185,7 +1189,9 @@ export default function OvertimeReportClient() {
                   const author   = accounts.find(a => a.id === r.author_id);
                   const approver = accounts.find(a => a.id === r.approver_id);
                   const s = new Date(r.start_at), e = new Date(r.end_at);
-                  const ot = calcOvertimeResult(s, e, r.is_holiday);
+                  const rActiveIdxs = (r.workers ?? []).map((w: string, i: number) => w.trim() ? i : -1).filter((i: number) => i >= 0);
+                  const rAllOnHoliday = rActiveIdxs.length > 0 && rActiveIdxs.every((i: number) => !!(r.worker_holiday_types ?? [])[i]);
+                  const ot = calcOvertimeResult(s, e, r.is_holiday || rAllOnHoliday);
                   return (
                     <div key={r.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
                       <div className="flex items-start justify-between gap-2">
