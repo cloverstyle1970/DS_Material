@@ -27,7 +27,7 @@ interface OvertimeReport {
   work_reasons: string[]; work_reason_etc: string | null; work_elevator: string | null;
   start_at: string; end_at: string; is_holiday: boolean; holiday_type: string | null;
   work_hours: number | null; holiday_hours: number | null; overtime_hours: number | null;
-  workers: string[]; worker_notes: string[]; work_content: string | null; work_result: string | null; note: string | null;
+  workers: string[]; worker_notes: string[]; worker_holiday_types: string[]; work_content: string | null; work_result: string | null; note: string | null;
   approver_id: number | null; approval_status: string; approver_signature: string | null;
   submitted_at: string | null; approved_at: string | null; rejected_at: string | null; reject_reason: string | null;
   created_at: string; updated_at: string;
@@ -39,7 +39,7 @@ interface FormState {
   s_yr: string; s_mo: string; s_dy: string; s_hr: string; s_mi: string;
   e_yr: string; e_mo: string; e_dy: string; e_hr: string; e_mi: string;
   is_holiday: boolean; holiday_type: string;
-  workers: string[]; worker_notes: string[]; work_content: string; work_result: string; note: string;
+  workers: string[]; worker_notes: string[]; worker_holiday_types: string[]; work_content: string; work_result: string; note: string;
   approver_id: number | null;
   work_hours: number | null; holiday_hours: number | null; overtime_hours: number | null;
 }
@@ -73,7 +73,7 @@ function makeEmptyForm(): FormState {
     s_yr: String(n.getFullYear()).slice(2), s_mo: String(n.getMonth() + 1).padStart(2, "0"), s_dy: String(n.getDate()).padStart(2, "0"), s_hr: "", s_mi: "",
     e_yr: String(n.getFullYear()).slice(2), e_mo: String(n.getMonth() + 1).padStart(2, "0"), e_dy: String(n.getDate()).padStart(2, "0"), e_hr: "", e_mi: "",
     is_holiday: false, holiday_type: "",
-    workers: Array(10).fill(""), worker_notes: Array(10).fill(""), work_content: "", work_result: "", note: "",
+    workers: Array(10).fill(""), worker_notes: Array(10).fill(""), worker_holiday_types: Array(10).fill(""), work_content: "", work_result: "", note: "",
     approver_id: null, work_hours: null, holiday_hours: null, overtime_hours: null,
   };
 }
@@ -92,6 +92,7 @@ function reportToForm(r: OvertimeReport): FormState {
     is_holiday: r.is_holiday, holiday_type: r.holiday_type ?? "",
     workers: ws,
     worker_notes: (() => { const ns = [...(r.worker_notes ?? [])]; while (ns.length < targetLen) ns.push(""); return ns; })(),
+    worker_holiday_types: (() => { const h = [...(r.worker_holiday_types ?? [])]; while (h.length < targetLen) h.push(""); return h; })(),
     work_content: r.work_content ?? "", work_result: r.work_result ?? "", note: r.note ?? "",
     approver_id: r.approver_id, work_hours: r.work_hours, holiday_hours: r.holiday_hours, overtime_hours: r.overtime_hours,
   };
@@ -658,6 +659,7 @@ export default function OvertimeLedgerClient() {
         work_hours: f.work_hours, holiday_hours: f.holiday_hours, overtime_hours: f.overtime_hours,
         workers: f.workers.filter(w => w.trim()),
         worker_notes: f.worker_notes,
+        worker_holiday_types: f.worker_holiday_types,
         work_content: f.work_content.trim() || null, work_result: f.work_result.trim() || null,
         note: f.note.trim() || null, approver_id: f.approver_id,
         approval_status: submitForApproval ? "pending" : "draft",
@@ -1193,6 +1195,7 @@ export default function OvertimeLedgerClient() {
                           <tr key={rowIdx} style={{ borderBottom: bdr }}>
                             <td data-label="true" style={{ ...labelCell, padding: 0, verticalAlign: "top" }}>
                               <div style={{ height: "9mm", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: bdr }}>작업자명</div>
+                              <div style={{ height: "7mm", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: bdr, fontSize: "8pt" }}>휴일구분</div>
                               <div style={{ height: "11.44mm", display: "flex", alignItems: "center", justifyContent: "center" }}>비 고</div>
                             </td>
                             <td colSpan={3} style={{ padding: 0, verticalAlign: "top", overflow: "visible" }}>
@@ -1225,6 +1228,29 @@ export default function OvertimeLedgerClient() {
                                         </td>
                                       ))}
                                     </tr>
+                                    {/* 휴일구분 행 */}
+                                    <tr style={{ borderBottom: bdr }}>
+                                      {f.worker_holiday_types.slice(start, start + 10).map((ht, i) => (
+                                        <td key={i} style={{
+                                          borderLeft: i === 0 ? "none" : bdr, width: "10%", height: "7mm",
+                                          textAlign: "center", verticalAlign: "middle", padding: "0.5mm",
+                                        }}>
+                                          <select
+                                            value={ht}
+                                            disabled={isReadOnly}
+                                            onChange={e => { const h = [...f.worker_holiday_types]; h[start + i] = e.target.value; sf({ worker_holiday_types: h }); }}
+                                            style={{ ...iCell, textAlign: "center", padding: "0", fontSize: "7.5pt", cursor: isReadOnly ? "default" : "pointer" }}
+                                          >
+                                            <option value=""></option>
+                                            <option value="연차">연차</option>
+                                            <option value="대체휴무">대체휴무</option>
+                                            <option value="교육">교육</option>
+                                            <option value="출장">출장</option>
+                                            <option value="기타">기타</option>
+                                          </select>
+                                        </td>
+                                      ))}
+                                    </tr>
                                     <tr>
                                       {f.worker_notes.slice(start, start + 10).map((n, i) => (
                                         <td key={i} style={{
@@ -1250,7 +1276,7 @@ export default function OvertimeLedgerClient() {
                                   >
                                     <button
                                       type="button"
-                                      onClick={() => sf({ workers: [...f.workers, ...Array(10).fill("")], worker_notes: [...f.worker_notes, ...Array(10).fill("")] })}
+                                      onClick={() => sf({ workers: [...f.workers, ...Array(10).fill("")], worker_notes: [...f.worker_notes, ...Array(10).fill("")], worker_holiday_types: [...f.worker_holiday_types, ...Array(10).fill("")] })}
                                       style={{ height: "9mm", fontSize: "8pt", padding: "0 2mm", cursor: "pointer", border: "1px solid #aaa", borderRadius: "2px", background: "#f9f9f9", whiteSpace: "nowrap" }}
                                     >
                                       + 추가
@@ -1258,7 +1284,7 @@ export default function OvertimeLedgerClient() {
                                     {f.workers.length > 10 && (
                                       <button
                                         type="button"
-                                        onClick={() => sf({ workers: f.workers.slice(0, -10), worker_notes: f.worker_notes.slice(0, -10) })}
+                                        onClick={() => sf({ workers: f.workers.slice(0, -10), worker_notes: f.worker_notes.slice(0, -10), worker_holiday_types: f.worker_holiday_types.slice(0, -10) })}
                                         style={{ height: "11.44mm", fontSize: "8pt", padding: "0 2mm", cursor: "pointer", border: "1px solid #f99", borderRadius: "2px", background: "#fff5f5", whiteSpace: "nowrap", color: "#c00" }}
                                       >
                                         - 삭제
