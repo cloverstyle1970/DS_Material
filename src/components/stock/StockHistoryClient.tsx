@@ -69,6 +69,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
   const [sites, setSites] = useState<SiteOption[]>([]);
   const [userNames, setUserNames] = useState<string[]>([]);
   const [matMap, setMatMap] = useState<Map<string, string>>(new Map()); // materialId → modelNo(규격)
+  const [matAliasMap, setMatAliasMap] = useState<Map<string, string>>(new Map()); // materialId → alias(별명)
   const [matImgMap, setMatImgMap] = useState<Map<string, string[]>>(new Map()); // materialId → 사진 URL 목록
   // 입고 모드 한정: transactionId → 신청자명. transaction.note 의 '발주 #N' 패턴을 모아
   // purchase_orders 를 한 번에 조회해 매핑한다.
@@ -106,12 +107,15 @@ export default function StockHistoryClient({ mode, initial }: Props) {
       .then(data => {
         const m = new Map<string, string>();
         const imgs = new Map<string, string[]>();
+        const a = new Map<string, string>();
         data.forEach(x => {
           m.set(x.id, x.modelNo ?? "");
+          if (x.alias) a.set(x.id, x.alias);
           const urls = [x.referenceImageUrl1, x.referenceImageUrl2, x.opinionImageUrl].filter((u): u is string => !!u);
           if (urls.length > 0) imgs.set(x.id, urls);
         });
         setMatMap(m);
+        setMatAliasMap(a);
         setMatImgMap(imgs);
       })
       .catch(() => {});
@@ -209,10 +213,12 @@ export default function StockHistoryClient({ mode, initial }: Props) {
     if (search.matQuery) {
       const q = search.matQuery.trim().toLowerCase();
       const modelNo = (matMap.get(t.materialId) ?? "").toLowerCase();
+      const alias  = (matAliasMap.get(t.materialId) ?? "").toLowerCase();
       if (
         !t.materialId.toLowerCase().includes(q) &&
         !t.materialName.toLowerCase().includes(q) &&
         !modelNo.includes(q) &&
+        !alias.includes(q) &&
         !((t.serialNo ?? "").toLowerCase().includes(q))
       ) return false;
     }

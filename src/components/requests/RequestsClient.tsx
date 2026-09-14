@@ -244,6 +244,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
   const [orders,   setOrders]   = useState(initialOrders);
   const [showOrderBulkUpload, setShowOrderBulkUpload] = useState(false);
   const [matModelMap, setMatModelMap] = useState<Map<string, string>>(new Map()); // materialId → modelNo(규격)
+  const [matAliasMap, setMatAliasMap] = useState<Map<string, string>>(new Map()); // materialId → alias(별명)
   const [matImgMap,   setMatImgMap]   = useState<Map<string, string[]>>(new Map()); // materialId → imgUrls
 
   // 숨어 있던 탭이 다시 보일 때 신청/발주 목록을 다시 받아 stale 방지
@@ -280,16 +281,19 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
         setUserNames(active);
       })
       .catch(() => {});
-    api.get<{ id: string; modelNo: string | null; referenceImageUrl1?: string | null; referenceImageUrl2?: string | null; opinionImageUrl?: string | null }[]>("/api/materials")
+    api.get<{ id: string; modelNo: string | null; alias: string | null; referenceImageUrl1?: string | null; referenceImageUrl2?: string | null; opinionImageUrl?: string | null }[]>("/api/materials")
       .then(data => {
         const m = new Map<string, string>();
+        const a = new Map<string, string>();
         const imgs = new Map<string, string[]>();
         data.forEach(x => {
           m.set(x.id, x.modelNo ?? "");
+          if (x.alias) a.set(x.id, x.alias);
           const urls = [x.referenceImageUrl1, x.referenceImageUrl2, x.opinionImageUrl].filter((u): u is string => !!u);
           if (urls.length > 0) imgs.set(x.id, urls);
         });
         setMatModelMap(m);
+        setMatAliasMap(a);
         setMatImgMap(imgs);
       })
       .catch(() => {});
@@ -498,8 +502,9 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
     if (ordSearch.requesterName && !(o.requesterName?.toLowerCase().includes(ordSearch.requesterName.toLowerCase()))) return false;
     if (ordSearch.material) {
       const q = ordSearch.material.toLowerCase();
-      const spec = (matModelMap.get(o.materialId) ?? "").toLowerCase();
-      if (!o.materialName.toLowerCase().includes(q) && !o.materialId.toLowerCase().includes(q) && !spec.includes(q)) return false;
+      const spec  = (matModelMap.get(o.materialId) ?? "").toLowerCase();
+      const alias = (matAliasMap.get(o.materialId) ?? "").toLowerCase();
+      if (!o.materialName.toLowerCase().includes(q) && !o.materialId.toLowerCase().includes(q) && !spec.includes(q) && !alias.includes(q)) return false;
     }
     return true;
   });
