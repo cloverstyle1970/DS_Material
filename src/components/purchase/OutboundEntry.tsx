@@ -610,15 +610,38 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
                 </Td>
                 <Td>
                   {r.materialId ? (
-                    <button type="button" onClick={() => setSerialEditRowId(r.id)}
-                      title={r.serialNos.length > 0 && r.serialNos.length < r.qty ? `${r.serialNos.length}건 추적 + ${r.qty - r.serialNos.length}건 비추적` : undefined}
-                      className={`w-full text-xs px-2 py-1 rounded border font-medium transition-colors ${r.serialNos.length === 0 ? "border-gray-300 text-gray-500 bg-white hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600" : r.serialNos.length === r.qty ? "border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:bg-blue-900/30" : "border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:bg-amber-900/30"}`}>
-                      {r.serialNos.length === 0
-                        ? "S/N (선택) ▾"
-                        : r.serialNos.length === r.qty
-                          ? `S/N ${r.serialNos.length}건 ▾`
-                          : `S/N ${r.serialNos.length}/${r.qty}건 ▾`}
-                    </button>
+                    r.qty === 1 ? (
+                      // 수량 1: 인라인 직접입력 + 목록선택 버튼
+                      <div className="flex items-center gap-0.5">
+                        <input
+                          type="text" lang="ko"
+                          value={r.serialNos[0] ?? ""}
+                          onChange={e => {
+                            const sn = e.target.value;
+                            patchRow(r.id, { serialNos: sn ? [sn] : [] });
+                          }}
+                          placeholder="S/N"
+                          className={`${cellInput} font-mono flex-1 min-w-0 ${r.serialNos.length > 0 ? "!text-blue-700 dark:!text-blue-300" : ""}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setSerialEditRowId(r.id)}
+                          title="재고 S/N 목록에서 선택"
+                          className="shrink-0 px-1.5 py-1 text-[11px] text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors leading-none"
+                        >▾</button>
+                      </div>
+                    ) : (
+                      // 수량 1 초과: 모달 버튼
+                      <button type="button" onClick={() => setSerialEditRowId(r.id)}
+                        title={r.serialNos.length > 0 && r.serialNos.length < r.qty ? `${r.serialNos.length}건 추적 + ${r.qty - r.serialNos.length}건 비추적` : undefined}
+                        className={`w-full text-xs px-2 py-1 rounded border font-medium transition-colors ${r.serialNos.length === 0 ? "border-gray-300 text-gray-500 bg-white hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600" : r.serialNos.length === r.qty ? "border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:bg-blue-900/30" : "border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:bg-amber-900/30"}`}>
+                        {r.serialNos.length === 0
+                          ? "S/N (선택) ▾"
+                          : r.serialNos.length === r.qty
+                            ? `S/N ${r.serialNos.length}건 ▾`
+                            : `S/N ${r.serialNos.length}/${r.qty}건 ▾`}
+                      </button>
+                    )
                   ) : (
                     <span className="text-gray-300 dark:text-gray-600 text-xs px-2">—</span>
                   )}
