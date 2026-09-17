@@ -97,6 +97,91 @@ const ACCOUNT_EXPORT_COLS =
   "safety_shoes_size, email, gender, blood_type, permission_group_id, crew_id, " +
   "notifications_enabled, push_enabled";
 
+/** 사원 연락처 엑셀 (이름·전화·긴급연락처·주소·자체점검자격명·자격번호) */
+async function downloadStaffContactExcel() {
+  const PAGE = 1000;
+
+  // 1) accounts
+  type AccRow = { id: number; name: string; phone: string | null; address: string | null };
+  const accounts: AccRow[] = [];
+  for (let off = 0; ; off += PAGE) {
+    const { data, error } = await supabase
+      .from("accounts")
+      .select("id, name, phone, address")
+      .order("id")
+      .range(off, off + PAGE - 1);
+    if (error) throw new Error(error.message);
+    const batch = (data as AccRow[] | null) ?? [];
+    accounts.push(...batch);
+    if (batch.length < PAGE) break;
+  }
+
+  // 2) 긴급연락처 (is_emergency = true)
+  type FamRow = { user_id: number; name: string | null; phone: string | null };
+  const famRows: FamRow[] = [];
+  for (let off = 0; ; off += PAGE) {
+    const { data } = await supabase
+      .from("user_family_members")
+      .select("user_id, name, phone")
+      .eq("is_emergency", true)
+      .range(off, off + PAGE - 1);
+    const batch = (data as FamRow[] | null) ?? [];
+    famRows.push(...batch);
+    if (batch.length < PAGE) break;
+  }
+  const famMap = new Map<number, FamRow>();
+  for (const f of famRows) famMap.set(Number(f.user_id), f);
+
+  // 3) 자체점검 자격
+  type CertRow = { user_id: number; cert_name: string | null; cert_number: string | null };
+  const certRows: CertRow[] = [];
+  for (let off = 0; ; off += PAGE) {
+    const { data } = await supabase
+      .from("user_certifications")
+      .select("user_id, cert_name, cert_number")
+      .eq("self_check", true)
+      .range(off, off + PAGE - 1);
+    const batch = (data as CertRow[] | null) ?? [];
+    certRows.push(...batch);
+    if (batch.length < PAGE) break;
+  }
+  const certMap = new Map<number, CertRow[]>();
+  for (const c of certRows) {
+    const uid = Number(c.user_id);
+    if (!certMap.has(uid)) certMap.set(uid, []);
+    certMap.get(uid)!.push(c);
+  }
+
+  // 4) 병합
+  const rows = accounts.map(acc => {
+    const fam = famMap.get(acc.id);
+    const certs = certMap.get(acc.id) ?? [];
+    return {
+      "이름":            acc.name,
+      "전화번호":        acc.phone ?? "",
+      "긴급연락처(이름)": fam?.name ?? "",
+      "긴급연락처(전화)": fam?.phone ?? "",
+      "주소":            acc.address ?? "",
+      "자체점검자격명":  certs.map(c => c.cert_name ?? "").filter(Boolean).join(", "),
+      "자격번호":        certs.map(c => c.cert_number ?? "").filter(Boolean).join(", "),
+    };
+  });
+
+  if (rows.length === 0) { alert("데이터가 없습니다."); return; }
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "사원연락처");
+  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([buf], { type: "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url;
+  a.download = `사원연락처_${stamp}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 /** accounts 테이블을 엑셀로 다운로드 (비밀번호 컬럼은 조회 자체에서 제외) */
 async function downloadAccountsExcel() {
   const PAGE = 1000;
@@ -328,6 +413,27 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
                     ? `${statusFilter} ${fmtNum(filtered.length)}명`
                     : `전체 ${fmtNum(users.length)}명`}
           </span>
+
+          {/* 사원 연락처 엑셀 (관리자 전용) */}
+          {meIsAdmin && (
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await downloadStaffContactExcel();
+                } catch (e) {
+                  alert(`다운로드 실패: ${getErrorMessage(e)}`);
+                }
+              }}
+              className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
+                isDark
+                  ? "border-blue-700 bg-blue-900/40 text-blue-300 hover:bg-blue-800/60"
+                  : "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+              }`}
+            >
+              📋 연락처 엑셀
+            </button>
+          )}
 
           {/* accounts 전체 엑셀 다운로드 (관리자 전용) */}
           {meIsAdmin && (
