@@ -42,6 +42,7 @@ interface FormState {
   workers: string[]; worker_notes: string[]; worker_holiday_types: string[]; work_content: string; work_result: string; note: string;
   approver_id: number | null;
   work_hours: number | null; holiday_hours: number | null; overtime_hours: number | null;
+  written_at: string;
 }
 
 // ── 유틸 함수들 ──────────────────────────────────────────────
@@ -75,6 +76,7 @@ function makeEmptyForm(): FormState {
     is_holiday: false, holiday_type: "",
     workers: Array(10).fill(""), worker_notes: Array(10).fill(""), worker_holiday_types: Array(10).fill(""), work_content: "", work_result: "", note: "",
     approver_id: null, work_hours: null, holiday_hours: null, overtime_hours: null,
+    written_at: new Date().toISOString(),
   };
 }
 
@@ -95,6 +97,7 @@ function reportToForm(r: OvertimeReport): FormState {
     worker_holiday_types: (() => { const h = [...(r.worker_holiday_types ?? [])]; while (h.length < targetLen) h.push(""); return h; })(),
     work_content: r.work_content ?? "", work_result: r.work_result ?? "", note: r.note ?? "",
     approver_id: r.approver_id, work_hours: r.work_hours, holiday_hours: r.holiday_hours, overtime_hours: r.overtime_hours,
+    written_at: r.created_at,
   };
 }
 
@@ -500,7 +503,7 @@ export default function OvertimeLedgerClient() {
   }, [printLogs]);
   const approverAcc = accounts.find(a => a.id === f.approver_id);
   const authorAcc = accounts.find(a => a.id === user?.id);
-  const todayStr = new Date().toLocaleDateString("ko-KR");
+  const writtenDateStr = new Date(f.written_at).toLocaleDateString("ko-KR");
   const editingReport = reports.find(r => r.id === editingId);
   const isApproved = editingReport?.approval_status === "approved";
   const approvedAtStr = isApproved && editingReport?.approved_at
@@ -1314,7 +1317,7 @@ export default function OvertimeLedgerClient() {
                             : (authorAcc?.username ?? user?.name ?? "")}
                         </td>
                         <td data-label="true" style={{ ...labelCell, borderBottom: "none" }}>작성일자</td>
-                        <td style={{ padding: "0 3mm", verticalAlign: "middle", color: "#444" }}>{todayStr}</td>
+                        <td style={{ padding: "0 3mm", verticalAlign: "middle", color: "#444" }}>{writtenDateStr}</td>
                       </tr>
 
                     </tbody>
