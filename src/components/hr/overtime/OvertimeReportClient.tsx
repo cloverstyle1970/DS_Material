@@ -424,8 +424,10 @@ export default function OvertimeReportClient() {
   }, [printLogs]);
   const approverAcc     = accounts.find(a => a.id === f.approver_id);
   const authorAcc       = accounts.find(a => a.id === user?.id);
-  const todayStr        = new Date().toLocaleDateString("ko-KR");
   const editingReport   = myReports.find(r => r.id === editingId);
+  const writtenDateStr  = editingReport?.created_at
+    ? new Date(editingReport.created_at).toLocaleDateString("ko-KR")
+    : new Date().toLocaleDateString("ko-KR");
   const isApproved      = editingReport?.approval_status === "approved";
   const approvedAtStr   = isApproved && editingReport?.approved_at
     ? new Date(editingReport.approved_at).toLocaleDateString("ko-KR", { month:"2-digit", day:"2-digit" }).replace(". ", "/").replace(".", "")
@@ -1094,7 +1096,7 @@ export default function OvertimeReportClient() {
                         {authorAcc?.username ?? user?.name ?? ""}
                       </td>
                       <td data-label="true" style={{ ...labelCell, borderBottom:"none" }}>작성일자</td>
-                      <td style={{ padding:"0 3mm", verticalAlign:"middle", color:"#444" }}>{todayStr}</td>
+                      <td style={{ padding:"0 3mm", verticalAlign:"middle", color:"#444" }}>{writtenDateStr}</td>
                     </tr>
 
                   </tbody>
