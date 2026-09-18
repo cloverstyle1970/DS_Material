@@ -832,6 +832,8 @@ export default function OvertimeLedgerClient() {
           #ot-print-doc input, #ot-print-doc select {
             border: none !important;
             border-bottom: 1px solid #888 !important;
+            -webkit-appearance: none !important;
+            appearance: none !important;
             outline: none !important; box-shadow: none !important;
           }
           #ot-print-doc textarea {
