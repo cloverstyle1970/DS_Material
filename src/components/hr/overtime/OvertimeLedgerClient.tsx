@@ -43,6 +43,7 @@ interface FormState {
   approver_id: number | null;
   work_hours: number | null; holiday_hours: number | null; overtime_hours: number | null;
   written_at: string;
+  author_id: number | null;
 }
 
 // ── 유틸 함수들 ──────────────────────────────────────────────
@@ -77,6 +78,7 @@ function makeEmptyForm(): FormState {
     workers: Array(10).fill(""), worker_notes: Array(10).fill(""), worker_holiday_types: Array(10).fill(""), work_content: "", work_result: "", note: "",
     approver_id: null, work_hours: null, holiday_hours: null, overtime_hours: null,
     written_at: new Date().toISOString(),
+    author_id: null,
   };
 }
 
@@ -98,6 +100,7 @@ function reportToForm(r: OvertimeReport): FormState {
     work_content: r.work_content ?? "", work_result: r.work_result ?? "", note: r.note ?? "",
     approver_id: r.approver_id, work_hours: r.work_hours, holiday_hours: r.holiday_hours, overtime_hours: r.overtime_hours,
     written_at: r.created_at,
+    author_id: r.author_id,
   };
 }
 
@@ -1314,9 +1317,7 @@ export default function OvertimeLedgerClient() {
                       <tr>
                         <td data-label="true" style={{ ...labelCell, borderBottom: "none", height: "9mm" }}>작 성 자</td>
                         <td style={{ borderRight: bdr, padding: "0 3mm", verticalAlign: "middle", fontWeight: "bold" }}>
-                          {editingReport
-                            ? (accounts.find(a => a.id === editingReport.author_id)?.username ?? "")
-                            : (authorAcc?.username ?? user?.name ?? "")}
+                          {accounts.find(a => a.id === (f.author_id ?? user?.id))?.username ?? user?.name ?? ""}
                         </td>
                         <td data-label="true" style={{ ...labelCell, borderBottom: "none" }}>작성일자</td>
                         <td style={{ padding: "0 3mm", verticalAlign: "middle", color: "#444" }}>{writtenDateStr}</td>
