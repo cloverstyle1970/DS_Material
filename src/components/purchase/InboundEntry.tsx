@@ -103,6 +103,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
         setEditBatchId(target.batchId || null);
         setEditTransactionNo(target.transactionNo || null);
         if (target.siteName) setSiteName(target.siteName);
+        if (target.requesterName) setRequesterName(target.requesterName);
 
         const loaded: Row[] = [];
         for (const t of siblings) {

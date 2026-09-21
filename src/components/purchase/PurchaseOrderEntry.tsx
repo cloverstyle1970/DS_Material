@@ -119,11 +119,14 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
     isEdit ? [] : [newRow(), newRow(), newRow(), newRow(), newRow()]
   );
 
-  // 모든 유효 라인이 입고완료인 경우 → 전체 조회 전용 모드
+  // 모든 유효 라인이 입고완료인 경우
   const isFullyReceived = isEdit && !editLoading &&
     rows.some(r => r.lineId != null) &&
     rows.filter(r => r.lineId != null && r.status !== "취소").every(r => r.status === "입고완료");
-  const isReadOnly = isFullyReceived;
+  // 일부라도 입고된 경우 → 헤더 포함 전체 수정 불가 (개별 라인은 receivedQty > 0 이면 이미 잠김)
+  const hasAnyReceived = isEdit && !editLoading &&
+    rows.some(r => r.lineId != null && r.receivedQty > 0);
+  const isReadOnly = isFullyReceived || hasAnyReceived;
   const [saving,      setSaving]      = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [company,     setCompany]     = useState<POPrintCompany | null>(null);
@@ -354,7 +357,8 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
           <span className="text-indigo-500">📑</span>
           {isEdit ? (isReadOnly ? "발주서 조회" : "발주서 수정") : "발주서입력"}
           {isEdit && editLoading && <span className="text-xs text-gray-400 ml-2">불러오는 중...</span>}
-          {isReadOnly && <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 font-semibold">입고완료</span>}
+          {isFullyReceived && <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 font-semibold">입고완료</span>}
+          {hasAnyReceived && !isFullyReceived && <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 font-semibold">부분입고</span>}
         </h1>
       </div>
 
@@ -438,7 +442,7 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
       <div className="bg-[#f0f2f5] dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 px-5 py-2 flex items-center gap-2 flex-wrap text-xs shrink-0">
         {isReadOnly ? (
           <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-semibold">
-            🔒 입고완료 — 조회 전용 (수정 불가)
+            🔒 {isFullyReceived ? "입고완료" : "부분입고"} — 조회 전용 (수정 불가)
           </span>
         ) : (
           <button type="button" onClick={() => setPopup("request")}
