@@ -832,12 +832,19 @@ export default function OvertimeLedgerClient() {
             background: transparent !important;
             -webkit-text-fill-color: black !important;
           }
-          #ot-print-doc input, #ot-print-doc select {
+          #ot-print-doc input:not([type="checkbox"]), #ot-print-doc select {
             border: none !important;
             border-bottom: 1px solid #888 !important;
             -webkit-appearance: none !important;
             appearance: none !important;
             outline: none !important; box-shadow: none !important;
+          }
+          /* 체크박스(작업사유): 기본 모양 유지해 체크 상태 인쇄 */
+          #ot-print-doc input[type="checkbox"] {
+            -webkit-appearance: auto !important;
+            appearance: auto !important;
+            accent-color: #444 !important;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
           #ot-print-doc textarea {
             border: none !important;
@@ -852,7 +859,7 @@ export default function OvertimeLedgerClient() {
             background-color: #f0f0f0 !important;
             -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
-          #ot-print-doc table input, #ot-print-doc table select {
+          #ot-print-doc table input:not([type="checkbox"]), #ot-print-doc table select {
             border-bottom: none !important;
           }
         }

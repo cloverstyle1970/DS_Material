@@ -661,12 +661,19 @@ export default function OvertimeReportClient() {
             -webkit-text-fill-color: black !important;
           }
           /* 입력 필드: border-bottom 유지하여 화면과 동일한 밑줄 표시 */
-          #ot-print-doc input, #ot-print-doc select {
+          #ot-print-doc input:not([type="checkbox"]), #ot-print-doc select {
             border: none !important;
             border-bottom: 1px solid #888 !important;
             -webkit-appearance: none !important;
             appearance: none !important;
             outline: none !important; box-shadow: none !important;
+          }
+          /* 체크박스(작업사유): 기본 모양 유지해 체크 상태 인쇄 */
+          #ot-print-doc input[type="checkbox"] {
+            -webkit-appearance: auto !important;
+            appearance: auto !important;
+            accent-color: #444 !important;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
           #ot-print-doc textarea {
             border: none !important;
@@ -682,7 +689,7 @@ export default function OvertimeReportClient() {
             -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
           /* 테이블 셀 안의 입력: 셀 테두리가 이미 있으므로 밑줄 제거 */
-          #ot-print-doc table input, #ot-print-doc table select {
+          #ot-print-doc table input:not([type="checkbox"]), #ot-print-doc table select {
             border-bottom: none !important;
           }
         }
