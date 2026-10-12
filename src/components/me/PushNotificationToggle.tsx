@@ -12,12 +12,14 @@ async function callPushFn<T = unknown>(
   method: "POST" | "DELETE",
   body: unknown
 ): Promise<T> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token ?? SUPABASE_ANON_KEY;
   const res = await fetch(`${SUPABASE_URL}/functions/v1/${fnName}`, {
     method,
     headers: {
       "Content-Type":  "application/json",
       "apikey":        SUPABASE_ANON_KEY,
-      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+      "Authorization": `Bearer ${token}`,
     },
     body: JSON.stringify(body),
   });

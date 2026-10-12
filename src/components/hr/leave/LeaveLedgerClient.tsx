@@ -9,7 +9,7 @@ import { notifyLeaveApprovalRequest, notifyLeaveApproved, notifyLeaveApprovedToM
 
 export const LR_LEDGER_MENU_HREF = "/hr/leave-ledger";
 
-const LEAVE_TYPES = ["조퇴", "결근", "경조", "연차", "훈련", "교육", "휴가"] as const;
+const LEAVE_TYPES = ["조퇴", "결근", "경조", "연차", "훈련", "교육", "휴가", "기타"] as const;
 type LeaveType = typeof LEAVE_TYPES[number];
 
 interface Account {

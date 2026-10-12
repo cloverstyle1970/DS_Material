@@ -78,7 +78,11 @@ BEGIN
     'notifications', 'manuals', 'annual_events',
     'construction_schedules', 'construction_requests',
     'uniform_safety_requests', 'uniform_safety_request_items',
-    'push_subscriptions', 'sales_tax'
+    'push_subscriptions', 'sales_tax',
+    -- HR 문서 (기존 목록 누락 — 취약점 보완)
+    'leave_requests', 'overtime_reports',
+    'print_logs', 'login_logs',
+    'payroll_periods', 'payslips', 'payslip_items'
   ] LOOP
     IF NOT EXISTS (
       SELECT 1 FROM information_schema.tables

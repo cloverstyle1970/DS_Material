@@ -480,24 +480,15 @@ export default function MyProfileClient() {
 
     setPwSubmitting(true);
     try {
-      // 신DB 로그인은 accounts.password(평문) 기반 → 유지보수 사이트와 동일 컬럼으로 일원화.
-      const { data: r, error: fErr } = await supabase
-        .from("accounts")
-        .select("password")
-        .eq("id", user.id)
-        .single();
-      if (fErr || !r) { setPwStatus({ type: "error", text: "사용자 정보를 불러오지 못했습니다." }); return; }
-      const stored = r.password as string | null;
-      if (stored != null && currentPw !== stored) {
+      // Supabase Auth로 현재 비밀번호 검증 (DB에서 평문을 읽어 비교하는 방식 제거)
+      const { error: verifyErr } = await supabase.auth.signInWithPassword({
+        email: `${user.id}@daesol.el`,
+        password: currentPw,
+      });
+      if (verifyErr) {
         setPwStatus({ type: "error", text: "현재 비밀번호가 올바르지 않습니다." });
         return;
       }
-      const { error: uErr } = await supabase
-        .from("accounts")
-        .update({ password: newPw })
-        .eq("id", user.id);
-      if (uErr) { setPwStatus({ type: "error", text: `비밀번호 변경 실패: ${uErr.message}` }); return; }
-      // 유지보수 사이트(auth.users) 측 비번도 같이 갱신해 두 시스템 비번을 일치시킨다.
       const authRes = await changeAuthPassword(user.id, newPw);
       if (!authRes.ok) {
         setPwStatus({ type: "error", text: `비밀번호 변경 실패(유지보수 동기화): ${authRes.error}` });

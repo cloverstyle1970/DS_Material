@@ -32,13 +32,15 @@ export async function insertNotification(params: NotifyParams): Promise<void> {
   sendWebPush(params).catch(e => console.warn("[push] send failed:", e));
 }
 
-function sendWebPush(params: NotifyParams): Promise<void> {
-  return fetch(`${SUPABASE_URL}/functions/v1/push-send`, {
+async function sendWebPush(params: NotifyParams): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token ?? SUPABASE_ANON_KEY;
+  await fetch(`${SUPABASE_URL}/functions/v1/push-send`, {
     method: "POST",
     headers: {
       "Content-Type":  "application/json",
       "apikey":        SUPABASE_ANON_KEY,
-      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+      "Authorization": `Bearer ${token}`,
     },
     body: JSON.stringify({
       userId:  params.userId,
@@ -47,7 +49,7 @@ function sendWebPush(params: NotifyParams): Promise<void> {
       link:    params.link    ?? null,
       refType: params.refType ?? null,
       refId:   params.refId   ?? null,
-      tag:     params.type, // 같은 type 알림은 직전 것을 덮어씀
+      tag:     params.type,
     }),
-  }).then(() => undefined);
+  });
 }

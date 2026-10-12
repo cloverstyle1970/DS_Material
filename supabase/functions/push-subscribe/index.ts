@@ -44,6 +44,14 @@ Deno.serve(async (req: Request) => {
   const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const db = createClient(SUPABASE_URL, SERVICE_KEY);
 
+  // JWT 검증 — anon 키 단독 호출 차단
+  const authHeader = req.headers.get("Authorization");
+  const token = authHeader?.replace(/^Bearer\s+/i, "") ?? "";
+  const { data: { user: caller }, error: authErr } = await db.auth.getUser(token);
+  if (authErr || !caller) return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+  // caller.email = "${accountId}@daesol.el" 규약에서 accountId 추출
+  const callerAccountId = caller.email?.split("@")[0] ?? "";
+
   try {
     const body = await req.json();
 
@@ -51,6 +59,10 @@ Deno.serve(async (req: Request) => {
       const { userId, username, isMobile, subscription, userAgent: _userAgent } = body ?? {};
       if (!userId || !subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
         return jsonResponse({ error: "userId, subscription 필수" }, { status: 400 });
+      }
+      // 본인 구독만 등록 가능
+      if (String(userId) !== callerAccountId) {
+        return jsonResponse({ error: "Forbidden" }, { status: 403 });
       }
 
       // username/is_mobile NOT NULL — 클라이언트 누락 시 accounts에서 username 보충, is_mobile은 false 기본
@@ -81,7 +93,10 @@ Deno.serve(async (req: Request) => {
     if (req.method === "DELETE") {
       const { endpoint } = body ?? {};
       if (!endpoint) return jsonResponse({ error: "endpoint 필수" }, { status: 400 });
-      const { error } = await db.from("push_subscriptions").delete().eq("endpoint", endpoint);
+      // 본인 구독만 삭제 가능 (account_id 소유권 검증)
+      const { error } = await db.from("push_subscriptions").delete()
+        .eq("endpoint", endpoint)
+        .eq("account_id", callerAccountId);
       if (error) return jsonResponse({ error: error.message }, { status: 500 });
       return jsonResponse({ ok: true });
     }

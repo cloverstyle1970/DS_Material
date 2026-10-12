@@ -70,6 +70,12 @@ Deno.serve(async (req: Request) => {
   const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const db = createClient(SUPABASE_URL, SERVICE_KEY);
 
+  // JWT 검증 — anon 키 단독 호출 차단
+  const authHeader = req.headers.get("Authorization");
+  const token = authHeader?.replace(/^Bearer\s+/i, "") ?? "";
+  const { data: { user: caller }, error: authErr } = await db.auth.getUser(token);
+  if (authErr || !caller) return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const body = await req.json();
     const { userId, title } = body ?? {};

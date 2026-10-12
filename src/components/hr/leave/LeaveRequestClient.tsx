@@ -9,7 +9,7 @@ import { notifyLeaveApprovalRequest, notifyLeaveApproved, notifyLeaveRejected } 
 
 export const LR_MENU_HREF = "/hr/leave";
 
-const LEAVE_TYPES = ["조퇴", "결근", "경조", "연차", "훈련", "교육", "휴가"] as const;
+const LEAVE_TYPES = ["조퇴", "결근", "경조", "연차", "훈련", "교육", "휴가", "기타"] as const;
 type LeaveType = typeof LEAVE_TYPES[number];
 
 interface Account {
@@ -386,7 +386,9 @@ export default function LeaveRequestClient() {
           notifyLeaveApprovalRequest({ approverId: f.approver_id, authorName: authorAcc?.username ?? user.name, requestNo: no, requestId: (newRec as {id:number}|null)?.id ?? 0, leaveType: f.leave_type }).catch(console.warn);
         }
       } else {
-        const { error } = await supabase.from("leave_requests").update(corePayload).eq("id", editingId!);
+        let updateQ = supabase.from("leave_requests").update(corePayload).eq("id", editingId!);
+        if (user && !isAdmin(user)) updateQ = updateQ.eq("author_id", user.id);
+        const { error } = await updateQ;
         if (error) throw new Error(error.message);
         if (authorSig) {
           await supabase.from("leave_requests").update({ author_signature: authorSig }).eq("id", editingId!).then(({ error }) => {
@@ -428,7 +430,9 @@ export default function LeaveRequestClient() {
 
   async function deleteRecord(id: number, no: string) {
     if (!confirm(`${no} 문서를 삭제하시겠습니까?`)) return;
-    const { error } = await supabase.from("leave_requests").delete().eq("id", id);
+    let deleteQ = supabase.from("leave_requests").delete().eq("id", id);
+    if (user && !isAdmin(user)) deleteQ = deleteQ.eq("author_id", user.id);
+    const { error } = await deleteQ;
     if (error) { alert("삭제 실패: " + error.message); return; }
     load();
   }
@@ -469,9 +473,11 @@ export default function LeaveRequestClient() {
   async function approveWithSig(sig: string) {
     if (!signModal || !user) return;
     const target = signModal;
-    const { error } = await supabase.from("leave_requests")
+    let approveQ = supabase.from("leave_requests")
       .update({ approval_status:"approved", approved_at: new Date().toISOString(), approver_signature: sig })
       .eq("id", target.id);
+    if (user && !isAdmin(user)) approveQ = approveQ.eq("approver_id", user.id);
+    const { error } = await approveQ;
     if (error) { alert("오류: " + error.message); return; }
     notifyLeaveApproved({ authorId: target.author_id, approverName: authorAcc?.username ?? user.name, requestNo: target.request_no, requestId: target.id }).catch(console.warn);
     setSignModal(null); await load();
@@ -489,7 +495,9 @@ export default function LeaveRequestClient() {
   async function rejectRecord() {
     if (!rejectModal || !user) return;
     if (!rejectReason.trim()) { alert("반려 사유를 입력해주세요."); return; }
-    const { error } = await supabase.from("leave_requests").update({ approval_status:"rejected", rejected_at: new Date().toISOString(), reject_reason: rejectReason.trim() }).eq("id", rejectModal.id);
+    let rejectQ = supabase.from("leave_requests").update({ approval_status:"rejected", rejected_at: new Date().toISOString(), reject_reason: rejectReason.trim() }).eq("id", rejectModal.id);
+    if (user && !isAdmin(user)) rejectQ = rejectQ.eq("approver_id", user.id);
+    const { error } = await rejectQ;
     if (error) { alert("오류: " + error.message); return; }
     const rec = records.find(r => r.id === rejectModal.id);
     if (rec) notifyLeaveRejected({ authorId: rec.author_id, approverName: authorAcc?.username ?? user.name, requestNo: rec.request_no, requestId: rec.id, reason: rejectReason.trim() }).catch(console.warn);

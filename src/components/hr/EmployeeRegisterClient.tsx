@@ -427,7 +427,6 @@ export default function EmployeeRegisterClient() {
         safety_shoes_size: form.safety_shoes_size || null,
         permission_group_id: form.permission_group_id,
         permissions: newPermissions,
-        password: form.initial_password,
       };
       const { data: inserted, error: insErr } = await supabase.from("accounts")
         .insert(payload).select("id").single();
