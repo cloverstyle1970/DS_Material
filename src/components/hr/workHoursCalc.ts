@@ -49,6 +49,18 @@ export const rosterToEntries = (roster: RosterRow[]): DutyEntry[] =>
 
 
 
+// 야간 잔업 종료 시각 기준: 03:00~06:00 전 종료 → 종료일 13시 출근(late), 06:00 이후 종료 → 종료일 휴무(rest).
+// 야간 잔업 = 날을 넘겼거나 자정~03시 사이 시작. 06시 이후 시작한 조출·주간 작업은 대상 아님.
+export function overnightEffect(startAt: string, endAt: string): { endDay: string; endHm: string; effect: "rest" | "late" } | null {
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  const endDay = dateKey(end);
+  const overnight = endDay > dateKey(start) || start.getHours() < 3;
+  if (!overnight || end.getHours() < 3) return null;
+  const endHm = `${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}`;
+  return { endDay, endHm, effect: end.getHours() >= 6 ? "rest" : "late" };
+}
+
 export interface DayHours {
   date: string;
   regular: number;
@@ -93,26 +105,18 @@ export function buildDailyHours(args: {
   };
 
   for (const r of overtime) {
-    const start = new Date(r.start_at);
-    const end = new Date(r.end_at);
-    const day = dateKey(start);
-    const endDay = dateKey(end);
+    const day = dateKey(new Date(r.start_at));
     // 휴일 잔업은 근무시간 전체, 평일은 잔업시간만 (정규시간은 소정근무로 이미 계산)
     const hours = Number(r.is_holiday ? r.work_hours : r.overtime_hours) || 0;
-    // 야간 잔업 종료 시각 기준: 03:00~06:00 전 종료 → 종료일 13시 출근, 06:00 이후 종료 → 종료일 휴무.
-    // 야간 잔업 = 날을 넘겼거나 자정~03시 사이 시작. 06시 이후 시작한 조출·주간 작업은 대상 아님.
-    const overnight = endDay > day || start.getHours() < 3;
-    const endHm = `${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}`;
-    const restEnd = overnight && end.getHours() >= 6;
-    const lateEnd = overnight && !restEnd && end.getHours() >= 3;
+    const night = overnightEffect(r.start_at, r.end_at);
     for (const w of r.workers ?? []) {
       const id = byName.get(w.trim());
       if (id == null) continue;
       const s = slot(id, day);
       s.overtime += hours;
       s.notes.push(`잔업 ${hours}H (${r.report_no})`);
-      if (restEnd) slot(id, endDay).rest.push(`잔업 익일 ${endHm} 종료 휴무`);
-      if (lateEnd) slot(id, endDay).late.push(`잔업 익일 ${endHm} 종료 13시 출근`);
+      if (night?.effect === "rest") slot(id, night.endDay).rest.push(`잔업 익일 ${night.endHm} 종료 휴무`);
+      if (night?.effect === "late") slot(id, night.endDay).late.push(`잔업 익일 ${night.endHm} 종료 13시 출근`);
     }
   }
 
