@@ -9,7 +9,7 @@ import { calcOvertimeResult, detectHoliday, dayOfWeekKr, OvertimeResult } from "
 import { notifyOvertimeApprovalRequest, notifyOvertimeApproved, notifyOvertimeRejected } from "./overtimeNotify";
 
 export const OT_LEDGER_MENU_HREF = "/hr/overtime-ledger";
-const WORK_REASONS = ["점검", "공사", "수리·부품교체", "상주", "조출", "기타"] as const;
+const WORK_REASONS = ["점검", "야간점검", "공사", "수리·부품교체", "상주", "조출", "기타"] as const;
 
 interface Account {
   id: number;
@@ -1073,7 +1073,7 @@ export default function OvertimeLedgerClient() {
                       <tr style={{ borderBottom: bdr }}>
                         <td data-label="true" style={{ ...labelCell, height: "10mm" }}>작업사유</td>
                         <td colSpan={3} style={{ padding: "2mm 3mm", verticalAlign: "middle" }}>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: "0 6mm", fontSize: "10pt", alignItems: "center" }}>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "0 4.5mm", fontSize: "10pt", alignItems: "center" }}>
                             {WORK_REASONS.map(r => (
                               <label key={r} style={{ display: "flex", alignItems: "center", gap: "1mm", cursor: isReadOnly ? "default" : "pointer", whiteSpace: "nowrap" }}>
                                 <input type="checkbox" checked={f.work_reasons.includes(r)}

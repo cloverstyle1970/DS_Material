@@ -2,7 +2,7 @@
 // 회사 근무표 양식("YY년 M월 근무자 명단"): 날짜 | 요일 | 사무실 숙직(2칸) | 숙직보조 | 파주대기(2칸) | 야간점검
 //  - ○○숙직·숙직보조 → 당직 (평일=평일당직, 토·일·공휴일=휴일당직)
 //  - ○○대기·파주○○   → 고장대기 (평일=고장대기, 토·일·공휴일=휴일고장대기)
-//  - 야간점검        → 근무표에 저장하지 않음 (시간은 잔업보고서로 반영)
+//  - 야간점검        → 야간점검 (22:00~익일 06:00, 잔업 8H, 다음날 퇴근)
 //  - 머리글이 평일당직·휴일당직·고장대기·휴일고장대기 이면 그 구분 그대로
 
 import * as XLSX from "xlsx";
@@ -24,6 +24,7 @@ type ColRole = { group: string; role: "duty" | "standby" | DutyKind | "skip" };
 function roleOf(group: string): ColRole["role"] {
   const g = group.replace(/\s/g, "");
   if ((DUTY_KINDS as string[]).includes(g)) return g as DutyKind;
+  if (g.includes("야간점검")) return "야간점검"; // 평일·휴일 구분 없음
   if (g.includes("파주") || g.includes("대기")) return "standby"; // 파주는 숙직 표기여도 고장대기
   if (g.includes("숙직") || g.includes("당직")) return "duty";
   return "skip";

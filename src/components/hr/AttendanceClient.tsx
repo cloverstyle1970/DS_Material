@@ -7,7 +7,7 @@ import { useAuth, hasMenuPermission } from "@/context/AuthContext";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 import {
-  DEFAULT_STATUS_DEFS, KIND_LABELS, STATUS_TYPE_SELECT, rowToStatusDef, statusMapOf,
+  DEFAULT_STATUS_DEFS, DEDUCT_KINDS, KIND_LABELS, STATUS_TYPE_SELECT, rowToStatusDef, statusMapOf,
   EMPLOYEE_SELECT, LEAVE_SELECT, STATUS_HISTORY_TYPES,
   excludedRankSet, expandLeave, normalizeEmploymentDates, buildEmploymentPeriods, buildLoaPeriods,
   inPeriods, overlapsPeriods, empName, ymd, dateKey, pad2, addDays,
@@ -20,6 +20,7 @@ export const ATTENDANCE_MENU_HREF = "/hr/attendance";
 const KIND_CLS: Record<Kind, string> = {
   leave:  "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200",
   off:    "bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-200",
+  subst:  "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/50 dark:text-cyan-200",
   absent: "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-200",
   late:   "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-200",
   early:  "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-200",
@@ -28,6 +29,7 @@ const KIND_CLS: Record<Kind, string> = {
   etc:    "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200",
 };
 
+const NIGHT_CHECK_CLS = "bg-slate-700 text-white dark:bg-slate-300 dark:text-slate-900";
 const DUTY_REST_CLS = "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-200";
 
 interface LeaveDay { type: string; amount: number; requestNo: string; }
@@ -36,12 +38,13 @@ interface CellInfo {
   record: AttendanceRecord | null; // 수기 등록
   restReason: string | null;   // 휴무 사유 (주52시간 관리와 같은 규칙: 당직 다음날 퇴근, 야간 잔업 06시 이후 종료) — "휴무" 표시
   holidayWork: string[];       // 휴일 근무 (승인 잔업보고서·근무표 휴일당직/휴일고장대기) — "휴근" 표시
+  nightCheck: boolean;         // 근무표 야간점검 (22:00~익일 06:00) — "야점" 표시, 다음날은 휴무
 }
 
 const fmtDays = (n: number) => (n === 0 ? "" : n % 1 === 0 ? String(n) : n.toFixed(1));
 
 interface Summary {
-  required: number; present: number; leave: number; off: number; loa: number; absent: number;
+  required: number; present: number; leave: number; off: number; subst: number; loa: number; absent: number;
   late: number; early: number; work: number; etc: number;
 }
 
@@ -163,7 +166,7 @@ export default function AttendanceClient() {
       let row = m.get(id);
       if (!row) { row = new Map(); m.set(id, row); }
       let c = row.get(date);
-      if (!c) { c = { leaves: [], record: null, restReason: null, holidayWork: [] }; row.set(date, c); }
+      if (!c) { c = { leaves: [], record: null, restReason: null, holidayWork: [], nightCheck: false }; row.set(date, c); }
       return c;
     };
     for (const r of leaves) {
@@ -192,7 +195,9 @@ export default function AttendanceClient() {
     // 휴일 근무: 토·일·공휴일의 근무표 휴일당직·휴일고장대기, 승인 잔업보고서 작업자
     for (const r of roster) {
       const date = r.duty_date.slice(0, 10);
-      if (date < monthStart || !isOffDay(date)) continue;
+      if (date < monthStart) continue;
+      if (r.duty_type === "야간점검") { get(r.account_id, date).nightCheck = true; continue; }
+      if (!isOffDay(date)) continue;
       get(r.account_id, date).holidayWork.push(`${r.duty_type} (근무표)`);
     }
     const byName = new Map(employees.map(e => [empName(e), e.id]));
@@ -217,7 +222,7 @@ export default function AttendanceClient() {
   const activeDefs = useMemo(() => statusDefs.filter(d => d.active).sort((a, b) => a.sortOrder - b.sortOrder), [statusDefs]);
 
   const summarize = useCallback((e: Employee): Summary => {
-    const s: Summary = { required: 0, present: 0, leave: 0, off: 0, loa: 0, absent: 0, late: 0, early: 0, work: 0, etc: 0 };
+    const s: Summary = { required: 0, present: 0, leave: 0, off: 0, subst: 0, loa: 0, absent: 0, late: 0, early: 0, work: 0, etc: 0 };
     const row = cells.get(e.id);
     for (const day of days) {
       if (!inEmployment(e, day.key)) continue;
@@ -232,6 +237,7 @@ export default function AttendanceClient() {
         switch (kind) {
           case "leave":  if (!day.off) s.leave += amount; break;
           case "off":    if (!day.off) s.off += amount; break;
+          case "subst":  if (!day.off) s.subst += amount; break;
           case "absent": if (!day.off) s.absent += amount; break;
           case "late":   s.late++; break;
           case "early":  s.early++; break;
@@ -241,7 +247,7 @@ export default function AttendanceClient() {
         }
       }
     }
-    s.present = Math.max(0, s.required - s.leave - s.off - s.absent);
+    s.present = Math.max(0, s.required - s.leave - s.off - s.subst - s.absent);
     return s;
   }, [cells, days, inEmployment, onLoa, statusMap]);
 
@@ -295,7 +301,8 @@ export default function AttendanceClient() {
         const c = row?.get(d.key);
         let t = "";
         const realLeave = c?.leaves.some(l => l.amount > 0);
-        if (d.off && c?.holidayWork.length && !c.record && !realLeave) t = "휴근";
+        if (c?.nightCheck && !c.record && !realLeave) t = "야점";
+        else if (d.off && c?.holidayWork.length && !c.record && !realLeave) t = "휴근";
         else if (c?.leaves.length) t = c.leaves.map(l => (statusMap[l.type]?.short ?? l.type[0]) + (l.amount > 0 && l.amount < 1 ? "½" : "")).join("");
         else if (c?.record) t = statusMap[c.record.status]?.short ?? c.record.status[0];
         else if (c?.restReason && !d.off) t = "휴무";
@@ -303,7 +310,7 @@ export default function AttendanceClient() {
       }).join("");
       const s = summarize(e);
       return `<tr><td>${i + 1}</td><td class="nm">${esc(empName(e))}</td>${tds}` +
-        [s.required, s.present, s.leave, s.off, s.loa, s.absent, s.late, s.early, s.work].map(v => `<td class="sum">${fmtDays(v)}</td>`).join("") + `</tr>`;
+        [s.required, s.present, s.leave, s.off, s.subst, s.loa, s.absent, s.late, s.early, s.work].map(v => `<td class="sum">${fmtDays(v)}</td>`).join("") + `</tr>`;
     }).join("");
     const legend = activeDefs.map(s => `${s.short}:${s.key}`).join(" · ");
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>근태현황 ${year}-${pad2(month)}</title>
@@ -322,8 +329,8 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
 </style></head><body>
 <h1>${year}년 ${month}월 근태현황</h1>
 <div class="meta"><span>${esc(legend)} · ½:반일</span><span>출력: ${esc(dateKey(new Date()))}</span></div>
-<table><colgroup><col class="c-no"/><col class="c-nm"/>${days.map(() => "<col/>").join("")}${"<col class=\"c-sum\"/>".repeat(9)}</colgroup>
-<thead><tr><th>No</th><th>성명</th>${dayHead}<th>소정</th><th>출근</th><th>연차</th><th>휴가</th><th>휴직</th><th>결근</th><th>지각</th><th>조퇴</th><th>출장<br/>교육</th></tr></thead>
+<table><colgroup><col class="c-no"/><col class="c-nm"/>${days.map(() => "<col/>").join("")}${"<col class=\"c-sum\"/>".repeat(10)}</colgroup>
+<thead><tr><th>No</th><th>성명</th>${dayHead}<th>소정</th><th>출근</th><th>연차</th><th>휴가</th><th>대휴</th><th>휴직</th><th>결근</th><th>지각</th><th>조퇴</th><th>출장<br/>교육</th></tr></thead>
 <tbody>${body}</tbody></table>
 <script>window.onload = () => { window.print(); };</script>
 </body></html>`);
@@ -389,6 +396,7 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
         <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300">휴직</span>
         <span className={`px-1.5 py-0.5 rounded ${DUTY_REST_CLS}`}>휴무 당직 후 퇴근·야간 잔업</span>
         <span className={`px-1.5 py-0.5 rounded ${KIND_CLS.extra}`}>휴근 휴일 근무</span>
+        <span className={`px-1.5 py-0.5 rounded ${NIGHT_CHECK_CLS}`}>야점 야간점검</span>
         <span className="px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">휴일 (토·일·공휴일·대체휴일)</span>
         {!canWrite && <span className="ml-2 text-gray-400">· 조회 전용</span>}
       </div>
@@ -415,7 +423,7 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
                     <div className="text-[10px] font-normal">{"일월화수목금토"[d.dow]}</div>
                   </th>
                 ))}
-                {["소정", "출근", "연차", "휴가", "휴직", "결근", "지각", "조퇴", "출장·교육", "기타"].map(h => (
+                {["소정", "출근", "연차", "휴가", "대휴", "휴직", "결근", "지각", "조퇴", "출장·교육", "기타"].map(h => (
                   <th key={h} className="border border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 px-1.5 py-1 text-gray-700 dark:text-gray-200 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -443,16 +451,20 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
                       }
                       const c = row?.get(d.key);
                       // 휴근: 휴일 근무가 있으면 (실사용 연차·수기 등록이 없을 때) 휴일에 걸친 연차 표시보다 우선
-                      const holidayWork = d.off && !!c?.holidayWork.length && !c.record && !c.leaves.some(l => l.amount > 0);
-                      const leave = holidayWork ? undefined : c?.leaves[0];
+                      const realLeave = !!c?.leaves.some(l => l.amount > 0);
+                      // 야점: 근무표 야간점검 (실사용 연차·수기 등록이 없을 때). 휴근보다 우선
+                      const nightCheck = !!c?.nightCheck && !c.record && !realLeave;
+                      const holidayWork = !nightCheck && d.off && !!c?.holidayWork.length && !c.record && !realLeave;
+                      const leave = holidayWork || nightCheck ? undefined : c?.leaves[0];
                       const def = leave ? statusMap[leave.type] : c?.record ? statusMap[c.record.status] : undefined;
                       const restReason = !leave && !c?.record && !d.off ? c?.restReason ?? null : null;
                       const label = leave
                         ? (def?.short ?? leave.type[0]) + (leave.amount > 0 && leave.amount < 1 ? "½" : "")
-                        : c?.record ? (def?.short ?? c.record.status[0]) : holidayWork ? "휴근" : restReason ? "휴무" : "";
+                        : c?.record ? (def?.short ?? c.record.status[0]) : nightCheck ? "야점" : holidayWork ? "휴근" : restReason ? "휴무" : "";
                       const title = leave
                         ? c!.leaves.map(l => `${l.type} ${l.amount ? `${l.amount}일` : "(휴일·미공제)"} (${l.requestNo})`).join("\n") + "\n연차계 승인 건"
                         : c?.record ? `${c.record.status}${c.record.note ? ` - ${c.record.note}` : ""}`
+                        : nightCheck ? "야간점검 22:00~익일 06:00 (근무표) — 다음날 휴무"
                         : holidayWork ? `휴일 근무\n${c!.holidayWork.join("\n")}`
                         : restReason ? `휴무 — ${restReason}` : d.holiday ?? undefined;
                       const clickable = active && (canWrite || !!leave || !!c?.record);
@@ -465,7 +477,7 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
                             ${clickable ? "cursor-pointer hover:outline hover:outline-2 hover:outline-blue-400 hover:-outline-offset-2" : ""}`}>
                           {label && (
                             <span className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-0.5 rounded text-[11px] font-bold
-                              ${holidayWork ? KIND_CLS.extra : restReason ? DUTY_REST_CLS : KIND_CLS[def?.kind ?? "etc"]} ${leave && leave.amount === 0 ? "opacity-50" : ""}
+                              ${nightCheck ? NIGHT_CHECK_CLS : holidayWork ? KIND_CLS.extra : restReason ? DUTY_REST_CLS : KIND_CLS[def?.kind ?? "etc"]} ${leave && leave.amount === 0 ? "opacity-50" : ""}
                               ${c?.record?.note && !leave ? "underline decoration-dotted" : ""}`}>
                               {label}
                             </span>
@@ -473,10 +485,10 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
                         </td>
                       );
                     })}
-                    {[s.required, s.present, s.leave, s.off, s.loa, s.absent, s.late, s.early, s.work, s.etc].map((v, i) => (
+                    {[s.required, s.present, s.leave, s.off, s.subst, s.loa, s.absent, s.late, s.early, s.work, s.etc].map((v, i) => (
                       <td key={i} className={`border border-gray-200 dark:border-gray-600 px-1.5 text-center font-semibold whitespace-nowrap
                         ${i === 1 ? "text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700/40" : "text-gray-700 dark:text-gray-300"}
-                        ${i === 5 && v > 0 ? "text-red-600 dark:text-red-400" : ""}`}>
+                        ${i === 6 && v > 0 ? "text-red-600 dark:text-red-400" : ""}`}>
                         {fmtDays(v)}
                       </td>
                     ))}
@@ -601,7 +613,6 @@ function CellEditor({ emp, date, top, left, cell, canWrite, defs, statusMap, onC
 
 // ── 근태 종류 관리 ───────────────────────────────────────────
 interface TypeDraft { id?: number; origName: string | null; name: string; short: string; kind: Kind; dayAmount: number; sortOrder: number; active: boolean; }
-const DEDUCT_KINDS: Kind[] = ["leave", "off", "absent"];
 
 function StatusTypesModal({ defs, onClose, onSaved }: {
   defs: StatusDef[];

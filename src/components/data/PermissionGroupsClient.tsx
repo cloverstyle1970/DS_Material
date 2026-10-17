@@ -100,6 +100,7 @@ const PERMISSION_TREE: MenuSection[] = [
       { href: "/hr/overtime-ledger",     label: "잔업보고서" },
       { href: "/hr/leave-ledger",        label: "연차계" },
       { href: "/hr/attendance",          label: "근태현황", ops: ["read","update"] },
+      { href: "/hr/work-hours",          label: "주52시간 관리", ops: ["read","update"] },
       { href: "/hr/public-holidays",     label: "공휴일 관리" },
       { href: "/hr/employee-register",   label: "사원등록" },
       { href: "/hr/dept-rank",           label: "부서/직급관리" },

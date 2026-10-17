@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAuth, isAdmin } from "@/context/AuthContext";
+import { useAuth, hasMenuPermission } from "@/context/AuthContext";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
 import DutyRosterEditor from "./DutyRosterEditor";
+import type { SwapCheck } from "./DutyChangePanel";
 import {
   STATUS_TYPE_SELECT, rowToStatusDef, statusMapOf, EMPLOYEE_SELECT, LEAVE_SELECT, STATUS_HISTORY_TYPES, DOW_KR,
   excludedRankSet, expandLeave, normalizeEmploymentDates, buildEmploymentPeriods, buildLoaPeriods,
@@ -14,7 +15,7 @@ import {
 } from "./attendanceShared";
 import {
   WEEK_WARN_HOURS, WEEK_LIMIT_HOURS, DUTY_RULES, OVERTIME_SELECT, ROSTER_SELECT, rosterToEntries,
-  deptSchedule, buildDailyHours, leaveDeduction, recordDeduction, weekStart, weeksOfPeriod, hoursLevel, fmtH,
+  deptSchedule, buildDailyHours, consecutiveDuties, leaveDeduction, recordDeduction, weekStart, weeksOfPeriod, hoursLevel, fmtH,
   type OvertimeRow, type RosterRow, type DayHours, type DutyKind,
 } from "./workHoursCalc";
 
@@ -88,8 +89,9 @@ export default function WorkHoursClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 시스템 관리자 전용 (사이드바 adminOnly + 권한그룹 트리 미노출)
-  const canRead = !!user && isAdmin(user);
+  // 메뉴 권한: 조회(read), 근무표 등록·수정(update). admin 은 전체 통과
+  const canRead = hasMenuPermission(user, WORK_HOURS_MENU_HREF, "read");
+  const canWrite = hasMenuPermission(user, WORK_HOURS_MENU_HREF, "update");
   const [today] = useState(() => dateKey(new Date())); // 이후 일자는 내역에 "예정" 표시 (계산 규칙은 같음)
 
   // 연 단위로 조회 (주가 연도를 걸치므로 앞뒤 1주 여유)
@@ -207,12 +209,64 @@ export default function WorkHoursClient() {
     return m;
   }, [leaves, records, statusMap, isOffDay, loadFrom, loadTo]);
 
+  // 근태현황에 특근 분류(예: 상주팀 교대 '근무')로 등록된 날 → 휴일이면 소정시간 근무 인정 (판정은 계산 모듈)
+  const holidayWork = useMemo(() => {
+    const m = new Map<number, Map<string, string>>();
+    for (const rec of records) {
+      if (statusMap[rec.status]?.kind !== "extra") continue;
+      let row = m.get(rec.account_id);
+      if (!row) { row = new Map(); m.set(rec.account_id, row); }
+      row.set(rec.work_date, `${rec.status} (근태)`);
+    }
+    return m;
+  }, [records, statusMap]);
+
   const daily = useMemo(() => buildDailyHours({
     employees: yearEmployees, from: loadFrom, to: loadTo, today, isOffDay,
     employed: (e, k) => inPeriods(employmentPeriods.get(e.id), k),
     onLoa: (e, k) => inPeriods(loaPeriods.get(e.id), k),
-    leaveUse, overtime, duty: rosterToEntries(roster),
-  }), [yearEmployees, loadFrom, loadTo, today, isOffDay, employmentPeriods, loaPeriods, leaveUse, overtime, roster]);
+    leaveUse, holidayWork, overtime, duty: rosterToEntries(roster),
+  }), [yearEmployees, loadFrom, loadTo, today, isOffDay, employmentPeriods, loaPeriods, leaveUse, holidayWork, overtime, roster]);
+
+  // 근무변경(맞교환) 검토: 변경 전·후 두 사람의 ① 영향 주(근무일·다음날 퇴근일이 속한 주) 합계 64H 이하
+  // ② 해당 분기 주평균 52H 이하. 계산 규칙은 화면 집계와 같다 (조회 연도 범위 안에서만 가능).
+  const checkSwap = useCallback((from: RosterRow, to: RosterRow): SwapCheck => {
+    const dates = [from.duty_date.slice(0, 10), to.duty_date.slice(0, 10)];
+    if (dates.some(d => d < loadFrom || addDays(d, 1) > loadTo)) {
+      return { ok: false, message: `${year}년 근무만 검토할 수 있습니다. 화면의 연도를 바꿔 다시 시도하세요.`, weeks: [], avgs: [] };
+    }
+    const ids = [from.account_id, to.account_id];
+    const emps = yearEmployees.filter(e => ids.includes(e.id));
+    const swapped = roster.map(r => r.id === from.id ? { ...r, account_id: to.account_id } : r.id === to.id ? { ...r, account_id: from.account_id } : r);
+    const base = {
+      employees: emps, from: loadFrom, to: loadTo, today, isOffDay,
+      employed: (e: Employee, k: string) => inPeriods(employmentPeriods.get(e.id), k),
+      onLoa: (e: Employee, k: string) => inPeriods(loaPeriods.get(e.id), k),
+      leaveUse, holidayWork, overtime,
+    };
+    const before = buildDailyHours({ ...base, duty: rosterToEntries(roster) });
+    const after = buildDailyHours({ ...base, duty: rosterToEntries(swapped) });
+    const weekKeys = [...new Set(dates.flatMap(d => [weekStart(d), weekStart(addDays(d, 1))]))].sort();
+    const quarters = [...new Set(dates.map(d => Math.floor((parseKey(d).getMonth()) / 3) + 1))].sort();
+    const weeks: SwapCheck["weeks"] = [];
+    const avgs: SwapCheck["avgs"] = [];
+    for (const e of emps) {
+      for (const sun of weekKeys) {
+        weeks.push({ name: empName(e), week: `${shortMd(sun)}~${shortMd(addDays(sun, 6))}`,
+          before: weekTotal(before.get(e.id), sun), after: weekTotal(after.get(e.id), sun) });
+      }
+      for (const q of quarters) {
+        const ws = weeksOfPeriod(...quarterRange(year, q)).filter(sun => overlapsPeriods(employmentPeriods.get(e.id), sun, addDays(sun, 6)));
+        const avg = (m: Map<string, DayHours> | undefined) =>
+          ws.length ? Math.round(ws.reduce((t, sun) => t + weekTotal(m, sun), 0) / ws.length * 10) / 10 : 0;
+        avgs.push({ name: empName(e), quarter: `${q}분기`, before: avg(before.get(e.id)), after: avg(after.get(e.id)) });
+      }
+    }
+    const consecutive = consecutiveDuties(swapped, ids, dates).map(c =>
+      `${empName(yearEmployees.find(e => e.id === c.accountId) ?? { username: `#${c.accountId}` } as Employee)} ${shortMd(c.first)}·${shortMd(c.second)}`);
+    const ok = weeks.every(w => w.after <= WEEK_LIMIT_HOURS) && avgs.every(a => a.after <= WEEK_WARN_HOURS) && !consecutive.length;
+    return { ok, weeks, avgs, consecutive };
+  }, [year, yearEmployees, roster, loadFrom, loadTo, today, isOffDay, employmentPeriods, loaPeriods, leaveUse, holidayWork, overtime]);
 
   // ── 행 요약 ──
   const rows = useMemo(() => yearEmployees
@@ -266,7 +320,7 @@ export default function WorkHoursClient() {
       <div className="p-12 text-center">
         <div className="text-5xl mb-3">🔒</div>
         <div className="text-base font-semibold text-gray-700 dark:text-gray-200">접근 권한이 없습니다</div>
-        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">시스템 관리자만 이용할 수 있습니다.</div>
+        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">주52시간 관리 메뉴 권한이 필요합니다.</div>
       </div>
     );
   }
@@ -299,7 +353,8 @@ export default function WorkHoursClient() {
       </div>
 
       {tab === "roster" ? (
-        <DutyRosterEditor candidates={yearEmployees} userId={user.id ?? null} onChanged={load} />
+        <DutyRosterEditor candidates={yearEmployees} userId={user.id ?? null} me={{ id: user.id, name: user.name }}
+          canEdit={canWrite} checkSwap={checkSwap} onChanged={load} />
       ) : (<>
       {/* 툴바 */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex flex-wrap items-center gap-2">

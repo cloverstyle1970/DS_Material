@@ -8,8 +8,9 @@ import {
   type Employee, type LeaveRow,
 } from "./attendanceShared";
 import { downloadTemplate, parseRosterFile, type ParseResult } from "./dutyRosterExcel";
+import DutyChangePanel, { type SwapCheck } from "./DutyChangePanel";
 import {
-  DUTY_KINDS, DUTY_RULES, OVERTIME_SELECT, ROSTER_SELECT, weekStart,
+  DUTY_KINDS, DUTY_RULES, OVERTIME_SELECT, ROSTER_SELECT, consecutiveDuties, weekStart,
   type DutyKind, type OvertimeRow, type RosterRow,
 } from "./workHoursCalc";
 
@@ -18,17 +19,22 @@ const KIND_CLS: Record<DutyKind, string> = {
   휴일당직:     "bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-200",
   고장대기:     "bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-200",
   휴일고장대기: "bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-200",
+  야간점검:     "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
 };
 const LEAVE_CLS = "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200";
 const OT_CLS = "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200";
-const KIND_SHORT: Record<DutyKind, string> = { 평일당직: "평당", 휴일당직: "휴당", 고장대기: "고대", 휴일고장대기: "휴고" };
+const KIND_SHORT: Record<DutyKind, string> = { 평일당직: "평당", 휴일당직: "휴당", 고장대기: "고대", 휴일고장대기: "휴고", 야간점검: "야점" };
 
 const lastDay = (y: number, m: number) => new Date(y, m, 0).getDate();
 
 // 월 근무표 등록 (주52시간 관리 > 근무표 등록 탭). 저장 후 onChanged 로 상위 근무시간 재계산.
-export default function DutyRosterEditor({ candidates, userId, onChanged }: {
+// canEdit=false(조회 권한만): 근무표 보기 + 근무변경요청만 가능
+export default function DutyRosterEditor({ candidates, userId, me, canEdit, checkSwap, onChanged }: {
   candidates: Employee[];
   userId: number | null;
+  me: { id: number; name: string };
+  canEdit: boolean;
+  checkSwap: (from: RosterRow, to: RosterRow) => SwapCheck;
   onChanged: () => void;
 }) {
   const now = new Date();
@@ -133,6 +139,16 @@ export default function DutyRosterEditor({ candidates, userId, onChanged }: {
     const f = ymd(res.year, res.month, 1);
     const t = ymd(res.year, res.month, lastDay(res.year, res.month));
     setBusy(true);
+    const ids = [...new Set(res.entries.map(e => e.account_id))];
+    const { data: near } = await supabase.from("work_duty_roster").select(ROSTER_SELECT)
+      .in("account_id", ids).gte("duty_date", addDays(f, -1)).lte("duty_date", addDays(t, 1));
+    const kept = ((near ?? []) as RosterRow[]).filter(r => !replace || r.duty_date.slice(0, 10) < f || r.duty_date.slice(0, 10) > t);
+    const bad = consecutiveDuties([...kept, ...res.entries], ids);
+    if (bad.length) {
+      setBusy(false);
+      alert(`당직 다음날 근무 배정이 있어 저장할 수 없습니다.\n${bad.map(b => `${res.entries.find(e => e.account_id === b.accountId)?.name ?? `#${b.accountId}`} ${b.first.slice(5)}·${b.second.slice(5)}`).join("\n")}`);
+      return;
+    }
     if (replace) {
       const { error } = await supabase.from("work_duty_roster").delete().gte("duty_date", f).lte("duty_date", t);
       if (error) { alert(`기존 근무표 삭제 실패: ${error.message}`); setBusy(false); return; }
@@ -161,7 +177,22 @@ export default function DutyRosterEditor({ candidates, userId, onChanged }: {
     afterWrite();
   }
 
+  // 당직 후 연속근무 검사: 대상 사원들의 앞뒤 하루 근무를 DB 에서 확인 (월 경계 포함). 위반 문구 반환
+  async function consecutiveViolations(date: string, kind: DutyKind, ids: number[], excludeId?: number): Promise<string[]> {
+    if (!ids.length) return [];
+    const { data } = await supabase.from("work_duty_roster").select(ROSTER_SELECT)
+      .in("account_id", ids).gte("duty_date", addDays(date, -1)).lte("duty_date", addDays(date, 1));
+    const rows = ((data ?? []) as RosterRow[]).filter(r => r.id !== excludeId);
+    const all = [...rows, ...ids.map(id => ({ account_id: id, duty_date: date, duty_type: kind }))];
+    return consecutiveDuties(all, ids, [date]).map(c => {
+      const e = byId.get(c.accountId);
+      return `${e ? empName(e) : `#${c.accountId}`} ${c.first.slice(5)}·${c.second.slice(5)}`;
+    });
+  }
+
   async function updateEntry(r: RosterRow, patch: Pick<RosterRow, "duty_date" | "account_id" | "duty_type" | "note">) {
+    const bad = await consecutiveViolations(patch.duty_date, patch.duty_type, [patch.account_id], r.id);
+    if (bad.length) { alert(`당직 다음날에는 당직·파주대기를 배정할 수 없습니다.\n${bad.join("\n")}`); return; }
     const { error } = await supabase.from("work_duty_roster").update(patch).eq("id", r.id);
     if (error) {
       alert(error.code === "23505" ? "같은 날 같은 구분에 이미 등록된 사원입니다." : `수정 실패: ${error.message}`);
@@ -178,6 +209,8 @@ export default function DutyRosterEditor({ candidates, userId, onChanged }: {
   }
 
   async function addEntries(date: string, kind: DutyKind, ids: number[], note: string) {
+    const bad = await consecutiveViolations(date, kind, ids);
+    if (bad.length) { alert(`당직 다음날에는 당직·파주대기를 배정할 수 없습니다.\n${bad.join("\n")}`); return; }
     const { error } = await supabase.from("work_duty_roster").upsert(
       ids.map(id => ({ duty_date: date, account_id: id, duty_type: kind, note: note.trim() || null, created_by: userId })),
       { onConflict: "duty_date,account_id,duty_type", ignoreDuplicates: true });
@@ -194,6 +227,7 @@ export default function DutyRosterEditor({ candidates, userId, onChanged }: {
 
   return (
     <div className="flex-1 min-h-0 overflow-auto px-6 py-4">
+      <DutyChangePanel me={me} employees={candidates} checkSwap={checkSwap} onApplied={afterWrite} />
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <button onClick={() => move(-1)} className={btnCls}>◀</button>
         <span className="px-2 text-sm font-bold text-gray-900 dark:text-white min-w-[100px] text-center">{year}년 {month}월</span>
@@ -204,12 +238,14 @@ export default function DutyRosterEditor({ candidates, userId, onChanged }: {
           {roster.length ? `근무표 ${roster.length}건 등록` : "근무표 미등록 — 이 달 당직·대기 시간 0"}
         </span>
         <div className="flex-1" />
+        {canEdit && <>
         <button onClick={() => downloadTemplate(year, month)} className={btnCls}>⤓ 엑셀 양식</button>
         <button onClick={() => fileRef.current?.click()} disabled={busy || loading}
           className="px-2 py-1.5 rounded bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-40">⤒ 엑셀·PDF 업로드</button>
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.pdf" className="hidden" onChange={e => onFile(e.target.files?.[0])} />
         <button onClick={clearMonth} disabled={busy || loading || !roster.length}
           className="px-2 py-1.5 rounded border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 disabled:opacity-40">월 근무표 삭제</button>
+        </>}
       </div>
 
       <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3 text-[11px] text-gray-600 dark:text-gray-300">
@@ -247,20 +283,20 @@ export default function DutyRosterEditor({ candidates, userId, onChanged }: {
                     {parseKey(key).getDate()}
                   </span>
                   {holiday && <span className="truncate text-[10px] text-red-500 dark:text-red-400">{holiday}</span>}
-                  <button onClick={() => setAdding(key)} disabled={busy}
-                    className="ml-auto px-1 rounded text-[11px] text-blue-600 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30">＋</button>
+                  {canEdit && <button onClick={() => setAdding(key)} disabled={busy}
+                    className="ml-auto px-1 rounded text-[11px] text-blue-600 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30">＋</button>}
                 </div>
                 {(byDate.get(key) ?? []).map(r => {
                   const emp = byId.get(r.account_id);
                   const onLeave = actual.leaveMap.get(key)?.find(l => l.id === r.account_id);
                   return (
-                    <span key={r.id} onClick={() => setEditing(r)}
-                      title={`${r.duty_type}${r.note ? ` - ${r.note}` : ""}${onLeave ? `\n⚠ 같은 날 ${onLeave.label} (연차계 승인)` : ""}\n클릭하여 수정`}
-                      className={`group/chip flex items-center gap-1 rounded px-1 py-0.5 text-[11px] cursor-pointer hover:brightness-95 ${KIND_CLS[r.duty_type]} ${onLeave ? "ring-1 ring-red-500" : ""}`}>
+                    <span key={r.id} onClick={canEdit ? () => setEditing(r) : undefined}
+                      title={`${r.duty_type}${r.note ? ` - ${r.note}` : ""}${onLeave ? `\n⚠ 같은 날 ${onLeave.label} (연차계 승인)` : ""}${canEdit ? "\n클릭하여 수정" : ""}`}
+                      className={`group/chip flex items-center gap-1 rounded px-1 py-0.5 text-[11px] ${canEdit ? "cursor-pointer hover:brightness-95" : ""} ${KIND_CLS[r.duty_type]} ${onLeave ? "ring-1 ring-red-500" : ""} ${r.account_id === me.id ? "outline outline-1 outline-indigo-500" : ""}`}>
                       <b>{KIND_SHORT[r.duty_type]}</b>
                       <span className="truncate">{emp ? empName(emp) : `#${r.account_id}`}</span>
-                      <button onClick={e => { e.stopPropagation(); removeEntry(r); }} title="삭제"
-                        className="ml-auto opacity-50 hover:opacity-100">✕</button>
+                      {canEdit && <button onClick={e => { e.stopPropagation(); removeEntry(r); }} title="삭제"
+                        className="ml-auto opacity-50 hover:opacity-100">✕</button>}
                     </span>
                   );
                 })}
@@ -393,6 +429,8 @@ function UploadPreviewModal({ res, candidates, busy, onClose, onSave }: {
   onSave: (replace: boolean) => void;
 }) {
   const [replace, setReplace] = useState(true);
+  // 당직 다음날 근무(당직·파주대기) 배정 — 파일 안에서 확인, 저장 시 DB 와 합쳐 다시 확인
+  const violations = consecutiveDuties(res.entries, [...new Set(res.entries.map(e => e.account_id))]);
   const byId = new Map(candidates.map(e => [e.id, e]));
   const byDate = new Map<string, ParseResult["entries"]>();
   for (const e of res.entries) byDate.set(e.duty_date, [...(byDate.get(e.duty_date) ?? []), e]);
@@ -419,6 +457,12 @@ function UploadPreviewModal({ res, candidates, busy, onClose, onSave }: {
           <p className="text-xs text-gray-500 dark:text-gray-400">
             저장하지 않는 열: {res.ignored.join(", ")} (야간점검 시간은 잔업보고서로 반영됩니다)
           </p>
+        )}
+        {!!violations.length && (
+            <div className="px-3 py-2 rounded border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 text-xs text-red-700 dark:text-red-300 space-y-0.5">
+              <b>⛔ 당직 다음날 근무 배정 {violations.length}건 — 근무표를 고친 뒤 다시 업로드하세요 (저장 불가)</b>
+              {violations.map((x, i) => <div key={i}>{res.entries.find(e => e.account_id === x.accountId)?.name} {x.first.slice(5)}·{x.second.slice(5)}</div>)}
+            </div>
         )}
         {!!res.errors.length && (
           <div className="px-3 py-2 rounded border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 text-xs text-red-700 dark:text-red-300 space-y-0.5">
@@ -465,7 +509,7 @@ function UploadPreviewModal({ res, candidates, busy, onClose, onSave }: {
         <div className="flex gap-2">
           <div className="flex-1" />
           <button onClick={onClose} className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-xs text-gray-700 dark:text-gray-200">취소</button>
-          <button disabled={!res.entries.length || busy} onClick={() => onSave(replace)}
+          <button disabled={!res.entries.length || busy || !!violations.length} onClick={() => onSave(replace)}
             className="px-3 py-1.5 rounded bg-blue-600 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
             {res.entries.length}건 저장
           </button>

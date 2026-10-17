@@ -4,12 +4,15 @@
 // ── 근태 종류 ────────────────────────────────────────────────
 // DB attendance_status_types 에서 관리 (근태현황 > ⚙ 근태 종류). 아래 기본값은 DB 를 못 읽을 때와,
 // 연차계 종류(연차·휴가·경조 등)가 DB 에서 지워졌을 때의 판정용 예비값.
-// kind: 집계 분류. leave=연차, off=휴가류, absent=결근 (이 셋은 dayAmount 만큼 근무 공제),
-//       late=지각, early=조퇴·외출, work=출장·교육(출근 인정), extra=특근, etc=기타
-export type Kind = "leave" | "off" | "absent" | "late" | "early" | "work" | "extra" | "etc";
+// kind: 집계 분류. leave=연차, off=휴가류, subst=대체휴무, absent=결근 (이 넷은 dayAmount 만큼 근무 공제),
+//       late=지각, early=조퇴·외출, work=출장·교육(출근 인정),
+//       extra=특근 (토·일·공휴일에 등록하면 주52시간에 부서 소정시간 근무로 인정), etc=기타
+export type Kind = "leave" | "off" | "subst" | "absent" | "late" | "early" | "work" | "extra" | "etc";
+// 근무 공제 분류 (근태현황 출근일수·주52시간 정규근무에서 공제 일수만큼 뺌)
+export const DEDUCT_KINDS: Kind[] = ["leave", "off", "subst", "absent"];
 export const KIND_LABELS: Record<Kind, string> = {
-  leave: "연차 (공제)", off: "휴가류 (공제)", absent: "결근 (공제)", late: "지각",
-  early: "조퇴·외출", work: "출장·교육 (출근 인정)", extra: "특근", etc: "기타",
+  leave: "연차 (공제)", off: "휴가류 (공제)", subst: "대체휴무 (공제)", absent: "결근 (공제)", late: "지각",
+  early: "조퇴·외출", work: "출장·교육 (출근 인정)", extra: "특근 (휴일 근무 인정)", etc: "기타",
 };
 
 export interface StatusDef { id?: number; key: string; short: string; kind: Kind; dayAmount: number; sortOrder: number; active: boolean; }
