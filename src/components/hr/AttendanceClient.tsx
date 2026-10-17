@@ -8,9 +8,10 @@ import { supabase } from "@/lib/supabase";
 import {
   STATUS_DEFS, STATUS_MAP, EMPLOYEE_SELECT, LEAVE_SELECT, STATUS_HISTORY_TYPES,
   excludedRankSet, expandLeave, normalizeEmploymentDates, buildEmploymentPeriods, buildLoaPeriods,
-  inPeriods, overlapsPeriods, empName, ymd, dateKey, pad2,
+  inPeriods, overlapsPeriods, empName, ymd, dateKey, pad2, addDays,
   type Kind, type Employee, type Rank, type LeaveRow, type AttendanceRecord, type StatusEvent,
 } from "./attendanceShared";
+import { DUTY_RULES, OVERTIME_SELECT, ROSTER_SELECT, type OvertimeRow, type RosterRow } from "./workHoursCalc";
 
 export const ATTENDANCE_MENU_HREF = "/hr/attendance";
 
@@ -25,10 +26,14 @@ const KIND_CLS: Record<Kind, string> = {
   etc:    "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200",
 };
 
+const DUTY_REST_CLS = "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-200";
+
 interface LeaveDay { type: string; amount: number; requestNo: string; }
 interface CellInfo {
   leaves: LeaveDay[];          // 연차계 승인 건 (잠금)
   record: AttendanceRecord | null; // 수기 등록
+  dutyRest: string | null;     // 전날 당직 후 퇴근 (근무표) — 연차·수기 등록이 없을 때 "휴" 표시
+  holidayWork: string[];       // 휴일 근무 (승인 잔업보고서·근무표 휴일당직/휴일고장대기) — "휴근" 표시
 }
 
 const fmtDays = (n: number) => (n === 0 ? "" : n % 1 === 0 ? String(n) : n.toFixed(1));
@@ -51,6 +56,8 @@ export default function AttendanceClient() {
   const [holidays, setHolidays] = useState<Map<string, string>>(new Map());
   const [leaves, setLeaves] = useState<LeaveRow[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [roster, setRoster] = useState<RosterRow[]>([]);
+  const [overtime, setOvertime] = useState<OvertimeRow[]>([]);
   const [statusEvents, setStatusEvents] = useState<StatusEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +73,7 @@ export default function AttendanceClient() {
 
   // setState 는 모두 await 이후에 호출 (effect 내 동기 setState 금지 규칙). 로딩 표시는 월 이동 시 켠다.
   const load = useCallback(async () => {
-    const [accRes, rankRes, holRes, leaveRes, recRes, histRes] = await Promise.all([
+    const [accRes, rankRes, holRes, leaveRes, recRes, histRes, rosterRes, otRes] = await Promise.all([
       supabase.from("accounts").select(EMPLOYEE_SELECT),
       supabase.from("ranks").select("name,sort_order"),
       supabase.from("public_holidays").select("date,name").gte("date", monthStart).lte("date", monthEnd),
@@ -77,8 +84,13 @@ export default function AttendanceClient() {
         .gte("work_date", monthStart).lte("work_date", monthEnd),
       supabase.from("user_status_history").select("user_id,status_type,event_date")
         .in("status_type", STATUS_HISTORY_TYPES).order("event_date"),
+      // 전월 말일 당직 → 1일 퇴근까지 보도록 하루 앞부터
+      supabase.from("work_duty_roster").select(ROSTER_SELECT)
+        .gte("duty_date", ymd(year, month, 0)).lt("duty_date", monthEnd),
+      supabase.from("overtime_reports").select(OVERTIME_SELECT).eq("approval_status", "approved")
+        .gte("start_at", `${monthStart}T00:00:00+09:00`).lte("start_at", `${monthEnd}T23:59:59+09:00`),
     ]);
-    const err = accRes.error || rankRes.error || holRes.error || leaveRes.error || recRes.error || histRes.error;
+    const err = accRes.error || rankRes.error || holRes.error || leaveRes.error || recRes.error || histRes.error || rosterRes.error || otRes.error;
     setError(err ? err.message : null);
     setEmployees(((accRes.data ?? []) as Employee[]).map(normalizeEmploymentDates));
     setRanks((rankRes.data ?? []) as Rank[]);
@@ -86,8 +98,10 @@ export default function AttendanceClient() {
     setLeaves((leaveRes.data ?? []) as LeaveRow[]);
     setRecords((recRes.data ?? []) as AttendanceRecord[]);
     setStatusEvents((histRes.data ?? []) as StatusEvent[]);
+    setRoster((rosterRes.data ?? []) as RosterRow[]);
+    setOvertime((otRes.data ?? []) as OvertimeRow[]);
     setLoading(false);
-  }, [monthStart, monthEnd]);
+  }, [year, month, monthStart, monthEnd]);
 
   // 월 변경 시 Supabase 재조회 (외부 시스템 동기화 — setState 는 await 이후에만 발생)
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -142,7 +156,7 @@ export default function AttendanceClient() {
       let row = m.get(id);
       if (!row) { row = new Map(); m.set(id, row); }
       let c = row.get(date);
-      if (!c) { c = { leaves: [], record: null }; row.set(date, c); }
+      if (!c) { c = { leaves: [], record: null, dutyRest: null, holidayWork: [] }; row.set(date, c); }
       return c;
     };
     for (const r of leaves) {
@@ -152,8 +166,31 @@ export default function AttendanceClient() {
       }
     }
     for (const rec of records) get(rec.account_id, rec.work_date).record = rec;
+    for (const r of roster) {
+      if (!DUTY_RULES[r.duty_type]?.restNextDay) continue;
+      const next = addDays(r.duty_date.slice(0, 10), 1);
+      if (next < monthStart || next > monthEnd) continue;
+      const [, m, d] = r.duty_date.slice(0, 10).split("-").map(Number);
+      get(r.account_id, next).dutyRest = `${m}/${d} ${r.duty_type}`;
+    }
+    // 휴일 근무: 토·일·공휴일의 근무표 휴일당직·휴일고장대기, 승인 잔업보고서 작업자
+    for (const r of roster) {
+      const date = r.duty_date.slice(0, 10);
+      if (date < monthStart || !isOffDay(date)) continue;
+      get(r.account_id, date).holidayWork.push(`${r.duty_type} (근무표)`);
+    }
+    const byName = new Map(employees.map(e => [empName(e), e.id]));
+    for (const r of overtime) {
+      const date = dateKey(new Date(r.start_at));
+      if (date < monthStart || date > monthEnd || !isOffDay(date)) continue;
+      const hours = Number(r.work_hours) || 0;
+      for (const w of r.workers ?? []) {
+        const id = byName.get(w.trim());
+        if (id != null) get(id, date).holidayWork.push(`휴일 잔업 ${hours}H (${r.report_no})`);
+      }
+    }
     return m;
-  }, [leaves, records, isOffDay, monthStart, monthEnd]);
+  }, [leaves, records, roster, overtime, employees, isOffDay, monthStart, monthEnd]);
 
   const loaPeriods = useMemo(() => buildLoaPeriods(employees, statusEvents), [statusEvents, employees]);
 
@@ -169,6 +206,7 @@ export default function AttendanceClient() {
       if (!day.off) s.required++;
       const c = row?.get(day.key);
       if (!c) continue;
+      if (day.off && !c.record && c.holidayWork.length) s.extra++; // 휴근 = 특근 집계
       const entries: { kind: Kind; amount: number }[] = c.leaves.length
         ? c.leaves.filter(l => l.amount > 0).map(l => ({ kind: STATUS_MAP[l.type]?.kind ?? "etc", amount: l.amount }))
         : c.record ? [{ kind: STATUS_MAP[c.record.status]?.kind ?? "etc", amount: c.record.status === "반차" ? 0.5 : 1 }] : [];
@@ -238,8 +276,11 @@ export default function AttendanceClient() {
         if (onLoa(e, d.key)) return `<td class="loa">휴직</td>`;
         const c = row?.get(d.key);
         let t = "";
-        if (c?.leaves.length) t = c.leaves.map(l => (STATUS_MAP[l.type]?.short ?? l.type[0]) + (l.amount > 0 && l.amount < 1 ? "½" : "")).join("");
+        const realLeave = c?.leaves.some(l => l.amount > 0);
+        if (d.off && c?.holidayWork.length && !c.record && !realLeave) t = "휴근";
+        else if (c?.leaves.length) t = c.leaves.map(l => (STATUS_MAP[l.type]?.short ?? l.type[0]) + (l.amount > 0 && l.amount < 1 ? "½" : "")).join("");
         else if (c?.record) t = STATUS_MAP[c.record.status]?.short ?? c.record.status[0];
+        else if (c?.dutyRest && !d.off) t = "휴";
         return `<td class="${d.off ? "off" : ""}">${esc(t)}</td>`;
       }).join("");
       const s = summarize(e);
@@ -324,6 +365,8 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
           <span key={s.key} className={`px-1.5 py-0.5 rounded ${KIND_CLS[s.kind]}`}>{s.short} {s.key}</span>
         ))}
         <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300">휴직</span>
+        <span className={`px-1.5 py-0.5 rounded ${DUTY_REST_CLS}`}>휴 당직 후 퇴근</span>
+        <span className={`px-1.5 py-0.5 rounded ${KIND_CLS.extra}`}>휴근 휴일 근무</span>
         <span className="px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">휴일 (토·일·공휴일·대체휴일)</span>
         {!canWrite && <span className="ml-2 text-gray-400">· 조회 전용</span>}
       </div>
@@ -377,14 +420,19 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
                         );
                       }
                       const c = row?.get(d.key);
-                      const leave = c?.leaves[0];
+                      // 휴근: 휴일 근무가 있으면 (실사용 연차·수기 등록이 없을 때) 휴일에 걸친 연차 표시보다 우선
+                      const holidayWork = d.off && !!c?.holidayWork.length && !c.record && !c.leaves.some(l => l.amount > 0);
+                      const leave = holidayWork ? undefined : c?.leaves[0];
                       const def = leave ? STATUS_MAP[leave.type] : c?.record ? STATUS_MAP[c.record.status] : undefined;
+                      const dutyRest = !leave && !c?.record && !d.off ? c?.dutyRest ?? null : null;
                       const label = leave
                         ? (def?.short ?? leave.type[0]) + (leave.amount > 0 && leave.amount < 1 ? "½" : "")
-                        : c?.record ? (def?.short ?? c.record.status[0]) : "";
+                        : c?.record ? (def?.short ?? c.record.status[0]) : holidayWork ? "휴근" : dutyRest ? "휴" : "";
                       const title = leave
                         ? c!.leaves.map(l => `${l.type} ${l.amount ? `${l.amount}일` : "(휴일·미공제)"} (${l.requestNo})`).join("\n") + "\n연차계 승인 건"
-                        : c?.record ? `${c.record.status}${c.record.note ? ` - ${c.record.note}` : ""}` : d.holiday ?? undefined;
+                        : c?.record ? `${c.record.status}${c.record.note ? ` - ${c.record.note}` : ""}`
+                        : holidayWork ? `휴일 근무\n${c!.holidayWork.join("\n")}`
+                        : dutyRest ? `당직 후 퇴근 (${dutyRest}, 근무표)` : d.holiday ?? undefined;
                       const clickable = active && (canWrite || !!leave || !!c?.record);
                       return (
                         <td key={d.key} title={title}
@@ -395,7 +443,7 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
                             ${clickable ? "cursor-pointer hover:outline hover:outline-2 hover:outline-blue-400 hover:-outline-offset-2" : ""}`}>
                           {label && (
                             <span className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-0.5 rounded text-[11px] font-bold
-                              ${KIND_CLS[def?.kind ?? "etc"]} ${leave && leave.amount === 0 ? "opacity-50" : ""}
+                              ${holidayWork ? KIND_CLS.extra : dutyRest ? DUTY_REST_CLS : KIND_CLS[def?.kind ?? "etc"]} ${leave && leave.amount === 0 ? "opacity-50" : ""}
                               ${c?.record?.note && !leave ? "underline decoration-dotted" : ""}`}>
                               {label}
                             </span>

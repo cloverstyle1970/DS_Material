@@ -42,6 +42,7 @@ export default function DutyRosterEditor({ candidates, userId, onChanged }: {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState<string | null>(null); // 추가 중인 일자
+  const [editing, setEditing] = useState<RosterRow | null>(null); // 수정 중인 근무
   const [upload, setUpload] = useState<ParseResult | null>(null); // 엑셀·PDF 업로드 미리보기
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -160,6 +161,16 @@ export default function DutyRosterEditor({ candidates, userId, onChanged }: {
     afterWrite();
   }
 
+  async function updateEntry(r: RosterRow, patch: Pick<RosterRow, "duty_date" | "account_id" | "duty_type" | "note">) {
+    const { error } = await supabase.from("work_duty_roster").update(patch).eq("id", r.id);
+    if (error) {
+      alert(error.code === "23505" ? "같은 날 같은 구분에 이미 등록된 사원입니다." : `수정 실패: ${error.message}`);
+      return;
+    }
+    setEditing(null);
+    afterWrite();
+  }
+
   async function removeEntry(r: RosterRow) {
     const { error } = await supabase.from("work_duty_roster").delete().eq("id", r.id);
     if (error) { alert(`삭제 실패: ${error.message}`); return; }
@@ -243,11 +254,12 @@ export default function DutyRosterEditor({ candidates, userId, onChanged }: {
                   const emp = byId.get(r.account_id);
                   const onLeave = actual.leaveMap.get(key)?.find(l => l.id === r.account_id);
                   return (
-                    <span key={r.id} title={`${r.duty_type}${r.note ? ` - ${r.note}` : ""}${onLeave ? `\n⚠ 같은 날 ${onLeave.label} (연차계 승인)` : ""}`}
-                      className={`group/chip flex items-center gap-1 rounded px-1 py-0.5 text-[11px] ${KIND_CLS[r.duty_type]} ${onLeave ? "ring-1 ring-red-500" : ""}`}>
+                    <span key={r.id} onClick={() => setEditing(r)}
+                      title={`${r.duty_type}${r.note ? ` - ${r.note}` : ""}${onLeave ? `\n⚠ 같은 날 ${onLeave.label} (연차계 승인)` : ""}\n클릭하여 수정`}
+                      className={`group/chip flex items-center gap-1 rounded px-1 py-0.5 text-[11px] cursor-pointer hover:brightness-95 ${KIND_CLS[r.duty_type]} ${onLeave ? "ring-1 ring-red-500" : ""}`}>
                       <b>{KIND_SHORT[r.duty_type]}</b>
                       <span className="truncate">{emp ? empName(emp) : `#${r.account_id}`}</span>
-                      <button onClick={() => removeEntry(r)} title="삭제"
+                      <button onClick={e => { e.stopPropagation(); removeEntry(r); }} title="삭제"
                         className="ml-auto opacity-50 hover:opacity-100">✕</button>
                     </span>
                   );
@@ -275,6 +287,18 @@ export default function DutyRosterEditor({ candidates, userId, onChanged }: {
           busy={busy}
           onClose={() => setUpload(null)}
           onSave={replace => saveUpload(upload, replace)}
+        />
+      )}
+
+      {editing && (
+        <EditDutyModal
+          entry={editing}
+          candidates={candidates}
+          monthFrom={from}
+          monthTo={to}
+          onClose={() => setEditing(null)}
+          onSave={patch => updateEntry(editing, patch)}
+          onDelete={() => { setEditing(null); removeEntry(editing); }}
         />
       )}
 
@@ -445,6 +469,75 @@ function UploadPreviewModal({ res, candidates, busy, onClose, onSave }: {
             className="px-3 py-1.5 rounded bg-blue-600 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
             {res.entries.length}건 저장
           </button>
+        </div>
+      </div>
+    </DraggableModal>
+  );
+}
+
+function EditDutyModal({ entry, candidates, monthFrom, monthTo, onClose, onSave, onDelete }: {
+  entry: RosterRow;
+  candidates: Employee[];
+  monthFrom: string;
+  monthTo: string;
+  onClose: () => void;
+  onSave: (patch: Pick<RosterRow, "duty_date" | "account_id" | "duty_type" | "note">) => void;
+  onDelete: () => void;
+}) {
+  const [kind, setKind] = useState<DutyKind>(entry.duty_type);
+  const [accountId, setAccountId] = useState(entry.account_id);
+  const [date, setDate] = useState(entry.duty_date.slice(0, 10));
+  const [note, setNote] = useState(entry.note ?? "");
+  const [search, setSearch] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const q = search.trim();
+  const list = candidates.filter(e => e.id === accountId || !q || empName(e).includes(q) || (e.dept ?? "").includes(q));
+  const valid = date >= monthFrom && date <= monthTo;
+  const inputCls = "w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100";
+
+  return (
+    <DraggableModal open onClose={onClose} panelClassName="w-full max-w-md max-h-[90vh]"
+      header={
+        <div className="flex items-center w-full">
+          <span className="font-bold text-gray-900 dark:text-white">근무 수정</span>
+          <button onClick={onClose} className="ml-auto text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">✕</button>
+        </div>
+      }>
+      <div className="p-4 space-y-3 text-sm">
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">날짜</label>
+          <input type="date" value={date} min={monthFrom} max={monthTo} onChange={e => setDate(e.target.value)} className={inputCls} />
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {DUTY_KINDS.map(k => (
+            <button key={k} onClick={() => setKind(k)}
+              className={`py-2 rounded border text-xs font-semibold ${kind === k
+                ? `border-blue-600 ring-2 ring-blue-500/40 ${KIND_CLS[k]}`
+                : "border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"}`}>
+              {k}<div className="font-normal text-[10px]">{DUTY_RULES[k].time} · {DUTY_RULES[k].hours}H</div>
+            </button>
+          ))}
+        </div>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="근무자 검색 (성명·부서)" className={inputCls} />
+        <div className="max-h-48 overflow-auto rounded border border-gray-200 dark:border-gray-600 divide-y divide-gray-100 dark:divide-gray-700">
+          {list.map(e => (
+            <label key={e.id} className="flex items-center gap-2 px-2 py-1.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/60">
+              <input type="radio" name="duty-edit-emp" checked={accountId === e.id} onChange={() => setAccountId(e.id)} />
+              <span className="font-semibold text-gray-900 dark:text-gray-100">{empName(e)}</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">{e.dept ?? "-"}</span>
+            </label>
+          ))}
+        </div>
+        <input value={note} onChange={e => setNote(e.target.value)} placeholder="비고 (선택)" className={inputCls} />
+        <div className="flex gap-2">
+          <button onClick={() => { if (confirm("이 근무를 삭제할까요?")) onDelete(); }}
+            className="px-3 py-1.5 rounded border border-red-300 dark:border-red-700 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30">삭제</button>
+          <div className="flex-1" />
+          <button onClick={onClose} className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-xs text-gray-700 dark:text-gray-200">취소</button>
+          <button disabled={!valid || saving}
+            onClick={() => { setSaving(true); onSave({ duty_date: date, account_id: accountId, duty_type: kind, note: note.trim() || null }); }}
+            className="px-3 py-1.5 rounded bg-blue-600 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50">저장</button>
         </div>
       </div>
     </DraggableModal>
