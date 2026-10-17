@@ -59,6 +59,8 @@ import ManualCenterClient from "@/components/manual/ManualCenterClient";
 import ImprovementRequestsClient from "@/components/board/ImprovementRequestsClient";
 import OvertimeLedgerClient from "@/components/hr/overtime/OvertimeLedgerClient";
 import LeaveLedgerClient from "@/components/hr/leave/LeaveLedgerClient";
+import AttendanceClient from "@/components/hr/AttendanceClient";
+import WorkHoursClient from "@/components/hr/WorkHoursClient";
 import PublicHolidaysClient from "@/components/hr/leave/PublicHolidaysClient";
 
 export interface PageEntry {
@@ -158,6 +160,14 @@ export const PAGE_REGISTRY: Record<string, PageEntry> = {
   "/hr/leave-ledger": {
     label: "연차계",
     render: () => <LeaveLedgerClient />,
+  },
+  "/hr/attendance": {
+    label: "근태현황",
+    render: () => <AttendanceClient />,
+  },
+  "/hr/work-hours": {
+    label: "주52시간 관리",
+    render: () => <WorkHoursClient />,
   },
   "/hr/public-holidays": {
     label: "공휴일 관리",
