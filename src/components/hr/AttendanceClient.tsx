@@ -40,7 +40,7 @@ const fmtDays = (n: number) => (n === 0 ? "" : n % 1 === 0 ? String(n) : n.toFix
 
 interface Summary {
   required: number; present: number; leave: number; off: number; loa: number; absent: number;
-  late: number; early: number; work: number; extra: number; holidayWork: number; etc: number;
+  late: number; early: number; work: number; etc: number;
 }
 
 export default function AttendanceClient() {
@@ -198,7 +198,7 @@ export default function AttendanceClient() {
     inPeriods(loaPeriods.get(e.id), key), [loaPeriods]);
 
   const summarize = useCallback((e: Employee): Summary => {
-    const s: Summary = { required: 0, present: 0, leave: 0, off: 0, loa: 0, absent: 0, late: 0, early: 0, work: 0, extra: 0, holidayWork: 0, etc: 0 };
+    const s: Summary = { required: 0, present: 0, leave: 0, off: 0, loa: 0, absent: 0, late: 0, early: 0, work: 0, etc: 0 };
     const row = cells.get(e.id);
     for (const day of days) {
       if (!inEmployment(e, day.key)) continue;
@@ -206,7 +206,6 @@ export default function AttendanceClient() {
       if (!day.off) s.required++;
       const c = row?.get(day.key);
       if (!c) continue;
-      if (day.off && !c.record && c.holidayWork.length) s.holidayWork++; // 휴근 (휴일 근무일수)
       const entries: { kind: Kind; amount: number }[] = c.leaves.length
         ? c.leaves.filter(l => l.amount > 0).map(l => ({ kind: STATUS_MAP[l.type]?.kind ?? "etc", amount: l.amount }))
         : c.record ? [{ kind: STATUS_MAP[c.record.status]?.kind ?? "etc", amount: c.record.status === "반차" ? 0.5 : 1 }] : [];
@@ -218,7 +217,7 @@ export default function AttendanceClient() {
           case "late":   s.late++; break;
           case "early":  s.early++; break;
           case "work":   s.work++; break;
-          case "extra":  s.extra++; break;
+          case "extra":  break; // 특근은 합계 표시하지 않음
           default:       s.etc++;
         }
       }
@@ -285,7 +284,7 @@ export default function AttendanceClient() {
       }).join("");
       const s = summarize(e);
       return `<tr><td>${i + 1}</td><td class="nm">${esc(empName(e))}</td>${tds}` +
-        [s.required, s.present, s.leave, s.off, s.loa, s.absent, s.late, s.early, s.work, s.extra, s.holidayWork].map(v => `<td class="sum">${fmtDays(v)}</td>`).join("") + `</tr>`;
+        [s.required, s.present, s.leave, s.off, s.loa, s.absent, s.late, s.early, s.work].map(v => `<td class="sum">${fmtDays(v)}</td>`).join("") + `</tr>`;
     }).join("");
     const legend = STATUS_DEFS.map(s => `${s.short}:${s.key}`).join(" · ");
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>근태현황 ${year}-${pad2(month)}</title>
@@ -304,8 +303,8 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
 </style></head><body>
 <h1>${year}년 ${month}월 근태현황</h1>
 <div class="meta"><span>${esc(legend)} · ½:반일</span><span>출력: ${esc(dateKey(new Date()))}</span></div>
-<table><colgroup><col class="c-no"/><col class="c-nm"/>${days.map(() => "<col/>").join("")}${"<col class=\"c-sum\"/>".repeat(11)}</colgroup>
-<thead><tr><th>No</th><th>성명</th>${dayHead}<th>소정</th><th>출근</th><th>연차</th><th>휴가</th><th>휴직</th><th>결근</th><th>지각</th><th>조퇴</th><th>출장<br/>교육</th><th>특근</th><th>휴근</th></tr></thead>
+<table><colgroup><col class="c-no"/><col class="c-nm"/>${days.map(() => "<col/>").join("")}${"<col class=\"c-sum\"/>".repeat(9)}</colgroup>
+<thead><tr><th>No</th><th>성명</th>${dayHead}<th>소정</th><th>출근</th><th>연차</th><th>휴가</th><th>휴직</th><th>결근</th><th>지각</th><th>조퇴</th><th>출장<br/>교육</th></tr></thead>
 <tbody>${body}</tbody></table>
 <script>window.onload = () => { window.print(); };</script>
 </body></html>`);
@@ -393,7 +392,7 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
                     <div className="text-[10px] font-normal">{"일월화수목금토"[d.dow]}</div>
                   </th>
                 ))}
-                {["소정", "출근", "연차", "휴가", "휴직", "결근", "지각", "조퇴", "출장·교육", "특근", "휴근", "기타"].map(h => (
+                {["소정", "출근", "연차", "휴가", "휴직", "결근", "지각", "조퇴", "출장·교육", "기타"].map(h => (
                   <th key={h} className="border border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 px-1.5 py-1 text-gray-700 dark:text-gray-200 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -451,7 +450,7 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
                         </td>
                       );
                     })}
-                    {[s.required, s.present, s.leave, s.off, s.loa, s.absent, s.late, s.early, s.work, s.extra, s.holidayWork, s.etc].map((v, i) => (
+                    {[s.required, s.present, s.leave, s.off, s.loa, s.absent, s.late, s.early, s.work, s.etc].map((v, i) => (
                       <td key={i} className={`border border-gray-200 dark:border-gray-600 px-1.5 text-center font-semibold whitespace-nowrap
                         ${i === 1 ? "text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700/40" : "text-gray-700 dark:text-gray-300"}
                         ${i === 5 && v > 0 ? "text-red-600 dark:text-red-400" : ""}`}>
