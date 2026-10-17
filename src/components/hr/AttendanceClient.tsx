@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import DraggableModal from "@/components/common/DraggableModal";
 import { useAuth, hasMenuPermission } from "@/context/AuthContext";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 import {
-  STATUS_DEFS, STATUS_MAP, EMPLOYEE_SELECT, LEAVE_SELECT, STATUS_HISTORY_TYPES,
+  DEFAULT_STATUS_DEFS, KIND_LABELS, STATUS_TYPE_SELECT, rowToStatusDef, statusMapOf,
+  EMPLOYEE_SELECT, LEAVE_SELECT, STATUS_HISTORY_TYPES,
   excludedRankSet, expandLeave, normalizeEmploymentDates, buildEmploymentPeriods, buildLoaPeriods,
   inPeriods, overlapsPeriods, empName, ymd, dateKey, pad2, addDays,
-  type Kind, type Employee, type Rank, type LeaveRow, type AttendanceRecord, type StatusEvent,
+  type Kind, type StatusDef, type StatusTypeRow, type Employee, type Rank, type LeaveRow, type AttendanceRecord, type StatusEvent,
 } from "./attendanceShared";
 import { DUTY_RULES, OVERTIME_SELECT, ROSTER_SELECT, overnightEffect, type OvertimeRow, type RosterRow } from "./workHoursCalc";
 
@@ -57,6 +59,8 @@ export default function AttendanceClient() {
   const [leaves, setLeaves] = useState<LeaveRow[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [roster, setRoster] = useState<RosterRow[]>([]);
+  const [statusDefs, setStatusDefs] = useState<StatusDef[]>(DEFAULT_STATUS_DEFS);
+  const [typesOpen, setTypesOpen] = useState(false);
   const [overtime, setOvertime] = useState<OvertimeRow[]>([]);
   const [statusEvents, setStatusEvents] = useState<StatusEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,7 +77,7 @@ export default function AttendanceClient() {
 
   // setState 는 모두 await 이후에 호출 (effect 내 동기 setState 금지 규칙). 로딩 표시는 월 이동 시 켠다.
   const load = useCallback(async () => {
-    const [accRes, rankRes, holRes, leaveRes, recRes, histRes, rosterRes, otRes] = await Promise.all([
+    const [accRes, rankRes, holRes, leaveRes, recRes, histRes, rosterRes, otRes, typeRes] = await Promise.all([
       supabase.from("accounts").select(EMPLOYEE_SELECT),
       supabase.from("ranks").select("name,sort_order"),
       supabase.from("public_holidays").select("date,name").gte("date", monthStart).lte("date", monthEnd),
@@ -89,8 +93,9 @@ export default function AttendanceClient() {
         .gte("duty_date", addDays(monthStart, -1)).lte("duty_date", monthEnd),
       supabase.from("overtime_reports").select(OVERTIME_SELECT).eq("approval_status", "approved")
         .gte("start_at", `${addDays(monthStart, -1)}T00:00:00+09:00`).lte("start_at", `${monthEnd}T23:59:59+09:00`), // 전월 말일 야간 잔업 포함
+      supabase.from("attendance_status_types").select(STATUS_TYPE_SELECT),
     ]);
-    const err = accRes.error || rankRes.error || holRes.error || leaveRes.error || recRes.error || histRes.error || rosterRes.error || otRes.error;
+    const err = accRes.error || rankRes.error || holRes.error || leaveRes.error || recRes.error || histRes.error || rosterRes.error || otRes.error || typeRes.error;
     setError(err ? err.message : null);
     setEmployees(((accRes.data ?? []) as Employee[]).map(normalizeEmploymentDates));
     setRanks((rankRes.data ?? []) as Rank[]);
@@ -100,6 +105,8 @@ export default function AttendanceClient() {
     setStatusEvents((histRes.data ?? []) as StatusEvent[]);
     setRoster((rosterRes.data ?? []) as RosterRow[]);
     setOvertime((otRes.data ?? []) as OvertimeRow[]);
+    const types = ((typeRes.data ?? []) as StatusTypeRow[]).map(rowToStatusDef);
+    setStatusDefs(types.length ? types : DEFAULT_STATUS_DEFS);
     setLoading(false);
   }, [monthStart, monthEnd]);
 
@@ -206,6 +213,9 @@ export default function AttendanceClient() {
   const onLoa = useCallback((e: Employee, key: string) =>
     inPeriods(loaPeriods.get(e.id), key), [loaPeriods]);
 
+  const statusMap = useMemo(() => statusMapOf(statusDefs), [statusDefs]);
+  const activeDefs = useMemo(() => statusDefs.filter(d => d.active).sort((a, b) => a.sortOrder - b.sortOrder), [statusDefs]);
+
   const summarize = useCallback((e: Employee): Summary => {
     const s: Summary = { required: 0, present: 0, leave: 0, off: 0, loa: 0, absent: 0, late: 0, early: 0, work: 0, etc: 0 };
     const row = cells.get(e.id);
@@ -216,8 +226,8 @@ export default function AttendanceClient() {
       const c = row?.get(day.key);
       if (!c) continue;
       const entries: { kind: Kind; amount: number }[] = c.leaves.length
-        ? c.leaves.filter(l => l.amount > 0).map(l => ({ kind: STATUS_MAP[l.type]?.kind ?? "etc", amount: l.amount }))
-        : c.record ? [{ kind: STATUS_MAP[c.record.status]?.kind ?? "etc", amount: c.record.status === "반차" ? 0.5 : 1 }] : [];
+        ? c.leaves.filter(l => l.amount > 0).map(l => ({ kind: statusMap[l.type]?.kind ?? "etc", amount: l.amount }))
+        : c.record ? [{ kind: statusMap[c.record.status]?.kind ?? "etc", amount: statusMap[c.record.status]?.dayAmount ?? 1 }] : [];
       for (const { kind, amount } of entries) {
         switch (kind) {
           case "leave":  if (!day.off) s.leave += amount; break;
@@ -233,7 +243,7 @@ export default function AttendanceClient() {
     }
     s.present = Math.max(0, s.required - s.leave - s.off - s.absent);
     return s;
-  }, [cells, days, inEmployment, onLoa]);
+  }, [cells, days, inEmployment, onLoa, statusMap]);
 
   function moveMonth(delta: number) {
     const d = new Date(year, month - 1 + delta, 1);
@@ -286,8 +296,8 @@ export default function AttendanceClient() {
         let t = "";
         const realLeave = c?.leaves.some(l => l.amount > 0);
         if (d.off && c?.holidayWork.length && !c.record && !realLeave) t = "휴근";
-        else if (c?.leaves.length) t = c.leaves.map(l => (STATUS_MAP[l.type]?.short ?? l.type[0]) + (l.amount > 0 && l.amount < 1 ? "½" : "")).join("");
-        else if (c?.record) t = STATUS_MAP[c.record.status]?.short ?? c.record.status[0];
+        else if (c?.leaves.length) t = c.leaves.map(l => (statusMap[l.type]?.short ?? l.type[0]) + (l.amount > 0 && l.amount < 1 ? "½" : "")).join("");
+        else if (c?.record) t = statusMap[c.record.status]?.short ?? c.record.status[0];
         else if (c?.restReason && !d.off) t = "휴무";
         return `<td class="${d.off ? "off" : ""}">${esc(t)}</td>`;
       }).join("");
@@ -295,7 +305,7 @@ export default function AttendanceClient() {
       return `<tr><td>${i + 1}</td><td class="nm">${esc(empName(e))}</td>${tds}` +
         [s.required, s.present, s.leave, s.off, s.loa, s.absent, s.late, s.early, s.work].map(v => `<td class="sum">${fmtDays(v)}</td>`).join("") + `</tr>`;
     }).join("");
-    const legend = STATUS_DEFS.map(s => `${s.short}:${s.key}`).join(" · ");
+    const legend = activeDefs.map(s => `${s.short}:${s.key}`).join(" · ");
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>근태현황 ${year}-${pad2(month)}</title>
 <style>
 @page { size: A4 landscape; margin: 8mm; }
@@ -365,11 +375,15 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
         <div className="flex-1" />
         <button onClick={printMonth} disabled={loading}
           className="px-3 py-1.5 rounded bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm font-semibold disabled:opacity-50">🖨 인쇄</button>
+        {canWrite && (
+          <button onClick={() => setTypesOpen(true)}
+            className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">⚙ 근태 종류</button>
+        )}
       </div>
 
       {/* 범례 */}
       <div className="px-6 py-2 flex flex-wrap gap-1.5 text-[11px] text-gray-600 dark:text-gray-300">
-        {STATUS_DEFS.map(s => (
+        {activeDefs.map(s => (
           <span key={s.key} className={`px-1.5 py-0.5 rounded ${KIND_CLS[s.kind]}`}>{s.short} {s.key}</span>
         ))}
         <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300">휴직</span>
@@ -431,7 +445,7 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
                       // 휴근: 휴일 근무가 있으면 (실사용 연차·수기 등록이 없을 때) 휴일에 걸친 연차 표시보다 우선
                       const holidayWork = d.off && !!c?.holidayWork.length && !c.record && !c.leaves.some(l => l.amount > 0);
                       const leave = holidayWork ? undefined : c?.leaves[0];
-                      const def = leave ? STATUS_MAP[leave.type] : c?.record ? STATUS_MAP[c.record.status] : undefined;
+                      const def = leave ? statusMap[leave.type] : c?.record ? statusMap[c.record.status] : undefined;
                       const restReason = !leave && !c?.record && !d.off ? c?.restReason ?? null : null;
                       const label = leave
                         ? (def?.short ?? leave.type[0]) + (leave.amount > 0 && leave.amount < 1 ? "½" : "")
@@ -474,6 +488,14 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
         )}
       </div>
 
+      {typesOpen && (
+        <StatusTypesModal
+          defs={statusDefs}
+          onClose={() => setTypesOpen(false)}
+          onSaved={() => { setTypesOpen(false); load(); }}
+        />
+      )}
+
       {editing && typeof document !== "undefined" && createPortal(
         <CellEditor
           emp={editing.emp}
@@ -482,6 +504,8 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
           left={editing.left}
           cell={editCell}
           canWrite={canWrite}
+          defs={activeDefs}
+          statusMap={statusMap}
           onClose={() => setEditing(null)}
           onSave={(status, note) => saveRecord(editing.emp, editing.date, status, note)}
           onDelete={rec => deleteRecord(rec)}
@@ -493,13 +517,15 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
 }
 
 // ── 셀 편집 팝오버 ───────────────────────────────────────────
-function CellEditor({ emp, date, top, left, cell, canWrite, onClose, onSave, onDelete }: {
+function CellEditor({ emp, date, top, left, cell, canWrite, defs, statusMap, onClose, onSave, onDelete }: {
   emp: Employee;
   date: string;
   top: number;
   left: number;
   cell: CellInfo | undefined;
   canWrite: boolean;
+  defs: StatusDef[];
+  statusMap: Record<string, StatusDef>;
   onClose: () => void;
   onSave: (status: string, note: string) => void;
   onDelete: (rec: AttendanceRecord) => void;
@@ -545,7 +571,7 @@ function CellEditor({ emp, date, top, left, cell, canWrite, onClose, onSave, onD
         ) : (
           <>
             <div className="grid grid-cols-5 gap-1 mb-2">
-              {STATUS_DEFS.map(s => (
+              {[...defs, ...(record && !defs.some(d => d.key === record.status) && statusMap[record.status] ? [statusMap[record.status]] : [])].map(s => (
                 <button key={s.key} onClick={() => setStatus(s.key)}
                   className={`py-1.5 rounded text-xs font-semibold border
                     ${status === s.key ? "border-blue-600 ring-2 ring-blue-500/40 " + KIND_CLS[s.kind] : "border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"}`}>
@@ -570,5 +596,129 @@ function CellEditor({ emp, date, top, left, cell, canWrite, onClose, onSave, onD
         )}
       </div>
     </>
+  );
+}
+
+// ── 근태 종류 관리 ───────────────────────────────────────────
+interface TypeDraft { id?: number; origName: string | null; name: string; short: string; kind: Kind; dayAmount: number; sortOrder: number; active: boolean; }
+const DEDUCT_KINDS: Kind[] = ["leave", "off", "absent"];
+
+function StatusTypesModal({ defs, onClose, onSaved }: {
+  defs: StatusDef[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [rows, setRows] = useState<TypeDraft[]>(() => [...defs].sort((a, b) => a.sortOrder - b.sortOrder).map(d => ({
+    id: d.id, origName: d.id ? d.key : null, name: d.key, short: d.short, kind: d.kind, dayAmount: d.dayAmount, sortOrder: d.sortOrder, active: d.active,
+  })));
+  const [removed, setRemoved] = useState<TypeDraft[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  const set = (i: number, patch: Partial<TypeDraft>) => setRows(rs => rs.map((r, k) => (k === i ? { ...r, ...patch } : r)));
+  const add = () => setRows(rs => [...rs, {
+    origName: null, name: "", short: "", kind: "etc", dayAmount: 1, active: true,
+    sortOrder: Math.max(0, ...rs.map(r => r.sortOrder)) + 10,
+  }]);
+
+  async function remove(i: number) {
+    const r = rows[i];
+    if (r.id && r.origName) {
+      const { count } = await supabase.from("attendance_records").select("id", { count: "exact", head: true }).eq("status", r.origName);
+      if (count) { alert(`'${r.origName}'은(는) 근태 기록 ${count}건에서 사용 중이라 삭제할 수 없습니다.\n'사용' 체크를 해제해 목록에서 숨기세요.`); return; }
+      setRemoved(rm => [...rm, r]);
+    }
+    setRows(rs => rs.filter((_, k) => k !== i));
+  }
+
+  async function save() {
+    const list = rows.map(r => ({ ...r, name: r.name.trim(), short: r.short.trim() }));
+    const bad = list.find(r => !r.name || !r.short);
+    if (bad) { alert("이름과 약칭을 모두 입력하세요."); return; }
+    const names = list.map(r => r.name);
+    const dup = names.find((n, i) => names.indexOf(n) !== i);
+    if (dup) { alert(`'${dup}' 이름이 중복됩니다.`); return; }
+    setSaving(true);
+    for (const r of removed) {
+      const { error } = await supabase.from("attendance_status_types").delete().eq("id", r.id!);
+      if (error) { alert(`삭제 실패(${r.origName}): ${error.message}`); setSaving(false); return; }
+    }
+    // 이름이 바뀐 종류: 다른 종류의 기존 이름과 겹칠 수 있으므로 임시 이름을 거쳐 변경
+    const renamed = list.filter(r => r.id && r.origName && r.origName !== r.name);
+    for (const r of renamed) {
+      await supabase.from("attendance_status_types").update({ name: `__tmp_${r.id}` }).eq("id", r.id!);
+    }
+    for (const r of list) {
+      const payload = { name: r.name, short: r.short, kind: r.kind, day_amount: DEDUCT_KINDS.includes(r.kind) ? r.dayAmount : 1, sort_order: r.sortOrder, active: r.active };
+      const { error } = r.id
+        ? await supabase.from("attendance_status_types").update(payload).eq("id", r.id)
+        : await supabase.from("attendance_status_types").insert(payload);
+      if (error) { alert(`저장 실패(${r.name}): ${error.message}`); setSaving(false); return; }
+    }
+    // 기존 근태 기록도 새 이름으로
+    for (const r of renamed) {
+      const { error } = await supabase.from("attendance_records").update({ status: r.name }).eq("status", r.origName!);
+      if (error) { alert(`근태 기록 이름 변경 실패(${r.origName}→${r.name}): ${error.message}`); setSaving(false); return; }
+    }
+    setSaving(false);
+    onSaved();
+  }
+
+  const cell = "px-1.5 py-1 border-b border-gray-100 dark:border-gray-700";
+  const inp = "w-full px-1.5 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100";
+
+  return (
+    <DraggableModal open onClose={onClose} panelClassName="w-full max-w-3xl max-h-[90vh]"
+      header={
+        <div className="flex items-center w-full">
+          <span className="font-bold text-gray-900 dark:text-white">근태 종류 관리</span>
+          <button onClick={onClose} className="ml-auto text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">✕</button>
+        </div>
+      }>
+      <div className="p-4 space-y-3 text-sm overflow-auto max-h-[calc(90vh-60px)]">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          집계 분류가 연차·휴가류·결근이면 공제 일수만큼 출근일수와 주52시간 정규근무에서 뺍니다. 이름을 바꾸면 이미 등록된 근태 기록도 함께 바뀝니다.
+          연차계 종류(연차·휴가·경조·훈련·교육·조퇴·결근·기타)는 연차계 승인 건 표시에도 쓰입니다.
+        </p>
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+              {["순서", "이름", "약칭", "집계 분류", "공제 일수", "사용", ""].map(h => <th key={h} className="px-1.5 py-1.5 text-center whitespace-nowrap">{h}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={r.id ?? `new-${i}`} className={r.active ? "" : "opacity-50"}>
+                <td className={`${cell} w-16`}><input type="number" value={r.sortOrder} onChange={e => set(i, { sortOrder: Number(e.target.value) || 0 })} className={inp} /></td>
+                <td className={cell}><input value={r.name} onChange={e => set(i, { name: e.target.value })} placeholder="예: 대체휴무" className={inp} /></td>
+                <td className={`${cell} w-16`}><input value={r.short} maxLength={2} onChange={e => set(i, { short: e.target.value })} placeholder="대" className={`${inp} text-center`} /></td>
+                <td className={cell}>
+                  <select value={r.kind} onChange={e => set(i, { kind: e.target.value as Kind })} className={inp}>
+                    {(Object.keys(KIND_LABELS) as Kind[]).map(k => <option key={k} value={k}>{KIND_LABELS[k]}</option>)}
+                  </select>
+                </td>
+                <td className={`${cell} w-24`}>
+                  {DEDUCT_KINDS.includes(r.kind) ? (
+                    <select value={r.dayAmount} onChange={e => set(i, { dayAmount: Number(e.target.value) })} className={inp}>
+                      <option value={1}>1일</option>
+                      <option value={0.5}>0.5일</option>
+                    </select>
+                  ) : <span className="text-gray-400">-</span>}
+                </td>
+                <td className={`${cell} text-center`}><input type="checkbox" checked={r.active} onChange={e => set(i, { active: e.target.checked })} /></td>
+                <td className={`${cell} text-center`}>
+                  <button onClick={() => remove(i)} className="text-red-500 hover:text-red-700" title="삭제">✕</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="flex gap-2">
+          <button onClick={add} className="px-3 py-1.5 rounded border border-blue-300 dark:border-blue-700 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30">＋ 종류 추가</button>
+          <div className="flex-1" />
+          <button onClick={onClose} className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-xs text-gray-700 dark:text-gray-200">취소</button>
+          <button onClick={save} disabled={saving} className="px-3 py-1.5 rounded bg-blue-600 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50">저장</button>
+        </div>
+      </div>
+    </DraggableModal>
   );
 }

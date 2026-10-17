@@ -9,7 +9,7 @@ import { notifyLeaveApprovalRequest, notifyLeaveApproved, notifyLeaveApprovedToM
 
 export const LR_LEDGER_MENU_HREF = "/hr/leave-ledger";
 
-const LEAVE_TYPES = ["조퇴", "결근", "경조", "연차", "훈련", "교육", "휴가", "기타"] as const;
+const LEAVE_TYPES = ["조퇴", "결근", "경조", "연차", "훈련", "교육", "휴가", "대체휴무", "기타"] as const;
 type LeaveType = typeof LEAVE_TYPES[number];
 
 interface Account {
@@ -978,9 +978,9 @@ export default function LeaveLedgerClient() {
 
                     {/* ── 구분 체크박스 ── */}
                     <div style={{ flex: 1 }} />
-                    <div style={{ display: "flex", justifyContent: "center", gap: "6mm", flexWrap: "wrap", marginBottom: "4mm", fontSize: "10pt" }}>
+                    <div style={{ display: "flex", justifyContent: "center", gap: "4mm", flexWrap: "nowrap", whiteSpace: "nowrap", marginBottom: "4mm", fontSize: "10pt" }}>
                       {LEAVE_TYPES.map(t => (
-                        <label key={t} style={{ display: "flex", alignItems: "center", gap: "1.5mm", cursor: isReadOnly ? "default" : "pointer", userSelect: "none" }}>
+                        <label key={t} style={{ display: "flex", alignItems: "center", gap: "1.5mm", flexShrink: 0, cursor: isReadOnly ? "default" : "pointer", userSelect: "none" }}>
                           <input
                             type="checkbox"
                             checked={f.leave_type === t}

@@ -1,7 +1,7 @@
 // 주52시간 관리 근무시간 계산.
 // 하루 근무시간 = 정규(부서별 소정시간 − 연차 등 공제, 휴일·휴무일 0) + 승인 잔업보고서 + 근무표 당직·고장대기
 
-import { STATUS_MAP, addDays, dateKey, parseKey, type Employee } from "./attendanceShared";
+import { addDays, dateKey, parseKey, type Employee, type StatusDef } from "./attendanceShared";
 
 export const WEEK_WARN_HOURS  = 52; // 초과 시 경고
 export const WEEK_LIMIT_HOURS = 64; // 초과 시 위반 (52 + 연장 12)
@@ -171,10 +171,9 @@ export function buildDailyHours(args: {
 export function leaveDeduction(kind: string | undefined): boolean {
   return kind === "leave" || kind === "off" || kind === "absent" || kind === "early";
 }
-export function recordDeduction(status: string): number {
-  const kind = STATUS_MAP[status]?.kind;
-  if (status === "반차") return 0.5;
-  return kind === "leave" || kind === "off" || kind === "absent" ? 1 : 0;
+// 근태 수기 등록 → 공제 일수: 근태 종류의 집계 분류가 연차·휴가류·결근이면 그 종류의 공제 일수(반차 0.5 등)
+export function recordDeduction(def: StatusDef | undefined): number {
+  return def && (def.kind === "leave" || def.kind === "off" || def.kind === "absent") ? def.dayAmount : 0;
 }
 
 // 일요일 시작 ~ 토요일 마감 주. 주의 귀속 월은 그 주 목요일이 속한 월 (예: 9/27~10/3 → 10월)

@@ -7,10 +7,10 @@ import { supabase } from "@/lib/supabase";
 import DraggableModal from "@/components/common/DraggableModal";
 import DutyRosterEditor from "./DutyRosterEditor";
 import {
-  STATUS_MAP, EMPLOYEE_SELECT, LEAVE_SELECT, STATUS_HISTORY_TYPES, DOW_KR,
+  STATUS_TYPE_SELECT, rowToStatusDef, statusMapOf, EMPLOYEE_SELECT, LEAVE_SELECT, STATUS_HISTORY_TYPES, DOW_KR,
   excludedRankSet, expandLeave, normalizeEmploymentDates, buildEmploymentPeriods, buildLoaPeriods,
   inPeriods, overlapsPeriods, empName, ymd, addDays, parseKey, dateKey, fetchAllPages,
-  type Employee, type Rank, type LeaveRow, type AttendanceRecord, type StatusEvent,
+  type Employee, type Rank, type StatusDef, type StatusTypeRow, type LeaveRow, type AttendanceRecord, type StatusEvent,
 } from "./attendanceShared";
 import {
   WEEK_WARN_HOURS, WEEK_LIMIT_HOURS, DUTY_RULES, OVERTIME_SELECT, ROSTER_SELECT, rosterToEntries,
@@ -80,6 +80,7 @@ export default function WorkHoursClient() {
   const [holidays, setHolidays] = useState<Map<string, string>>(new Map());
   const [leaves, setLeaves] = useState<LeaveRow[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [statusDefs, setStatusDefs] = useState<StatusDef[]>([]);
   const [statusEvents, setStatusEvents] = useState<StatusEvent[]>([]);
   const [overtime, setOvertime] = useState<OvertimeRow[]>([]);
   const [roster, setRoster] = useState<RosterRow[]>([]);
@@ -97,7 +98,7 @@ export default function WorkHoursClient() {
 
   // setState 는 모두 await 이후에 호출. 로딩 표시는 연도 이동 시 켠다.
   const load = useCallback(async () => {
-    const [accRes, rankRes, holRes, leaveRes, histRes, recRes, otRes, rosterRes] = await Promise.all([
+    const [accRes, rankRes, holRes, leaveRes, histRes, recRes, otRes, rosterRes, typeRes] = await Promise.all([
       supabase.from("accounts").select(EMPLOYEE_SELECT),
       supabase.from("ranks").select("name,sort_order"),
       supabase.from("public_holidays").select("date,name").gte("date", loadFrom).lte("date", loadTo),
@@ -111,9 +112,10 @@ export default function WorkHoursClient() {
         .gte("start_at", `${loadFrom}T00:00:00+09:00`).lte("start_at", `${loadTo}T23:59:59+09:00`).order("id")),
       fetchAllPages<RosterRow>(() => supabase.from("work_duty_roster").select(ROSTER_SELECT)
         .gte("duty_date", addDays(loadFrom, -1)).lte("duty_date", loadTo).order("id")),
+      supabase.from("attendance_status_types").select(STATUS_TYPE_SELECT),
     ]);
     const err = accRes.error?.message || rankRes.error?.message || holRes.error?.message || leaveRes.error?.message
-      || histRes.error?.message || recRes.error || otRes.error || rosterRes.error;
+      || histRes.error?.message || recRes.error || otRes.error || rosterRes.error || typeRes.error?.message;
     setError(err || null);
     setEmployees(((accRes.data ?? []) as Employee[]).map(normalizeEmploymentDates));
     setRanks((rankRes.data ?? []) as Rank[]);
@@ -123,6 +125,7 @@ export default function WorkHoursClient() {
     setRecords(recRes.data);
     setOvertime(otRes.data);
     setRoster(rosterRes.data);
+    setStatusDefs(((typeRes.data ?? []) as StatusTypeRow[]).map(rowToStatusDef));
     setLoading(false);
   }, [loadFrom, loadTo]);
 
@@ -178,6 +181,7 @@ export default function WorkHoursClient() {
   [employees, excludedRanks, employmentPeriods, loadFrom, loadTo]);
 
   // ── 근무 공제 (연차계 승인 + 근태 수기) ──
+  const statusMap = useMemo(() => statusMapOf(statusDefs), [statusDefs]);
   const leaveUse = useMemo(() => {
     const m = new Map<number, Map<string, { amount: number; label: string }[]>>();
     const push = (id: number, date: string, amount: number, label: string) => {
@@ -187,7 +191,7 @@ export default function WorkHoursClient() {
     };
     const leaveDays = new Set<string>();
     for (const r of leaves) {
-      const kind = STATUS_MAP[r.leave_type]?.kind;
+      const kind = statusMap[r.leave_type]?.kind;
       for (const { date, amount } of expandLeave(r, isOffDay)) {
         if (date < loadFrom || date > loadTo || amount <= 0) continue;
         leaveDays.add(`${r.author_id}|${date}`);
@@ -197,11 +201,11 @@ export default function WorkHoursClient() {
     // 근태현황과 동일하게 연차계 건이 있는 날은 수기 등록 무시
     for (const rec of records) {
       if (leaveDays.has(`${rec.account_id}|${rec.work_date}`)) continue;
-      const amount = recordDeduction(rec.status);
+      const amount = recordDeduction(statusMap[rec.status]);
       if (amount > 0) push(rec.account_id, rec.work_date, amount, `${rec.status} (근태)`);
     }
     return m;
-  }, [leaves, records, isOffDay, loadFrom, loadTo]);
+  }, [leaves, records, statusMap, isOffDay, loadFrom, loadTo]);
 
   const daily = useMemo(() => buildDailyHours({
     employees: yearEmployees, from: loadFrom, to: loadTo, today, isOffDay,

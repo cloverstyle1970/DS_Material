@@ -1,30 +1,35 @@
 // 근태현황(/hr/attendance)·주52시간 관리(/hr/work-hours) 공통 로직.
 // 연차계 승인 건 펼치기, 재직·휴직 기간 계산, 전무 이상 제외 등 두 화면이 같은 기준을 쓰도록 여기서만 정의한다.
 
-// ── 근태 구분 ────────────────────────────────────────────────
-// kind: 집계 분류. leave=연차, off=휴가류, absent=결근, late=지각, early=조퇴·외출,
-//       work=출장·교육(출근 인정), extra=특근, etc=기타
+// ── 근태 종류 ────────────────────────────────────────────────
+// DB attendance_status_types 에서 관리 (근태현황 > ⚙ 근태 종류). 아래 기본값은 DB 를 못 읽을 때와,
+// 연차계 종류(연차·휴가·경조 등)가 DB 에서 지워졌을 때의 판정용 예비값.
+// kind: 집계 분류. leave=연차, off=휴가류, absent=결근 (이 셋은 dayAmount 만큼 근무 공제),
+//       late=지각, early=조퇴·외출, work=출장·교육(출근 인정), extra=특근, etc=기타
 export type Kind = "leave" | "off" | "absent" | "late" | "early" | "work" | "extra" | "etc";
+export const KIND_LABELS: Record<Kind, string> = {
+  leave: "연차 (공제)", off: "휴가류 (공제)", absent: "결근 (공제)", late: "지각",
+  early: "조퇴·외출", work: "출장·교육 (출근 인정)", extra: "특근", etc: "기타",
+};
 
-export const STATUS_DEFS: { key: string; short: string; kind: Kind }[] = [
-  { key: "연차", short: "연", kind: "leave" },
-  { key: "반차", short: "반", kind: "leave" },
-  { key: "휴가", short: "휴", kind: "off" },
-  { key: "경조", short: "경", kind: "off" },
-  { key: "공가", short: "공", kind: "off" },
-  { key: "병가", short: "병", kind: "off" },
-  { key: "결근", short: "결", kind: "absent" },
-  { key: "지각", short: "지", kind: "late" },
-  { key: "조퇴", short: "조", kind: "early" },
-  { key: "외출", short: "외", kind: "early" },
-  { key: "출장", short: "출", kind: "work" },
-  { key: "교육", short: "교", kind: "work" },
-  { key: "훈련", short: "훈", kind: "work" },
-  { key: "특근", short: "특", kind: "extra" },
-  { key: "기타", short: "기", kind: "etc" },
-];
-export const STATUS_MAP: Record<string, { key: string; short: string; kind: Kind }> =
-  Object.fromEntries(STATUS_DEFS.map(s => [s.key, s]));
+export interface StatusDef { id?: number; key: string; short: string; kind: Kind; dayAmount: number; sortOrder: number; active: boolean; }
+
+export const DEFAULT_STATUS_DEFS: StatusDef[] = [
+  ["연차", "연", "leave", 1], ["반차", "반", "leave", 0.5], ["휴가", "휴", "off", 1], ["경조", "경", "off", 1],
+  ["공가", "공", "off", 1], ["병가", "병", "off", 1], ["결근", "결", "absent", 1], ["지각", "지", "late", 1],
+  ["조퇴", "조", "early", 1], ["외출", "외", "early", 1], ["출장", "출", "work", 1], ["교육", "교", "work", 1],
+  ["훈련", "훈", "work", 1], ["특근", "특", "extra", 1], ["기타", "기", "etc", 1],
+].map(([key, short, kind, dayAmount], i) => ({ key, short, kind, dayAmount, sortOrder: (i + 1) * 10, active: true }) as StatusDef);
+
+export const STATUS_TYPE_SELECT = "id,name,short,kind,day_amount,sort_order,active";
+export interface StatusTypeRow { id: number; name: string; short: string; kind: Kind; day_amount: number; sort_order: number; active: boolean; }
+export const rowToStatusDef = (r: StatusTypeRow): StatusDef =>
+  ({ id: r.id, key: r.name, short: r.short, kind: r.kind, dayAmount: Number(r.day_amount), sortOrder: r.sort_order, active: r.active });
+
+// 이름 → 정의. DB 값이 기본값을 덮어쓴다 (DB 에 없는 연차계 종류도 판정 가능하도록 기본값을 먼저 깐다)
+export function statusMapOf(defs: StatusDef[]): Record<string, StatusDef> {
+  return Object.fromEntries([...DEFAULT_STATUS_DEFS, ...defs].map(d => [d.key, d]));
+}
 
 // 직급 전무 이상은 근태관리 제외. ranks 테이블의 전무 sort_order 보다 높은(작은) 직급 + 아래 고정 목록
 const EXEC_RANKS_FALLBACK = ["회장", "부회장", "대표이사", "대표", "사장", "부사장", "전무"];
