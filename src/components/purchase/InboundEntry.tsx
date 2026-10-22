@@ -82,6 +82,8 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
   const [serialEditRowId, setSerialEditRowId] = useState<string | null>(null);
   const [editBatchId, setEditBatchId] = useState<string | null>(null);
   const [editTransactionNo, setEditTransactionNo] = useState<string | null>(null);
+  const [createdByUserId,   setCreatedByUserId]   = useState<number | null>(null);
+  const [createdByUserName, setCreatedByUserName] = useState<string>("");
 
   useEffect(() => {
     if (!isEdit || !editId) return;
@@ -104,6 +106,8 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
         setEditTransactionNo(target.transactionNo || null);
         if (target.siteName) setSiteName(target.siteName);
         if (target.requesterName) setRequesterName(target.requesterName);
+        setCreatedByUserId(target.userId ?? null);
+        setCreatedByUserName(target.userName ?? "");
 
         const loaded: Row[] = [];
         for (const t of siblings) {
@@ -284,7 +288,9 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
           qty: r.qty, siteName: siteName || null,
           elevatorName: r.elevatorName || null,
           serialNos: r.serialNos.length > 0 ? r.serialNos : null,
-          note, userId: user.id, userName: user.name,
+          note,
+          userId: isEdit ? (createdByUserId ?? user.id) : user.id,
+          userName: isEdit ? (createdByUserName || user.name) : user.name,
           batchId,
           transactionNo,
           unitPrice: r.unitPrice || 0,
@@ -326,7 +332,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
             <VendorInlineSearch value={vendorName} onChange={setVendorName} vendors={vendors} />
           </FormField>
           <FormField label="담당자">
-            <input type="text" value={user?.name ?? ""} readOnly className={inputCls + " bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 cursor-not-allowed"} />
+            <input type="text" value={isEdit ? (createdByUserName || (user?.name ?? "")) : (user?.name ?? "")} readOnly className={inputCls + " bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 cursor-not-allowed"} />
           </FormField>
           <FormField label="신청자">
             <RequesterInlineSearch value={requesterName} onChange={setRequesterName} users={accounts} />

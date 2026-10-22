@@ -90,6 +90,8 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
   const [serialEditRowId, setSerialEditRowId] = useState<string | null>(null);
   const [editBatchId, setEditBatchId] = useState<string | null>(null);
   const [editTransactionNo, setEditTransactionNo] = useState<string | null>(null);
+  const [createdByUserId,   setCreatedByUserId]   = useState<number | null>(null);
+  const [createdByUserName, setCreatedByUserName] = useState<string>("");
   const [previewDN, setPreviewDN] = useState(false);
   const [dnReceiver, setDnReceiver] = useState<DNReceiver>({ name: "", bizNo: "", address: "", phone: "" });
   const [dnVendors, setDnVendors] = useState<DNVendor[]>([]);
@@ -115,6 +117,8 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
         setReference(target.note || "");
         setEditBatchId(target.batchId || null);
         setEditTransactionNo(target.transactionNo || null);
+        setCreatedByUserId(target.userId ?? null);
+        setCreatedByUserName(target.userName ?? "");
 
         // siblings 는 add_transaction RPC 가 한 화면 Row 를 S/N 1건당 + 잔여 비추적분 1행 으로
         // 분할 저장한 결과다. 수정 모드에서는 원래 입력 단위(자재/호기/단가/회수/입고참조/메모)로
@@ -435,7 +439,9 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
           elevatorName: r.elevatorName || null,
           serialNos: r.serialNos.length > 0 ? r.serialNos : null,
           requiresReturn: r.requiresReturn,
-          note, userId: user.id, userName: user.name,
+          note,
+          userId: isEdit ? (createdByUserId ?? user.id) : user.id,
+          userName: isEdit ? (createdByUserName || user.name) : user.name,
           batchId,
           transactionNo,
           // 무상 체크 시 화면 상태와 관계없이 저장 단가는 무조건 0.
@@ -501,7 +507,7 @@ export default function OutboundEntry({ editId }: { editId?: number } = {}) {
             </div>
           </FormField>
           <FormField label="담당자">
-            <input type="text" value={user?.name ?? ""} readOnly className={inputCls + " bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 cursor-not-allowed"} />
+            <input type="text" value={isEdit ? (createdByUserName || (user?.name ?? "")) : (user?.name ?? "")} readOnly className={inputCls + " bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 cursor-not-allowed"} />
           </FormField>
           <FormField label="수령인">
             <ReceiverInlineSearch value={receiverName} onChange={setReceiverName} users={users} />

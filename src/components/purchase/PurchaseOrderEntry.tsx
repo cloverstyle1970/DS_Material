@@ -79,6 +79,8 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
   const [requesterPhones, setRequesterPhones] = useState<Record<string, string>>({});
   const [removedLineIds, setRemovedLineIds] = useState<Set<number>>(new Set());
   const [editLoading, setEditLoading] = useState(isEdit);
+  const [createdByUserId,   setCreatedByUserId]   = useState<number | null>(null);
+  const [createdByUserName, setCreatedByUserName] = useState<string>("");
 
   useEffect(() => {
     if (!user) return;
@@ -159,6 +161,8 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
         setOrderRefNo(head.orderRefNo ?? "");
         setFormType(head.formType);
         setOrderDate(head.orderedAt.slice(0, 10));
+        setCreatedByUserId(head.userId ?? null);
+        setCreatedByUserName(head.userName ?? "");
         setShipInfo({
           shipTo:   head.shipTo       ?? "",
           dueDate:  head.shipDueDate  ?? "",
@@ -301,8 +305,8 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
         orderRefNo:    orderRefNo || null,
         formType:      formType,
         note:          reference || null,
-        userId:        user.id,
-        userName:      user.name,
+        userId:        isEdit ? (createdByUserId ?? user.id) : user.id,
+        userName:      isEdit ? (createdByUserName || user.name) : user.name,
         shipTo:        shipInfo.shipTo   || null,
         shipDueDate:   shipInfo.dueDate  || null,
         shipReceiver:  shipInfo.receiver || null,
@@ -391,6 +395,11 @@ export default function PurchaseOrderEntry({ editId }: { editId?: number } = {})
           <FormField label="신청자" className="w-48">
             <RequesterInlineSearch value={managerName} onChange={setManagerName} names={requesterNames} phones={requesterPhones} readOnly={isReadOnly} />
           </FormField>
+          {isEdit && (
+            <FormField label="등록자" className="w-48">
+              <RequesterInlineSearch value={createdByUserName} onChange={setCreatedByUserName} names={requesterNames} phones={requesterPhones} readOnly={isReadOnly} />
+            </FormField>
+          )}
           <FormField label="무상" className="w-20">
             <input
               type="checkbox"
