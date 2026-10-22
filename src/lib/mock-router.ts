@@ -380,9 +380,11 @@ function dbToMaterial(r: any): MaterialRecord {
     opinionImageUrl:    r.opinion_image_url    ?? null,
     referenceImageUrl1: r.reference_image_url1 ?? null,
     referenceImageUrl2: r.reference_image_url2 ?? null,
-    vendor1Id:    r.vendor1_id ?? null,
-    vendor2Id:    r.vendor2_id ?? null,
+    vendor1Id:    r.vendor1_id  ?? null,
+    vendor2Id:    r.vendor2_id  ?? null,
     createdAt:    r.created_at,
+    isActive:     r.is_active   ?? true,
+    mergedInto:   r.merged_into ?? null,
   };
 }
 
@@ -747,6 +749,7 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
   if (path === "/api/materials") {
     const q = params.get("q");
     const matType = params.get("matType") as "DS" | "TK" | null;
+    const includeInactive = params.get("includeInactive") === "true";
     const PAGE = 1000;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const all: any[] = [];
@@ -754,6 +757,7 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
       let query = supabase.from("materials").select("*").order("name").order("id").range(offset, offset + PAGE - 1);
       if (matType === "DS") query = query.like("id", "D%");
       if (matType === "TK") query = query.not("id", "like", "D%");
+      if (!includeInactive) query = query.eq("is_active", true);
       const { data, error } = await query;
       if (error) throw new MockApiError(error.message, 500);
       const rows = data ?? [];
@@ -1115,6 +1119,21 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
     const { data, error } = await supabase.from("materials").insert(row).select().single();
     if (error) throw new MockApiError(error.message, 500);
     return dbToMaterial(data);
+  }
+
+  if (path === "/api/materials/merge") {
+    const { sourceId, targetId, userId, userName } = body;
+    if (!sourceId || !targetId) throw new MockApiError("sourceId, targetId 필수", 400);
+    if (sourceId === targetId) throw new MockApiError("원본과 대상이 동일합니다", 400);
+    const { data, error } = await supabase.rpc("merge_materials", {
+      p_source_id: sourceId,
+      p_target_id: targetId,
+      p_user_id:   userId   ?? 0,
+      p_user_name: userName ?? "",
+    });
+    if (error) throw new MockApiError(error.message, 500);
+    if (data?.error) throw new MockApiError(data.error, 400);
+    return data;
   }
 
   // 자재실사: S/N 폐기 처리

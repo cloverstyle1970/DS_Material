@@ -21,6 +21,8 @@ export interface MaterialRecord {
   vendor1Id: number | null;
   vendor2Id: number | null;
   createdAt: string;
+  isActive: boolean;
+  mergedInto: string | null;
 }
 
 let materials: MaterialRecord[] = partListJson as MaterialRecord[];

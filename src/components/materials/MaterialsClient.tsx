@@ -6,6 +6,7 @@ import { MaterialRecord } from "@/lib/mock-materials";
 import AddMaterialModal from "./AddMaterialModal";
 import EditMaterialModal from "./EditMaterialModal";
 import BulkUploadModal from "./BulkUploadModal";
+import MergeMaterialModal from "./MergeMaterialModal";
 import { useAuth, isViewOnly } from "@/context/AuthContext";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -76,6 +77,8 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [editTarget, setEditTarget] = useState<MaterialRecord | null>(null);
   const [repairTarget, setRepairTarget] = useState<MaterialRecord | null>(null);
+  const [mergeSource, setMergeSource] = useState<MaterialRecord | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -111,7 +114,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
   }
 
   useEffect(() => {
-    api.get<MaterialRecord[]>("/api/materials").then(d => setMaterials(dedupeById(d))).catch(() => {});
+    api.get<MaterialRecord[]>("/api/materials?includeInactive=true").then(d => setMaterials(dedupeById(d))).catch(() => {});
   }, []);
 
   const { user } = useAuth();
@@ -120,7 +123,11 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
 
   const q = query.trim().toLowerCase();
 
+  const activeMaterials = materials.filter(m => m.isActive ?? true);
+  const inactiveMaterials = materials.filter(m => !(m.isActive ?? true));
+
   const filtered = materials.filter(m => {
+    if (!showInactive && !(m.isActive ?? true)) return false;
     if (matType === "DS" && !m.id.startsWith("D")) return false;
     if (matType === "TK" &&  m.id.startsWith("D")) return false;
     if (!q) return true;
@@ -236,7 +243,7 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api.get<MaterialRecord[]>("/api/materials");
+      const data = await api.get<MaterialRecord[]>("/api/materials?includeInactive=true");
       setMaterials(dedupeById(data));
     } catch (e) {
       alert(getErrorMessage(e));
@@ -318,7 +325,10 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
               ? `검색 ${fmtNum(filtered.length)}종`
               : matType !== "전체"
                 ? `${matType} ${fmtNum(filtered.length)}종`
-                : `전체 ${fmtNum(materials.length)}종`}
+                : `전체 ${fmtNum(activeMaterials.length)}종`}
+            {inactiveMaterials.length > 0 && (
+              <span className="ml-1.5 text-xs text-gray-400">(통합됨 {inactiveMaterials.length})</span>
+            )}
             {selected.size > 0 && <span className="ml-2 text-slate-600 font-medium">(선택 {selected.size}개)</span>}
           </span>
 
@@ -336,6 +346,17 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
                 </button>
               )}
             </div>
+          )}
+
+          {!viewOnly && inactiveMaterials.length > 0 && (
+            <button type="button" onClick={() => setShowInactive(v => !v)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors shrink-0 border ${
+                showInactive
+                  ? "bg-orange-100 dark:bg-orange-900/40 border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300"
+                  : "border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+              }`}>
+              통합됨 {showInactive ? "숨기기" : "보기"}
+            </button>
           )}
 
           {!viewOnly && (
@@ -427,32 +448,38 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
               </td></tr>
             ) : paginated.map(m => {
               const isChecked = selected.has(m.id);
-              // 수리품 행은 보라색 톤으로 강조
-              const rowBg = isChecked
-                ? (isDark ? "bg-gray-700" : "bg-slate-50")
-                : m.isRepair
-                  ? (isDark ? "bg-green-950/30 hover:bg-green-900/40" : "bg-green-100 hover:bg-green-200")
-                  : (isDark ? "hover:bg-gray-800" : "hover:bg-gray-50");
+              const isInactive = !(m.isActive ?? true);
+              const rowBg = isInactive
+                ? (isDark ? "opacity-50 bg-gray-900" : "opacity-50 bg-gray-100")
+                : isChecked
+                  ? (isDark ? "bg-gray-700" : "bg-slate-50")
+                  : m.isRepair
+                    ? (isDark ? "bg-green-950/30 hover:bg-green-900/40" : "bg-green-100 hover:bg-green-200")
+                    : (isDark ? "hover:bg-gray-800" : "hover:bg-gray-50");
               return (
                 <tr key={m.id}
-                  onClick={() => toggleOne(m.id)}
-                  className={`transition-colors cursor-pointer ${rowBg}`}>
+                  onClick={() => !isInactive && toggleOne(m.id)}
+                  className={`transition-colors ${isInactive ? "cursor-default" : "cursor-pointer"} ${rowBg}`}>
                   {!isMobile && (
                     <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                      <input type="checkbox" checked={isChecked} onChange={() => toggleOne(m.id)}
-                        className="w-4 h-4 rounded border-gray-300 accent-slate-700 cursor-pointer" />
+                      {!isInactive && (
+                        <input type="checkbox" checked={isChecked} onChange={() => toggleOne(m.id)}
+                          className="w-4 h-4 rounded border-gray-300 accent-slate-700 cursor-pointer" />
+                      )}
                     </td>
                   )}
                   <td className="px-4 py-3 text-center">
-                    {m.isRepair
-                      ? <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${isDark ? "bg-green-900/60 text-green-300" : "bg-green-100 text-green-700"}`}>RE</span>
-                      : <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          isDark
-                            ? m.id.startsWith("D") ? "bg-red-900/60 text-red-300" : "bg-blue-900/60 text-blue-300"
-                            : m.id.startsWith("D") ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600"
-                        }`}>
-                          {m.id.startsWith("D") ? "DS" : "TK"}
-                        </span>
+                    {isInactive
+                      ? <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${isDark ? "bg-gray-700 text-gray-400" : "bg-gray-200 text-gray-500"}`}>통합됨</span>
+                      : m.isRepair
+                        ? <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${isDark ? "bg-green-900/60 text-green-300" : "bg-green-100 text-green-700"}`}>RE</span>
+                        : <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            isDark
+                              ? m.id.startsWith("D") ? "bg-red-900/60 text-red-300" : "bg-blue-900/60 text-blue-300"
+                              : m.id.startsWith("D") ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600"
+                          }`}>
+                            {m.id.startsWith("D") ? "DS" : "TK"}
+                          </span>
                     }
                   </td>
                   <td
@@ -491,39 +518,55 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
                   </td>
                   {!viewOnly && (
                     <td className={`px-4 py-3 sticky right-0 z-10 ${
-                      isChecked
-                        ? (isDark ? "bg-gray-700" : "bg-slate-50")
-                        : m.isRepair
-                          ? (isDark ? "bg-green-950/40" : "bg-green-100")
-                          : (isDark ? "bg-gray-900" : "bg-white")
+                      isInactive
+                        ? (isDark ? "bg-gray-900" : "bg-gray-100")
+                        : isChecked
+                          ? (isDark ? "bg-gray-700" : "bg-slate-50")
+                          : m.isRepair
+                            ? (isDark ? "bg-green-950/40" : "bg-green-100")
+                            : (isDark ? "bg-gray-900" : "bg-white")
                     }`} onClick={e => e.stopPropagation()}>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setEditTarget(m)}
-                          className={`text-xs px-2.5 py-1 rounded-lg border transition-colors whitespace-nowrap ${isDark ? "border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white hover:border-gray-500" : "border-gray-200 text-gray-500 hover:bg-slate-50 hover:text-slate-700 hover:border-slate-300"}`}
-                        >
-                          수정
-                        </button>
-                        {!m.isRepair && (
+                      {isInactive ? (
+                        <span className="text-xs text-gray-400 dark:text-gray-600 whitespace-nowrap">
+                          → {m.mergedInto ?? ""}
+                        </span>
+                      ) : (
+                        <div className="flex items-center gap-1">
                           <button
                             type="button"
-                            onClick={() => setRepairTarget(m)}
-                            title="수리품 등록"
-                            className={`text-xs px-2.5 py-1 rounded-lg border font-bold transition-colors whitespace-nowrap ${isDark ? "border-green-700 text-green-300 hover:bg-green-900/40 hover:text-green-200" : "border-green-300 text-green-600 hover:bg-green-50 hover:text-green-800 hover:border-green-400"}`}
+                            onClick={() => setEditTarget(m)}
+                            className={`text-xs px-2.5 py-1 rounded-lg border transition-colors whitespace-nowrap ${isDark ? "border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white hover:border-gray-500" : "border-gray-200 text-gray-500 hover:bg-slate-50 hover:text-slate-700 hover:border-slate-300"}`}
                           >
-                            R
+                            수정
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => deleteMaterials([m.id])}
-                          title="자재 삭제"
-                          className="text-xs px-2.5 py-1 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors whitespace-nowrap font-medium"
-                        >
-                          삭제
-                        </button>
-                      </div>
+                          {!m.isRepair && (
+                            <button
+                              type="button"
+                              onClick={() => setRepairTarget(m)}
+                              title="수리품 등록"
+                              className={`text-xs px-2.5 py-1 rounded-lg border font-bold transition-colors whitespace-nowrap ${isDark ? "border-green-700 text-green-300 hover:bg-green-900/40 hover:text-green-200" : "border-green-300 text-green-600 hover:bg-green-50 hover:text-green-800 hover:border-green-400"}`}
+                            >
+                              R
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setMergeSource(m)}
+                            title="파트번호 통합"
+                            className={`text-xs px-2.5 py-1 rounded-lg border font-bold transition-colors whitespace-nowrap ${isDark ? "border-orange-700 text-orange-300 hover:bg-orange-900/40 hover:text-orange-200" : "border-orange-300 text-orange-600 hover:bg-orange-50 hover:text-orange-800 hover:border-orange-400"}`}
+                          >
+                            통합
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteMaterials([m.id])}
+                            title="자재 삭제"
+                            className="text-xs px-2.5 py-1 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors whitespace-nowrap font-medium"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      )}
                     </td>
                   )}
                 </tr>
@@ -606,6 +649,14 @@ export default function MaterialsClient({ initial }: { initial: MaterialRecord[]
           material={editTarget}
           onClose={() => setEditTarget(null)}
           onSaved={() => { setEditTarget(null); reload(); }}
+        />
+      )}
+      {mergeSource && (
+        <MergeMaterialModal
+          source={mergeSource}
+          allMaterials={materials}
+          onClose={() => setMergeSource(null)}
+          onSaved={() => { setMergeSource(null); reload(); }}
         />
       )}
 
