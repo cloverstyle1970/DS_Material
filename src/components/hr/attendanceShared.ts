@@ -211,6 +211,11 @@ export const inPeriods = (periods: Period[] | undefined, key: string) =>
 // 해당 일자가 속한 기간 (휴직 표시명 조회용)
 export const periodAt = (periods: Period[] | undefined, key: string) =>
   (periods ?? []).find(p => p.from <= key && (p.to === null || key <= p.to));
+// 휴직 기간 표시명 ("휴직"·"육휴"), 휴직 기간이 아니면 null
+export const loaLabelAt = (periods: Period[] | undefined, key: string): string | null => {
+  const p = periodAt(periods, key);
+  return p ? p.label ?? "휴직" : null;
+};
 export const overlapsPeriods = (periods: Period[] | undefined, from: string, to: string) =>
   (periods ?? []).some(p => p.from <= to && (p.to === null || p.to >= from));
 

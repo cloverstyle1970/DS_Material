@@ -107,7 +107,7 @@ export function buildDailyHours(args: {
   today: string;
   isOffDay: (key: string) => boolean;
   employed: (e: Employee, key: string) => boolean;
-  onLoa: (e: Employee, key: string) => boolean;
+  onLoa: (e: Employee, key: string) => string | null; // 휴직 표시명("휴직"·"육휴"), 휴직 아니면 null
   leaveUse: Map<number, Map<string, { amount: number; label: string }[]>>;
   // 휴일 근무 인정: 근태현황에 특근 분류(예: 근무)로 등록된 날 → 토·일·공휴일이면 부서 소정시간을 정규로
   holidayWork?: Map<number, Map<string, string>>;
@@ -179,7 +179,8 @@ export function buildDailyHours(args: {
       // 미래 일자도 같은 규칙: 평일 소정시간(상주팀 9H·그 외 8H) − 승인 연차 + 등록 근무표(당직·대기, 다음날 퇴근)
       let regular = 0;
       const workLabel = holidayWork?.get(e.id)?.get(key);
-      if (onLoa(e, key)) notes.push("휴직");
+      const loa = onLoa(e, key);
+      if (loa) notes.push(loa);
       else if (isOffDay(key)) {
         if (workLabel) { regular = sched.hours; notes.push(`${workLabel} — 휴일 근무 ${sched.hours}H`); }
       } else {

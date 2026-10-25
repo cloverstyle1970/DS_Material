@@ -10,7 +10,7 @@ import type { SwapCheck } from "./DutyChangePanel";
 import {
   STATUS_TYPE_SELECT, rowToStatusDef, statusMapOf, EMPLOYEE_SELECT, LEAVE_SELECT, STATUS_HISTORY_TYPES, DOW_KR,
   excludedRankSet, expandLeave, normalizeEmploymentDates, buildEmploymentPeriods, buildLoaPeriods,
-  inPeriods, overlapsPeriods, empName, ymd, addDays, parseKey, dateKey, fetchAllPages,
+  inPeriods, loaLabelAt, overlapsPeriods, empName, ymd, addDays, parseKey, dateKey, fetchAllPages,
   type Employee, type Rank, type StatusDef, type StatusTypeRow, type LeaveRow, type AttendanceRecord, type StatusEvent,
 } from "./attendanceShared";
 import {
@@ -52,7 +52,7 @@ function dayLabel(d: DayHours | undefined): { text: string; cls: string } {
   }
   const n = d.notes[0] ?? "";
   if (n.includes("휴무") || n.includes("퇴근")) return { text: "휴무", cls: "text-[10px] text-gray-500 dark:text-gray-400" };
-  if (n === "휴직") return { text: "휴직", cls: "text-[10px] text-slate-500 dark:text-slate-400" };
+  if (n === "휴직" || n === "육휴") return { text: n, cls: "text-[10px] text-slate-500 dark:text-slate-400" };
   if (n === "재직 기간 외") return { text: "", cls: "" };
   const leave = n.match(/^(\S+) [\d.]+일|^(\S+) \(근태\)/);
   if (leave) return { text: (leave[1] ?? leave[2]).slice(0, 2), cls: "text-[10px] text-purple-700 dark:text-purple-300" };
@@ -224,7 +224,7 @@ export default function WorkHoursClient() {
   const daily = useMemo(() => buildDailyHours({
     employees: yearEmployees, from: loadFrom, to: loadTo, today, isOffDay,
     employed: (e, k) => inPeriods(employmentPeriods.get(e.id), k),
-    onLoa: (e, k) => inPeriods(loaPeriods.get(e.id), k),
+    onLoa: (e, k) => loaLabelAt(loaPeriods.get(e.id), k),
     leaveUse, holidayWork, overtime, duty: rosterToEntries(roster),
   }), [yearEmployees, loadFrom, loadTo, today, isOffDay, employmentPeriods, loaPeriods, leaveUse, holidayWork, overtime, roster]);
 
@@ -241,7 +241,7 @@ export default function WorkHoursClient() {
     const base = {
       employees: emps, from: loadFrom, to: loadTo, today, isOffDay,
       employed: (e: Employee, k: string) => inPeriods(employmentPeriods.get(e.id), k),
-      onLoa: (e: Employee, k: string) => inPeriods(loaPeriods.get(e.id), k),
+      onLoa: (e: Employee, k: string) => loaLabelAt(loaPeriods.get(e.id), k),
       leaveUse, holidayWork, overtime,
     };
     const before = buildDailyHours({ ...base, duty: rosterToEntries(roster) });
