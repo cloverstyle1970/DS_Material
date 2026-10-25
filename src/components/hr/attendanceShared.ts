@@ -201,7 +201,11 @@ export function buildLoaPeriods(employees: Employee[], events: StatusEvent[]): M
   }
   for (const e of employees) {
     const label = e.status ? LOA_LABELS[e.status] : undefined;
-    if (label && !m.has(e.id)) m.set(e.id, [{ from: "0000-01-01", to: null, label }]);
+    if (!label) continue;
+    const list = m.get(e.id);
+    if (!list) { m.set(e.id, [{ from: "0000-01-01", to: null, label }]); continue; }
+    // 재직상태가 육아휴직인데 이력은 '휴직'으로 등록된 경우: 현재(마지막) 휴직 기간을 재직상태 표시명으로
+    if (e.status === "육아휴직" && list.length) list[list.length - 1].label = label;
   }
   return m;
 }
