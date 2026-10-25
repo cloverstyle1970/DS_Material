@@ -17,6 +17,12 @@ export function isRepairMaterial(materialId: string | null | undefined): boolean
   return materialId.startsWith("D") ? materialId.endsWith("R") : materialId.startsWith("A");
 }
 
+/** TK 자재 구매단가 = 판매단가의 80% (원 단위 반올림) */
+export const TK_BUY_PRICE_RATE = 0.8;
+export function tkBuyPrice(sellPrice: number): number {
+  return Math.round(sellPrice * TK_BUY_PRICE_RATE);
+}
+
 /** 화면(라이트/다크 공용) TK 텍스트 색 */
 export const TK_TEXT_CLASS = "text-blue-600 dark:text-blue-400";
 

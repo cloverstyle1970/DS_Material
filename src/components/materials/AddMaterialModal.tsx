@@ -10,6 +10,7 @@ import { MaterialRecord } from "@/lib/mock-materials";
 import { VendorRecord } from "@/lib/mock-vendors";
 import { parseNum } from "@/lib/format";
 import { formatMoney } from "@/lib/input-format";
+import { tkBuyPrice } from "@/lib/material-style";
 import CategoryManagerModal from "./CategoryManagerModal";
 import DraggableModal from "@/components/common/DraggableModal";
 import SearchableSelect from "@/components/ui/SearchableSelect";
@@ -368,7 +369,7 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">구매단가 (원)</label>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">구매단가 (원){!isDs && <span className="ml-1 text-[10px] text-blue-500">판매×80%</span>}</label>
                 <input type="text" inputMode="numeric" value={buyPrice}
                   onChange={e => setBuyPrice(formatMoney(e.target.value))} placeholder="0"
                   className="w-full rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-right text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-400" />
@@ -376,7 +377,11 @@ export default function AddMaterialModal({ onClose, onSaved, source }: Props) {
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">판매단가 (원)</label>
                 <input type="text" inputMode="numeric" value={sellPrice}
-                  onChange={e => setSellPrice(formatMoney(e.target.value))} placeholder="0"
+                  onChange={e => {
+                    const v = formatMoney(e.target.value);
+                    setSellPrice(v);
+                    if (!isDs) setBuyPrice(v ? formatMoney(tkBuyPrice(parseNum(v))) : "");
+                  }} placeholder="0"
                   className="w-full rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-right text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-400" />
               </div>
             </div>

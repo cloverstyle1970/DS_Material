@@ -11,6 +11,7 @@ import DraggableModal from "@/components/common/DraggableModal";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { parseNum } from "@/lib/format";
 import { formatMoney } from "@/lib/input-format";
+import { tkBuyPrice } from "@/lib/material-style";
 
 const REFERENCE_BUCKET = "material-references";
 
@@ -180,14 +181,18 @@ export default function EditMaterialModal({ material, onClose, onSaved }: Props)
           {/* 단가 */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">구매단가 (원)</label>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">구매단가 (원){!isDs && <span className="ml-1 text-[10px] text-blue-500">판매×80%</span>}</label>
               <input type="text" inputMode="numeric" value={buyPrice}
                 onChange={e => setBuyPrice(formatMoney(e.target.value))} placeholder="0" className={field + " text-right"} />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">판매단가 (원)</label>
               <input type="text" inputMode="numeric" value={sellPrice}
-                onChange={e => setSellPrice(formatMoney(e.target.value))} placeholder="0" className={field + " text-right"} />
+                onChange={e => {
+                  const v = formatMoney(e.target.value);
+                  setSellPrice(v);
+                  if (!isDs) setBuyPrice(v ? formatMoney(tkBuyPrice(parseNum(v))) : "");
+                }} placeholder="0" className={field + " text-right"} />
             </div>
           </div>
 

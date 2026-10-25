@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { CategoryStore } from "@/lib/mock-categories";
 import DraggableModal from "@/components/common/DraggableModal";
+import { tkBuyPrice } from "@/lib/material-style";
 
 interface Props {
   onClose: () => void;
@@ -219,6 +220,12 @@ export default function BulkUploadModal({ onClose, onSaved }: Props) {
       const isDs = asString(r.자재구분).toUpperCase() === "DS";
       const directId = asString(r.자재코드).toUpperCase();
       const repairFlag = asString(r.수리품).toUpperCase();
+      // TK 자재는 구매단가가 비어 있으면 판매단가의 80%로 채움
+      const sellPrice = asNumberOrEmpty(r.판매단가);
+      let buyPrice = asNumberOrEmpty(r.구매단가);
+      if (!isDs && buyPrice === "" && sellPrice !== "" && Number.isFinite(Number(sellPrice))) {
+        buyPrice = String(tkBuyPrice(Number(sellPrice)));
+      }
       const computedRepairFromId = directId
         ? (isDs ? directId.endsWith("R") : directId.startsWith("A"))
         : false;
@@ -235,8 +242,8 @@ export default function BulkUploadModal({ onClose, onSaved }: Props) {
         mid: pad2(r.중분류코드),
         sub: pad2(r.소분류코드),
         isRepair: directId ? computedRepairFromId : repairFlag === "Y",
-        buyPrice: asNumberOrEmpty(r.구매단가),
-        sellPrice: asNumberOrEmpty(r.판매단가),
+        buyPrice,
+        sellPrice,
         storageLoc: asString(r.보관장소),
         stockQty: Number(asNumberOrEmpty(r.초기재고) || 0),
         errors: [],
