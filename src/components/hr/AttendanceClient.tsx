@@ -10,10 +10,9 @@ import {
   DEFAULT_STATUS_DEFS, DEDUCT_KINDS, KIND_LABELS, STATUS_TYPE_SELECT, rowToStatusDef, statusMapOf,
   EMPLOYEE_SELECT, LEAVE_SELECT, STATUS_HISTORY_TYPES,
   excludedRankSet, expandLeave, normalizeEmploymentDates, buildEmploymentPeriods, buildLoaPeriods,
-  inPeriods, overlapsPeriods, empName, ymd, dateKey, pad2, addDays,
+  inPeriods, overlapsPeriods, empName, ymd, dateKey, pad2,
   type Kind, type StatusDef, type StatusTypeRow, type Employee, type Rank, type LeaveRow, type AttendanceRecord, type StatusEvent,
 } from "./attendanceShared";
-import { DUTY_RULES, OVERTIME_SELECT, ROSTER_SELECT, overnightEffect, type OvertimeRow, type RosterRow } from "./workHoursCalc";
 
 export const ATTENDANCE_MENU_HREF = "/hr/attendance";
 
@@ -29,16 +28,14 @@ const KIND_CLS: Record<Kind, string> = {
   etc:    "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200",
 };
 
-const NIGHT_CHECK_CLS = "bg-slate-700 text-white dark:bg-slate-300 dark:text-slate-900";
-const DUTY_REST_CLS = "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-200";
+
+const WORKDAY_MARK = "V"; // 평일 정상근무 표시 (근태 종류 "근무" 약어와 동일)
 
 interface LeaveDay { type: string; amount: number; requestNo: string; }
 interface CellInfo {
   leaves: LeaveDay[];          // 연차계 승인 건 (잠금)
   record: AttendanceRecord | null; // 수기 등록
-  restReason: string | null;   // 휴무 사유 (주52시간 관리와 같은 규칙: 당직 다음날 퇴근, 야간 잔업 06시 이후 종료) — "휴무" 표시
-  holidayWork: string[];       // 휴일 근무 (승인 잔업보고서·근무표 휴일당직/휴일고장대기) — "휴근" 표시
-  nightCheck: boolean;         // 근무표 야간점검 (22:00~익일 06:00) — "야점" 표시, 다음날은 휴무
+  // 근무표·잔업보고서는 근태현황에 적용하지 않음 (주52시간 관리에서만 사용)
 }
 
 const fmtDays = (n: number) => (n === 0 ? "" : n % 1 === 0 ? String(n) : n.toFixed(1));
@@ -61,10 +58,8 @@ export default function AttendanceClient() {
   const [holidays, setHolidays] = useState<Map<string, string>>(new Map());
   const [leaves, setLeaves] = useState<LeaveRow[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
-  const [roster, setRoster] = useState<RosterRow[]>([]);
   const [statusDefs, setStatusDefs] = useState<StatusDef[]>(DEFAULT_STATUS_DEFS);
   const [typesOpen, setTypesOpen] = useState(false);
-  const [overtime, setOvertime] = useState<OvertimeRow[]>([]);
   const [statusEvents, setStatusEvents] = useState<StatusEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +75,7 @@ export default function AttendanceClient() {
 
   // setState 는 모두 await 이후에 호출 (effect 내 동기 setState 금지 규칙). 로딩 표시는 월 이동 시 켠다.
   const load = useCallback(async () => {
-    const [accRes, rankRes, holRes, leaveRes, recRes, histRes, rosterRes, otRes, typeRes] = await Promise.all([
+    const [accRes, rankRes, holRes, leaveRes, recRes, histRes, typeRes] = await Promise.all([
       supabase.from("accounts").select(EMPLOYEE_SELECT),
       supabase.from("ranks").select("name,sort_order"),
       supabase.from("public_holidays").select("date,name").gte("date", monthStart).lte("date", monthEnd),
@@ -91,14 +86,9 @@ export default function AttendanceClient() {
         .gte("work_date", monthStart).lte("work_date", monthEnd),
       supabase.from("user_status_history").select("user_id,status_type,event_date")
         .in("status_type", STATUS_HISTORY_TYPES).order("event_date"),
-      // 전월 말일 당직 → 1일 퇴근까지 보도록 하루 앞부터
-      supabase.from("work_duty_roster").select(ROSTER_SELECT)
-        .gte("duty_date", addDays(monthStart, -1)).lte("duty_date", monthEnd),
-      supabase.from("overtime_reports").select(OVERTIME_SELECT).eq("approval_status", "approved")
-        .gte("start_at", `${addDays(monthStart, -1)}T00:00:00+09:00`).lte("start_at", `${monthEnd}T23:59:59+09:00`), // 전월 말일 야간 잔업 포함
       supabase.from("attendance_status_types").select(STATUS_TYPE_SELECT),
     ]);
-    const err = accRes.error || rankRes.error || holRes.error || leaveRes.error || recRes.error || histRes.error || rosterRes.error || otRes.error || typeRes.error;
+    const err = accRes.error || rankRes.error || holRes.error || leaveRes.error || recRes.error || histRes.error || typeRes.error;
     setError(err ? err.message : null);
     setEmployees(((accRes.data ?? []) as Employee[]).map(normalizeEmploymentDates));
     setRanks((rankRes.data ?? []) as Rank[]);
@@ -106,8 +96,6 @@ export default function AttendanceClient() {
     setLeaves((leaveRes.data ?? []) as LeaveRow[]);
     setRecords((recRes.data ?? []) as AttendanceRecord[]);
     setStatusEvents((histRes.data ?? []) as StatusEvent[]);
-    setRoster((rosterRes.data ?? []) as RosterRow[]);
-    setOvertime((otRes.data ?? []) as OvertimeRow[]);
     const types = ((typeRes.data ?? []) as StatusTypeRow[]).map(rowToStatusDef);
     setStatusDefs(types.length ? types : DEFAULT_STATUS_DEFS);
     setLoading(false);
@@ -166,7 +154,7 @@ export default function AttendanceClient() {
       let row = m.get(id);
       if (!row) { row = new Map(); m.set(id, row); }
       let c = row.get(date);
-      if (!c) { c = { leaves: [], record: null, restReason: null, holidayWork: [], nightCheck: false }; row.set(date, c); }
+      if (!c) { c = { leaves: [], record: null }; row.set(date, c); }
       return c;
     };
     for (const r of leaves) {
@@ -176,42 +164,8 @@ export default function AttendanceClient() {
       }
     }
     for (const rec of records) get(rec.account_id, rec.work_date).record = rec;
-    for (const r of roster) {
-      if (!DUTY_RULES[r.duty_type]?.restNextDay) continue;
-      const next = addDays(r.duty_date.slice(0, 10), 1);
-      if (next < monthStart || next > monthEnd) continue;
-      const [, m, d] = r.duty_date.slice(0, 10).split("-").map(Number);
-      get(r.account_id, next).restReason = `${m}/${d} ${r.duty_type} 후 퇴근 (근무표)`;
-    }
-    const nameToId = new Map(employees.map(e => [empName(e), e.id]));
-    for (const r of overtime) {
-      const night = overnightEffect(r.start_at, r.end_at);
-      if (night?.effect !== "rest" || night.endDay < monthStart || night.endDay > monthEnd) continue;
-      for (const w of r.workers ?? []) {
-        const id = nameToId.get(w.trim());
-        if (id != null) get(id, night.endDay).restReason ??= `야간 잔업 ${night.endHm} 종료 휴무 (${r.report_no})`;
-      }
-    }
-    // 휴일 근무: 토·일·공휴일의 근무표 휴일당직·휴일고장대기, 승인 잔업보고서 작업자
-    for (const r of roster) {
-      const date = r.duty_date.slice(0, 10);
-      if (date < monthStart) continue;
-      if (r.duty_type === "야간점검") { get(r.account_id, date).nightCheck = true; continue; }
-      if (!isOffDay(date)) continue;
-      get(r.account_id, date).holidayWork.push(`${r.duty_type} (근무표)`);
-    }
-    const byName = new Map(employees.map(e => [empName(e), e.id]));
-    for (const r of overtime) {
-      const date = dateKey(new Date(r.start_at));
-      if (date < monthStart || date > monthEnd || !isOffDay(date)) continue;
-      const hours = Number(r.work_hours) || 0;
-      for (const w of r.workers ?? []) {
-        const id = byName.get(w.trim());
-        if (id != null) get(id, date).holidayWork.push(`휴일 잔업 ${hours}H (${r.report_no})`);
-      }
-    }
     return m;
-  }, [leaves, records, roster, overtime, employees, isOffDay, monthStart, monthEnd]);
+  }, [leaves, records, isOffDay, monthStart, monthEnd]);
 
   const loaPeriods = useMemo(() => buildLoaPeriods(employees, statusEvents), [statusEvents, employees]);
 
@@ -290,6 +244,7 @@ export default function AttendanceClient() {
   function printMonth() {
     const w = window.open("", "_blank", "width=1200,height=800");
     if (!w) { alert("팝업이 차단되었습니다. 팝업을 허용해 주세요."); return; }
+    const today = dateKey(new Date());
     const esc = (v: string) => v.replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]!));
     const dayHead = days.map(d =>
       `<th class="${d.off ? "off" : ""}">${d.d}<br/><span>${"일월화수목금토"[d.dow]}</span></th>`).join("");
@@ -300,12 +255,9 @@ export default function AttendanceClient() {
         if (onLoa(e, d.key)) return `<td class="loa">휴직</td>`;
         const c = row?.get(d.key);
         let t = "";
-        const realLeave = c?.leaves.some(l => l.amount > 0);
-        if (c?.nightCheck && !c.record && !realLeave) t = "야점";
-        else if (d.off && c?.holidayWork.length && !c.record && !realLeave) t = "휴근";
-        else if (c?.leaves.length) t = c.leaves.map(l => (statusMap[l.type]?.short ?? l.type[0]) + (l.amount > 0 && l.amount < 1 ? "½" : "")).join("");
+        if (c?.leaves.length) t = c.leaves.map(l => (statusMap[l.type]?.short ?? l.type[0]) + (l.amount > 0 && l.amount < 1 ? "½" : "")).join("");
         else if (c?.record) t = statusMap[c.record.status]?.short ?? c.record.status[0];
-        else if (c?.restReason && !d.off) t = "휴무";
+        else if (!d.off && d.key <= today) t = WORKDAY_MARK;
         return `<td class="${d.off ? "off" : ""}">${esc(t)}</td>`;
       }).join("");
       const s = summarize(e);
@@ -394,9 +346,6 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
           <span key={s.key} className={`px-1.5 py-0.5 rounded ${KIND_CLS[s.kind]}`}>{s.short} {s.key}</span>
         ))}
         <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300">휴직</span>
-        <span className={`px-1.5 py-0.5 rounded ${DUTY_REST_CLS}`}>휴무 당직 후 퇴근·야간 잔업</span>
-        <span className={`px-1.5 py-0.5 rounded ${KIND_CLS.extra}`}>휴근 휴일 근무</span>
-        <span className={`px-1.5 py-0.5 rounded ${NIGHT_CHECK_CLS}`}>야점 야간점검</span>
         <span className="px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">휴일 (토·일·공휴일·대체휴일)</span>
         {!canWrite && <span className="ml-2 text-gray-400">· 조회 전용</span>}
       </div>
@@ -450,23 +399,17 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
                         );
                       }
                       const c = row?.get(d.key);
-                      // 휴근: 휴일 근무가 있으면 (실사용 연차·수기 등록이 없을 때) 휴일에 걸친 연차 표시보다 우선
-                      const realLeave = !!c?.leaves.some(l => l.amount > 0);
-                      // 야점: 근무표 야간점검 (실사용 연차·수기 등록이 없을 때). 휴근보다 우선
-                      const nightCheck = !!c?.nightCheck && !c.record && !realLeave;
-                      const holidayWork = !nightCheck && d.off && !!c?.holidayWork.length && !c.record && !realLeave;
-                      const leave = holidayWork || nightCheck ? undefined : c?.leaves[0];
+                      const leave = c?.leaves[0];
                       const def = leave ? statusMap[leave.type] : c?.record ? statusMap[c.record.status] : undefined;
-                      const restReason = !leave && !c?.record && !d.off ? c?.restReason ?? null : null;
+                      // 평일 정상근무(연차·수기 등록 없음, 오늘까지): "V"
+                      const workday = !leave && !c?.record && !d.off && d.key <= todayKey;
                       const label = leave
                         ? (def?.short ?? leave.type[0]) + (leave.amount > 0 && leave.amount < 1 ? "½" : "")
-                        : c?.record ? (def?.short ?? c.record.status[0]) : nightCheck ? "야점" : holidayWork ? "휴근" : restReason ? "휴무" : "";
+                        : c?.record ? (def?.short ?? c.record.status[0]) : workday ? WORKDAY_MARK : "";
                       const title = leave
                         ? c!.leaves.map(l => `${l.type} ${l.amount ? `${l.amount}일` : "(휴일·미공제)"} (${l.requestNo})`).join("\n") + "\n연차계 승인 건"
                         : c?.record ? `${c.record.status}${c.record.note ? ` - ${c.record.note}` : ""}`
-                        : nightCheck ? "야간점검 22:00~익일 06:00 (근무표) — 다음날 휴무"
-                        : holidayWork ? `휴일 근무\n${c!.holidayWork.join("\n")}`
-                        : restReason ? `휴무 — ${restReason}` : d.holiday ?? undefined;
+                        : d.holiday ?? undefined;
                       const clickable = active && (canWrite || !!leave || !!c?.record);
                       return (
                         <td key={d.key} title={title}
@@ -477,7 +420,7 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
                             ${clickable ? "cursor-pointer hover:outline hover:outline-2 hover:outline-blue-400 hover:-outline-offset-2" : ""}`}>
                           {label && (
                             <span className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-0.5 rounded text-[11px] font-bold
-                              ${nightCheck ? NIGHT_CHECK_CLS : holidayWork ? KIND_CLS.extra : restReason ? DUTY_REST_CLS : KIND_CLS[def?.kind ?? "etc"]} ${leave && leave.amount === 0 ? "opacity-50" : ""}
+                              ${workday ? KIND_CLS.work : KIND_CLS[def?.kind ?? "etc"]} ${leave && leave.amount === 0 ? "opacity-50" : ""}
                               ${c?.record?.note && !leave ? "underline decoration-dotted" : ""}`}>
                               {label}
                             </span>
