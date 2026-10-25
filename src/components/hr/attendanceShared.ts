@@ -81,8 +81,11 @@ export interface AttendanceRecord {
   note: string | null;
 }
 export interface StatusEvent { user_id: number; status_type: string; event_date: string; }
-export const STATUS_HISTORY_TYPES = ["입사", "퇴직", "재입사", "휴직", "복직"];
-export interface Period { from: string; to: string | null; } // to 포함, null=진행중
+export const STATUS_HISTORY_TYPES = ["입사", "퇴직", "재입사", "휴직", "육아휴직", "복직"];
+
+// 휴직 종류(재직상태 이력·accounts.status) → 근태현황 표시
+export const LOA_LABELS: Record<string, string> = { "휴직": "휴직", "육아휴직": "육휴" };
+export interface Period { from: string; to: string | null; label?: string; } // to 포함, null=진행중. label: 휴직 기간 표시명
 
 // ── 날짜 ────────────────────────────────────────────────────
 export const pad2 = (n: number | string) => String(n).padStart(2, "0");
@@ -182,27 +185,32 @@ export function buildEmploymentPeriods(employees: Employee[], events: StatusEven
   return m;
 }
 
-// 휴직 기간: 재직상태 이력의 휴직→복직. 복직일 전날까지가 휴직.
+// 휴직 기간: 재직상태 이력의 휴직(육아휴직)→복직. 복직일 전날까지가 휴직.
 // 현재 휴직 상태인데 휴직·복직 이력이 전혀 없으면 전 기간 휴직으로 본다.
 // (복직 예정일이 미리 등록된 경우 accounts.status 는 아직 '휴직'이므로 이력이 있으면 이력을 따른다)
 export function buildLoaPeriods(employees: Employee[], events: StatusEvent[]): Map<number, Period[]> {
   const m = new Map<number, Period[]>();
   for (const ev of events) {
-    if (ev.status_type !== "휴직" && ev.status_type !== "복직") continue;
+    const loaLabel = LOA_LABELS[ev.status_type];
+    if (!loaLabel && ev.status_type !== "복직") continue;
     const list = m.get(ev.user_id) ?? [];
     const open = list.find(p => p.to === null);
-    if (ev.status_type === "휴직" && !open) list.push({ from: ev.event_date, to: null });
+    if (loaLabel && !open) list.push({ from: ev.event_date, to: null, label: loaLabel });
     if (ev.status_type === "복직" && open) open.to = addDays(ev.event_date, -1);
     m.set(ev.user_id, list);
   }
   for (const e of employees) {
-    if (e.status === "휴직" && !m.has(e.id)) m.set(e.id, [{ from: "0000-01-01", to: null }]);
+    const label = e.status ? LOA_LABELS[e.status] : undefined;
+    if (label && !m.has(e.id)) m.set(e.id, [{ from: "0000-01-01", to: null, label }]);
   }
   return m;
 }
 
 export const inPeriods = (periods: Period[] | undefined, key: string) =>
   (periods ?? []).some(p => p.from <= key && (p.to === null || key <= p.to));
+// 해당 일자가 속한 기간 (휴직 표시명 조회용)
+export const periodAt = (periods: Period[] | undefined, key: string) =>
+  (periods ?? []).find(p => p.from <= key && (p.to === null || key <= p.to));
 export const overlapsPeriods = (periods: Period[] | undefined, from: string, to: string) =>
   (periods ?? []).some(p => p.from <= to && (p.to === null || p.to >= from));
 

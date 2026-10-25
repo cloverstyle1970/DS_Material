@@ -7,13 +7,14 @@ import { useReloadOnActivate } from "@/context/TabActivationContext";
 import DraggableModal from "@/components/common/DraggableModal";
 
 // 고용상태 변동 구분 (발령=인사이동과 분리해 여기서는 5종만 다룬다)
-const STATUS_TYPES = ["입사", "퇴직", "휴직", "복직", "재입사"] as const;
+const STATUS_TYPES = ["입사", "퇴직", "휴직", "육아휴직", "복직", "재입사"] as const;
 
 // status_type → accounts.status 매핑
 function mapToAccountStatus(t: string): string | null {
   switch (t) {
     case "퇴직": return "퇴사";
     case "휴직": return "휴직";
+    case "육아휴직": return "육아휴직";
     case "입사":
     case "복직":
     case "재입사": return "재직";
@@ -58,7 +59,7 @@ function todayYmd(): string {
 
 function typeBadgeCls(t: string): string {
   if (t === "퇴직") return "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300";
-  if (t === "휴직") return "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300";
+  if (t === "휴직" || t === "육아휴직") return "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300";
   return "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300"; // 입사/복직/재입사
 }
 

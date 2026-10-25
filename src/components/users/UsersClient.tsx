@@ -37,6 +37,7 @@ const STATUS_CLS: Record<string, string> = {
   "재직": "bg-green-50 text-green-700 dark:bg-green-900/40 dark:text-green-300",
   "퇴직": "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300",
   "휴직": "bg-amber-50 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  "육아휴직": "bg-amber-50 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
 };
 
 const PERMISSION_OPTIONS: { value: Permission; label: string; desc: string; color: string }[] = [
@@ -308,7 +309,8 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
 
   const q = query.trim().toLowerCase();
   const filtered = users.filter(u => {
-    if (statusFilter !== "전체" && u.status !== statusFilter) return false;
+    // "휴직" 필터는 육아휴직 포함
+    if (statusFilter !== "전체" && u.status !== statusFilter && !(statusFilter === "휴직" && u.status === "육아휴직")) return false;
     if (selfCheckOnly && !selfCheckIds.has(u.id)) return false;
     if (expiryOnly && !isExpiryAlert(expiryByUser.get(u.id)?.daysLeft ?? null)) return false;
     if (!q) return true;

@@ -8,7 +8,7 @@ import DraggableModal from "@/components/common/DraggableModal";
 
 // 발령(부서이동·진급 등) 구분. 고용상태 변동(입사/퇴직 등)은 개인정보수정 탭에서 관리.
 const ASSIGNMENT_TYPES = ["부서이동", "진급", "강등", "전보", "직책변경", "겸직"] as const;
-const ALL_TYPES = ["입사", "퇴직", "휴직", "복직", "재입사", ...ASSIGNMENT_TYPES] as const;
+const ALL_TYPES = ["입사", "퇴직", "휴직", "육아휴직", "복직", "재입사", ...ASSIGNMENT_TYPES] as const;
 
 // 직급 변동(진급/강등)은 to_rank, 부서 변동(부서이동/전보)은 to_dept를 주로 다룬다.
 const RANK_TYPES = new Set(["진급", "강등"]);

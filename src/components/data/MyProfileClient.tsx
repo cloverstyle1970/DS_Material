@@ -108,7 +108,7 @@ interface RP {
 
 interface StatusHistory {
   id?: number;
-  status_type: "입사" | "퇴직" | "휴직" | "복직" | "재입사" | "부서이동" | "진급" | "강등" | "전보" | "직책변경" | "겸직" | "";
+  status_type: "입사" | "퇴직" | "휴직" | "육아휴직" | "복직" | "재입사" | "부서이동" | "진급" | "강등" | "전보" | "직책변경" | "겸직" | "";
   event_date: string;
   reason: string;
   from_dept?: string;
@@ -955,6 +955,7 @@ export default function MyProfileClient() {
                           <option value="재직">재직</option>
                           <option value="퇴사">퇴사</option>
                           <option value="휴직">휴직</option>
+                          <option value="육아휴직">육아휴직</option>
                         </select>
                       ) : (
                         <input type="text" value={row.status ?? ""} readOnly className={lockedCls} />
@@ -1540,7 +1541,7 @@ export default function MyProfileClient() {
               {statusHistory.map((s, i) => (
                 <div key={i} className={`rounded-lg border p-3 ${
                   s.status_type === "퇴직" ? "border-red-300 bg-red-50/30 dark:bg-red-900/10"
-                  : s.status_type === "휴직" ? "border-amber-300 bg-amber-50/30 dark:bg-amber-900/10"
+                  : s.status_type === "휴직" || s.status_type === "육아휴직" ? "border-amber-300 bg-amber-50/30 dark:bg-amber-900/10"
                   : s.status_type === "재입사" || s.status_type === "입사" || s.status_type === "복직" ? "border-green-300 bg-green-50/30 dark:bg-green-900/10"
                   : ["부서이동", "진급", "강등", "전보", "직책변경", "겸직"].includes(s.status_type) ? "border-purple-300 bg-purple-50/30 dark:bg-purple-900/10"
                   : "border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/30"
@@ -1563,6 +1564,7 @@ export default function MyProfileClient() {
                           <option value="입사">입사</option>
                           <option value="퇴직">퇴직</option>
                           <option value="휴직">휴직</option>
+                          <option value="육아휴직">육아휴직</option>
                           <option value="복직">복직</option>
                           <option value="재입사">재입사</option>
                         </optgroup>

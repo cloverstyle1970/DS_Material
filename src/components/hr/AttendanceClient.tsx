@@ -10,7 +10,7 @@ import {
   DEFAULT_STATUS_DEFS, DEDUCT_KINDS, KIND_LABELS, STATUS_TYPE_SELECT, rowToStatusDef, statusMapOf,
   EMPLOYEE_SELECT, LEAVE_SELECT, STATUS_HISTORY_TYPES,
   excludedRankSet, expandLeave, normalizeEmploymentDates, buildEmploymentPeriods, buildLoaPeriods,
-  inPeriods, overlapsPeriods, empName, ymd, dateKey, pad2,
+  inPeriods, periodAt, overlapsPeriods, empName, ymd, dateKey, pad2,
   type Kind, type StatusDef, type StatusTypeRow, type Employee, type Rank, type LeaveRow, type AttendanceRecord, type StatusEvent,
 } from "./attendanceShared";
 
@@ -171,6 +171,9 @@ export default function AttendanceClient() {
 
   const onLoa = useCallback((e: Employee, key: string) =>
     inPeriods(loaPeriods.get(e.id), key), [loaPeriods]);
+  // 휴직 셀 표시명: 육아휴직 "육휴", 그 외 "휴직"
+  const loaLabel = useCallback((e: Employee, key: string) =>
+    periodAt(loaPeriods.get(e.id), key)?.label ?? "휴직", [loaPeriods]);
 
   const statusMap = useMemo(() => statusMapOf(statusDefs), [statusDefs]);
   const activeDefs = useMemo(() => statusDefs.filter(d => d.active).sort((a, b) => a.sortOrder - b.sortOrder), [statusDefs]);
@@ -252,7 +255,7 @@ export default function AttendanceClient() {
       const row = cells.get(e.id);
       const tds = days.map(d => {
         if (!inEmployment(e, d.key)) return `<td class="na"></td>`;
-        if (onLoa(e, d.key)) return `<td class="loa">휴직</td>`;
+        if (onLoa(e, d.key)) return `<td class="loa">${esc(loaLabel(e, d.key))}</td>`;
         const c = row?.get(d.key);
         let t = "";
         if (c?.leaves.length) t = c.leaves.map(l => (statusMap[l.type]?.short ?? l.type[0]) + (l.amount > 0 && l.amount < 1 ? "½" : "")).join("");
@@ -345,7 +348,7 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
         {activeDefs.map(s => (
           <span key={s.key} className={`px-1.5 py-0.5 rounded ${KIND_CLS[s.kind]}`}>{s.short} {s.key}</span>
         ))}
-        <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300">휴직</span>
+        <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300">휴직 · 육휴 육아휴직</span>
         <span className="px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">휴일 (토·일·공휴일·대체휴일)</span>
         {!canWrite && <span className="ml-2 text-gray-400">· 조회 전용</span>}
       </div>
@@ -392,17 +395,18 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
                     {days.map(d => {
                       const active = inEmployment(e, d.key);
                       if (active && onLoa(e, d.key)) {
+                        const lbl = loaLabel(e, d.key);
                         return (
-                          <td key={d.key} title="휴직" className="border border-gray-200 dark:border-gray-600 text-center p-0 h-9 bg-slate-200 dark:bg-slate-700/60">
-                            <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-300">휴직</span>
+                          <td key={d.key} title={lbl === "육휴" ? "육아휴직" : "휴직"} className="border border-gray-200 dark:border-gray-600 text-center p-0 h-9 bg-slate-200 dark:bg-slate-700/60">
+                            <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-300">{lbl}</span>
                           </td>
                         );
                       }
                       const c = row?.get(d.key);
                       const leave = c?.leaves[0];
                       const def = leave ? statusMap[leave.type] : c?.record ? statusMap[c.record.status] : undefined;
-                      // 평일 정상근무(연차·수기 등록 없음, 오늘까지): "V"
-                      const workday = !leave && !c?.record && !d.off && d.key <= todayKey;
+                      // 평일 정상근무(재직 중, 연차·수기 등록 없음, 오늘까지): "V"
+                      const workday = active && !leave && !c?.record && !d.off && d.key <= todayKey;
                       const label = leave
                         ? (def?.short ?? leave.type[0]) + (leave.amount > 0 && leave.amount < 1 ? "½" : "")
                         : c?.record ? (def?.short ?? c.record.status[0]) : workday ? WORKDAY_MARK : "";
@@ -420,7 +424,7 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
                             ${clickable ? "cursor-pointer hover:outline hover:outline-2 hover:outline-blue-400 hover:-outline-offset-2" : ""}`}>
                           {label && (
                             <span className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-0.5 rounded text-[11px] font-bold
-                              ${workday ? KIND_CLS.work : KIND_CLS[def?.kind ?? "etc"]} ${leave && leave.amount === 0 ? "opacity-50" : ""}
+                              ${label === WORKDAY_MARK ? "text-gray-700 dark:text-gray-200" : KIND_CLS[def?.kind ?? "etc"]} ${leave && leave.amount === 0 ? "opacity-50" : ""}
                               ${c?.record?.note && !leave ? "underline decoration-dotted" : ""}`}>
                               {label}
                             </span>

@@ -759,6 +759,7 @@ export default function EmployeeRegisterClient() {
                         <option value="재직">재직</option>
                         <option value="퇴사">퇴사</option>
                         <option value="휴직">휴직</option>
+                        <option value="육아휴직">육아휴직</option>
                       </select>
                     </div>
                     <div>
