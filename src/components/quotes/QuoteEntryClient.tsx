@@ -1176,8 +1176,11 @@ function QuoteEntryInner() {
                                   : tk ? TK_TEXT_CLASS : "text-slate-400";
                                 return (
                                 <li key={m.id}>
-                                  <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => applyMaterial(r.key, m)}
-                                    className={`w-full text-left px-3 py-2 border-b border-gray-50 dark:border-gray-700 last:border-0 ${r.searchFocusIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
+                                  <div role="button" tabIndex={0}
+                                    onMouseDown={e => e.preventDefault()}
+                                    onClick={() => applyMaterial(r.key, m)}
+                                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") applyMaterial(r.key, m); }}
+                                    className={`w-full text-left px-3 py-2 border-b border-gray-50 dark:border-gray-700 last:border-0 cursor-pointer ${r.searchFocusIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
                                     <div className="flex items-center gap-2">
                                       <div className="flex-1 min-w-0">
                                         <div className={`text-xs font-medium ${nameCls} truncate`}>
@@ -1192,7 +1195,7 @@ function QuoteEntryInner() {
                                       </div>
                                       <PhotoIconBtn urls={[m.referenceImageUrl1, m.referenceImageUrl2, m.opinionImageUrl]} />
                                     </div>
-                                  </button>
+                                  </div>
                                 </li>
                                 );
                               })}

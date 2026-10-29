@@ -22,6 +22,11 @@ export interface MaterialRequestRecord {
   processedAt: string | null;
   processorId: number | null;
   processorName: string | null;
+  // 무상신청 승인 흐름 (null = 승인 불필요)
+  approvalStatus: "pending" | "approved" | "rejected" | null;
+  approverName: string | null;
+  approvedAt: string | null;
+  rejectReason: string | null;
 }
 
 let records: MaterialRequestRecord[] = [];
@@ -37,7 +42,7 @@ export function getMaterialRequests(status?: string): MaterialRequestRecord[] {
 }
 
 export function addMaterialRequest(
-  data: Omit<MaterialRequestRecord, "id" | "status" | "requestedAt" | "processedAt" | "processorId" | "processorName">
+  data: Omit<MaterialRequestRecord, "id" | "status" | "requestedAt" | "processedAt" | "processorId" | "processorName" | "approvalStatus" | "approverName" | "approvedAt" | "rejectReason">
 ): MaterialRequestRecord {
   const record: MaterialRequestRecord = {
     ...data,
@@ -47,6 +52,10 @@ export function addMaterialRequest(
     processedAt: null,
     processorId: null,
     processorName: null,
+    approvalStatus: data.requestType === "무상신청" ? "pending" : null,
+    approverName: null,
+    approvedAt: null,
+    rejectReason: null,
   };
   records.push(record);
   return record;

@@ -498,19 +498,23 @@ async function supabaseAddTransaction(data: {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function dbToRequest(r: any): MaterialRequestRecord {
   return {
-    id:            r.id,
-    status:        r.status,
-    requestType:   r.request_type   ?? null,
-    siteName:      r.site_name      ?? null,
-    items:         r.items          ?? [],
-    note:          r.note           ?? null,
-    requesterId:   r.requester_id,
-    requesterName: r.requester_name,
-    requesterDept: r.requester_dept,
-    requestedAt:   r.requested_at,
-    processedAt:   r.processed_at   ?? null,
-    processorId:   r.processor_id   ?? null,
-    processorName: r.processor_name ?? null,
+    id:             r.id,
+    status:         r.status,
+    requestType:    r.request_type    ?? null,
+    siteName:       r.site_name       ?? null,
+    items:          r.items           ?? [],
+    note:           r.note            ?? null,
+    requesterId:    r.requester_id,
+    requesterName:  r.requester_name,
+    requesterDept:  r.requester_dept,
+    requestedAt:    r.requested_at,
+    processedAt:    r.processed_at    ?? null,
+    processorId:    r.processor_id    ?? null,
+    processorName:  r.processor_name  ?? null,
+    approvalStatus: r.approval_status ?? null,
+    approverName:   r.approver_name   ?? null,
+    approvedAt:     r.approved_at     ?? null,
+    rejectReason:   r.reject_reason   ?? null,
   };
 }
 
@@ -1259,15 +1263,17 @@ async function routePOST(path: string, body: AnyBody): Promise<unknown> {
     return { records };
   }
   if (path === "/api/material-requests") {
+    const requestType = body.requestType ?? null;
     const { data, error } = await supabase.from("material_requests").insert({
-      status: "신청",
-      site_name:      body.siteName      ?? null,
-      items:          body.items         ?? [],
-      note:           body.note          ?? null,
-      requester_id:   body.requesterId,
-      requester_name: body.requesterName,
-      requester_dept: body.requesterDept,
-      request_type:   body.requestType   ?? null,
+      status:          "신청",
+      site_name:       body.siteName      ?? null,
+      items:           body.items         ?? [],
+      note:            body.note          ?? null,
+      requester_id:    body.requesterId,
+      requester_name:  body.requesterName,
+      requester_dept:  body.requesterDept,
+      request_type:    requestType,
+      approval_status: requestType === "무상신청" ? "pending" : null,
     }).select().single();
     if (error) throw new MockApiError(error.message, 500);
     return dbToRequest(data);
@@ -1478,6 +1484,87 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
   if (reqId) {
     const numId = Number(reqId);
     const { action, processorId, processorName } = body;
+
+    // ── 무상신청 승인 ──────────────────────────────────────────────
+    if (action === "승인") {
+      const { data: existing } = await supabase.from("material_requests")
+        .select("requester_id, site_name, items").eq("id", numId).maybeSingle();
+      const { data, error } = await supabase.from("material_requests")
+        .update({
+          approval_status: "approved",
+          approver_id:     processorId,
+          approver_name:   processorName,
+          approved_at:     new Date().toISOString(),
+        }).eq("id", numId).select().single();
+      if (error) throw new MockApiError(error.message, 500);
+      const requesterId = (existing as { requester_id?: number } | null)?.requester_id;
+      const items = (((existing as { items?: unknown }) ?? {}).items as Array<{ materialName?: string }>) ?? [];
+      const first = items[0];
+      const summary = !first?.materialName ? "" : items.length === 1 ? first.materialName : `${first.materialName} 외 ${items.length - 1}건`;
+      const sitePart = ((existing as { site_name?: string | null })?.site_name ?? null) ? `${(existing as { site_name: string }).site_name} · ` : "";
+      // 신청자에게 승인 알림
+      if (requesterId && requesterId !== Number(processorId)) {
+        await insertNotification({
+          userId:  requesterId,
+          type:    "request_status",
+          title:   "무상 자재신청이 승인되었습니다",
+          message: `${sitePart}${summary}`,
+          link:    "/requests",
+          refType: "material_request",
+          refId:   numId,
+        });
+      }
+      // 황진한·박은숙에게도 알림 (본인·신청자 중복 제외)
+      const { data: notifyTargets } = await supabase.from("accounts")
+        .select("id").in("name", ["황진한", "박은숙"]);
+      await Promise.all((notifyTargets ?? []).map(a => {
+        const uid = a.id as number;
+        if (uid === Number(processorId) || uid === requesterId) return Promise.resolve();
+        return insertNotification({
+          userId:  uid,
+          type:    "request_status",
+          title:   "무상 자재신청이 승인되었습니다",
+          message: `${sitePart}${summary}`,
+          link:    "/requests",
+          refType: "material_request",
+          refId:   numId,
+        });
+      }));
+      return dbToRequest(data);
+    }
+
+    // ── 무상신청 반려 ──────────────────────────────────────────────
+    if (action === "반려") {
+      const { data: existing } = await supabase.from("material_requests")
+        .select("requester_id, site_name, items").eq("id", numId).maybeSingle();
+      const { data, error } = await supabase.from("material_requests")
+        .update({
+          approval_status: "rejected",
+          approver_id:     processorId,
+          approver_name:   processorName,
+          rejected_at:     new Date().toISOString(),
+          reject_reason:   body.rejectReason ?? null,
+        }).eq("id", numId).select().single();
+      if (error) throw new MockApiError(error.message, 500);
+      const requesterId = (existing as { requester_id?: number } | null)?.requester_id;
+      if (requesterId && requesterId !== Number(processorId)) {
+        const items = (((existing as { items?: unknown }) ?? {}).items as Array<{ materialName?: string }>) ?? [];
+        const first = items[0];
+        const summary = !first?.materialName ? "" : items.length === 1 ? first.materialName : `${first.materialName} 외 ${items.length - 1}건`;
+        const sitePart = ((existing as { site_name?: string | null })?.site_name ?? null) ? `${(existing as { site_name: string }).site_name} · ` : "";
+        await insertNotification({
+          userId:  requesterId,
+          type:    "request_status",
+          title:   "무상 자재신청이 반려되었습니다",
+          message: `${sitePart}${summary}${body.rejectReason ? ` — ${body.rejectReason}` : ""}`,
+          link:    "/requests",
+          refType: "material_request",
+          refId:   numId,
+        });
+      }
+      return dbToRequest(data);
+    }
+
     if (action === "처리중") {
       const { data: existing } = await supabase.from("material_requests")
         .select("requester_id, site_name, items").eq("id", numId).maybeSingle();

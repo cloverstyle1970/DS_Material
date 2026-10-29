@@ -11,7 +11,7 @@ import { isRepairMaterial, isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-st
 import DraggableModal from "@/components/common/DraggableModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 
-interface SiteOption { id: number; name: string }
+interface SiteOption { id: number; name: string; companyType: string | null }
 
 interface Row {
   id: string;
@@ -53,7 +53,9 @@ export default function MaterialRequestEntry() {
   const [popupRow, setPopupRow] = useState<string | null>(null);
 
   useEffect(() => {
-    api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
+    api.get<{ id: number; name: string; companyType?: string | null }[]>("/api/sites")
+      .then(data => setSites(data.map(s => ({ id: s.id, name: s.name, companyType: s.companyType ?? null }))))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -62,7 +64,11 @@ export default function MaterialRequestEntry() {
       return () => clearTimeout(t);
     }
     api.get<ElevatorRecord[]>(`/api/elevators?site=${encodeURIComponent(siteName)}`).then(setElevators).catch(() => setElevators([]));
-  }, [siteName]);
+    // 현장의 DS/TK 구분 자동 설정
+    const matched = sites.find(s => s.name === siteName);
+    if (matched?.companyType === "TK") setMatType("TK");
+    else if (matched?.companyType === "DS") setMatType("DS");
+  }, [siteName, sites]);
 
   function patchRow(id: string, patch: Partial<Row>) {
     setRows(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
@@ -164,19 +170,30 @@ export default function MaterialRequestEntry() {
           <FormField label="참조" wide>
             <div className="flex items-center gap-2">
               <input type="text" value={reference} onChange={e => setReference(e.target.value)} className={`${inputCls} flex-1`} />
-              <div className="flex rounded overflow-hidden border border-gray-300 dark:border-gray-600 shrink-0">
-                {(["전체", "DS", "TK"] as const).map(t => (
-                  <button key={t} type="button" onClick={() => setMatType(t)}
-                    className={`px-2.5 py-1 text-xs font-semibold transition-colors ${
-                      matType === t
-                        ? t === "DS" ? "bg-red-500 text-white"
-                          : t === "TK" ? "bg-blue-600 text-white"
-                          : "bg-slate-600 text-white"
-                        : "bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600"
-                    }`}>
-                    {t}
-                  </button>
-                ))}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {(() => {
+                  const matched = sites.find(s => s.name === siteName);
+                  const autoType = matched?.companyType;
+                  return autoType === "TK" || autoType === "DS"
+                    ? <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${autoType === "TK" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"}`}>
+                        현장 {autoType}
+                      </span>
+                    : null;
+                })()}
+                <div className="flex rounded overflow-hidden border border-gray-300 dark:border-gray-600">
+                  {(["전체", "DS", "TK"] as const).map(t => (
+                    <button key={t} type="button" onClick={() => setMatType(t)}
+                      className={`px-2.5 py-1 text-xs font-semibold transition-colors ${
+                        matType === t
+                          ? t === "DS" ? "bg-red-500 text-white"
+                            : t === "TK" ? "bg-blue-600 text-white"
+                            : "bg-slate-600 text-white"
+                          : "bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600"
+                      }`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </FormField>

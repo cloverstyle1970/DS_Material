@@ -118,6 +118,14 @@ export default function ClaimEntryClient() {
   const [histLoading, setHistLoading] = useState(false);
   const [histKindFilter, setHistKindFilter] = useState<"전체" | HistoryKind>("전체");
 
+  // 무상신청 승인자 선택 모달
+  const [showApproverModal, setShowApproverModal] = useState(false);
+  const [approverList, setApproverList] = useState<{ id: number; name: string; dept: string | null }[]>([]);
+  const [approverListLoading, setApproverListLoading] = useState(false);
+  const [selectedApproverId, setSelectedApproverId] = useState<number | null>(null);
+  const [selectedApproverName, setSelectedApproverName] = useState("");
+  const [approverSearch, setApproverSearch] = useState("");
+
   useEffect(() => {
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
   }, []);
@@ -185,7 +193,7 @@ export default function ClaimEntryClient() {
       // 신DB: 현장은 managed_sites(site_name), 호기는 site_elevators(site_id FK)
       // 호기 식별 기준은 installation_place (비어있을 때만 unit_name fallback)
       const { data: ms } = await supabase.from("managed_sites")
-        .select("id, contract_type").eq("site_name", siteName).maybeSingle();
+        .select("id, contract_type, company_type").eq("site_name", siteName).maybeSingle();
       const elev = (ms as { id?: number } | null)?.id != null
         ? await supabase.from("site_elevators")
             .select("installation_place, unit_name").eq("site_id", (ms as { id: number }).id).order("installation_place")
@@ -199,14 +207,19 @@ export default function ClaimEntryClient() {
       if (opts.length === 1) {
         setRows(prev => prev.map(r => r.elevator_name.trim() ? r : { ...r, elevator_name: opts[0] }));
       }
-      const ct = (ms as { contract_type: string | null } | null)?.contract_type;
+      const ms2 = ms as { contract_type: string | null; company_type: string | null } | null;
+      const ct = ms2?.contract_type;
+      const cmp = ms2?.company_type;
       if (ms !== null) {
-        // DB에 등록된 현장이면 계약구분에 따라 모드 자동 재설정
+        // 계약구분에 따라 모드 자동 재설정
         if (ct === "TK-FM" || ct === "대솔FM" || ct === "DS-FM") {
           setMode("무상신청");
         } else {
           setMode("유상견적요청");
         }
+        // 회사구분(DS/TK)에 따라 기본 자재구분 토글 자동 설정
+        if (cmp === "TK") { setClaimMatType("TK"); setMatTypeFilter("TK"); }
+        else if (cmp === "DS") { setClaimMatType("DS"); setMatTypeFilter("DS"); }
       }
     })();
   }, [siteName]);
@@ -267,7 +280,35 @@ export default function ClaimEntryClient() {
     return `${prefix}${String(nextSeq).padStart(4, "0")}`;
   }
 
-  async function submit() {
+  // 저장 버튼 클릭: 유상/당직은 바로 저장, 무상은 승인자 선택 모달 오픈
+  function handleSaveClick() {
+    if (mode !== "무상신청") { void doSubmit(); return; }
+    setMessage(null);
+    if (!user) { setMessage({ type: "error", text: "로그인이 필요합니다." }); return; }
+    if (!siteName.trim()) { setMessage({ type: "error", text: "현장명을 입력해 주세요." }); return; }
+    const validItems = rows.filter(r => r.material_id || r.material_name.trim());
+    if (validItems.length === 0) { setMessage({ type: "error", text: "자재를 1개 이상 입력해 주세요." }); return; }
+    setSelectedApproverId(null);
+    setSelectedApproverName("");
+    setApproverSearch("");
+    setShowApproverModal(true);
+    setApproverListLoading(true);
+    void (async () => {
+      try {
+        const { data } = await supabase.from("accounts").select("id, username, name, dept").order("username");
+        const mapped = ((data ?? []) as { id: number; username: string | null; name: string | null; dept: string | null }[])
+          .map(a => ({ id: a.id, name: (a.username || a.name || "").trim(), dept: a.dept }))
+          .filter(a => !!a.name)
+          .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+        setApproverList(mapped);
+      } finally {
+        setApproverListLoading(false);
+      }
+    })();
+  }
+
+  // 실제 저장 (승인자 선택 후 모달 확정, 또는 유상/당직 직접 저장)
+  async function doSubmit(approverId?: number, approverName?: string) {
     setMessage(null);
     if (!user) { setMessage({ type: "error", text: "로그인이 필요합니다." }); return; }
     if (!siteName.trim()) { setMessage({ type: "error", text: "현장명을 입력해 주세요." }); return; }
@@ -338,22 +379,25 @@ export default function ClaimEntryClient() {
           elevatorName:  r.elevator_name || null,
         }));
         const { data: inserted, error } = await supabase.from("material_requests").insert({
-          status:         "신청",
-          site_name:      siteName,
+          status:          "신청",
+          approval_status: mode === "무상신청" ? "pending" : null,
+          approver_id:     mode === "무상신청" ? (approverId ?? null) : null,
+          approver_name:   mode === "무상신청" ? (approverName ?? null) : null,
+          site_name:       siteName,
           items,
-          note:           [workTitle, reason].filter(Boolean).join(" / ") || null,
-          requester_id:   user.id,
-          requester_name: user.name,
-          requester_dept: user.dept ?? "",
-          request_type:   mode,    // '무상신청' | '당직선출고'
+          note:            [workTitle, reason].filter(Boolean).join(" / ") || null,
+          requester_id:    user.id,
+          requester_name:  user.name,
+          requester_dept:  user.dept ?? "",
+          request_type:    mode,    // '무상신청' | '당직선출고'
         }).select("id").single();
         if (error) throw error;
+        const requestId = (inserted as { id?: number } | null)?.id ?? null;
         const msg = mode === "당직선출고"
           ? "당직 선출고 신청이 접수되었습니다. 관리자가 즉시 출고 처리합니다."
-          : "무상 자재신청이 접수되었습니다.";
+          : `무상 자재신청이 접수되었습니다. ${approverName ? `${approverName}님께 승인 요청을 보냈습니다.` : "담당자 승인 후 처리됩니다."}`;
         setMessage({ type: "success", text: msg });
         // 자재관리 담당(박은숙·황진한)에게 알림 — 본인 포함. 실패는 silent.
-        const requestId = (inserted as { id?: number } | null)?.id ?? null;
         const notifyTitle = mode === "당직선출고"
           ? "새 당직선출고 신청이 접수되었습니다"
           : "새 무상자재신청이 접수되었습니다";
@@ -365,6 +409,18 @@ export default function ClaimEntryClient() {
           refType: "material_request",
           refId:   requestId,
         }).catch(e => console.warn("[notify] 자재청구 알림 실패:", e));
+        // 무상신청: 선택된 승인자에게 승인 요청 알림
+        if (mode === "무상신청" && approverId) {
+          void insertNotification({
+            userId:  approverId,
+            type:    "approval_request",
+            title:   "무상 자재신청 승인 요청",
+            message: `[${siteName}] ${summary} — ${user.name}님의 승인을 요청합니다.`,
+            link:    "/requests",
+            refType: "material_request",
+            refId:   requestId,
+          }).catch(e => console.warn("[notify] 승인자 알림 실패:", e));
+        }
       }
       // 폼 리셋
       setRows(Array.from({ length: DEFAULT_ROW_COUNT }, () => newRow()));
@@ -403,6 +459,7 @@ export default function ClaimEntryClient() {
   );
 
   return (
+    <>
     <div className="min-h-full bg-gray-50 dark:bg-gray-900">
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
         <h1 className="text-xl font-bold text-gray-900 dark:text-white">🔧 견적 및 자재청구 등록</h1>
@@ -536,8 +593,11 @@ export default function ClaimEntryClient() {
                             : tk ? TK_TEXT_CLASS : "text-slate-400";
                           return (
                           <li key={m.id}>
-                            <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => applyMaterial(r.key, m)}
-                              className={`w-full text-left px-3 py-2.5 border-b border-gray-50 dark:border-gray-700 last:border-0 ${r.searchFocusIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
+                            <div role="button" tabIndex={0}
+                              onMouseDown={e => e.preventDefault()}
+                              onClick={() => applyMaterial(r.key, m)}
+                              onKeyDown={e => { if (e.key === "Enter" || e.key === " ") applyMaterial(r.key, m); }}
+                              className={`w-full text-left px-3 py-2.5 border-b border-gray-50 dark:border-gray-700 last:border-0 cursor-pointer ${r.searchFocusIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
                               <div className="flex items-center gap-2">
                                 <div className="flex-1 min-w-0">
                                   <div className={`text-sm font-medium ${nameCls} truncate`}>
@@ -551,7 +611,7 @@ export default function ClaimEntryClient() {
                                 </div>
                                 <PhotoIconBtn urls={[m.referenceImageUrl1, m.referenceImageUrl2, m.opinionImageUrl]} />
                               </div>
-                            </button>
+                            </div>
                           </li>
                           );
                         })}
@@ -661,8 +721,11 @@ export default function ClaimEntryClient() {
                                 : tk ? TK_TEXT_CLASS : "text-slate-400";
                               return (
                               <li key={m.id}>
-                                <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => applyMaterial(r.key, m)}
-                                  className={`w-full text-left px-3 py-2 border-b border-gray-50 dark:border-gray-700 last:border-0 ${r.searchFocusIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
+                                <div role="button" tabIndex={0}
+                                  onMouseDown={e => e.preventDefault()}
+                                  onClick={() => applyMaterial(r.key, m)}
+                                  onKeyDown={e => { if (e.key === "Enter" || e.key === " ") applyMaterial(r.key, m); }}
+                                  className={`w-full text-left px-3 py-2 border-b border-gray-50 dark:border-gray-700 last:border-0 cursor-pointer ${r.searchFocusIndex === idx ? "bg-blue-100 dark:bg-blue-900/50" : "hover:bg-gray-50 dark:hover:bg-gray-700"}`}>
                                   <div className="flex items-center gap-2">
                                     <div className="flex-1 min-w-0">
                                       <div className={`text-xs font-medium ${nameCls} truncate`}>
@@ -676,7 +739,7 @@ export default function ClaimEntryClient() {
                                     </div>
                                     <PhotoIconBtn urls={[m.referenceImageUrl1, m.referenceImageUrl2, m.opinionImageUrl]} />
                                   </div>
-                                </button>
+                                </div>
                               </li>
                               );
                             })}
@@ -720,9 +783,13 @@ export default function ClaimEntryClient() {
         )}
 
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={submit} disabled={saving}
-            className="px-6 py-2 rounded bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
-            {saving ? "저장 중..." : `💾 ${MODES.find(m => m.key === mode)?.label} 저장`}
+          <button type="button" onClick={handleSaveClick} disabled={saving}
+            className={`px-6 py-2 rounded text-white text-sm font-semibold disabled:opacity-50 ${
+              mode === "무상신청"
+                ? "bg-emerald-600 hover:bg-emerald-700"
+                : "bg-blue-600 hover:bg-blue-700"
+            }`}>
+            {saving ? "저장 중..." : mode === "무상신청" ? "🆓 승인자 선택 후 저장" : `💾 ${MODES.find(m => m.key === mode)?.label} 저장`}
           </button>
         </div>
 
@@ -828,6 +895,113 @@ export default function ClaimEntryClient() {
         </div>
       </div>
     </div>
+
+    {/* ─── 무상신청 승인자 선택 모달 ─────────────────────────────────── */}
+    {showApproverModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm flex flex-col max-h-[80vh]">
+          {/* 헤더 */}
+          <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between shrink-0">
+            <div>
+              <h2 className="text-base font-bold text-gray-900 dark:text-white">🆓 승인자 선택</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">승인을 요청할 담당자를 검색하거나 직접 입력하세요.</p>
+            </div>
+            <button type="button" onClick={() => setShowApproverModal(false)}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl font-light leading-none">×</button>
+          </div>
+          {/* 검색 입력 */}
+          <div className="px-4 pt-3 pb-2 shrink-0">
+            <input
+              type="text" lang="ko" autoFocus
+              value={approverSearch}
+              onChange={e => {
+                const v = e.target.value;
+                setApproverSearch(v);
+                setSelectedApproverName(v);
+                // 기존에 목록에서 선택했던 이름과 달라지면 id 초기화
+                setSelectedApproverId(prev =>
+                  approverList.find(a => a.name === v)?.id ?? null
+                );
+              }}
+              onKeyDown={e => {
+                if (e.key === "Enter") {
+                  const q = approverSearch.trim().toLowerCase();
+                  const filtered = q ? approverList.filter(a => (a.name?.toLowerCase().includes(q) ?? false) || (a.dept?.toLowerCase().includes(q) ?? false)) : approverList;
+                  if (filtered.length === 1) {
+                    setSelectedApproverId(filtered[0].id); setSelectedApproverName(filtered[0].name); setApproverSearch(filtered[0].name);
+                  }
+                }
+              }}
+              placeholder="이름 또는 부서로 검색 (직접 입력 가능)"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            />
+          </div>
+          {/* 목록 */}
+          <div className="overflow-y-auto flex-1 px-2 pb-2">
+            {approverListLoading ? (
+              <div className="text-center text-sm text-gray-400 py-6">불러오는 중...</div>
+            ) : (() => {
+              const q = approverSearch.trim().toLowerCase();
+              const filtered = q
+                ? approverList.filter(a => (a.name?.toLowerCase().includes(q) ?? false) || (a.dept?.toLowerCase().includes(q) ?? false))
+                : approverList;
+              return (
+                <ul>
+                  {filtered.map(a => (
+                    <li key={a.id}>
+                      <button type="button"
+                        onClick={() => { setSelectedApproverId(a.id); setSelectedApproverName(a.name); setApproverSearch(a.name); }}
+                        className={`w-full text-left px-4 py-2.5 rounded-lg text-sm flex items-center gap-3 mb-0.5 transition-colors ${
+                          selectedApproverId === a.id
+                            ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 font-semibold"
+                            : "text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        }`}>
+                        <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                          selectedApproverId === a.id
+                            ? "border-emerald-500 bg-emerald-500"
+                            : "border-gray-300 dark:border-gray-600"
+                        }`}>
+                          {selectedApproverId === a.id && <span className="text-white text-[10px] font-bold">✓</span>}
+                        </span>
+                        <span className="font-medium">{a.name}</span>
+                        {a.dept && <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">{a.dept}</span>}
+                      </button>
+                    </li>
+                  ))}
+                  {filtered.length === 0 && approverSearch.trim() && (
+                    <li className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
+                      일치하는 사원이 없습니다. 입력한 이름 <span className="font-semibold text-gray-700 dark:text-gray-200">&quot;{approverSearch.trim()}&quot;</span>으로 직접 지정하려면 아래 저장 버튼을 누르세요.
+                    </li>
+                  )}
+                </ul>
+              );
+            })()}
+          </div>
+          {/* 푸터 */}
+          <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-700 shrink-0">
+            {selectedApproverName.trim() && (
+              <p className="text-xs mb-2 text-emerald-600 dark:text-emerald-400">
+                선택: <span className="font-semibold">{selectedApproverName}</span>
+                {!selectedApproverId && <span className="text-gray-400 dark:text-gray-500"> (직접입력 — 알림 미발송)</span>}
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setShowApproverModal(false)}
+                className="px-4 py-2 rounded border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                취소
+              </button>
+              <button type="button"
+                disabled={!selectedApproverName.trim() || saving}
+                onClick={() => { setShowApproverModal(false); void doSubmit(selectedApproverId ?? undefined, selectedApproverName); }}
+                className="px-5 py-2 rounded bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50">
+                {saving ? "저장 중..." : "승인 요청 후 저장"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 

@@ -153,10 +153,10 @@ function MaterialAutocomplete({ value, onChange }: {
 
 
 const REQ_STATUS_STYLE: Record<RequestStatus, string> = {
-  "신청":   "",  // 동적 처리 — reqStatusCls() 사용
-  "처리중": "bg-yellow-50 text-yellow-700",
-  "완료":   "bg-green-50 text-green-700",
-  "취소":   "bg-gray-100 text-gray-400",
+  "신청":   "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300",
+  "처리중": "bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+  "완료":   "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  "취소":   "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500",
 };
 
 type MatKind = "DS" | "TK" | "혼합";
@@ -171,10 +171,6 @@ const KIND_CLS: Record<MatKind, string> = {
   TK:   "bg-blue-50 text-blue-600",
   혼합: "bg-green-50 text-green-700",
 };
-function reqStatusCls(status: RequestStatus, kind: MatKind) {
-  if (status !== "신청") return REQ_STATUS_STYLE[status];
-  return KIND_CLS[kind];
-}
 const ORD_STATUS_STYLE: Record<OrderStatus, string> = {
   "발주":     "bg-indigo-50 text-indigo-600",
   "부분입고": "bg-amber-50 text-amber-700",
@@ -360,17 +356,23 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
   }, [requests, restrictToTeam, user]);
 
   // ── 자재신청 액션 ────────────────────────────────────────────────
-  async function handleReqAction(id: number, action: string) {
+  async function handleReqAction(id: number, action: string, extra?: { rejectReason?: string }) {
     if (!user) return;
     setActionLoading(id);
     try {
-      await api.patch(`/api/material-requests/${id}`, { action, processorId: user.id, processorName: user.name });
+      await api.patch(`/api/material-requests/${id}`, { action, processorId: user.id, processorName: user.name, ...extra });
       setRequests(await api.get<MaterialRequestRecord[]>("/api/material-requests"));
     } catch (e) {
       alert(getErrorMessage(e));
     } finally {
       setActionLoading(null);
     }
+  }
+
+  function handleReject(id: number) {
+    const reason = prompt("반려 사유를 입력해 주세요.");
+    if (reason === null) return; // 취소
+    handleReqAction(id, "반려", { rejectReason: reason || undefined });
   }
 
   // ── 발주 액션 (라인 단위) ────────────────────────────────────────
@@ -709,8 +711,16 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                         <div onClick={() => toggleExpand(r.id)} className="cursor-pointer">
                           <div className="flex items-center justify-between gap-2 flex-wrap">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${reqStatusCls(r.status, kind)}`}>{r.status === "신청" ? kind : r.status}</span>
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${REQ_STATUS_STYLE[r.status]}`}>{r.status}</span>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${KIND_CLS[kind]}`}>{kind}</span>
                               {r.requestType && <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${REQ_TYPE_CLS[r.requestType]}`}>{r.requestType}</span>}
+                              {r.approvalStatus === "pending" && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">승인대기</span>
+                              )}
+                              {r.approvalStatus === "rejected" && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+                                  title={r.rejectReason ?? ""}>반려</span>
+                              )}
                             </div>
                             <span className="text-xs text-gray-400 dark:text-gray-500">{fmtDate(r.requestedAt)}</span>
                           </div>
@@ -720,14 +730,30 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                         </div>
                         {canEditReq && (r.status === "신청" || r.status === "처리중") && (
                           <div className="flex gap-1 mt-2 flex-wrap">
-                            {r.status === "신청" && (
-                              <button type="button" disabled={actionLoading === r.id} onClick={() => handleReqAction(r.id, "처리중")}
-                                className="text-xs px-2 py-1 rounded-lg bg-yellow-50 text-yellow-700 hover:bg-yellow-100 whitespace-nowrap">처리중</button>
-                            )}
-                            <button type="button" disabled={actionLoading === r.id} onClick={() => handleReqAction(r.id, "출고처리")}
-                              className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 whitespace-nowrap">출고처리</button>
-                            <button type="button" disabled={actionLoading === r.id} onClick={() => handleReqAction(r.id, "취소")}
-                              className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">취소</button>
+                            {r.status === "신청" && r.approvalStatus === "pending" ? (
+                              <>
+                                <button type="button" disabled={actionLoading === r.id} onClick={() => handleReqAction(r.id, "승인")}
+                                  className="text-xs px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 whitespace-nowrap font-semibold">승인</button>
+                                <button type="button" disabled={actionLoading === r.id} onClick={() => handleReject(r.id)}
+                                  className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 whitespace-nowrap">반려</button>
+                              </>
+                            ) : r.status === "신청" && (r.approvalStatus === "approved" || r.approvalStatus === null) ? (
+                              <>
+                                <button type="button" disabled={actionLoading === r.id} onClick={() => handleReqAction(r.id, "처리중")}
+                                  className="text-xs px-2 py-1 rounded-lg bg-yellow-50 text-yellow-700 hover:bg-yellow-100 whitespace-nowrap">처리중</button>
+                                <button type="button" disabled={actionLoading === r.id} onClick={() => handleReqAction(r.id, "출고처리")}
+                                  className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 whitespace-nowrap">출고처리</button>
+                                <button type="button" disabled={actionLoading === r.id} onClick={() => handleReqAction(r.id, "취소")}
+                                  className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">취소</button>
+                              </>
+                            ) : r.status === "처리중" ? (
+                              <>
+                                <button type="button" disabled={actionLoading === r.id} onClick={() => handleReqAction(r.id, "출고처리")}
+                                  className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 whitespace-nowrap">출고처리</button>
+                                <button type="button" disabled={actionLoading === r.id} onClick={() => handleReqAction(r.id, "취소")}
+                                  className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">취소</button>
+                              </>
+                            ) : null}
                           </div>
                         )}
                         {isOpen && (
@@ -814,18 +840,30 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                         </td>
                         <td className="px-2 py-3 text-center text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">{fmtDate(r.requestedAt)}</td>
                         <td className="px-2 py-3 text-center">
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${reqStatusCls(r.status, kind)}`}>
-                            {r.status === "신청" ? kind : r.status}
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${REQ_STATUS_STYLE[r.status]}`}>
+                            {r.status}
                           </span>
                         </td>
                         <td className="px-2 py-3 text-center">
-                          {r.requestType ? (
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold whitespace-nowrap ${REQ_TYPE_CLS[r.requestType]}`}>
-                              {r.requestType}
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-gray-300 dark:text-gray-600">—</span>
-                          )}
+                          <div className="flex flex-col items-center gap-1">
+                            <span className={`text-xs px-1.5 py-0.5 rounded font-semibold ${KIND_CLS[kind]}`}>{kind}</span>
+                            {r.requestType && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold whitespace-nowrap ${REQ_TYPE_CLS[r.requestType]}`}>
+                                {r.requestType}
+                              </span>
+                            )}
+                            {r.approvalStatus === "pending" && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 whitespace-nowrap">
+                                승인대기
+                              </span>
+                            )}
+                            {r.approvalStatus === "rejected" && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 whitespace-nowrap"
+                                title={r.rejectReason ?? ""}>
+                                반려{r.rejectReason ? ` (${r.rejectReason})` : ""}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-2 py-3 text-center text-gray-700 dark:text-gray-300 text-xs whitespace-nowrap">
                           {r.siteName ?? "-"}
@@ -845,7 +883,15 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                         <td className="px-2 py-3 text-center text-gray-400 dark:text-gray-500 text-xs max-w-[120px] truncate">{r.note ?? "-"}</td>
                         {canEditReq && (
                           <td className="px-2 py-3" onClick={e => e.stopPropagation()}>
-                            {r.status === "신청" && (
+                            {r.status === "신청" && r.approvalStatus === "pending" && (
+                              <div className="flex gap-1">
+                                <button type="button" disabled={actionLoading === r.id} onClick={() => handleReqAction(r.id, "승인")}
+                                  className="text-xs px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 whitespace-nowrap font-semibold">승인</button>
+                                <button type="button" disabled={actionLoading === r.id} onClick={() => handleReject(r.id)}
+                                  className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 whitespace-nowrap">반려</button>
+                              </div>
+                            )}
+                            {r.status === "신청" && (r.approvalStatus === "approved" || r.approvalStatus === null) && (
                               <div className="flex gap-1">
                                 <button type="button" disabled={actionLoading === r.id} onClick={() => handleReqAction(r.id, "처리중")}
                                   className="text-xs px-2 py-1 rounded-lg bg-yellow-50 text-yellow-700 hover:bg-yellow-100 whitespace-nowrap">처리중</button>
@@ -854,6 +900,9 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                                 <button type="button" disabled={actionLoading === r.id} onClick={() => handleReqAction(r.id, "취소")}
                                   className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">취소</button>
                               </div>
+                            )}
+                            {r.status === "신청" && r.approvalStatus === "rejected" && (
+                              <span className="text-xs text-red-400 dark:text-red-500">반려됨</span>
                             )}
                             {r.status === "처리중" && (
                               <div className="flex gap-1">
