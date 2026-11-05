@@ -27,6 +27,7 @@ export interface MaterialRequestRecord {
   approverName: string | null;
   approvedAt: string | null;
   rejectReason: string | null;
+  photoUrls: string[] | null;
 }
 
 let records: MaterialRequestRecord[] = [];

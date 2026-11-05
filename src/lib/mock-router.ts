@@ -516,6 +516,7 @@ function dbToRequest(r: any): MaterialRequestRecord {
     approverName:   r.approver_name   ?? null,
     approvedAt:     r.approved_at     ?? null,
     rejectReason:   r.reject_reason   ?? null,
+    photoUrls:      Array.isArray(r.photo_urls) ? r.photo_urls : null,
   };
 }
 

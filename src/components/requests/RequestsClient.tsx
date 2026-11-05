@@ -757,16 +757,41 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                           </div>
                         )}
                         {isOpen && (
-                          <div className="mt-2 rounded-lg border border-gray-200 dark:border-gray-600 p-2 space-y-1">
-                            {r.items.map((item, idx) => (
-                              <div key={idx} className="flex items-center justify-between gap-2 text-xs">
-                                <div className="flex items-center gap-1 min-w-0">
-                                  <span className="text-gray-600 dark:text-gray-300 min-w-0 truncate">{item.elevatorName ? `${item.elevatorName} · ` : ""}{item.materialName}</span>
-                                  <PhotoIconBtn urls={matImgMap.get(item.materialId) ?? []} />
-                                </div>
-                                <span className="tabular-nums text-gray-700 dark:text-gray-300 shrink-0">{fmtNum(item.qty)}</span>
+                          <div className="mt-2 space-y-2">
+                            {/* 신청사유/고장증상 */}
+                            {r.note && (
+                              <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 px-3 py-2">
+                                <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 mb-0.5">신청사유 / 고장증상</p>
+                                <p className="text-xs text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{r.note}</p>
                               </div>
-                            ))}
+                            )}
+                            {/* 첨부사진 */}
+                            {r.photoUrls && r.photoUrls.length > 0 && (
+                              <div className="rounded-lg bg-gray-50 dark:bg-gray-700/40 border border-gray-200 dark:border-gray-600 px-3 py-2">
+                                <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-1.5">첨부사진 ({r.photoUrls.length}장)</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {r.photoUrls.map((url, pi) => (
+                                    <button key={pi} type="button" onClick={e => { e.stopPropagation(); window.open(url, "_blank"); }}
+                                      className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600 hover:ring-2 hover:ring-blue-400 transition-all flex-shrink-0">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={url} alt={`사진 ${pi + 1}`} className="w-full h-full object-cover" />
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {/* 자재 목록 */}
+                            <div className="rounded-lg border border-gray-200 dark:border-gray-600 p-2 space-y-1">
+                              {r.items.map((item, idx) => (
+                                <div key={idx} className="flex items-center justify-between gap-2 text-xs">
+                                  <div className="flex items-center gap-1 min-w-0">
+                                    <span className="text-gray-600 dark:text-gray-300 min-w-0 truncate">{item.elevatorName ? `${item.elevatorName} · ` : ""}{item.materialName}</span>
+                                    <PhotoIconBtn urls={matImgMap.get(item.materialId) ?? []} />
+                                  </div>
+                                  <span className="tabular-nums text-gray-700 dark:text-gray-300 shrink-0">{fmtNum(item.qty)}</span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -921,37 +946,62 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                       {isOpen && (
                         <tr className="bg-slate-50/60 dark:bg-gray-700/20">
                           <td colSpan={canEditReq ? 11 : 10} className="px-6 py-3">
-                            <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 overflow-hidden">
-                              <table className="w-full text-xs">
-                                <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700">
-                                  <tr>
-                                    {["호기", "자재명", "코드", "구분", "수량"].map(h => (
-                                      <th key={h} className="px-3 py-2 text-center font-medium text-gray-500 dark:text-gray-400">{h}</th>
+                            <div className="space-y-2">
+                              {/* 신청사유/고장증상 */}
+                              {r.note && (
+                                <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 px-4 py-2.5">
+                                  <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 mr-2">신청사유 / 고장증상</span>
+                                  <span className="text-xs text-gray-700 dark:text-gray-200">{r.note}</span>
+                                </div>
+                              )}
+                              {/* 첨부사진 */}
+                              {r.photoUrls && r.photoUrls.length > 0 && (
+                                <div className="rounded-lg bg-gray-50 dark:bg-gray-700/40 border border-gray-200 dark:border-gray-600 px-4 py-2.5">
+                                  <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-1.5">첨부사진 ({r.photoUrls.length}장)</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {r.photoUrls.map((url, pi) => (
+                                      <button key={pi} type="button" onClick={e => { e.stopPropagation(); window.open(url, "_blank"); }}
+                                        className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600 hover:ring-2 hover:ring-blue-400 transition-all flex-shrink-0">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={url} alt={`사진 ${pi + 1}`} className="w-full h-full object-cover" />
+                                      </button>
                                     ))}
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                                  {r.items.map((item, idx) => {
-                                    const itemKind = matKind([item.materialId]);
-                                    return (
-                                      <tr key={idx}>
-                                        <td className="px-3 py-2 text-center text-gray-600 dark:text-gray-400 whitespace-nowrap">{item.elevatorName ?? "-"}</td>
-                                        <td className={`px-3 py-2 text-center font-medium ${isTkMaterial(item.materialId) ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-200"}`}>
-                                          <div className="flex items-center justify-center gap-1">
-                                            <span>{item.materialName}</span>
-                                            <PhotoIconBtn urls={matImgMap.get(item.materialId) ?? []} />
-                                          </div>
-                                        </td>
-                                        <td className={`px-3 py-2 text-center font-mono whitespace-nowrap ${isTkMaterial(item.materialId) ? TK_TEXT_CLASS : "text-slate-500 dark:text-slate-400"}`}>{item.materialId}</td>
-                                        <td className="px-3 py-2 text-center">
-                                          <span className={`px-1.5 py-0.5 rounded font-medium ${KIND_CLS[itemKind]}`}>{itemKind}</span>
-                                        </td>
-                                        <td className="px-3 py-2 text-center tabular-nums text-gray-700 dark:text-gray-300">{fmtNum(item.qty)}</td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
+                                  </div>
+                                </div>
+                              )}
+                              {/* 자재 목록 */}
+                              <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 overflow-hidden">
+                                <table className="w-full text-xs">
+                                  <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700">
+                                    <tr>
+                                      {["호기", "자재명", "코드", "구분", "수량"].map(h => (
+                                        <th key={h} className="px-3 py-2 text-center font-medium text-gray-500 dark:text-gray-400">{h}</th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                    {r.items.map((item, idx) => {
+                                      const itemKind = matKind([item.materialId]);
+                                      return (
+                                        <tr key={idx}>
+                                          <td className="px-3 py-2 text-center text-gray-600 dark:text-gray-400 whitespace-nowrap">{item.elevatorName ?? "-"}</td>
+                                          <td className={`px-3 py-2 text-center font-medium ${isTkMaterial(item.materialId) ? TK_TEXT_CLASS : "text-gray-800 dark:text-gray-200"}`}>
+                                            <div className="flex items-center justify-center gap-1">
+                                              <span>{item.materialName}</span>
+                                              <PhotoIconBtn urls={matImgMap.get(item.materialId) ?? []} />
+                                            </div>
+                                          </td>
+                                          <td className={`px-3 py-2 text-center font-mono whitespace-nowrap ${isTkMaterial(item.materialId) ? TK_TEXT_CLASS : "text-slate-500 dark:text-slate-400"}`}>{item.materialId}</td>
+                                          <td className="px-3 py-2 text-center">
+                                            <span className={`px-1.5 py-0.5 rounded font-medium ${KIND_CLS[itemKind]}`}>{itemKind}</span>
+                                          </td>
+                                          <td className="px-3 py-2 text-center tabular-nums text-gray-700 dark:text-gray-300">{fmtNum(item.qty)}</td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
                             </div>
                           </td>
                         </tr>
