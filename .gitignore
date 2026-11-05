@@ -45,6 +45,9 @@ next-env.d.ts
 # 임시 Office 잠금 파일
 ~$*
 
+# 테스트 스크린샷
+test-*.png
+
 # Office 참조 자료 (대용량 바이너리 — git LFS 또는 외부 저장소 권장)
 *.xlsx
 *.xls
