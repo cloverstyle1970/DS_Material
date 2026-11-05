@@ -10,6 +10,8 @@ import { visibleUserIds } from "@/lib/crew";
 import { insertNotification } from "@/lib/notify";
 import { isRepairMaterial, isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 import { PhotoIconBtn } from "@/components/ui/PhotoIconBtn";
+import { getMaterialManagers, setMaterialManagerIds, type MaterialManager } from "@/lib/material-managers";
+import { isAdmin } from "@/context/AuthContext";
 
 const DEFAULT_ROW_COUNT = 1;
 
@@ -97,6 +99,25 @@ export default function ClaimEntryClient() {
   const [workTitle, setWorkTitle] = useState("");
   const [reason, setReason]       = useState("");
 
+  // 무상신청 사진 슬롯
+  interface PhotoSlot { key: string; file: File | null; previewUrl: string | null }
+  const [photos, setPhotos] = useState<PhotoSlot[]>([{ key: crypto.randomUUID(), file: null, previewUrl: null }]);
+  function addPhotoSlot() { setPhotos(prev => [...prev, { key: crypto.randomUUID(), file: null, previewUrl: null }]); }
+  function removePhotoSlot(key: string) {
+    setPhotos(prev => {
+      const slot = prev.find(p => p.key === key);
+      if (slot?.previewUrl) URL.revokeObjectURL(slot.previewUrl);
+      return prev.length === 1 ? [{ key: crypto.randomUUID(), file: null, previewUrl: null }] : prev.filter(p => p.key !== key);
+    });
+  }
+  function setPhotoFile(key: string, file: File | null) {
+    setPhotos(prev => prev.map(p => {
+      if (p.key !== key) return p;
+      if (p.previewUrl) URL.revokeObjectURL(p.previewUrl);
+      return { key, file, previewUrl: file ? URL.createObjectURL(file) : null };
+    }));
+  }
+
   // 자재 라인
   const [rows, setRows] = useState<ItemRow[]>(() => Array.from({ length: DEFAULT_ROW_COUNT }, () => newRow()));
 
@@ -113,10 +134,16 @@ export default function ClaimEntryClient() {
   const [saving, setSaving]     = useState(false);
   const [message, setMessage]   = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // 청구 이력 (본인)
-  const [history, setHistory]   = useState<HistoryRow[]>([]);
+  // 청구 이력
+  const [history, setHistory]     = useState<HistoryRow[]>([]);
   const [histLoading, setHistLoading] = useState(false);
   const [histKindFilter, setHistKindFilter] = useState<"전체" | HistoryKind>("전체");
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const oneMonthAgo = (() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 10); })();
+  const [histFrom, setHistFrom]   = useState(oneMonthAgo);
+  const [histTo, setHistTo]       = useState(todayStr);
+  const [histPage, setHistPage]   = useState(1);
+  const HIST_PAGE_SIZE = 10;
 
   // 무상신청 승인자 선택 모달
   const [showApproverModal, setShowApproverModal] = useState(false);
@@ -126,23 +153,45 @@ export default function ClaimEntryClient() {
   const [selectedApproverName, setSelectedApproverName] = useState("");
   const [approverSearch, setApproverSearch] = useState("");
 
+  // 자재담당자 설정 (관리자 전용)
+  const [managers, setManagers] = useState<MaterialManager[]>([]);
+  const [managerSaving, setManagerSaving] = useState(false);
+  const [managerMsg, setManagerMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [allAccounts, setAllAccounts] = useState<{ id: number; name: string; dept: string | null }[]>([]);
+  const [managerSearch, setManagerSearch] = useState("");
+
   useEffect(() => {
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
   }, []);
 
-  async function loadHistory() {
+  useEffect(() => {
+    if (!user || !isAdmin(user)) return;
+    getMaterialManagers().then(setManagers).catch(() => {});
+    void supabase.from("accounts").select("id, username, name, dept").order("username")
+      .then(({ data }) => {
+        const mapped = ((data ?? []) as { id: number; username: string | null; name: string | null; dept: string | null }[])
+          .map(a => ({ id: a.id, name: (a.username || a.name || "").trim(), dept: a.dept }))
+          .filter(a => !!a.name);
+        setAllAccounts(mapped);
+      });
+  }, [user]);
+
+  async function loadHistory(from = histFrom, to = histTo) {
     if (!user) return;
     setHistLoading(true);
+    setHistPage(1);
+    const fromISO = from + "T00:00:00.000Z";
+    const toISO   = to   + "T23:59:59.999Z";
     const ids = await visibleUserIds(user, "/claim/new");
     let qrQ = supabase.from("quote_requests")
       .select("id, request_no, requested_at, site_name, work_title, requester_name, status, quote_id, quote_request_items(material_name)")
-      .order("requested_at", { ascending: false })
-      .limit(20);
+      .gte("requested_at", fromISO).lte("requested_at", toISO)
+      .order("requested_at", { ascending: false });
     let mrQ = supabase.from("material_requests")
       .select("id, requested_at, site_name, items, note, requester_name, request_type, status")
-      .in("request_type", ["무상신청", "당직선출고"])  // 유상견적 자동생성분은 quote_requests 측에서 보임
-      .order("requested_at", { ascending: false })
-      .limit(20);
+      .in("request_type", ["무상신청", "당직선출고"])
+      .gte("requested_at", fromISO).lte("requested_at", toISO)
+      .order("requested_at", { ascending: false });
     if (ids) { qrQ = qrQ.in("requester_id", ids); mrQ = mrQ.in("requester_id", ids); }
     const [qr, mr] = await Promise.all([qrQ, mrQ]);
     const rows: HistoryRow[] = [];
@@ -180,7 +229,7 @@ export default function ClaimEntryClient() {
       });
     }
     rows.sort((a, b) => b.date.localeCompare(a.date));
-    setHistory(rows.slice(0, 20));
+    setHistory(rows);
     setHistLoading(false);
   }
 
@@ -286,6 +335,7 @@ export default function ClaimEntryClient() {
     setMessage(null);
     if (!user) { setMessage({ type: "error", text: "로그인이 필요합니다." }); return; }
     if (!siteName.trim()) { setMessage({ type: "error", text: "현장명을 입력해 주세요." }); return; }
+    if (!reason.trim()) { setMessage({ type: "error", text: "신청사유 / 고장 증상을 입력해 주세요." }); return; }
     const validItems = rows.filter(r => r.material_id || r.material_name.trim());
     if (validItems.length === 0) { setMessage({ type: "error", text: "자재를 1개 이상 입력해 주세요." }); return; }
     setSelectedApproverId(null);
@@ -322,14 +372,11 @@ export default function ClaimEntryClient() {
       const headerElev = elevSet.length === 0 ? null : elevSet.join(", ");
       const firstName = validItems[0]?.material_name ?? "";
       const summary = validItems.length <= 1 ? firstName : `${firstName} 외 ${validItems.length - 1}건`;
-      // 자재청구 알림 고정 수신자 — 자재관리 담당(코드 곳곳에 동일하게 하드코딩됨)
-      const NOTIFY_RECIPIENTS = ["박은숙", "황진한"] as const;
       async function notifyRecipients(payload: {
         type: string; title: string; message: string; link: string; refType: string; refId: number | null;
       }) {
-        const { data: targets } = await supabase.from("accounts")
-          .select("id").in("name", NOTIFY_RECIPIENTS as unknown as string[]);
-        const targetIds = (targets ?? []).map(a => a.id as number);
+        const mgrs = await getMaterialManagers();
+        const targetIds = mgrs.map(m => m.id);
         await Promise.all(targetIds.map(uid => insertNotification({ userId: uid, ...payload })));
       }
 
@@ -372,6 +419,28 @@ export default function ClaimEntryClient() {
         }).catch(e => console.warn("[notify] 견적요청 알림 실패:", e));
       } else {
         // 무상신청 / 당직선출고 — material_requests 사용
+
+        // 무상신청 사진 업로드 (선택된 파일만)
+        let uploadedPhotoUrls: string[] = [];
+        if (mode === "무상신청") {
+          const filesToUpload = photos.filter(p => p.file);
+          if (filesToUpload.length > 0) {
+            const uploads = await Promise.allSettled(filesToUpload.map(async p => {
+              const ext = p.file!.name.split(".").pop() ?? "jpg";
+              const path = `${user.id}/${Date.now()}-${p.key}.${ext}`;
+              const { error: upErr } = await supabase.storage
+                .from("material-request-photos")
+                .upload(path, p.file!, { upsert: false });
+              if (upErr) throw upErr;
+              const { data: pub } = supabase.storage.from("material-request-photos").getPublicUrl(path);
+              return pub.publicUrl;
+            }));
+            uploadedPhotoUrls = uploads
+              .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
+              .map(r => r.value);
+          }
+        }
+
         const items = validItems.map(r => ({
           materialId:    r.material_id,
           materialName:  r.material_name,
@@ -386,10 +455,11 @@ export default function ClaimEntryClient() {
           site_name:       siteName,
           items,
           note:            [workTitle, reason].filter(Boolean).join(" / ") || null,
+          photo_urls:      uploadedPhotoUrls.length > 0 ? uploadedPhotoUrls : null,
           requester_id:    user.id,
           requester_name:  user.name,
           requester_dept:  user.dept ?? "",
-          request_type:    mode,    // '무상신청' | '당직선출고'
+          request_type:    mode,
         }).select("id").single();
         if (error) throw error;
         const requestId = (inserted as { id?: number } | null)?.id ?? null;
@@ -425,10 +495,17 @@ export default function ClaimEntryClient() {
       // 폼 리셋
       setRows(Array.from({ length: DEFAULT_ROW_COUNT }, () => newRow()));
       setSiteName(""); setWorkTitle(""); setReason("");
+      photos.forEach(p => { if (p.previewUrl) URL.revokeObjectURL(p.previewUrl); });
+      setPhotos([{ key: crypto.randomUUID(), file: null, previewUrl: null }]);
       // 이력 즉시 갱신
       void loadHistory();
     } catch (err) {
-      setMessage({ type: "error", text: err instanceof Error ? err.message : String(err) });
+      const msg = err instanceof Error
+        ? err.message
+        : (typeof err === "object" && err !== null && "message" in err)
+          ? String((err as { message: unknown }).message)
+          : String(err);
+      setMessage({ type: "error", text: msg });
     } finally {
       setSaving(false);
     }
@@ -510,11 +587,62 @@ export default function ClaimEntryClient() {
               <input type="text" value={workTitle} onChange={e => setWorkTitle(e.target.value)} lang="ko" className={inputCls} />
             </div>
             <div className="sm:col-span-2">
-              <label className={labelCls}>신청사유 / 고장 증상</label>
-              <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2} lang="ko" className={inputCls + " resize-none"} />
+              <label className={labelCls}>
+                {mode === "무상신청"
+                  ? <span className="text-red-600 dark:text-red-400 font-bold">신청사유 / 고장 증상 <span className="text-red-500">*</span></span>
+                  : <>신청사유 / 고장 증상</>}
+              </label>
+              <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2} lang="ko"
+                className={inputCls + " resize-none" + (mode === "무상신청" && !reason.trim() ? " border-red-300 dark:border-red-600 focus:ring-red-400" : "")} />
+              {mode === "무상신청" && !reason.trim() && (
+                <p className="text-[11px] text-red-500 mt-0.5">무상신청 시 필수 입력 항목입니다.</p>
+              )}
             </div>
           </div>
         </div>
+
+        {/* 무상신청 사진 첨부 */}
+        {mode === "무상신청" && (
+          <div className={sectionCls}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">📷 사진 첨부 <span className="text-[11px] font-normal text-gray-400">(고장 증상 사진)</span></h2>
+              <button type="button" onClick={addPhotoSlot}
+                className="px-3 py-1.5 rounded bg-gray-100 dark:bg-gray-700 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center gap-1">
+                + 사진 추가
+              </button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {photos.map((p, idx) => (
+                <div key={p.key} className="relative group">
+                  <label className="block cursor-pointer">
+                    <input type="file" accept="image/*" className="sr-only"
+                      onChange={e => setPhotoFile(p.key, e.target.files?.[0] ?? null)} />
+                    <div className={`aspect-square rounded-lg border-2 border-dashed flex items-center justify-center overflow-hidden transition-colors ${
+                      p.previewUrl
+                        ? "border-blue-300 dark:border-blue-600"
+                        : "border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 bg-gray-50 dark:bg-gray-700/50"
+                    }`}>
+                      {p.previewUrl
+                        ? <img src={p.previewUrl} alt={`사진 ${idx + 1}`} className="w-full h-full object-cover" />
+                        : <div className="text-center text-gray-400 dark:text-gray-500 px-2">
+                            <div className="text-2xl mb-1">📷</div>
+                            <div className="text-[10px]">클릭하여 선택</div>
+                          </div>
+                      }
+                    </div>
+                  </label>
+                  <button type="button" onClick={() => removePhotoSlot(p.key)}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow">
+                    ×
+                  </button>
+                  {p.file && (
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 truncate text-center">{p.file.name}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* 자재 라인 */}
         <div className={sectionCls}>
@@ -793,33 +921,43 @@ export default function ClaimEntryClient() {
           </button>
         </div>
 
-        {/* ─── 팀 청구 이력 ───────────────────────────────── */}
+        {/* ─── 팀 청구이력 ───────────────────────────────── */}
         <div className={sectionCls}>
+          {/* 헤더 */}
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <div>
-              <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">📜 팀 청구 이력 (최근 20건)</h2>
-              <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                같은 팀({user?.dept ?? "-"}) 사원들의 청구 내역을 함께 표시합니다. 유상견적요청은 견적요청 목록 페이지에서, 무상·당직 신청은 자재신청 관리 페이지에서 처리 상황을 추적할 수 있습니다.
-              </p>
+            <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">📜 팀 청구이력</h2>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 w-full -mt-2">
+              같은 팀({user?.dept ?? "-"}) 사원들의 청구 내역입니다.
+            </p>
+          </div>
+
+          {/* 기간 검색 + 구분 필터 */}
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <div className="flex items-center gap-1">
+              <input type="date" value={histFrom} onChange={e => setHistFrom(e.target.value)}
+                className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+              <span className="text-xs text-gray-400">~</span>
+              <input type="date" value={histTo} onChange={e => setHistTo(e.target.value)}
+                className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400" />
             </div>
-            <div className="flex items-center gap-2">
-              <div className="flex gap-0.5 bg-gray-100 dark:bg-gray-700 p-0.5 rounded">
-                {(["전체", "유상견적요청", "무상신청", "당직선출고"] as const).map(f => (
-                  <button key={f} type="button" onClick={() => setHistKindFilter(f)}
-                    className={`px-2.5 py-1 text-[11px] font-semibold rounded transition-colors ${
-                      histKindFilter === f
-                        ? "bg-blue-600 text-white"
-                        : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-                    }`}>{f}</button>
-                ))}
-              </div>
-              <button type="button" onClick={() => void loadHistory()} disabled={histLoading}
-                className="px-2.5 py-1 text-[11px] rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
-                {histLoading ? "..." : "🔄"}
-              </button>
+            <button type="button" onClick={() => void loadHistory(histFrom, histTo)} disabled={histLoading}
+              className="px-3 py-1 text-xs rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50">
+              {histLoading ? "조회 중..." : "조회"}
+            </button>
+            <div className="flex gap-0.5 bg-gray-100 dark:bg-gray-700 p-0.5 rounded ml-auto">
+              {(["전체", "유상견적요청", "무상신청", "당직선출고"] as const).map(f => (
+                <button key={f} type="button"
+                  onClick={() => { setHistKindFilter(f); setHistPage(1); }}
+                  className={`px-2.5 py-1 text-[11px] font-semibold rounded transition-colors ${
+                    histKindFilter === f
+                      ? "bg-blue-600 text-white"
+                      : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                  }`}>{f}</button>
+              ))}
             </div>
           </div>
 
+          {/* 테이블 */}
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead className="bg-gray-50 dark:bg-gray-700/50 border-y border-gray-200 dark:border-gray-600 text-[11px] font-bold text-gray-600 dark:text-gray-300">
@@ -836,63 +974,200 @@ export default function ClaimEntryClient() {
               <tbody>
                 {(() => {
                   const filtered = histKindFilter === "전체" ? history : history.filter(h => h.kind === histKindFilter);
-                  if (histLoading && history.length === 0) {
-                    return <tr><td colSpan={7} className="px-2 py-6 text-center text-gray-400">로딩 중...</td></tr>;
+                  const totalPages = Math.max(1, Math.ceil(filtered.length / HIST_PAGE_SIZE));
+                  const safePage = Math.min(histPage, totalPages);
+                  const paged = filtered.slice((safePage - 1) * HIST_PAGE_SIZE, safePage * HIST_PAGE_SIZE);
+
+                  if (histLoading) {
+                    return <tr><td colSpan={7} className="px-2 py-6 text-center text-gray-400">조회 중...</td></tr>;
                   }
                   if (filtered.length === 0) {
                     return <tr><td colSpan={7} className="px-2 py-6 text-center text-gray-400">
-                      {history.length === 0 ? "아직 청구 이력이 없습니다." : "선택한 구분에 해당하는 이력이 없습니다."}
+                      해당 기간에 청구 이력이 없습니다.
                     </td></tr>;
                   }
-                  return filtered.map(h => (
-                    <tr key={`${h.source}-${h.rowId}`} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                      <td className="px-2 py-1.5 text-center text-gray-600 dark:text-gray-300 font-mono tabular-nums whitespace-nowrap">
-                        {fmtDT(h.date)}
-                      </td>
-                      <td className="px-2 py-1.5 text-center">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${HIST_KIND_CLS[h.kind]}`}>
-                          {h.kind}
-                        </span>
-                      </td>
-                      <td className="px-2 py-1.5 text-center text-gray-700 dark:text-gray-200 whitespace-nowrap">
-                        {h.requesterName ?? "-"}
-                      </td>
-                      <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200 truncate max-w-[180px]">
-                        {h.siteName ?? "-"}
-                        {h.workTitle && <span className="ml-1 text-gray-400 dark:text-gray-500 text-[10px]">· {h.workTitle}</span>}
-                      </td>
-                      <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200">
-                        <span className="font-medium">{h.itemFirstName}</span>
-                        {h.itemCount > 1 && (
-                          <span className="ml-1 text-gray-400 dark:text-gray-500 text-[10px]">외 {h.itemCount - 1}건</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-1.5 text-center">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${histStatusCls(h.status)}`}>
-                          {h.status}
-                        </span>
-                      </td>
-                      <td className="px-2 py-1.5 text-center text-[10px]">
-                        {h.source === "quote_request" ? (
-                          h.quoteId ? (
-                            <a href={`/quotes/detail?id=${h.quoteId}`}
-                              className="font-mono font-bold text-blue-600 dark:text-blue-400 hover:underline">
-                              📄 견적서
-                            </a>
-                          ) : (
-                            <span className="font-mono text-gray-500 dark:text-gray-400">{h.no}</span>
-                          )
-                        ) : (
-                          <span className="text-gray-400 dark:text-gray-500">자재신청#{h.rowId}</span>
-                        )}
-                      </td>
-                    </tr>
-                  ));
+                  return (
+                    <>
+                      {paged.map(h => (
+                        <tr key={`${h.source}-${h.rowId}`} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                          <td className="px-2 py-1.5 text-center text-gray-600 dark:text-gray-300 font-mono tabular-nums whitespace-nowrap">
+                            {fmtDT(h.date)}
+                          </td>
+                          <td className="px-2 py-1.5 text-center">
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${HIST_KIND_CLS[h.kind]}`}>
+                              {h.kind}
+                            </span>
+                          </td>
+                          <td className="px-2 py-1.5 text-center text-gray-700 dark:text-gray-200 whitespace-nowrap">
+                            {h.requesterName ?? "-"}
+                          </td>
+                          <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200 truncate max-w-[180px]">
+                            {h.siteName ?? "-"}
+                            {h.workTitle && <span className="ml-1 text-gray-400 dark:text-gray-500 text-[10px]">· {h.workTitle}</span>}
+                          </td>
+                          <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200">
+                            <span className="font-medium">{h.itemFirstName}</span>
+                            {h.itemCount > 1 && (
+                              <span className="ml-1 text-gray-400 dark:text-gray-500 text-[10px]">외 {h.itemCount - 1}건</span>
+                            )}
+                          </td>
+                          <td className="px-2 py-1.5 text-center">
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${histStatusCls(h.status)}`}>
+                              {h.status}
+                            </span>
+                          </td>
+                          <td className="px-2 py-1.5 text-center text-[10px]">
+                            {h.source === "quote_request" ? (
+                              h.quoteId ? (
+                                <a href={`/quotes/detail?id=${h.quoteId}`}
+                                  className="font-mono font-bold text-blue-600 dark:text-blue-400 hover:underline">
+                                  📄 견적서
+                                </a>
+                              ) : (
+                                <span className="font-mono text-gray-500 dark:text-gray-400">{h.no}</span>
+                              )
+                            ) : (
+                              <span className="text-gray-400 dark:text-gray-500">자재신청#{h.rowId}</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {/* 페이지네이션 */}
+                      {totalPages > 1 && (() => {
+                        const pages: (number | "…")[] = [];
+                        for (let i = 1; i <= totalPages; i++) {
+                          if (i === 1 || i === totalPages || Math.abs(i - safePage) <= 2) pages.push(i);
+                          else if (pages[pages.length - 1] !== "…") pages.push("…");
+                        }
+                        return (
+                          <tr>
+                            <td colSpan={7} className="px-2 py-3">
+                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                                  총 {filtered.length}건 · {safePage}/{totalPages} 페이지
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <button type="button" onClick={() => setHistPage(p => Math.max(1, p - 1))} disabled={safePage === 1}
+                                    className="px-2 py-1 text-[11px] rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-30">
+                                    ◀
+                                  </button>
+                                  {pages.map((p, i) => (
+                                    p === "…"
+                                      ? <span key={`e${i}`} className="px-1 text-[11px] text-gray-400">…</span>
+                                      : <button key={p} type="button" onClick={() => setHistPage(p)}
+                                          className={`px-2.5 py-1 text-[11px] rounded border transition-colors ${
+                                            p === safePage
+                                              ? "bg-blue-600 text-white border-blue-600"
+                                              : "border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                          }`}>{p}</button>
+                                  ))}
+                                  <button type="button" onClick={() => setHistPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}
+                                    className="px-2 py-1 text-[11px] rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-30">
+                                    ▶
+                                  </button>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })()}
+                    </>
+                  );
                 })()}
               </tbody>
             </table>
           </div>
         </div>
+
+        {/* ─── 자재담당자 설정 (관리자 전용) ─────────────────────────── */}
+        {isAdmin(user) && (
+          <div className={sectionCls + " border-dashed border-amber-300 dark:border-amber-700"}>
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <div>
+                <h2 className="text-sm font-bold text-amber-700 dark:text-amber-400">⚙️ 자재담당자 설정 <span className="text-[10px] font-normal text-gray-400">(관리자 전용)</span></h2>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">견적·자재청구 접수 시 알림을 받을 담당자입니다.</p>
+              </div>
+            </div>
+
+            {/* 현재 담당자 목록 */}
+            <div className="flex flex-wrap gap-2 mb-3">
+              {managers.length === 0 && <span className="text-xs text-gray-400">등록된 담당자 없음</span>}
+              {managers.map(m => (
+                <span key={m.id} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 text-xs text-amber-800 dark:text-amber-200 font-medium">
+                  {m.name}
+                  {m.dept && <span className="text-[10px] text-gray-400">({m.dept})</span>}
+                  <button type="button"
+                    onClick={async () => {
+                      const next = managers.filter(x => x.id !== m.id);
+                      setManagerSaving(true);
+                      try {
+                        await setMaterialManagerIds(next.map(x => x.id));
+                        setManagers(next);
+                        setManagerMsg({ type: "success", text: `${m.name} 담당자에서 제외했습니다.` });
+                      } catch {
+                        setManagerMsg({ type: "error", text: "저장 중 오류가 발생했습니다." });
+                      } finally {
+                        setManagerSaving(false);
+                      }
+                    }}
+                    className="text-amber-400 hover:text-red-500 font-bold leading-none">×</button>
+                </span>
+              ))}
+            </div>
+
+            {/* 담당자 추가 */}
+            <div className="flex gap-2 items-center flex-wrap">
+              <div className="relative flex-1 min-w-48">
+                <input type="text" lang="ko" value={managerSearch}
+                  onChange={e => setManagerSearch(e.target.value)}
+                  placeholder="이름으로 검색하여 추가"
+                  className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+                {managerSearch.trim() && (() => {
+                  const q = managerSearch.trim().toLowerCase();
+                  const filtered = allAccounts
+                    .filter(a => a.name.toLowerCase().includes(q) && !managers.find(m => m.id === a.id))
+                    .slice(0, 8);
+                  if (filtered.length === 0) return null;
+                  return (
+                    <ul className="absolute z-50 top-full left-0 mt-0.5 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                      {filtered.map(a => (
+                        <li key={a.id}>
+                          <button type="button"
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={async () => {
+                              const next = [...managers, { id: a.id, name: a.name, dept: a.dept }];
+                              setManagerSaving(true);
+                              setManagerSearch("");
+                              try {
+                                await setMaterialManagerIds(next.map(x => x.id));
+                                setManagers(next);
+                                setManagerMsg({ type: "success", text: `${a.name}을(를) 담당자로 추가했습니다.` });
+                              } catch {
+                                setManagerMsg({ type: "error", text: "저장 중 오류가 발생했습니다." });
+                              } finally {
+                                setManagerSaving(false);
+                              }
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-gray-800 dark:text-gray-200 border-b border-gray-50 dark:border-gray-700 last:border-0 hover:bg-amber-50 dark:hover:bg-amber-900/30">
+                            <span className="font-medium">{a.name}</span>
+                            {a.dept && <span className="ml-2 text-[10px] text-gray-400">{a.dept}</span>}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  );
+                })()}
+              </div>
+              {managerSaving && <span className="text-xs text-gray-400">저장 중...</span>}
+            </div>
+
+            {managerMsg && (
+              <p className={`text-xs mt-2 ${managerMsg.type === "success" ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                {managerMsg.text}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
 

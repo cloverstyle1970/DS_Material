@@ -3,6 +3,7 @@
 
 import { supabase } from "./supabase";
 import { insertNotification } from "./notify";
+import { getNotifyTargetIds } from "./material-managers";
 import type { SiteRecord } from "./mock-sites";
 import type { ElevatorRecord } from "./mock-elevators";
 import type { VendorRecord } from "./mock-vendors";
@@ -1514,22 +1515,18 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
           refId:   numId,
         });
       }
-      // 황진한·박은숙에게도 알림 (본인·신청자 중복 제외)
-      const { data: notifyTargets } = await supabase.from("accounts")
-        .select("id").in("name", ["황진한", "박은숙"]);
-      await Promise.all((notifyTargets ?? []).map(a => {
-        const uid = a.id as number;
-        if (uid === Number(processorId) || uid === requesterId) return Promise.resolve();
-        return insertNotification({
-          userId:  uid,
-          type:    "request_status",
-          title:   "무상 자재신청이 승인되었습니다",
-          message: `${sitePart}${summary}`,
-          link:    "/requests",
-          refType: "material_request",
-          refId:   numId,
-        });
-      }));
+      // 자재담당자에게 승인 알림 (본인·신청자 중복 제외)
+      const excludes = [Number(processorId), requesterId].filter(Boolean) as number[];
+      const managerIds = await getNotifyTargetIds(excludes);
+      await Promise.all(managerIds.map(uid => insertNotification({
+        userId:  uid,
+        type:    "request_status",
+        title:   "무상 자재신청이 승인되었습니다",
+        message: `${sitePart}${summary}`,
+        link:    "/requests",
+        refType: "material_request",
+        refId:   numId,
+      })));
       return dbToRequest(data);
     }
 
