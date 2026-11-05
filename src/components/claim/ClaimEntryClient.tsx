@@ -40,6 +40,9 @@ interface HistoryRow {
   kind: HistoryKind;
   status: string;
   quoteId: number | null;       // 견적서로 연결된 ID (유상견적요청만)
+  approvalStatus: "pending" | "approved" | "rejected" | null;
+  rejectReason: string | null;
+  photoUrls: string[] | null;
 }
 
 const HIST_KIND_CLS: Record<HistoryKind, string> = {
@@ -188,7 +191,7 @@ export default function ClaimEntryClient() {
       .gte("requested_at", fromISO).lte("requested_at", toISO)
       .order("requested_at", { ascending: false });
     let mrQ = supabase.from("material_requests")
-      .select("id, requested_at, site_name, items, note, requester_name, request_type, status")
+      .select("id, requested_at, site_name, items, note, requester_name, request_type, status, approval_status, reject_reason, photo_urls")
       .in("request_type", ["무상신청", "당직선출고"])
       .gte("requested_at", fromISO).lte("requested_at", toISO)
       .order("requested_at", { ascending: false });
@@ -210,12 +213,14 @@ export default function ClaimEntryClient() {
         itemFirstName: items[0]?.material_name ?? "-",
         itemCount: items.length,
         kind: "유상견적요청", status: r.status, quoteId: r.quote_id,
+        approvalStatus: null, rejectReason: null, photoUrls: null,
       });
     }
     for (const r of (mr.data ?? []) as Array<{
       id: number; requested_at: string; site_name: string | null;
       items: { materialName?: string }[] | null;
       note: string | null; requester_name: string | null; request_type: string; status: string;
+      approval_status: string | null; reject_reason: string | null; photo_urls: string[] | null;
     }>) {
       const items = r.items ?? [];
       const kind = r.request_type === "당직선출고" ? "당직선출고" : "무상신청";
@@ -226,6 +231,9 @@ export default function ClaimEntryClient() {
         itemFirstName: items[0]?.materialName ?? "-",
         itemCount: items.length,
         kind, status: r.status, quoteId: null,
+        approvalStatus: (r.approval_status as "pending" | "approved" | "rejected" | null) ?? null,
+        rejectReason: r.reject_reason ?? null,
+        photoUrls: Array.isArray(r.photo_urls) ? r.photo_urls : null,
       });
     }
     rows.sort((a, b) => b.date.localeCompare(a.date));
@@ -967,6 +975,7 @@ export default function ClaimEntryClient() {
                   <th className="px-2 py-2 text-left">현장</th>
                   <th className="px-2 py-2 text-left">자재 요약</th>
                   <th className="px-2 py-2 text-center w-28">상태</th>
+                  <th className="px-2 py-2 text-center w-10">사진</th>
                   <th className="px-2 py-2 text-center w-32">번호 / 추적</th>
                 </tr>
               </thead>
@@ -978,10 +987,10 @@ export default function ClaimEntryClient() {
                   const paged = filtered.slice((safePage - 1) * HIST_PAGE_SIZE, safePage * HIST_PAGE_SIZE);
 
                   if (histLoading) {
-                    return <tr><td colSpan={7} className="px-2 py-6 text-center text-gray-400">조회 중...</td></tr>;
+                    return <tr><td colSpan={8} className="px-2 py-6 text-center text-gray-400">조회 중...</td></tr>;
                   }
                   if (filtered.length === 0) {
-                    return <tr><td colSpan={7} className="px-2 py-6 text-center text-gray-400">
+                    return <tr><td colSpan={8} className="px-2 py-6 text-center text-gray-400">
                       해당 기간에 청구 이력이 없습니다.
                     </td></tr>;
                   }
@@ -1011,9 +1020,29 @@ export default function ClaimEntryClient() {
                             )}
                           </td>
                           <td className="px-2 py-1.5 text-center">
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${histStatusCls(h.status)}`}>
-                              {h.status}
-                            </span>
+                            {h.approvalStatus === "rejected" ? (
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-300">
+                                  반려
+                                </span>
+                                {h.rejectReason && (
+                                  <span className="text-[10px] text-red-500 dark:text-red-400 max-w-[120px] text-center leading-tight break-words">
+                                    {h.rejectReason}
+                                  </span>
+                                )}
+                              </div>
+                            ) : h.approvalStatus === "pending" ? (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-300">
+                                승인대기
+                              </span>
+                            ) : (
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${histStatusCls(h.status)}`}>
+                                {h.status}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-2 py-1.5 text-center">
+                            <PhotoIconBtn urls={h.photoUrls ?? []} />
                           </td>
                           <td className="px-2 py-1.5 text-center text-[10px]">
                             {h.source === "quote_request" ? (
@@ -1040,7 +1069,7 @@ export default function ClaimEntryClient() {
                         }
                         return (
                           <tr>
-                            <td colSpan={7} className="px-2 py-3">
+                            <td colSpan={8} className="px-2 py-3">
                               <div className="flex items-center justify-between flex-wrap gap-2">
                                 <span className="text-[11px] text-gray-500 dark:text-gray-400">
                                   총 {filtered.length}건 · {safePage}/{totalPages} 페이지
