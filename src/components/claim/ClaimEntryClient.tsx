@@ -467,18 +467,17 @@ export default function ClaimEntryClient() {
           ? "당직 선출고 신청이 접수되었습니다. 관리자가 즉시 출고 처리합니다."
           : `무상 자재신청이 접수되었습니다. ${approverName ? `${approverName}님께 승인 요청을 보냈습니다.` : "담당자 승인 후 처리됩니다."}`;
         setMessage({ type: "success", text: msg });
-        // 자재관리 담당(박은숙·황진한)에게 알림 — 본인 포함. 실패는 silent.
-        const notifyTitle = mode === "당직선출고"
-          ? "새 당직선출고 신청이 접수되었습니다"
-          : "새 무상자재신청이 접수되었습니다";
-        void notifyRecipients({
-          type:    "material_request",
-          title:   notifyTitle,
-          message: `[${siteName}${headerElev ? ` · ${headerElev}` : ""}] ${workTitle ? `${workTitle} — ` : ""}${summary}`,
-          link:    "/requests",
-          refType: "material_request",
-          refId:   requestId,
-        }).catch(e => console.warn("[notify] 자재청구 알림 실패:", e));
+        // 당직선출고만 즉시 자재담당자 알림 — 무상신청은 승인자 승인 완료 후 mock-router에서 발송
+        if (mode === "당직선출고") {
+          void notifyRecipients({
+            type:    "material_request",
+            title:   "새 당직선출고 신청이 접수되었습니다",
+            message: `[${siteName}${headerElev ? ` · ${headerElev}` : ""}] ${workTitle ? `${workTitle} — ` : ""}${summary}`,
+            link:    "/requests",
+            refType: "material_request",
+            refId:   requestId,
+          }).catch(e => console.warn("[notify] 당직선출고 알림 실패:", e));
+        }
         // 무상신청: 선택된 승인자에게 승인 요청 알림
         if (mode === "무상신청" && approverId) {
           void insertNotification({

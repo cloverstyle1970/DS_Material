@@ -1515,13 +1515,13 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
           refId:   numId,
         });
       }
-      // 자재담당자에게 승인 알림 (본인·신청자 중복 제외)
+      // 자재담당자에게 알림 — 승인 완료, 출고 처리 필요 (본인·신청자 중복 제외)
       const excludes = [Number(processorId), requesterId].filter(Boolean) as number[];
       const managerIds = await getNotifyTargetIds(excludes);
       await Promise.all(managerIds.map(uid => insertNotification({
         userId:  uid,
-        type:    "request_status",
-        title:   "무상 자재신청이 승인되었습니다",
+        type:    "material_request",
+        title:   "무상 자재신청 승인 완료 — 출고 처리 필요",
         message: `${sitePart}${summary}`,
         link:    "/requests",
         refType: "material_request",

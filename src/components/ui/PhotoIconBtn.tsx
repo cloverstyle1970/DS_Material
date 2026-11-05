@@ -14,8 +14,6 @@ const btnBase =
 
 export function PhotoIconBtn({ urls }: { urls: (string | null | undefined)[] }) {
   const valid = urls.filter((u): u is string => !!u);
-  if (valid.length === 0) return null;
-
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -27,6 +25,8 @@ export function PhotoIconBtn({ urls }: { urls: (string | null | undefined)[] }) 
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
+
+  if (valid.length === 0) return null;
 
   if (valid.length === 1) {
     return (
