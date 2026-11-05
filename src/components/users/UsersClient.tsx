@@ -34,9 +34,10 @@ const COLUMNS: { key: SortKey; label: string }[] = [
 ];
 
 const STATUS_CLS: Record<string, string> = {
-  "재직": "bg-green-50 text-green-700 dark:bg-green-900/40 dark:text-green-300",
-  "퇴직": "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300",
-  "휴직": "bg-amber-50 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  "재직":   "bg-green-50 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+  "퇴직":   "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300",
+  "퇴사":   "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300",
+  "휴직":   "bg-amber-50 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
   "육아휴직": "bg-amber-50 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
 };
 
@@ -309,8 +310,10 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
 
   const q = query.trim().toLowerCase();
   const filtered = users.filter(u => {
-    // "휴직" 필터는 육아휴직 포함
-    if (statusFilter !== "전체" && u.status !== statusFilter && !(statusFilter === "휴직" && u.status === "육아휴직")) return false;
+    // "휴직" 필터는 육아휴직 포함, "퇴직" 필터는 "퇴사"도 포함
+    if (statusFilter !== "전체" && u.status !== statusFilter &&
+        !(statusFilter === "휴직" && u.status === "육아휴직") &&
+        !(statusFilter === "퇴직" && u.status === "퇴사")) return false;
     if (selfCheckOnly && !selfCheckIds.has(u.id)) return false;
     if (expiryOnly && !isExpiryAlert(expiryByUser.get(u.id)?.daysLeft ?? null)) return false;
     if (!q) return true;
@@ -500,6 +503,9 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
                 <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
                   <div><span className="text-gray-400">전화 </span>{u.phone ?? "-"}</div>
                   <div><span className="text-gray-400">입사 </span>{u.hireDate ?? "-"}</div>
+                  {(u.status === "퇴사" || u.status === "퇴직") && (
+                    <div><span className="text-gray-400">퇴사 </span>{u.resignDate ?? "-"}</div>
+                  )}
                   <div className="col-span-2 truncate"><span className="text-gray-400">자격증 </span>{u.cert ?? "-"}</div>
                 </div>
               </div>
@@ -564,6 +570,9 @@ export default function UsersClient({ initial }: { initial: UserRecord[] }) {
                     <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_CLS[u.status ?? ""] ?? "bg-gray-100 text-gray-500"}`}>
                       {u.status ?? "-"}
                     </span>
+                    {(u.status === "퇴사" || u.status === "퇴직") && u.resignDate && (
+                      <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 whitespace-nowrap">{u.resignDate}</div>
+                    )}
                   </td>
                   {meIsAdmin && (
                     <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
