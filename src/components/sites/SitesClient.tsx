@@ -801,8 +801,12 @@ export default function SitesClient({ initial, elevators }: Props) {
     return matched;
   }, [allElevators, q]);
 
+  // 상실 현장은 회사구분과 무관하게 기타로 분류 (필터·배지 공용)
+  const effectiveCompany = (s: SiteRecord) =>
+    s.siteType === "상실" ? null : normalizeCompany(s.companyType);
+
   const filteredSites = useMemo(() => {
-    // 검색어가 있으면 회사 필터 무시하고 매칭되는 모든 현장 표시
+    // 검색어가 있으면 회사 필터 무시하고 상실 포함 모든 현장 검색
     if (q) {
       return sites.filter(s =>
         s.name.toLowerCase().includes(q) ||
@@ -818,15 +822,11 @@ export default function SitesClient({ initial, elevators }: Props) {
         elevatorMatchBySite.has(s.name)
       );
     }
-    // 검색어 없으면 회사 필터만 적용 (상실은 기타로 분류)
+    // 검색어 없으면 회사 필터 적용 (상실은 기타로 분류되어 기타 필터에 포함)
     if (companyFilter === "기타")
       return sites.filter(s => { const c = effectiveCompany(s); return c !== "TK" && c !== "DS"; });
     return companyFilter !== "전체" ? sites.filter(s => effectiveCompany(s) === companyFilter) : sites;
   }, [sites, q, elevatorMatchBySite, companyFilter]);
-
-  // 상실 현장은 회사구분과 무관하게 기타로 분류
-  const effectiveCompany = (s: SiteRecord) =>
-    s.siteType === "상실" ? null : normalizeCompany(s.companyType);
 
   const siteStats = useMemo(() => {
     // 상실 제외 후 집계 (전체·TK·DS·기타 모두)
