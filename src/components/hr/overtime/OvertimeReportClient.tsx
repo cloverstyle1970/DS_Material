@@ -1200,26 +1200,27 @@ export default function OvertimeReportClient() {
                 <div className="text-center text-sm text-gray-400 py-16">검색 결과가 없습니다.</div>
               );
               return (
-              <div className="space-y-3">
+              <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div className="divide-y divide-gray-100 dark:divide-gray-700">
                 {filteredReports.map(r => {
                   const author   = accounts.find(a => a.id === r.author_id);
                   const approver = accounts.find(a => a.id === r.approver_id);
                   const s = new Date(r.start_at), e = new Date(r.end_at);
                   const ot = calcOvertimeResult(s, e, r.is_holiday);
                   return (
-                    <div key={r.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+                    <div key={r.id} className="p-4">
                       {/* 1행: 뱃지 + 날짜 */}
-                      <div className="flex items-center justify-between gap-2 mb-1.5">
-                        <div className="flex items-center gap-1 flex-wrap">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500">{r.report_no}</span>
                           <StatusBadge status={r.approval_status} />
                           {r.is_holiday && (
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 font-medium">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
                               {r.holiday_type ?? "휴일"}
                             </span>
                           )}
                           {(printCountMap[r.id] ?? 0) > 0 && (
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
                               🖨️ {printCountMap[r.id]}회
                             </span>
                           )}
@@ -1228,40 +1229,35 @@ export default function OvertimeReportClient() {
                           {s.getFullYear()}-{String(s.getMonth()+1).padStart(2,"0")}-{String(s.getDate()).padStart(2,"0")} {String(s.getHours()).padStart(2,"0")}:{String(s.getMinutes()).padStart(2,"0")}
                         </span>
                       </div>
-
                       {/* 2행: 현장명 */}
-                      <p className="font-semibold text-gray-900 dark:text-gray-100 leading-tight mb-0.5">{r.site_name}</p>
-
+                      <p className="font-medium text-gray-800 dark:text-gray-100 mt-1.5">{r.site_name}</p>
                       {/* 3행: 작업사유 · 잔업 */}
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                      <p className="text-sm text-gray-600 dark:text-gray-300 mt-0.5">
                         {(r.work_reasons ?? []).length > 0 ? (r.work_reasons ?? []).join(" · ") : "-"}
-                        {ot.display && (
+                        {ot.display && ot.display !== "-" && (
                           <span className="ml-1.5 text-blue-600 dark:text-blue-400 font-semibold">{ot.display}</span>
                         )}
                       </p>
-
                       {/* 4행: 작성자 · 승인자 */}
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                         {author?.username ?? ""}
                         {author?.dept && <span> ({author.dept})</span>}
-                        {approver && <span className="text-gray-400 dark:text-gray-500"> · 승인자: {approver.username}</span>}
+                        {approver && <span> · 승인자: {approver.username}</span>}
                       </p>
-
                       {/* 반려 사유 */}
                       {r.approval_status === "rejected" && r.reject_reason && (
                         <p className="text-xs text-red-500 dark:text-red-400 mt-1 font-medium">반려: {r.reject_reason}</p>
                       )}
-
                       {/* 액션 버튼 */}
-                      <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 flex flex-col gap-1">
+                      <div className="mt-2 flex flex-col gap-1">
                         {canApprove(r) && (
                           <div className="flex gap-1">
                             <button onClick={() => approve(r)}
-                              className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50 whitespace-nowrap font-medium">
+                              className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 whitespace-nowrap font-semibold">
                               승인
                             </button>
                             <button onClick={() => { setRejectModal({ id: r.id, reportNo: r.report_no }); setRejectReason(""); }}
-                              className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 whitespace-nowrap font-medium">
+                              className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 whitespace-nowrap">
                               반려
                             </button>
                           </div>
@@ -1288,6 +1284,7 @@ export default function OvertimeReportClient() {
                     </div>
                   );
                 })}
+                </div>
               </div>
               );
             })()}
