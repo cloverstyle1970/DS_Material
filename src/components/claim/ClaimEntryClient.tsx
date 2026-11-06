@@ -109,6 +109,7 @@ export default function ClaimEntryClient() {
   // 무상신청 사진 슬롯
   interface PhotoSlot { key: string; file: File | null; previewUrl: string | null }
   const [photos, setPhotos] = useState<PhotoSlot[]>([{ key: crypto.randomUUID(), file: null, previewUrl: null }]);
+  const [existingPhotoUrls, setExistingPhotoUrls] = useState<string[]>([]);
   function addPhotoSlot() { setPhotos(prev => [...prev, { key: crypto.randomUUID(), file: null, previewUrl: null }]); }
   function removePhotoSlot(key: string) {
     setPhotos(prev => {
@@ -154,6 +155,7 @@ export default function ClaimEntryClient() {
 
   // 무상신청 승인자 선택 모달
   const [showApproverModal, setShowApproverModal] = useState(false);
+  const [approverModalForSave, setApproverModalForSave] = useState(false); // true=저장연동, false=상태변경만
   const [approverList, setApproverList] = useState<{ id: number; name: string; dept: string | null }[]>([]);
   const [approverListLoading, setApproverListLoading] = useState(false);
   const [selectedApproverId, setSelectedApproverId] = useState<number | null>(null);
@@ -181,10 +183,16 @@ export default function ClaimEntryClient() {
         .eq("id", editId)
         .single();
       if (error || !data) return;
-      const r = data as { request_type: string | null; site_name: string | null; note: string | null; items: { materialId?: string; materialName?: string; qty?: number; elevatorName?: string | null }[] | null };
-      if (r.request_type === "무상신청")   setMode("무상신청");
+      const r = data as {
+        request_type: string | null; site_name: string | null; note: string | null;
+        items: { materialId?: string; materialName?: string; qty?: number; elevatorName?: string | null }[] | null;
+        approver_id: number | null; approver_name: string | null;
+        photo_urls: string[] | null;
+      };
+      if (r.request_type === "무상신청")        setMode("무상신청");
       else if (r.request_type === "당직선출고") setMode("당직선출고");
-      else setMode("당직선출고");
+      else if (r.request_type === "유상견적")   setMode("유상견적요청");
+      else                                      setMode("당직선출고");
       if (r.site_name) setSiteName(r.site_name);
       const noteVal = r.note ?? "";
       const slashIdx = noteVal.indexOf(" / ");
@@ -195,6 +203,9 @@ export default function ClaimEntryClient() {
         setWorkTitle("");
         setReason(noteVal);
       }
+      if (r.approver_id)   setSelectedApproverId(r.approver_id);
+      if (r.approver_name) setSelectedApproverName(r.approver_name);
+      if (Array.isArray(r.photo_urls) && r.photo_urls.length > 0) setExistingPhotoUrls(r.photo_urls);
       const items = Array.isArray(r.items) ? r.items : [];
       if (items.length > 0) {
         setRows(items.map(item => newRow({
@@ -308,11 +319,13 @@ export default function ClaimEntryClient() {
       const ct = ms2?.contract_type;
       const cmp = ms2?.company_type;
       if (ms !== null) {
-        // 계약구분에 따라 모드 자동 재설정
-        if (ct === "TK-FM" || ct === "대솔FM" || ct === "DS-FM") {
-          setMode("무상신청");
-        } else {
-          setMode("유상견적요청");
+        // 수정 모드에서는 mode 자동변경 안 함 (원본 request_type 유지)
+        if (!editId) {
+          if (ct === "TK-FM" || ct === "대솔FM" || ct === "DS-FM") {
+            setMode("무상신청");
+          } else {
+            setMode("유상견적요청");
+          }
         }
         // 회사구분(DS/TK)에 따라 기본 자재구분 토글 자동 설정
         if (cmp === "TK") { setClaimMatType("TK"); setMatTypeFilter("TK"); }
@@ -377,34 +390,54 @@ export default function ClaimEntryClient() {
     return `${prefix}${String(nextSeq).padStart(4, "0")}`;
   }
 
-  // 저장 버튼 클릭: 유상/당직은 바로 저장, 무상은 승인자 선택 모달 오픈
+  // 승인자 목록 로딩 공통 헬퍼
+  async function loadApproverList() {
+    setApproverListLoading(true);
+    try {
+      const { data } = await supabase.from("accounts").select("id, username, name, dept").order("username");
+      const mapped = ((data ?? []) as { id: number; username: string | null; name: string | null; dept: string | null }[])
+        .map(a => ({ id: a.id, name: (a.username || a.name || "").trim(), dept: a.dept }))
+        .filter(a => !!a.name)
+        .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+      setApproverList(mapped);
+    } finally {
+      setApproverListLoading(false);
+    }
+  }
+
+  // 헤더 "승인자 변경" 버튼 — 상태만 변경, 즉시 저장 없음
+  function openApproverChangeModal() {
+    setApproverSearch(selectedApproverName);
+    setApproverModalForSave(false);
+    setShowApproverModal(true);
+    void loadApproverList();
+  }
+
+  // 저장 버튼 클릭: 유상/당직은 바로 저장, 무상 신규는 승인자 선택 모달 오픈
   function handleSaveClick() {
-    // 수정 모드: 승인자 재선택 없이 바로 저장
-    if (editId) { void doSubmit(); return; }
-    if (mode !== "무상신청") { void doSubmit(); return; }
     setMessage(null);
     if (!user) { setMessage({ type: "error", text: "로그인이 필요합니다." }); return; }
     if (!siteName.trim()) { setMessage({ type: "error", text: "현장명을 입력해 주세요." }); return; }
-    if (!reason.trim()) { setMessage({ type: "error", text: "신청사유 / 고장 증상을 입력해 주세요." }); return; }
     const validItems = rows.filter(r => r.material_id || r.material_name.trim());
     if (validItems.length === 0) { setMessage({ type: "error", text: "자재를 1개 이상 입력해 주세요." }); return; }
+
+    if (editId) {
+      // 수정 모드: 승인자는 헤더 "변경" 버튼으로 별도 관리 → 바로 저장
+      if (mode === "무상신청" && !reason.trim()) { setMessage({ type: "error", text: "신청사유 / 고장 증상을 입력해 주세요." }); return; }
+      void doSubmit(selectedApproverId ?? undefined, selectedApproverName || undefined);
+      return;
+    }
+
+    if (mode !== "무상신청") { void doSubmit(); return; }
+
+    // 무상신청 신규: 승인자 모달 오픈 후 저장
+    if (!reason.trim()) { setMessage({ type: "error", text: "신청사유 / 고장 증상을 입력해 주세요." }); return; }
     setSelectedApproverId(null);
     setSelectedApproverName("");
     setApproverSearch("");
+    setApproverModalForSave(true);
     setShowApproverModal(true);
-    setApproverListLoading(true);
-    void (async () => {
-      try {
-        const { data } = await supabase.from("accounts").select("id, username, name, dept").order("username");
-        const mapped = ((data ?? []) as { id: number; username: string | null; name: string | null; dept: string | null }[])
-          .map(a => ({ id: a.id, name: (a.username || a.name || "").trim(), dept: a.dept }))
-          .filter(a => !!a.name)
-          .sort((a, b) => a.name.localeCompare(b.name, "ko"));
-        setApproverList(mapped);
-      } finally {
-        setApproverListLoading(false);
-      }
-    })();
+    void loadApproverList();
   }
 
   // 실제 저장 (승인자 선택 후 모달 확정, 또는 유상/당직 직접 저장)
@@ -425,11 +458,32 @@ export default function ClaimEntryClient() {
           qty:          r.qty,
           elevatorName: r.elevator_name || null,
         }));
-        const { error } = await supabase.from("material_requests").update({
-          site_name: siteName,
+        // 새로 추가된 사진 업로드
+        let newPhotoUrls: string[] = [];
+        const filesToUpload = photos.filter(p => p.file);
+        if (mode === "무상신청" && filesToUpload.length > 0) {
+          const uploads = await Promise.allSettled(filesToUpload.map(async p => {
+            const ext = p.file!.name.split(".").pop() ?? "jpg";
+            const path = `${user.id}/${Date.now()}-${p.key}.${ext}`;
+            const { error: upErr } = await supabase.storage.from("material-request-photos").upload(path, p.file!, { upsert: false });
+            if (upErr) throw upErr;
+            const { data: pub } = supabase.storage.from("material-request-photos").getPublicUrl(path);
+            return pub.publicUrl;
+          }));
+          newPhotoUrls = uploads.filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled").map(r => r.value);
+        }
+        const allPhotoUrls = [...existingPhotoUrls, ...newPhotoUrls];
+        const patch: Record<string, unknown> = {
+          site_name:  siteName,
           items,
-          note: [workTitle, reason].filter(Boolean).join(" / ") || null,
-        }).eq("id", editId);
+          note:       [workTitle, reason].filter(Boolean).join(" / ") || null,
+          photo_urls: allPhotoUrls.length > 0 ? allPhotoUrls : null,
+        };
+        if (mode === "무상신청") {
+          patch.approver_id   = approverId   ?? null;
+          patch.approver_name = approverName ?? null;
+        }
+        const { error } = await supabase.from("material_requests").update(patch).eq("id", editId);
         if (error) throw error;
         setMessage({ type: "success", text: "자재신청이 수정되었습니다." });
         await new Promise(res => setTimeout(res, 700));
@@ -608,13 +662,21 @@ export default function ClaimEntryClient() {
     <div className="min-h-full bg-gray-50 dark:bg-gray-900">
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
         {editId ? (
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">✏️ 자재신청 수정 <span className="text-sm font-normal text-gray-400">#{editId}</span></h1>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                ✏️ 자재신청 수정
+                <span className="ml-2 text-sm font-normal text-gray-400">#{editId}</span>
+                <span className={`ml-2 text-xs font-semibold px-2 py-0.5 rounded-full ${
+                  mode === "무상신청"   ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                  : mode === "당직선출고" ? "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
+                  : "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                }`}>{mode}</span>
+              </h1>
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">현장·자재·메모를 수정 후 저장하세요.</p>
             </div>
             <button type="button" onClick={() => router.push("/requests")}
-              className="px-3 py-1.5 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+              className="px-3 py-1.5 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 shrink-0">
               취소
             </button>
           </div>
@@ -696,6 +758,26 @@ export default function ClaimEntryClient() {
                 + 사진 추가
               </button>
             </div>
+            {/* 수정 모드: 기존 첨부 사진 */}
+            {editId && existingPhotoUrls.length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-2">📌 기존 첨부 사진 <span className="font-normal text-gray-400">({existingPhotoUrls.length}장 — × 클릭 시 삭제)</span></p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {existingPhotoUrls.map((url, idx) => (
+                    <div key={url} className="relative group">
+                      <div className="aspect-square rounded-lg border border-blue-200 dark:border-blue-700 overflow-hidden">
+                        <img src={url} alt={`기존 사진 ${idx + 1}`} className="w-full h-full object-cover" />
+                      </div>
+                      <button type="button"
+                        onClick={() => setExistingPhotoUrls(prev => prev.filter(u => u !== url))}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow">
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {photos.map((p, idx) => (
                 <div key={p.key} className="relative group">
@@ -995,7 +1077,20 @@ export default function ClaimEntryClient() {
           }`}>{message.text}</div>
         )}
 
-        <div className="flex justify-end gap-2">
+        <div className="flex items-center justify-end gap-2 flex-wrap">
+          {/* 무상신청 수정 모드: 승인자 표시 + 변경 */}
+          {editId && mode === "무상신청" && (
+            <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 mr-auto">
+              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">승인자</span>
+              <span className={`text-xs font-semibold ${selectedApproverName ? "text-emerald-800 dark:text-emerald-200" : "text-gray-400 dark:text-gray-500"}`}>
+                {selectedApproverName || "미지정"}
+              </span>
+              <button type="button" onClick={openApproverChangeModal}
+                className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-700 font-semibold whitespace-nowrap">
+                변경
+              </button>
+            </div>
+          )}
           {editId && (
             <button type="button" onClick={() => router.push("/requests")}
               className="px-5 py-2 rounded border border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
@@ -1381,9 +1476,12 @@ export default function ClaimEntryClient() {
               </button>
               <button type="button"
                 disabled={!selectedApproverName.trim() || saving}
-                onClick={() => { setShowApproverModal(false); void doSubmit(selectedApproverId ?? undefined, selectedApproverName); }}
+                onClick={() => {
+                  setShowApproverModal(false);
+                  if (approverModalForSave) void doSubmit(selectedApproverId ?? undefined, selectedApproverName);
+                }}
                 className="px-5 py-2 rounded bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50">
-                {saving ? "저장 중..." : "승인 요청 후 저장"}
+                {approverModalForSave ? (saving ? "저장 중..." : "승인 요청 후 저장") : "승인자 변경"}
               </button>
             </div>
           </div>
