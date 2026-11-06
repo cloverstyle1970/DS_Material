@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useReloadOnActivate, useTabIsActive } from "@/context/TabActivationContext";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
+import { useViewMode } from "@/context/ViewModeContext";
 import { supabase } from "@/lib/supabase";
 import { notifyLeaveApprovalRequest, notifyLeaveApproved, notifyLeaveApprovedToManager, notifyLeaveRejected } from "./leaveNotify";
 
@@ -238,6 +239,8 @@ type StatusFilter = "all" | "draft" | "pending" | "approved" | "rejected";
 
 export default function LeaveLedgerClient() {
   const { user } = useAuth();
+  const { viewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
   const canCreate = user ? (isAdmin(user) || hasMenuPermission(user, LR_LEDGER_MENU_HREF, "create")) : false;
   const isManager = user ? (isAdmin(user) || hasMenuPermission(user, LR_LEDGER_MENU_HREF, "update")) : false;
 
@@ -1078,7 +1081,66 @@ export default function LeaveLedgerClient() {
               </div>
             )}
 
-            {/* 목록 테이블 */}
+            {/* 목록: 모바일=카드 / PC=테이블 */}
+            {isMobile ? (
+              filtered.length === 0 ? (
+                <div className="text-center text-sm text-gray-400 py-16">문서가 없습니다.</div>
+              ) : (
+                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                    {filtered.map(r => {
+                      const author = accounts.find(a => a.id === r.author_id);
+                      const pad = (v: string | null) => (v ?? "").padStart(2, "0");
+                      const sDate = r.s_yr ? `20${r.s_yr}-${pad(r.s_mo)}-${pad(r.s_dy)}` : "—";
+                      const eDate = r.e_yr ? `20${r.e_yr}-${pad(r.e_mo)}-${pad(r.e_dy)}` : "";
+                      const period = eDate && eDate !== sDate ? `${sDate} ~ ${eDate}` : sDate;
+                      return (
+                        <div key={r.id} className="p-4">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500">{r.request_no}</span>
+                              <StatusBadge status={r.approval_status} />
+                              <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">{r.leave_type}</span>
+                              {(printCountMap[r.id] ?? 0) > 0 && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">🖨️ {printCountMap[r.id]}회</span>
+                              )}
+                            </div>
+                            <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0 tabular-nums">{sDate}</span>
+                          </div>
+                          <p className="font-medium text-gray-800 dark:text-gray-100 mt-1.5">{period}</p>
+                          {r.reason && <p className="text-sm text-gray-600 dark:text-gray-300 mt-0.5 truncate">{r.reason}</p>}
+                          {showAuthorCol && author && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{author.username}</p>
+                          )}
+                          {r.approval_status === "rejected" && r.reject_reason && (
+                            <p className="text-xs text-red-500 dark:text-red-400 mt-1 font-medium">반려: {r.reject_reason}</p>
+                          )}
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {canApprove(r) ? (
+                              <button onClick={() => openEdit(r)} className="text-xs px-2 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium">보기</button>
+                            ) : canEdit(r) ? (
+                              <button onClick={() => openEdit(r)} className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400">수정</button>
+                            ) : (
+                              <button onClick={() => openEdit(r)} className="text-xs px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">내용 확인</button>
+                            )}
+                            {canApprove(r) && (
+                              <>
+                                <button onClick={() => setSignModal(r)} className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 font-semibold">승인</button>
+                                <button onClick={() => { setRejectModal({ id: r.id, no: r.request_no }); setRejectReason(""); }} className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400">반려</button>
+                              </>
+                            )}
+                            {canDelete(r) && (
+                              <button onClick={() => deleteRecord(r.id, r.request_no)} className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400">삭제</button>
+                            )}
+                            <button onClick={() => openEdit(r, true)} className="text-xs px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 ml-auto">🖨️ 인쇄</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )
+            ) : (
             <div className="bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden">
               <table className="w-full text-xs">
                 <thead>
@@ -1148,6 +1210,7 @@ export default function LeaveLedgerClient() {
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         )}
       </div>

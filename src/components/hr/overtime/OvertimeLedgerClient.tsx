@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useReloadOnActivate, useTabIsActive } from "@/context/TabActivationContext";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
+import { useViewMode } from "@/context/ViewModeContext";
 import { supabase } from "@/lib/supabase";
 import { calcOvertimeResult, detectHoliday, dayOfWeekKr, OvertimeResult } from "./overtimeCalc";
 import { notifyOvertimeApprovalRequest, notifyOvertimeApproved, notifyOvertimeRejected } from "./overtimeNotify";
@@ -379,16 +380,10 @@ export default function OvertimeLedgerClient() {
   const signCanvasRef = useRef<HTMLCanvasElement>(null);
   const signIsDrawing = useRef(false);
 
-  // ── 반응형 ──
-  const [isMobile, setIsMobile] = useState(false);
+  // ── 반응형: 전역 ViewMode 사용 ──
+  const { viewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
   const [mobileStep, setMobileStep] = useState(0);
-
-  useEffect(() => {
-    function check() { setIsMobile(window.innerWidth < 768); }
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
 
   // ── 데이터 로드 ──
   const load = useCallback(async () => {
@@ -1423,11 +1418,71 @@ export default function OvertimeLedgerClient() {
               </div>
             )}
 
-            {/* 목록 테이블 */}
+            {/* 목록: 모바일=카드 / PC=테이블 */}
             <div className="flex-1 overflow-auto p-4">
               {filtered.length === 0 ? (
                 <div className="text-center text-sm text-gray-400 py-16">
                   {reports.length === 0 ? "등록된 잔업보고서가 없습니다." : "검색 결과가 없습니다."}
+                </div>
+              ) : isMobile ? (
+                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                    {filtered.map(r => {
+                      const author = accounts.find(a => a.id === r.author_id);
+                      const s = new Date(r.start_at);
+                      const e = new Date(r.end_at);
+                      return (
+                        <div key={r.id} className="p-4">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500">{r.report_no}</span>
+                              <StatusBadge status={r.approval_status} />
+                              {r.is_holiday && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
+                                  {r.holiday_type ?? "휴일"}
+                                </span>
+                              )}
+                              {(printCountMap[r.id] ?? 0) > 0 && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">🖨️ {printCountMap[r.id]}회</span>
+                              )}
+                            </div>
+                            <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0 tabular-nums">{s.toLocaleDateString("ko-KR")}</span>
+                          </div>
+                          <p className="font-medium text-gray-800 dark:text-gray-100 mt-1.5">{r.site_name}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-300 mt-0.5">
+                            {s.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}~{e.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+                            {r.work_hours != null && <span className="ml-1.5 text-blue-600 dark:text-blue-400 font-semibold">근무 {fmt(r.work_hours)}</span>}
+                            {r.overtime_hours != null && r.overtime_hours > 0 && <span className="ml-1.5 text-purple-600 dark:text-purple-400 font-semibold">잔업 {fmt(r.overtime_hours)}</span>}
+                          </p>
+                          {showAuthorCol && author && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{author.username}</p>
+                          )}
+                          {r.approval_status === "rejected" && r.reject_reason && (
+                            <p className="text-xs text-red-500 dark:text-red-400 mt-1 font-medium">반려: {r.reject_reason}</p>
+                          )}
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {canApprove(r) ? (
+                              <button onClick={() => openEdit(r)} className="text-xs px-2 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium">보기</button>
+                            ) : canEdit(r) ? (
+                              <button onClick={() => openEdit(r)} className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400">수정</button>
+                            ) : (
+                              <button onClick={() => openEdit(r)} className="text-xs px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">내용 확인</button>
+                            )}
+                            {canApprove(r) && (
+                              <>
+                                <button onClick={() => approve(r)} className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 font-semibold">승인</button>
+                                <button onClick={() => { setRejectModal({ id: r.id, reportNo: r.report_no }); setRejectReason(""); }} className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400">반려</button>
+                              </>
+                            )}
+                            {canDelete(r) && (
+                              <button onClick={() => deleteReport(r.id, r.report_no)} className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400">삭제</button>
+                            )}
+                            <button onClick={() => openEdit(r, true)} className="text-xs px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 ml-auto">🖨️ 인쇄</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
                 <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-x-auto">
