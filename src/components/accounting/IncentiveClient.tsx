@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { fmtNum } from "@/lib/format";
+import { useSiteKeywordMap } from "@/lib/useSiteKeywordMap";
 
 const MENU_HREF = "/accounting/incentive";
 
@@ -88,6 +89,7 @@ export default function IncentiveClient() {
   const [regionFilter, setRegionFilter]   = useState<string>(ALL);
   const [siteQuery, setSiteQuery] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const siteKeywordMap = useSiteKeywordMap();
 
   const fetchRows = useCallback(async (from: string, to: string) => {
     const lo = from <= to ? from : to;
@@ -141,10 +143,13 @@ export default function IncentiveClient() {
     return rows.filter(row => {
       if (companyFilter !== ALL && row.company !== companyFilter) return false;
       if (regionFilter  !== ALL && row.region  !== regionFilter)  return false;
-      if (q && !row.site.toLowerCase().includes(q)) return false;
+      if (q) {
+        const siteLc = row.site.trim().toLowerCase();
+        if (!siteLc.includes(q) && !(siteKeywordMap.get(siteLc) ?? "").includes(q)) return false;
+      }
       return true;
     });
-  }, [rows, companyFilter, regionFilter, siteQuery]);
+  }, [rows, companyFilter, regionFilter, siteQuery, siteKeywordMap]);
 
   // 총계
   const total = useMemo(() => {
