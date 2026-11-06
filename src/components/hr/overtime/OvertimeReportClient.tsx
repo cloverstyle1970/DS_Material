@@ -1207,41 +1207,82 @@ export default function OvertimeReportClient() {
                   const s = new Date(r.start_at), e = new Date(r.end_at);
                   const ot = calcOvertimeResult(s, e, r.is_holiday);
                   return (
-                    <div key={r.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-mono text-gray-400">{r.report_no}</span>
-                            <StatusBadge status={r.approval_status} />
-                            {r.is_holiday && <span className="text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">{r.holiday_type ?? "휴일"}</span>}
-                            {(printCountMap[r.id] ?? 0) > 0 && <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">🖨️ {printCountMap[r.id]}회</span>}
-                          </div>
-                          <p className="mt-1 font-medium">{r.site_name}</p>
-                          <div className="mt-0.5 text-xs text-gray-500 space-y-0.5">
-                            <p>{s.toLocaleDateString("ko-KR")} {s.toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})} ~ {e.toLocaleDateString("ko-KR")} {e.toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}</p>
-                            <p className="text-blue-600 font-medium">{ot.display}</p>
-                            <p>작업사유: {r.work_reasons.join(", ") || "-"}</p>
-                            {author   && <p>작성자: {author.username}</p>}
-                            {approver && <p>승인자: {approver.username}</p>}
-                          </div>
-                          {r.approval_status === "rejected" && r.reject_reason && (
-                            <p className="mt-1 text-xs text-red-500">반려: {r.reject_reason}</p>
+                    <div key={r.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+                      {/* 1행: 뱃지 + 날짜 */}
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500">{r.report_no}</span>
+                          <StatusBadge status={r.approval_status} />
+                          {r.is_holiday && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 font-medium">
+                              {r.holiday_type ?? "휴일"}
+                            </span>
+                          )}
+                          {(printCountMap[r.id] ?? 0) > 0 && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                              🖨️ {printCountMap[r.id]}회
+                            </span>
                           )}
                         </div>
-                        <div className="flex flex-col gap-1 shrink-0">
+                        <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0 tabular-nums">
+                          {s.getFullYear()}-{String(s.getMonth()+1).padStart(2,"0")}-{String(s.getDate()).padStart(2,"0")} {String(s.getHours()).padStart(2,"0")}:{String(s.getMinutes()).padStart(2,"0")}
+                        </span>
+                      </div>
+
+                      {/* 2행: 현장명 */}
+                      <p className="font-semibold text-gray-900 dark:text-gray-100 leading-tight mb-0.5">{r.site_name}</p>
+
+                      {/* 3행: 작업사유 · 잔업 */}
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {r.work_reasons.length > 0 ? r.work_reasons.join(" · ") : "-"}
+                        {ot.display && (
+                          <span className="ml-1.5 text-blue-600 dark:text-blue-400 font-semibold">{ot.display}</span>
+                        )}
+                      </p>
+
+                      {/* 4행: 작성자 · 승인자 */}
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        {author?.username ?? ""}
+                        {author?.dept && <span> ({author.dept})</span>}
+                        {approver && <span className="text-gray-400 dark:text-gray-500"> · 승인자: {approver.username}</span>}
+                      </p>
+
+                      {/* 반려 사유 */}
+                      {r.approval_status === "rejected" && r.reject_reason && (
+                        <p className="text-xs text-red-500 dark:text-red-400 mt-1 font-medium">반려: {r.reject_reason}</p>
+                      )}
+
+                      {/* 액션 버튼 */}
+                      <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 flex flex-col gap-1">
+                        {canApprove(r) && (
+                          <div className="flex gap-1">
+                            <button onClick={() => approve(r)}
+                              className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50 whitespace-nowrap font-medium">
+                              승인
+                            </button>
+                            <button onClick={() => { setRejectModal({ id: r.id, reportNo: r.report_no }); setRejectReason(""); }}
+                              className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 whitespace-nowrap font-medium">
+                              반려
+                            </button>
+                          </div>
+                        )}
+                        <div className="flex gap-1">
                           {canEdit(r) && (
-                            <button onClick={() => openEdit(r)} className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded">수정</button>
+                            <button onClick={() => openEdit(r)}
+                              className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 whitespace-nowrap">
+                              수정
+                            </button>
                           )}
                           {canDelete(r) && (
-                            <button onClick={() => deleteReport(r.id, r.report_no)} className="px-2 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 rounded">삭제</button>
+                            <button onClick={() => deleteReport(r.id, r.report_no)}
+                              className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 whitespace-nowrap">
+                              삭제
+                            </button>
                           )}
-                          <button onClick={() => openEdit(r, true)} className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-900 text-white rounded">🖨️ 인쇄</button>
-                          {canApprove(r) && (
-                            <>
-                              <button onClick={() => approve(r)} className="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded">승인</button>
-                              <button onClick={() => { setRejectModal({ id:r.id, reportNo:r.report_no }); setRejectReason(""); }} className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded">반려</button>
-                            </>
-                          )}
+                          <button onClick={() => openEdit(r, true)}
+                            className="text-xs px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap ml-auto">
+                            🖨️ 인쇄
+                          </button>
                         </div>
                       </div>
                     </div>
