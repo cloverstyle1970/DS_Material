@@ -371,8 +371,17 @@ function AddSiteModal({ onClose, onSaved, editSite, existingElevators, limitedEd
           ) : (
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-2">
-                <label className={labelCls}>현장명 <span className="text-red-500">*</span></label>
-                <input value={name} onChange={e => setName(e.target.value)} required className={fieldCls} />
+                <label className={labelCls}>
+                  현장명 {!isEdit && <span className="text-red-500">*</span>}
+                  {isEdit && <span className="ml-1 text-[10px] text-gray-400 font-normal">(변경 불가 — 유지보수에서 수정)</span>}
+                </label>
+                <input
+                  value={name}
+                  readOnly={isEdit}
+                  onChange={isEdit ? undefined : e => setName(e.target.value)}
+                  required={!isEdit}
+                  className={fieldCls + (isEdit ? (isDark ? " !bg-gray-900/40 !text-gray-400 cursor-not-allowed" : " !bg-gray-100 !text-gray-500 cursor-not-allowed") : "")}
+                />
               </div>
               <div>
                 <label className={labelCls}>회사구분</label>
