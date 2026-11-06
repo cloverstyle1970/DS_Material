@@ -691,7 +691,7 @@ export default function SitesClient({ initial, elevators }: Props) {
   const [sites, setSites]       = useState(initial);
   const [allElevators, setAllElevators] = useState(elevators);
   const [query, setQuery]       = useState("");
-  const [companyFilter, setCompanyFilter] = useState<"전체" | "DS" | "TK">("전체");
+  const [companyFilter, setCompanyFilter] = useState<"전체" | "DS" | "TK" | "기타">("전체");
   const [selected, setSelected] = useState<SiteRecord | null>(null);
   const [showAdd, setShowAdd]   = useState(false);
   const [editTarget, setEditTarget] = useState<SiteRecord | null>(null);
@@ -819,8 +819,34 @@ export default function SitesClient({ initial, elevators }: Props) {
       );
     }
     // 검색어 없으면 회사 필터만 적용
+    if (companyFilter === "기타")
+      return sites.filter(s => { const c = normalizeCompany(s.companyType); return c !== "TK" && c !== "DS"; });
     return companyFilter !== "전체" ? sites.filter(s => normalizeCompany(s.companyType) === companyFilter) : sites;
   }, [sites, q, elevatorMatchBySite, companyFilter]);
+
+  const siteStats = useMemo(() => {
+    const activeSites = sites.filter(s => s.siteType !== "상실");
+    const tkSites  = activeSites.filter(s => normalizeCompany(s.companyType) === "TK");
+    const dsSites  = activeSites.filter(s => normalizeCompany(s.companyType) === "DS");
+    const etcSites = activeSites.filter(s => {
+      const c = normalizeCompany(s.companyType);
+      return c !== "TK" && c !== "DS";
+    });
+    const countElevs = (siteList: SiteRecord[]) => {
+      const nameSet = new Set(siteList.map(s => s.name));
+      return allElevators.filter(e => nameSet.has(e.siteName)).length;
+    };
+    const activeElevs = allElevators.filter(e => {
+      const site = sites.find(s => s.name === e.siteName);
+      return site?.siteType !== "상실";
+    });
+    return {
+      total:    { sites: activeSites.length, elevs: activeElevs.length },
+      tk:       { sites: tkSites.length,     elevs: countElevs(tkSites)  },
+      ds:       { sites: dsSites.length,     elevs: countElevs(dsSites)  },
+      etc:      { sites: etcSites.length,    elevs: countElevs(etcSites) },
+    };
+  }, [sites, allElevators]);
 
   const totalPages  = Math.max(1, Math.ceil(filteredSites.length / PAGE_SIZE));
   const safePage    = Math.min(page, totalPages);
@@ -1123,6 +1149,32 @@ export default function SitesClient({ initial, elevators }: Props) {
         </div>
       </div>
 
+      {/* 통계 카드 */}
+      <div className={`shrink-0 px-6 py-2 border-b flex gap-3 flex-wrap ${isDark ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
+        {([
+          { label: "전체",  color: "gray",  sites: siteStats.total.sites, elevs: siteStats.total.elevs },
+          { label: "TK",    color: "blue",  sites: siteStats.tk.sites,    elevs: siteStats.tk.elevs    },
+          { label: "DS",    color: "red",   sites: siteStats.ds.sites,    elevs: siteStats.ds.elevs    },
+          { label: "기타",  color: "slate", sites: siteStats.etc.sites,   elevs: siteStats.etc.elevs   },
+        ] as const).map(({ label, color, sites: sc, elevs: ec }) => {
+          const colorMap: Record<string, { bg: string; badge: string; text: string }> = {
+            gray:  { bg: isDark ? "bg-gray-700/60" : "bg-white",     badge: isDark ? "bg-gray-600 text-gray-200"  : "bg-gray-200 text-gray-700",  text: isDark ? "text-gray-300" : "text-gray-700" },
+            blue:  { bg: isDark ? "bg-blue-900/30" : "bg-blue-50",   badge: "bg-blue-600 text-white",                                             text: isDark ? "text-blue-300" : "text-blue-700" },
+            red:   { bg: isDark ? "bg-red-900/30"  : "bg-red-50",    badge: "bg-red-500 text-white",                                              text: isDark ? "text-red-300"  : "text-red-700"  },
+            slate: { bg: isDark ? "bg-slate-700/40": "bg-slate-50",  badge: isDark ? "bg-slate-500 text-white"    : "bg-slate-400 text-white",     text: isDark ? "text-slate-300": "text-slate-600"},
+          };
+          const c = colorMap[color];
+          return (
+            <div key={label} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${c.bg} ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+              <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${c.badge}`}>{label}</span>
+              <span className={`text-sm font-semibold ${c.text}`}>{sc.toLocaleString()}개소</span>
+              <span className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>/</span>
+              <span className={`text-sm font-semibold ${c.text}`}>{ec.toLocaleString()}대</span>
+            </div>
+          );
+        })}
+      </div>
+
       {/* 좌우 분할 패널 */}
       <div className="flex flex-1 min-h-0">
 
@@ -1145,13 +1197,14 @@ export default function SitesClient({ initial, elevators }: Props) {
               )}
             </div>
             <div className="mt-2 flex gap-1 p-1 bg-gray-100 dark:bg-gray-700 rounded-xl">
-              {(["전체", "DS", "TK"] as const).map(t => (
+              {(["전체", "DS", "TK", "기타"] as const).map(t => (
                 <button key={t} type="button" onClick={() => { setCompanyFilter(t); setPage(1); }}
                   className={`flex-1 py-1 rounded-lg text-xs font-semibold transition-colors ${
                     companyFilter === t
                       ? t === "전체" ? "bg-gray-900 text-white shadow-sm"
                         : t === "DS" ? "bg-red-500 text-white shadow-sm"
-                        : "bg-blue-600 text-white shadow-sm"
+                        : t === "TK" ? "bg-blue-600 text-white shadow-sm"
+                        : "bg-slate-500 text-white shadow-sm"
                       : isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-400 hover:text-gray-600"
                   }`}>{t}</button>
               ))}

@@ -696,31 +696,48 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
       return all;
     }
 
-    const [todayResult, pendingResult, lowStockResult, totalResult, recentResult, tkeSitesResult, dsSitesResult, allElevators, allSites] = await Promise.all([
+    const [todayResult, pendingResult, lowStockResult, totalResult, recentResult, allElevators, allSites] = await Promise.all([
       supabase.from("material_requests").select("*", { count: "exact", head: true }).gte("requested_at", `${today}T00:00:00`),
       supabase.from("material_requests").select("*", { count: "exact", head: true }).eq("status", "신청"),
       supabase.from("materials").select("*", { count: "exact", head: true }).lte("stock_qty", 0),
       supabase.from("materials").select("*", { count: "exact", head: true }),
       supabase.from("material_requests").select("*").order("requested_at", { ascending: false }).limit(10),
-      supabase.from("managed_sites").select("*", { count: "exact", head: true }).eq("company_type", "TK"),
-      supabase.from("managed_sites").select("*", { count: "exact", head: true }).eq("company_type", "DS"),
       fetchAll("site_elevators", "site_id"),
-      fetchAll("managed_sites", "id, company_type"),
+      fetchAll("managed_sites", "id, company_type, site_type, site_kind"),
     ]);
-    const tkeSites = tkeSitesResult.count ?? 0;
-    const dsSites = dsSitesResult.count ?? 0;
 
-    const totalElevators = allElevators.length;
+    // "자사" → "DS" 정규화 (SitesClient normalizeCompany와 동일 기준)
+    function normalizeType(t: string | null): string {
+      if (t === "자사") return "DS";
+      return t ?? "";
+    }
+    // 상실 여부 (site_type 우선, 없으면 site_kind 폴백 — dbToSite와 동일 기준)
+    function isSangsil(s: any): boolean {
+      const kind = s.site_type ?? s.site_kind ?? null;
+      return kind === "상실";
+    }
+
+    // 상실 제외한 활성 현장만 집계
+    const activeSites = allSites.filter((s: any) => !isSangsil(s));
+    const sangsilIds  = new Set<number>(allSites.filter((s: any) => isSangsil(s)).map((s: any) => s.id));
 
     // 신DB: 호기=site_elevators(site_id), 현장 회사구분=managed_sites(id→company_type)
+    // 상실 현장 호기 제외
+    const activeElevators = allElevators.filter((e: any) => !sangsilIds.has(e.site_id));
+    const totalElevators  = activeElevators.length;
+
     const siteTypeMap = new Map<number, string>();
-    allSites.forEach((s: any) => siteTypeMap.set(s.id, s.company_type));
+    activeSites.forEach((s: any) => siteTypeMap.set(s.id, normalizeType(s.company_type)));
+
+    const tkeSites  = activeSites.filter((s: any) => normalizeType(s.company_type) === "TK").length;
+    const dsSites   = activeSites.filter((s: any) => normalizeType(s.company_type) === "DS").length;
+    const etcSites  = activeSites.length - tkeSites - dsSites;
 
     let tkeElevators = 0;
     let dsElevators = 0;
     let otherElevators = 0;
 
-    allElevators.forEach((e: any) => {
+    activeElevators.forEach((e: any) => {
       const type = siteTypeMap.get(e.site_id);
       if (type === "TK") tkeElevators++;
       else if (type === "DS") dsElevators++;
@@ -732,9 +749,10 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
       pendingRequests:   pendingResult.count   ?? 0,
       lowStockMaterials: lowStockResult.count  ?? 0,
       totalMaterials:    totalResult.count     ?? 0,
-      totalSites:        tkeSites + dsSites,
+      totalSites:        activeSites.length,
       tkeSites,
       dsSites,
+      etcSites,
       totalElevators,
       tkeElevators,
       dsElevators,

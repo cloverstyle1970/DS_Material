@@ -11,7 +11,8 @@ export interface DashboardStats {
   totalSites: number;
   tkeSites: number;
   dsSites: number;
-  
+  etcSites: number;
+
   totalElevators: number;
   tkeElevators: number;
   dsElevators: number;
