@@ -10,6 +10,18 @@ interface Department { id: number; name: string; sort_order: number; is_active: 
 interface Crew { id: number; department_id: number; name: string; sort_order: number; is_active: boolean }
 interface UserRow { id: number; name: string; dept: string | null; rank: string | null; crew_id: number | null; hire_date: string | null }
 interface RankRow { id: number; name: string; sort_order: number }
+interface InspectionTeam {
+  id: number; name: string; team: string;
+  main_inspector: string | null; sub_inspector: string | null; sub_inspector2: string | null;
+}
+
+// inspection_teams.team 값 → 자재관리 부서명 매핑 (보수팀·상주팀만)
+const DEPT_TO_INSP_TEAM: Record<string, string> = {
+  "보수1팀": "1팀",
+  "보수2팀": "2팀",
+  "보수3팀": "3팀",
+  "상주팀":  "상주",
+};
 
 export default function TeamCrewClient() {
   const { user } = useAuth();
@@ -17,6 +29,8 @@ export default function TeamCrewClient() {
   const [crews, setCrews] = useState<Crew[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
   const [ranks, setRanks] = useState<RankRow[]>([]);
+  const [inspectionTeams, setInspectionTeams] = useState<InspectionTeam[]>([]);
+  const [siteCountByTeamId, setSiteCountByTeamId] = useState<Map<number, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [editingCrew, setEditingCrew] = useState<Crew | null>(null);
   const [addingForDept, setAddingForDept] = useState<Department | null>(null);
@@ -24,16 +38,24 @@ export default function TeamCrewClient() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [d, c, u, r] = await Promise.all([
+    const [d, c, u, r, it, ms] = await Promise.all([
       supabase.from("departments").select("id, name, sort_order, is_active").eq("is_active", true).order("sort_order"),
       supabase.from("crews").select("id, department_id, name, sort_order, is_active").order("sort_order"),
       supabase.from("accounts").select("id, name:username, dept, rank, crew_id, hire_date").eq("status", "재직").order("username"),
       supabase.from("ranks").select("id, name, sort_order"),
+      supabase.from("inspection_teams").select("id, name, team, main_inspector, sub_inspector, sub_inspector2").order("team").order("name"),
+      supabase.from("managed_sites").select("team_id").not("team_id", "is", null),
     ]);
     setDepts((d.data ?? []) as Department[]);
     setCrews((c.data ?? []) as Crew[]);
     setUsers((u.data ?? []) as UserRow[]);
     setRanks((r.data ?? []) as RankRow[]);
+    setInspectionTeams((it.data ?? []) as InspectionTeam[]);
+    const cm = new Map<number, number>();
+    for (const row of (ms.data ?? [])) {
+      if (row.team_id != null) cm.set(row.team_id, (cm.get(row.team_id) ?? 0) + 1);
+    }
+    setSiteCountByTeamId(cm);
     setLoading(false);
   }, []);
 
@@ -155,10 +177,17 @@ export default function TeamCrewClient() {
         )}
 
         {!loading && depts.map(dept => {
-          const dCrews = (crewsByDept.get(dept.id) ?? []).sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
+          const inspTeamKey = DEPT_TO_INSP_TEAM[dept.name];
+          const isInspDept = !!inspTeamKey;
           const dUsers = usersByDept.get(dept.name) ?? [];
+          const deptInspTeams = isInspDept
+            ? inspectionTeams.filter(t => t.team === inspTeamKey)
+            : [];
+          const dCrews = isInspDept
+            ? []
+            : (crewsByDept.get(dept.id) ?? []).sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
           const dCrewIdSet = new Set(dCrews.map(c => c.id));
-          const unassigned = dUsers.filter(u => !u.crew_id || !dCrewIdSet.has(u.crew_id));
+          const unassigned = isInspDept ? [] : dUsers.filter(u => !u.crew_id || !dCrewIdSet.has(u.crew_id));
           const isOpen = openDeptIds.has(dept.id);
 
           return (
@@ -169,10 +198,12 @@ export default function TeamCrewClient() {
                   <span className="text-gray-400 dark:text-gray-500 text-xs w-3">{isOpen ? "▼" : "▶"}</span>
                   <span>📁 {dept.name}</span>
                   <span className="text-[11px] font-normal text-gray-500 dark:text-gray-400">
-                    · 사원 {dUsers.length}명 · 조 {dCrews.length}개 · 미배정 {unassigned.length}명
+                    {isInspDept
+                      ? `· 사원 ${dUsers.length}명 · 조 ${deptInspTeams.length}개`
+                      : `· 사원 ${dUsers.length}명 · 조 ${dCrews.length}개 · 미배정 ${unassigned.length}명`}
                   </span>
                 </div>
-                {canWrite && (
+                {canWrite && !isInspDept && (
                   <span onClick={e => { e.stopPropagation(); setAddingForDept(dept); }}
                     className="px-2.5 py-1 text-[11px] rounded bg-slate-700 text-white font-semibold hover:bg-slate-800 cursor-pointer">
                     + 조 추가
@@ -182,6 +213,7 @@ export default function TeamCrewClient() {
 
               {isOpen && (
                 <div className="border-t border-gray-100 dark:border-gray-700 px-4 py-3 space-y-3">
+                  {/* 팀 전체 구성원 — 공통 */}
                   {dUsers.length > 0 && (
                     <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/30 px-3 py-2">
                       <div className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">👥 팀 전체 구성원 (직급순)</div>
@@ -194,86 +226,134 @@ export default function TeamCrewClient() {
                       </div>
                     </div>
                   )}
-                  {dCrews.length === 0 && (
-                    <div className="text-center text-[11px] text-gray-400 dark:text-gray-500 py-4">
-                      등록된 조가 없습니다. 우측 상단 [+ 조 추가] 로 시작하세요.
-                    </div>
-                  )}
-                  {dCrews.map(c => {
-                    const members = sortByRank(dUsers.filter(u => u.crew_id === c.id));
-                    return (
-                      <div key={c.id} className={`rounded-lg border ${c.is_active ? "border-gray-200 dark:border-gray-600" : "border-dashed border-gray-300 dark:border-gray-600 opacity-60"} bg-gray-50 dark:bg-gray-700/30 px-3 py-2`}>
-                        <div className="flex items-center justify-between gap-2 mb-1.5">
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="font-bold text-gray-800 dark:text-gray-100">🧑‍🤝‍🧑 {c.name}</span>
-                            <span className="text-gray-500 dark:text-gray-400">· {members.length}명</span>
-                            {!c.is_active && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">비활성</span>}
-                          </div>
-                          {canWrite && (
-                            <div className="flex items-center gap-1.5">
-                              <button type="button" onClick={() => setEditingCrew(c)}
-                                className="px-2.5 py-1 text-[11px] font-semibold rounded bg-blue-600 text-white hover:bg-blue-700">
-                                ✏️ 조 수정
-                              </button>
-                              <button type="button" onClick={() => void removeCrew(c)}
-                                className="px-2.5 py-1 text-[11px] font-semibold rounded bg-red-500 text-white hover:bg-red-600">
-                                🗑 삭제
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {members.length === 0 && (
-                            <span className="text-[11px] text-gray-400 dark:text-gray-500 italic">배정된 사원 없음</span>
-                          )}
-                          {members.map(m => (
-                            <span key={m.id}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200">
-                              {m.name} {m.rank && <span className="text-gray-400 dark:text-gray-500">({m.rank})</span>}
-                              {canWrite && (
-                                <button type="button" onClick={() => void moveMemberToCrew(m.id, null)}
-                                  title="조 배정 해제"
-                                  className="text-gray-400 hover:text-red-500 leading-none">×</button>
-                              )}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
 
-                  {unassigned.length > 0 && (
-                    <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-900/10 px-3 py-2">
-                      <div className="text-xs font-bold text-amber-800 dark:text-amber-200 mb-1.5">⚠️ 미배정 사원 ({unassigned.length}명)</div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-xs">
-                          <tbody>
-                            {sortByRank(unassigned).map(m => (
-                              <tr key={m.id} className="border-t border-amber-100 dark:border-amber-800/40">
-                                <td className="py-1 text-gray-800 dark:text-gray-200">
-                                  {m.name} {m.rank && <span className="text-gray-400 dark:text-gray-500">({m.rank})</span>}
-                                  {m.crew_id && <span className="ml-1 text-[10px] text-red-600 dark:text-red-400">[타 부서 조에 잘못 배정됨]</span>}
-                                </td>
-                                <td className="py-1 text-right">
-                                  {!canWrite ? null : dCrews.filter(c => c.is_active).length === 0 ? (
-                                    <span className="text-[10px] text-amber-700 dark:text-amber-300">활성 조 없음</span>
-                                  ) : (
-                                    <select value=""
-                                      onChange={e => { const cid = Number(e.target.value); if (cid) void moveMemberToCrew(m.id, cid); }}
-                                      className="text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200">
-                                      <option value="">조 배정 ▼</option>
-                                      {dCrews.filter(c => c.is_active).map(c => (
-                                        <option key={c.id} value={c.id}>{c.name}</option>
-                                      ))}
-                                    </select>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                  {isInspDept ? (
+                    /* ── 보수팀·상주팀: 유지보수 inspection_teams 읽기 전용 ── */
+                    <>
+                      <div className="text-[11px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded px-3 py-1.5">
+                        🔗 유지보수 점검조 데이터 (읽기 전용) — 수정은 유지보수 시스템에서 하세요
                       </div>
-                    </div>
+                      {deptInspTeams.length === 0 ? (
+                        <div className="text-center text-[11px] text-gray-400 dark:text-gray-500 py-4">
+                          등록된 조가 없습니다.
+                        </div>
+                      ) : deptInspTeams.map(insp => {
+                        const siteCount = siteCountByTeamId.get(insp.id) ?? 0;
+                        const members = ([
+                          insp.main_inspector ? { name: insp.main_inspector, isMain: true  } : null,
+                          insp.sub_inspector  ? { name: insp.sub_inspector,  isMain: false } : null,
+                          insp.sub_inspector2 ? { name: insp.sub_inspector2, isMain: false } : null,
+                        ] as ({ name: string; isMain: boolean } | null)[]).filter((m): m is { name: string; isMain: boolean } => m !== null);
+                        return (
+                          <div key={insp.id} className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/30 px-3 py-2">
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <span className="text-xs font-bold text-gray-800 dark:text-gray-100">🧑‍🤝‍🧑 {insp.name}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold">{insp.team}</span>
+                              {siteCount > 0 && (
+                                <span className="text-[10px] text-gray-500 dark:text-gray-400">현장 {siteCount}곳</span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {members.length === 0 ? (
+                                <span className="text-[11px] text-gray-400 dark:text-gray-500 italic">배정된 사원 없음</span>
+                              ) : members.map((m, i) => (
+                                <span key={i}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200">
+                                  {m.name}
+                                  {m.isMain && (
+                                    <span className="text-[9px] px-1 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-bold">주</span>
+                                  )}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>
+                  ) : (
+                    /* ── 그 외 부서: 기존 crews UI ── */
+                    <>
+                      {dCrews.length === 0 && (
+                        <div className="text-center text-[11px] text-gray-400 dark:text-gray-500 py-4">
+                          등록된 조가 없습니다. 우측 상단 [+ 조 추가] 로 시작하세요.
+                        </div>
+                      )}
+                      {dCrews.map(c => {
+                        const members = sortByRank(dUsers.filter(u => u.crew_id === c.id));
+                        return (
+                          <div key={c.id} className={`rounded-lg border ${c.is_active ? "border-gray-200 dark:border-gray-600" : "border-dashed border-gray-300 dark:border-gray-600 opacity-60"} bg-gray-50 dark:bg-gray-700/30 px-3 py-2`}>
+                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="font-bold text-gray-800 dark:text-gray-100">🧑‍🤝‍🧑 {c.name}</span>
+                                <span className="text-gray-500 dark:text-gray-400">· {members.length}명</span>
+                                {!c.is_active && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">비활성</span>}
+                              </div>
+                              {canWrite && (
+                                <div className="flex items-center gap-1.5">
+                                  <button type="button" onClick={() => setEditingCrew(c)}
+                                    className="px-2.5 py-1 text-[11px] font-semibold rounded bg-blue-600 text-white hover:bg-blue-700">
+                                    ✏️ 조 수정
+                                  </button>
+                                  <button type="button" onClick={() => void removeCrew(c)}
+                                    className="px-2.5 py-1 text-[11px] font-semibold rounded bg-red-500 text-white hover:bg-red-600">
+                                    🗑 삭제
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {members.length === 0 && (
+                                <span className="text-[11px] text-gray-400 dark:text-gray-500 italic">배정된 사원 없음</span>
+                              )}
+                              {members.map(m => (
+                                <span key={m.id}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200">
+                                  {m.name} {m.rank && <span className="text-gray-400 dark:text-gray-500">({m.rank})</span>}
+                                  {canWrite && (
+                                    <button type="button" onClick={() => void moveMemberToCrew(m.id, null)}
+                                      title="조 배정 해제"
+                                      className="text-gray-400 hover:text-red-500 leading-none">×</button>
+                                  )}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {unassigned.length > 0 && (
+                        <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-900/10 px-3 py-2">
+                          <div className="text-xs font-bold text-amber-800 dark:text-amber-200 mb-1.5">⚠️ 미배정 사원 ({unassigned.length}명)</div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                              <tbody>
+                                {sortByRank(unassigned).map(m => (
+                                  <tr key={m.id} className="border-t border-amber-100 dark:border-amber-800/40">
+                                    <td className="py-1 text-gray-800 dark:text-gray-200">
+                                      {m.name} {m.rank && <span className="text-gray-400 dark:text-gray-500">({m.rank})</span>}
+                                      {m.crew_id && <span className="ml-1 text-[10px] text-red-600 dark:text-red-400">[타 부서 조에 잘못 배정됨]</span>}
+                                    </td>
+                                    <td className="py-1 text-right">
+                                      {!canWrite ? null : dCrews.filter(c => c.is_active).length === 0 ? (
+                                        <span className="text-[10px] text-amber-700 dark:text-amber-300">활성 조 없음</span>
+                                      ) : (
+                                        <select value=""
+                                          onChange={e => { const cid = Number(e.target.value); if (cid) void moveMemberToCrew(m.id, cid); }}
+                                          className="text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200">
+                                          <option value="">조 배정 ▼</option>
+                                          {dCrews.filter(c => c.is_active).map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                          ))}
+                                        </select>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
