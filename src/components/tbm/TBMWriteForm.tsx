@@ -30,7 +30,7 @@ interface HeatRest {
   rest_method: string;
 }
 
-interface Site { id: number; name: string }
+interface Site { id: number; name: string; search_keywords?: string | null }
 interface Elevator { id: number; site_name: string; unit_name: string }
 interface UserMini { id: number; name: string | null; dept: string | null; signature_url: string | null }
 interface Worker { name: string; user_id: number | null }
@@ -111,7 +111,7 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
         supabase.from("tbm_fault_types").select("*").eq("is_active", true).order("sort_order"),
         supabase.from("tbm_checklist_items").select("*").eq("is_active", true).order("sort_order"),
         // 신DB: 현장=managed_sites(site_name→name 별칭), 호기=site_elevators(site_id), 사원=accounts(username→name)
-        supabase.from("managed_sites").select("id, name:site_name").order("site_name"),
+        supabase.from("managed_sites").select("id, name:site_name, search_keywords").order("site_name"),
         supabase.from("site_elevators").select("id, site_id, installation_place, unit_name").order("installation_place"),
         supabase.from("accounts").select("id, name:username, dept, signature_url").eq("status", "재직").order("username"),
       ]);
@@ -653,6 +653,7 @@ export default function TBMWriteForm({ onSaved }: { onSaved: () => void }) {
             onChange={v => { setSiteName(v); setScheduleId(null); }}
             options={sites}
             getLabel={s => s.name}
+            filter={(s, q) => s.name.toLowerCase().includes(q.toLowerCase()) || (s.search_keywords?.toLowerCase().includes(q.toLowerCase()) ?? false)}
             onSelect={() => setElevatorName("")}
             nextRef={elevatorRef as unknown as React.RefObject<{ focus: () => void }>}
             placeholder="현장명 * (입력 후 ↓·↑·Enter)"

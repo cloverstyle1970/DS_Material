@@ -38,7 +38,7 @@ interface AnnualEvent {
   note: string;
 }
 
-interface SiteOption { id: number; name: string }
+interface SiteOption { id: number; name: string; search_keywords?: string | null }
 
 const EVENT_COLORS: Record<AnnualEvent["type"], string> = {
   "연차": "bg-green-500 text-white",
@@ -615,7 +615,7 @@ function CalendarContent() {
                     onChange={e => setSiteName(e.target.value)}
                     onKeyDown={e => {
                       if (e.key === "Enter" && siteName.trim()) {
-                        const matched = sites.filter(s => s.name.toLowerCase().includes(siteName.toLowerCase()));
+                        const matched = sites.filter(s => s.name.toLowerCase().includes(siteName.toLowerCase()) || (s.search_keywords?.toLowerCase().includes(siteName.toLowerCase()) ?? false));
                         if (matched.length === 1) {
                           e.preventDefault();
                           setSiteName(matched[0].name);

@@ -23,7 +23,7 @@ export interface ConstructionRequest {
   companyType: "TK" | "DS" | "" | null;
 }
 
-interface SiteOption { id: number; name: string }
+interface SiteOption { id: number; name: string; search_keywords?: string | null }
 
 export default function ConstructionRequestClient() {
   const { user } = useAuth();
@@ -330,7 +330,7 @@ export default function ConstructionRequestClient() {
                     onChange={e => setSiteName(e.target.value)}
                     onKeyDown={e => {
                       if (e.key === "Enter" && siteName.trim()) {
-                        const matched = sites.filter(s => s.name.toLowerCase().includes(siteName.toLowerCase()));
+                        const matched = sites.filter(s => s.name.toLowerCase().includes(siteName.toLowerCase()) || (s.search_keywords?.toLowerCase().includes(siteName.toLowerCase()) ?? false));
                         if (matched.length === 1) {
                           e.preventDefault();
                           setSiteName(matched[0].name);

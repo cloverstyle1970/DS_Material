@@ -16,7 +16,7 @@ import { PhotoIconBtn } from "@/components/ui/PhotoIconBtn";
 import DraggableModal from "@/components/common/DraggableModal";
 import SerialEntryModal from "./SerialEntryModal";
 
-interface SiteOption   { id: number; name: string }
+interface SiteOption   { id: number; name: string; search_keywords?: string | null }
 interface VendorOption { id: number; name: string }
 
 interface Row {
@@ -675,14 +675,14 @@ function MatInlineSearch({ value, materialId, matType, onMultiSelect, onChange }
 
 function SiteInlineSearch({ value, onChange, sites, cls }: {
   value: string; onChange: (v: string) => void;
-  sites: { id: number; name: string }[]; cls?: string;
+  sites: { id: number; name: string; search_keywords?: string | null }[]; cls?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
   const ulRef = useRef<HTMLUListElement>(null);
   const base = cls ?? inputCls;
-  const suggestions = value.trim() ? sites.filter(s => s.name.toLowerCase().includes(value.toLowerCase())).slice(0, 10) : [];
+  const suggestions = value.trim() ? sites.filter(s => s.name.toLowerCase().includes(value.toLowerCase()) || (s.search_keywords?.toLowerCase().includes(value.toLowerCase()) ?? false)).slice(0, 10) : [];
 
   useEffect(() => { setFocusedIndex(-1); }, [value]);
 

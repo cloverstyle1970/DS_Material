@@ -11,7 +11,7 @@ import { isRepairMaterial, isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-st
 import DraggableModal from "@/components/common/DraggableModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 
-interface SiteOption { id: number; name: string; companyType: string | null }
+interface SiteOption { id: number; name: string; companyType: string | null; search_keywords?: string | null }
 
 interface Row {
   id: string;
@@ -54,7 +54,7 @@ export default function MaterialRequestEntry() {
 
   useEffect(() => {
     api.get<{ id: number; name: string; companyType?: string | null }[]>("/api/sites")
-      .then(data => setSites(data.map(s => ({ id: s.id, name: s.name, companyType: s.companyType ?? null }))))
+      .then(data => setSites(data.map(s => ({ id: s.id, name: s.name, companyType: s.companyType ?? null, search_keywords: (s as { search_keywords?: string | null }).search_keywords ?? null }))))
       .catch(() => {});
   }, []);
 
@@ -491,7 +491,7 @@ function FormField({ label, required, wide, children }: { label: string; require
 function SiteInlineSearch({ value, onChange, sites }: {
   value: string;
   onChange: (v: string) => void;
-  sites: { id: number; name: string }[];
+  sites: { id: number; name: string; search_keywords?: string | null }[];
 }) {
   const [open, setOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
@@ -499,7 +499,7 @@ function SiteInlineSearch({ value, onChange, sites }: {
   const ulRef = useRef<HTMLUListElement>(null);
 
   const suggestions = value.trim()
-    ? sites.filter(s => s.name.toLowerCase().includes(value.toLowerCase())).slice(0, 10)
+    ? sites.filter(s => s.name.toLowerCase().includes(value.toLowerCase()) || (s.search_keywords?.toLowerCase().includes(value.toLowerCase()) ?? false)).slice(0, 10)
     : [];
 
   useEffect(() => { setFocusedIndex(-1); }, [value]);

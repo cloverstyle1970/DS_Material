@@ -18,7 +18,7 @@ import DraggableModal from "@/components/common/DraggableModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 import PurchaseOrderPrintPaper, { POPrintCompany, POShipInfo, POShipPlace } from "./PurchaseOrderPrintPaper";
 
-interface SiteOption   { id: number; name: string; alias?: string | null; address?: string | null }
+interface SiteOption   { id: number; name: string; alias?: string | null; address?: string | null; search_keywords?: string | null }
 interface VendorOption { id: number; name: string }
 
 interface Row {
@@ -736,7 +736,8 @@ function SiteInlineSearch({ value, onChange, sites, readOnly }: { value: string;
   const suggestions = q
     ? sites.filter(s =>
         s.name.toLowerCase().includes(q) ||
-        (s.alias?.toLowerCase().includes(q) ?? false)
+        (s.alias?.toLowerCase().includes(q) ?? false) ||
+        (s.search_keywords?.toLowerCase().includes(q) ?? false)
       ).slice(0, 10)
     : [];
 

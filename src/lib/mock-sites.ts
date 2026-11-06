@@ -4,6 +4,7 @@ export interface SiteRecord {
   id: number;
   name: string;
   alias: string | null;
+  search_keywords: string | null;
   ledgerNo: string | null;
   siteType: string | null;
   companyType: string | null;
@@ -41,6 +42,7 @@ export function getSites(query?: string): SiteRecord[] {
   return sites.filter(s =>
     s.name.toLowerCase().includes(q) ||
     (s.alias?.toLowerCase().includes(q) ?? false) ||
+    (s.search_keywords?.toLowerCase().includes(q) ?? false) ||
     (s.primaryInspector?.toLowerCase().includes(q) ?? false) ||
     (s.subInspector?.toLowerCase().includes(q) ?? false) ||
     (s.address?.toLowerCase().includes(q) ?? false) ||

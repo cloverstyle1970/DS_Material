@@ -18,7 +18,7 @@ function regionsOf(company: string): readonly string[] {
   return COMPANY_REGIONS[company] ?? [];
 }
 
-interface SiteOption { id: number; name: string }
+interface SiteOption { id: number; name: string; search_keywords?: string | null }
 
 interface Line {
   id: string;
@@ -131,10 +131,10 @@ export default function IncentiveEntryClient() {
     (async () => {
       const { data, error } = await supabase
         .from("managed_sites")
-        .select("id, name:site_name")
+        .select("id, name:site_name, search_keywords")
         .order("site_name", { ascending: true });
       if (error) { console.error("[incentive-entry] load sites", error); return; }
-      setSites((data ?? []).filter((s): s is SiteOption => !!s?.name));
+      setSites((data ?? []).filter(s => !!s?.name) as SiteOption[]);
     })();
   }, []);
 
@@ -789,7 +789,7 @@ function SiteCellSelect({ value, onChange, sites }: { value: string; onChange: (
   }, [open]);
 
   const q = query.trim().toLowerCase();
-  const filtered = q ? sites.filter(s => s.name.toLowerCase().includes(q)) : sites;
+  const filtered = q ? sites.filter(s => s.name.toLowerCase().includes(q) || (s.search_keywords?.toLowerCase().includes(q) ?? false)) : sites;
 
   function select(name: string) { setQuery(name); onChange(name); setOpen(false); }
 

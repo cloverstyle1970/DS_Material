@@ -146,6 +146,7 @@ function dbToSite(r: any): SiteRecord {
     id:                r.id,
     name:              r.site_name,   // managed_sites.site_name
     alias:             r.alias              ?? null,
+    search_keywords:   r.search_keywords    ?? null,
     ledgerNo:          r.ledger_no          ?? null,
     siteType:          r.site_type          ?? r.site_kind ?? null,
     companyType:       r.company_type       ?? null,

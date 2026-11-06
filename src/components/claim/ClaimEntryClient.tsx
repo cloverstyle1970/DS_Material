@@ -23,7 +23,7 @@ const MODES: { key: ClaimMode; label: string; icon: string; desc: string; color:
   { key: "당직선출고",   label: "당직 (선출고)",      icon: "🌙", desc: "당직 중 즉시 출고 → 사후 견적요청 처리.",     color: "bg-purple-50 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300" },
 ];
 
-interface SiteOption { id: number; name: string; alias?: string | null }
+interface SiteOption { id: number; name: string; alias?: string | null; search_keywords?: string | null }
 
 // ─── 본인 청구 이력 ─────────────────────────────────
 type HistoryKind = "유상견적요청" | "무상신청" | "당직선출고";
@@ -1320,7 +1320,7 @@ function SiteInlineSearch({
   const ref = useRef<HTMLDivElement>(null);
   const q = value.trim().toLowerCase();
   const suggestions = q
-    ? sites.filter(s => s.name.toLowerCase().includes(q) || (s.alias?.toLowerCase().includes(q) ?? false)).slice(0, 12)
+    ? sites.filter(s => s.name.toLowerCase().includes(q) || (s.alias?.toLowerCase().includes(q) ?? false) || (s.search_keywords?.toLowerCase().includes(q) ?? false)).slice(0, 12)
     : [];
 
   useEffect(() => { setFocusedIndex(-1); }, [value]);

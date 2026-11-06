@@ -19,7 +19,7 @@ import ElevatorPicker from "@/components/common/ElevatorPicker";
 import { formatDate as sharedFormatYmd } from "@/lib/input-format";
 import OutboundDeliveryNotePaper, { DNReceiver, DNVendor } from "./OutboundDeliveryNotePaper";
 
-interface SiteOption { id: number; name: string }
+interface SiteOption { id: number; name: string; search_keywords?: string | null }
 
 interface Row {
   id: string;
@@ -960,12 +960,12 @@ function MatInlineSearch({ value, materialId, matType, onMultiSelect, onChange }
   );
 }
 
-function SiteInlineSearch({ value, onChange, sites }: { value: string; onChange: (v: string) => void; sites: { id: number; name: string }[] }) {
+function SiteInlineSearch({ value, onChange, sites }: { value: string; onChange: (v: string) => void; sites: { id: number; name: string; search_keywords?: string | null }[] }) {
   const [open, setOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
   const ulRef = useRef<HTMLUListElement>(null);
-  const suggestions = value.trim() ? sites.filter(s => s.name.toLowerCase().includes(value.toLowerCase())).slice(0, 10) : [];
+  const suggestions = value.trim() ? sites.filter(s => s.name.toLowerCase().includes(value.toLowerCase()) || (s.search_keywords?.toLowerCase().includes(value.toLowerCase()) ?? false)).slice(0, 10) : [];
 
   useEffect(() => { setFocusedIndex(-1); }, [value]);
 

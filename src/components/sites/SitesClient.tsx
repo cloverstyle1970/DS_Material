@@ -798,6 +798,7 @@ export default function SitesClient({ initial, elevators }: Props) {
       return sites.filter(s =>
         s.name.toLowerCase().includes(q) ||
         (s.alias?.toLowerCase().includes(q) ?? false) ||
+        (s.search_keywords?.toLowerCase().includes(q) ?? false) ||
         (s.primaryInspector?.toLowerCase().includes(q) ?? false) ||
         (s.subInspector?.toLowerCase().includes(q) ?? false) ||
         (s.subInspector2?.toLowerCase().includes(q) ?? false) ||

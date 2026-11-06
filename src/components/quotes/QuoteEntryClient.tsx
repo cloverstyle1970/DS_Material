@@ -39,6 +39,7 @@ interface SiteOption {
   id: number;
   name: string;
   alias?: string | null;
+  search_keywords?: string | null;
 }
 
 interface SiteContractInfo {
@@ -1792,7 +1793,8 @@ function SiteInlineSearch({
   const suggestions = q
     ? sites.filter(s =>
         s.name.toLowerCase().includes(q) ||
-        (s.alias?.toLowerCase().includes(q) ?? false)
+        (s.alias?.toLowerCase().includes(q) ?? false) ||
+        (s.search_keywords?.toLowerCase().includes(q) ?? false)
       ).slice(0, 12)
     : [];
 
