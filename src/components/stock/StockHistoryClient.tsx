@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
 import Link from "next/link";
 import * as XLSX from "xlsx";
@@ -201,14 +201,14 @@ export default function StockHistoryClient({ mode, initial }: Props) {
     { key: null,           label: "비고",     sortable: false, optional: "note" },
   ], [isInbound]);
 
-  // 현장명 검색 키워드 맵: 현장명(lowered) → alias + search_keywords 를 소문자로 합쳐둠
+  // 현장명 검색 키워드 맵: 현장명(trim·lowered) → alias + search_keywords 를 소문자로 합쳐둠
   // 거래내역의 siteName 은 managed_sites.site_name 의 스냅샷 문자열. 별칭·검색키워드로도 찾을 수 있게
   // managed_sites 의 보조 필드를 매핑해 필터 단계에서 함께 검사한다.
   const siteKeywordMap = useMemo(() => {
     const m = new Map<string, string>();
     for (const s of sites) {
       const parts = [s.alias, s.search_keywords].filter(Boolean).join(" ").toLowerCase();
-      if (parts) m.set(s.name.toLowerCase(), parts);
+      if (parts) m.set(s.name.trim().toLowerCase(), parts);
     }
     return m;
   }, [sites]);
@@ -220,9 +220,9 @@ export default function StockHistoryClient({ mode, initial }: Props) {
       if (companyFilter === "TK" && !isTk) return false;
       if (companyFilter === "DS" && isTk) return false;
     }
-    if (search.siteName) {
-      const q = search.siteName.toLowerCase();
-      const siteName = (t.siteName ?? "").toLowerCase();
+    if (search.siteName.trim()) {
+      const q = search.siteName.trim().toLowerCase();
+      const siteName = (t.siteName ?? "").trim().toLowerCase();
       if (!siteName.includes(q) && !(siteKeywordMap.get(siteName) ?? "").includes(q)) return false;
     }
     if (search.userName && !t.userName.toLowerCase().includes(search.userName.toLowerCase())) return false;
@@ -421,12 +421,10 @@ export default function StockHistoryClient({ mode, initial }: Props) {
             onChange={e => setSearch(p => ({ ...p, matQuery: e.target.value }))}
             placeholder="품목코드·자재명·규격·S/N"
             className={inputCls() + " w-56"} />
-          <Autocomplete
+          <SiteSearchInput
             value={search.siteName}
             onChange={v => setSearch(p => ({ ...p, siteName: v }))}
-            items={sites.map(s => s.name)}
-            placeholder="현장명"
-            width="w-44"
+            sites={sites}
           />
           <Autocomplete
             value={search.userName}
@@ -958,5 +956,67 @@ function BulkOutboundModal({
         </div>
       </div>
     </DraggableModal>
+  );
+}
+
+// ── 현장명 검색 입력 (별칭·search_keywords 자동완성 지원) ──────────────
+function SiteSearchInput({ value, onChange, sites }: {
+  value: string;
+  onChange: (v: string) => void;
+  sites: SiteOption[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const v = value.trim().toLowerCase();
+  const suggestions = useMemo(() => {
+    if (!v) return [] as SiteOption[];
+    return sites.filter(s =>
+      s.name.toLowerCase().includes(v) ||
+      (s.alias?.toLowerCase().includes(v) ?? false) ||
+      (s.search_keywords?.toLowerCase().includes(v) ?? false)
+    ).slice(0, 10);
+  }, [v, sites]);
+
+  useEffect(() => {
+    function h(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  const showDropdown = open && focused && suggestions.length > 0;
+
+  return (
+    <div ref={ref} className="relative">
+      <input
+        type="text" lang="ko" autoComplete="off" placeholder="현장명·키워드"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onFocus={() => { setFocused(true); setOpen(true); }}
+        onBlur={() => setFocused(false)}
+        className={inputCls() + " w-44"}
+      />
+      {showDropdown && (
+        <ul className="absolute z-50 top-full left-0 mt-1 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+          {suggestions.map(s => (
+            <li key={s.id}>
+              <button
+                type="button"
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => { onChange(s.name); setOpen(false); }}
+                className="w-full text-left px-3 py-2 text-xs text-gray-800 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+              >
+                <div className="truncate">{s.name}</div>
+                {(s.alias || s.search_keywords) && (
+                  <div className="text-[10px] text-gray-400 dark:text-gray-500 truncate">
+                    {[s.alias, s.search_keywords].filter(Boolean).join(" · ")}
+                  </div>
+                )}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
