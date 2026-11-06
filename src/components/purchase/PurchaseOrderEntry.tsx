@@ -14,6 +14,7 @@ import { isTkMaterial, TK_TEXT_CLASS, isRepairMaterial } from "@/lib/material-st
 import { PhotoIconBtn } from "@/components/ui/PhotoIconBtn";
 import { supabase } from "@/lib/supabase";
 import { generateDocNo } from "@/lib/document-no";
+import { useSiteKeywordMap } from "@/lib/useSiteKeywordMap";
 import DraggableModal from "@/components/common/DraggableModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 import PurchaseOrderPrintPaper, { POPrintCompany, POShipInfo, POShipPlace } from "./PurchaseOrderPrintPaper";
@@ -1049,7 +1050,16 @@ function MatInlineSearch({ value, materialId, matType, onMultiSelect, onChange }
 
 function RequestPopup({ requests, onSelect, onClose }: { requests: MaterialRequestRecord[]; onSelect: (r: MaterialRequestRecord) => void; onClose: () => void }) {
   const [q, setQ] = useState("");
-  const filtered = requests.filter(r => !q || (r.siteName?.toLowerCase().includes(q.toLowerCase()) ?? false) || r.requesterName.toLowerCase().includes(q.toLowerCase()) || r.items.some(i => i.materialName.toLowerCase().includes(q.toLowerCase())));
+  const siteKeywordMap = useSiteKeywordMap();
+  const filtered = requests.filter(r => {
+    if (!q) return true;
+    const ql = q.toLowerCase();
+    const siteLc = (r.siteName ?? "").trim().toLowerCase();
+    return siteLc.includes(ql) ||
+      (siteKeywordMap.get(siteLc) ?? "").includes(ql) ||
+      r.requesterName.toLowerCase().includes(ql) ||
+      r.items.some(i => i.materialName.toLowerCase().includes(ql));
+  });
   return (
     <DraggableModal
       open={true}

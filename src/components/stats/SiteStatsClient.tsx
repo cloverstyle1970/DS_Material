@@ -9,6 +9,7 @@ import { useAuth, isViewOnly, isNonManager } from "@/context/AuthContext";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { useViewMode } from "@/context/ViewModeContext";
 import { isTkMaterial } from "@/lib/material-style";
+import { useSiteKeywordMap, matchSiteKeyword } from "@/lib/useSiteKeywordMap";
 
 interface Transaction {
   id: number;
@@ -35,6 +36,7 @@ export default function SiteStatsClient() {
   // 엑셀에는 전체 금액이 담기므로 다운로드도 관리자 전용으로 제한.
   const canDownload = showFin;
   const [selectedSite, setSelectedSite] = useState<string>("");
+  const siteKeywordMap = useSiteKeywordMap();
   // 좌측 '현장별 투입 현황'에서 현장명 클릭 시, 우측 '자재별 투입 현황'만 해당 현장으로 좁히는 필터.
   // (좌측 목록은 그대로 유지 — 다른 현장을 이어서 클릭할 수 있도록)
   const [detailSite, setDetailSite] = useState<string>("");
@@ -146,12 +148,11 @@ export default function SiteStatsClient() {
   }
 
   const filtered = useMemo(() => {
-    const siteQuery = selectedSite.trim().toLowerCase();
     return transactions.filter(t => {
       const d = t.createdAt.substring(0, 10);
       if (dateFrom && d < dateFrom) return false;
       if (dateTo   && d > dateTo)   return false;
-      if (siteQuery && !(t.siteName ?? "").toLowerCase().includes(siteQuery)) return false;
+      if (!matchSiteKeyword(t.siteName, selectedSite, siteKeywordMap)) return false;
       if (companyFilter !== "전체") {
         const isTk = isTkMaterial(t.materialId);
         if (companyFilter === "TK" && !isTk) return false;
@@ -159,7 +160,7 @@ export default function SiteStatsClient() {
       }
       return true;
     });
-  }, [transactions, dateFrom, dateTo, selectedSite, companyFilter]);
+  }, [transactions, dateFrom, dateTo, selectedSite, companyFilter, siteKeywordMap]);
 
   // 현장별 집계
   const siteStats = useMemo(() => {

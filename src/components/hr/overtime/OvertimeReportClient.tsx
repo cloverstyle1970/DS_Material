@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useReloadOnActivate, useTabIsActive } from "@/context/TabActivationContext";
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { useSiteKeywordMap } from "@/lib/useSiteKeywordMap";
 import { calcOvertimeResult, detectHoliday, dayOfWeekKr, OvertimeResult } from "./overtimeCalc";
 import { notifyOvertimeApprovalRequest, notifyOvertimeApproved, notifyOvertimeRejected } from "./overtimeNotify";
 
@@ -318,6 +319,7 @@ const bdr = "1px solid #444";
 
 export default function OvertimeReportClient() {
   const { user } = useAuth();
+  const siteKeywordMap = useSiteKeywordMap();
   const canCreate = user ? (isAdmin(user) || hasMenuPermission(user, OT_MENU_HREF, "create")) : false;
   const isManager = user ? (isAdmin(user) || hasMenuPermission(user, OT_MENU_HREF, "update")) : false;
 
@@ -1176,7 +1178,8 @@ export default function OvertimeReportClient() {
                   if (listDateTo   && dt > listDateTo)   return false;
                   if (listQuery) {
                     const q = listQuery.toLowerCase();
-                    if (!r.site_name.toLowerCase().includes(q) && !(r.work_reasons ?? []).join(",").toLowerCase().includes(q)) return false;
+                    const siteLc = r.site_name.trim().toLowerCase();
+                    if (!siteLc.includes(q) && !(siteKeywordMap.get(siteLc) ?? "").includes(q) && !(r.work_reasons ?? []).join(",").toLowerCase().includes(q)) return false;
                   }
                   return true;
                 }).length;
@@ -1192,7 +1195,8 @@ export default function OvertimeReportClient() {
                 if (listDateTo   && dt > listDateTo)   return false;
                 if (listQuery) {
                   const q = listQuery.toLowerCase();
-                  if (!r.site_name.toLowerCase().includes(q) && !(r.work_reasons ?? []).join(",").toLowerCase().includes(q)) return false;
+                  const siteLc = r.site_name.trim().toLowerCase();
+                  if (!siteLc.includes(q) && !(siteKeywordMap.get(siteLc) ?? "").includes(q) && !(r.work_reasons ?? []).join(",").toLowerCase().includes(q)) return false;
                 }
                 return true;
               });

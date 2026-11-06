@@ -11,6 +11,7 @@ import DraggableModal from "@/components/common/DraggableModal";
 import { useViewMode } from "@/context/ViewModeContext";
 import { getHolidaysForYear } from "@/lib/korean-holidays";
 import { formatPhone } from "@/lib/input-format";
+import { useSiteKeywordMap } from "@/lib/useSiteKeywordMap";
 
 export interface ConstructionSchedule {
   id: number;
@@ -82,6 +83,7 @@ function CalendarContent() {
   // 현장명 검색 (인라인)
   const [siteSearchInput, setSiteSearchInput] = useState("");
   const [siteSearchKeyword, setSiteSearchKeyword] = useState("");
+  const siteKeywordMap = useSiteKeywordMap();
 
   // 연간일정 관리 모달
   const [showAnnualModal, setShowAnnualModal] = useState(false);
@@ -473,7 +475,11 @@ function CalendarContent() {
 
             const daySchedules = schedules.filter(s => {
               if (s.startDate > cell.dateStr || s.endDate < cell.dateStr) return false;
-              if (siteSearchKeyword && !s.siteName.toLowerCase().includes(siteSearchKeyword.toLowerCase())) return false;
+              if (siteSearchKeyword) {
+                const q = siteSearchKeyword.trim().toLowerCase();
+                const siteLc = s.siteName.trim().toLowerCase();
+                if (!siteLc.includes(q) && !(siteKeywordMap.get(siteLc) ?? "").includes(q)) return false;
+              }
               if (companyFilter === "ALL") return true;
               if (s.siteName === "공사휴무") return true;
               return s.companyType === companyFilter;

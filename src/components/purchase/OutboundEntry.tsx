@@ -17,6 +17,7 @@ import DraggableModal from "@/components/common/DraggableModal";
 import SerialEntryModal from "./SerialEntryModal";
 import ElevatorPicker from "@/components/common/ElevatorPicker";
 import { formatDate as sharedFormatYmd } from "@/lib/input-format";
+import { useSiteKeywordMap } from "@/lib/useSiteKeywordMap";
 import OutboundDeliveryNotePaper, { DNReceiver, DNVendor } from "./OutboundDeliveryNotePaper";
 
 interface SiteOption { id: number; name: string; search_keywords?: string | null }
@@ -1105,6 +1106,7 @@ function InboundRefPopup({
   // materialId → imgUrls
   const [matImgMap,  setMatImgMap]  = useState<Map<string, string[]>>(new Map());
   const [q, setQ] = useState("");
+  const siteKeywordMap = useSiteKeywordMap();
   // 다수 선택된 입고 id 집합
   const [checked, setChecked] = useState<Set<number>>(new Set());
   useEffect(() => {
@@ -1165,12 +1167,16 @@ function InboundRefPopup({
     if (!m) return "";
     return orderRefMap.get(Number(m[1])) ?? "";
   }
-  const filtered = records.filter(t =>
-    !q || t.materialName.toLowerCase().includes(q.toLowerCase()) ||
-    t.materialId.toLowerCase().includes(q.toLowerCase()) ||
-    (t.siteName?.toLowerCase().includes(q.toLowerCase()) ?? false) ||
-    refForRecord(t).toLowerCase().includes(q.toLowerCase())
-  );
+  const filtered = records.filter(t => {
+    if (!q) return true;
+    const ql = q.toLowerCase();
+    const siteLc = (t.siteName ?? "").trim().toLowerCase();
+    return t.materialName.toLowerCase().includes(ql) ||
+      t.materialId.toLowerCase().includes(ql) ||
+      siteLc.includes(ql) ||
+      (siteKeywordMap.get(siteLc) ?? "").includes(ql) ||
+      refForRecord(t).toLowerCase().includes(ql);
+  });
 
   const allVisibleIds = filtered.map(t => t.id);
   const allChecked = allVisibleIds.length > 0 && allVisibleIds.every(id => checked.has(id));

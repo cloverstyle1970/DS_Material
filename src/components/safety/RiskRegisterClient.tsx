@@ -11,6 +11,7 @@ import {
   type HazardSurveyItem,
   type HazardSurveyParticipant,
 } from "@/lib/risk";
+import { useSiteKeywordMap } from "@/lib/useSiteKeywordMap";
 import { printRiskSheet } from "@/components/safety/riskSheetPrint";
 
 const HREF = "/safety/risk-register";
@@ -39,6 +40,7 @@ export default function RiskRegisterClient() {
   const [fFrom, setFFrom] = useState("");
   const [fTo, setFTo] = useState("");
   const [kw, setKw] = useState("");
+  const siteKeywordMap = useSiteKeywordMap();
 
   const [detail, setDetail] = useState<Row | null>(null);
 
@@ -100,12 +102,13 @@ export default function RiskRegisterClient() {
 
   const kwLc = kw.trim().toLowerCase();
   const view = kwLc
-    ? rows.filter(
-        (r) =>
-          (r.site_name ?? "").toLowerCase().includes(kwLc) ||
+    ? rows.filter((r) => {
+        const siteLc = (r.site_name ?? "").trim().toLowerCase();
+        return siteLc.includes(kwLc) ||
+          (siteKeywordMap.get(siteLc) ?? "").includes(kwLc) ||
           (r.assessor ?? "").toLowerCase().includes(kwLc) ||
-          (r._cat ?? "").toLowerCase().includes(kwLc)
-      )
+          (r._cat ?? "").toLowerCase().includes(kwLc);
+      })
     : rows;
 
   async function revert(r: Row) {

@@ -6,6 +6,7 @@ import { useReloadOnActivate, useTabIsActive } from "@/context/TabActivationCont
 import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { useViewMode } from "@/context/ViewModeContext";
 import { supabase } from "@/lib/supabase";
+import { useSiteKeywordMap } from "@/lib/useSiteKeywordMap";
 import { calcOvertimeResult, detectHoliday, dayOfWeekKr, OvertimeResult } from "./overtimeCalc";
 import { notifyOvertimeApprovalRequest, notifyOvertimeApproved, notifyOvertimeRejected } from "./overtimeNotify";
 
@@ -343,6 +344,7 @@ type StatusFilter = "all" | "draft" | "pending" | "approved" | "rejected";
 
 export default function OvertimeLedgerClient() {
   const { user } = useAuth();
+  const siteKeywordMap = useSiteKeywordMap();
   const canCreate = user ? (isAdmin(user) || hasMenuPermission(user, OT_LEDGER_MENU_HREF, "create")) : false;
   const isManager = user ? (isAdmin(user) || hasMenuPermission(user, OT_LEDGER_MENU_HREF, "update")) : false;
 
@@ -533,8 +535,10 @@ export default function OvertimeLedgerClient() {
       if (listQuery) {
         const q = listQuery.toLowerCase();
         const author = accounts.find(a => a.id === r.author_id);
+        const siteLc = r.site_name.trim().toLowerCase();
         if (
-          !r.site_name.toLowerCase().includes(q) &&
+          !siteLc.includes(q) &&
+          !(siteKeywordMap.get(siteLc) ?? "").includes(q) &&
           !r.report_no.toLowerCase().includes(q) &&
           !(author?.username ?? "").toLowerCase().includes(q) &&
           !(r.work_instructor ?? "").toLowerCase().includes(q)
@@ -542,7 +546,7 @@ export default function OvertimeLedgerClient() {
       }
       return true;
     });
-  }, [reports, appliedFrom, appliedTo, statusFilter, listQuery, accounts]);
+  }, [reports, appliedFrom, appliedTo, statusFilter, listQuery, accounts, siteKeywordMap]);
 
   // 상태별 건수
   const statusCounts = useMemo(() => {
@@ -553,8 +557,10 @@ export default function OvertimeLedgerClient() {
       if (listQuery) {
         const q = listQuery.toLowerCase();
         const author = accounts.find(a => a.id === r.author_id);
+        const siteLc = r.site_name.trim().toLowerCase();
         if (
-          !r.site_name.toLowerCase().includes(q) &&
+          !siteLc.includes(q) &&
+          !(siteKeywordMap.get(siteLc) ?? "").includes(q) &&
           !r.report_no.toLowerCase().includes(q) &&
           !(author?.username ?? "").toLowerCase().includes(q) &&
           !(r.work_instructor ?? "").toLowerCase().includes(q)
@@ -569,7 +575,7 @@ export default function OvertimeLedgerClient() {
       approved: base.filter(r => r.approval_status === "approved").length,
       rejected: base.filter(r => r.approval_status === "rejected").length,
     };
-  }, [reports, appliedFrom, appliedTo, listQuery, accounts]);
+  }, [reports, appliedFrom, appliedTo, listQuery, accounts, siteKeywordMap]);
 
   // 합계 (승인완료 기준)
   const approvedFiltered = filtered.filter(r => r.approval_status === "approved");

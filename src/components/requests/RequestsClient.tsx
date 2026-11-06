@@ -16,6 +16,7 @@ import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNum, fmtNumOr } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 import { extractOrderRef } from "@/lib/order-ref";
+import { useSiteKeywordMap, matchSiteKeyword } from "@/lib/useSiteKeywordMap";
 import DraggableModal from "@/components/common/DraggableModal";
 import Autocomplete from "@/components/common/Autocomplete";
 import { PhotoIconBtn } from "@/components/ui/PhotoIconBtn";
@@ -458,6 +459,8 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
     }
   }
 
+  const siteKeywordMap = useSiteKeywordMap();
+
   // ── 필터 (가시성 = 본인만 또는 전체) ─────────────────────────────
   const filteredReqs = visibleRequests.filter(r => {
     if (reqStatus !== "전체" && r.status !== reqStatus) return false;
@@ -473,7 +476,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
       } else if (r.requestType !== reqType) return false;
     }
     if (!inRange(r.requestedAt, reqSearch.dateFrom, reqSearch.dateTo)) return false;
-    if (reqSearch.siteName     && !(r.siteName?.toLowerCase().includes(reqSearch.siteName.toLowerCase()))) return false;
+    if (!matchSiteKeyword(r.siteName, reqSearch.siteName, siteKeywordMap)) return false;
     if (reqSearch.elevatorName && !r.items.some(i => i.elevatorName?.toLowerCase().includes(reqSearch.elevatorName.toLowerCase()))) return false;
     if (reqSearch.userName     && !r.requesterName.toLowerCase().includes(reqSearch.userName.toLowerCase())) return false;
     if (reqSearch.material) {
@@ -515,7 +518,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
       if (ordCompany === "DS" && isTk) return false;
     }
     if (!inRange(o.orderedAt, ordSearch.dateFrom, ordSearch.dateTo)) return false;
-    if (ordSearch.siteName     && !(o.siteName?.toLowerCase().includes(ordSearch.siteName.toLowerCase()))) return false;
+    if (!matchSiteKeyword(o.siteName, ordSearch.siteName, siteKeywordMap)) return false;
     if (ordSearch.vendorName   && !(o.vendorName?.toLowerCase().includes(ordSearch.vendorName.toLowerCase()))) return false;
     if (ordSearch.userName     && !o.userName.toLowerCase().includes(ordSearch.userName.toLowerCase())) return false;
     if (ordSearch.requesterName && !(o.requesterName?.toLowerCase().includes(ordSearch.requesterName.toLowerCase()))) return false;

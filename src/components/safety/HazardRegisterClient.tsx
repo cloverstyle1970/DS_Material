@@ -5,6 +5,7 @@ import { useAuth, hasMenuPermission } from "@/context/AuthContext";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 import { ASSESS_TYPES, type RiskCategory, type HazardSurvey, type HazardSurveyItem } from "@/lib/risk";
+import { useSiteKeywordMap } from "@/lib/useSiteKeywordMap";
 
 const HREF = "/safety/hazard-register";
 
@@ -33,6 +34,7 @@ export default function HazardRegisterClient() {
   const [fFrom, setFFrom] = useState("");
   const [fTo, setFTo] = useState("");
   const [kw, setKw] = useState("");
+  const siteKeywordMap = useSiteKeywordMap();
 
   const [detail, setDetail] = useState<Row | null>(null);
 
@@ -90,13 +92,14 @@ export default function HazardRegisterClient() {
 
   const kwLc = kw.trim().toLowerCase();
   const view = kwLc
-    ? rows.filter(
-        (r) =>
-          (r.site_name ?? "").toLowerCase().includes(kwLc) ||
+    ? rows.filter((r) => {
+        const siteLc = (r.site_name ?? "").trim().toLowerCase();
+        return siteLc.includes(kwLc) ||
+          (siteKeywordMap.get(siteLc) ?? "").includes(kwLc) ||
           (r.assessor ?? "").toLowerCase().includes(kwLc) ||
           (r._author ?? "").toLowerCase().includes(kwLc) ||
-          (r._cat ?? "").toLowerCase().includes(kwLc)
-      )
+          (r._cat ?? "").toLowerCase().includes(kwLc);
+      })
     : rows;
 
   async function del(r: Row) {

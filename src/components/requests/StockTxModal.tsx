@@ -9,6 +9,7 @@ import SiteSearchInput from "@/components/ui/SiteSearchInput";
 import { api, getErrorMessage } from "@/lib/api-client";
 import DraggableModal from "@/components/common/DraggableModal";
 import { fmtNum } from "@/lib/format";
+import { useSiteKeywordMap } from "@/lib/useSiteKeywordMap";
 
 interface SiteOption { id: number; name: string }
 
@@ -37,6 +38,7 @@ export default function StockTxModal({ initialType, sites, user, onClose, onSave
   const [pendingOrders, setPendingOrders] = useState<PurchaseOrderRecord[]>([]);
   const [inboundList,   setInboundList]   = useState<TransactionRecord[]>([]);
   const [refSearch,     setRefSearch]     = useState("");
+  const siteKeywordMap = useSiteKeywordMap();
   const [refOpen,       setRefOpen]       = useState(true);
   const [selectedRef,   setSelectedRef]   = useState<PurchaseOrderRecord | TransactionRecord | null>(null);
 
@@ -158,18 +160,22 @@ export default function StockTxModal({ initialType, sites, user, onClose, onSave
 
   // ── 참조 목록 필터 ───────────────────────────────────────────
   const q = refSearch.toLowerCase();
+  const matchSite = (siteName: string | null | undefined) => {
+    const lc = (siteName ?? "").trim().toLowerCase();
+    return lc.includes(q) || (siteKeywordMap.get(lc) ?? "").includes(q);
+  };
   const filteredOrders = pendingOrders.filter(o =>
     !q ||
     o.materialName.toLowerCase().includes(q) ||
     o.materialId.toLowerCase().includes(q) ||
     (o.vendorName?.toLowerCase().includes(q) ?? false) ||
-    (o.siteName?.toLowerCase().includes(q) ?? false)
+    matchSite(o.siteName)
   );
   const filteredInbound = inboundList.filter(t =>
     !q ||
     t.materialName.toLowerCase().includes(q) ||
     t.materialId.toLowerCase().includes(q) ||
-    (t.siteName?.toLowerCase().includes(q) ?? false)
+    matchSite(t.siteName)
   );
 
   const hasRef = txType === "입고" ? pendingOrders.length > 0 : inboundList.length > 0;

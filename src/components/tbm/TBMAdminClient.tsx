@@ -11,6 +11,7 @@ import {
   TBMMode, MODE_LABELS, SUB_TYPE_LABELS,
 } from "@/lib/tbm";
 import { heatStressLevel } from "@/lib/apparent-temperature";
+import { useSiteKeywordMap } from "@/lib/useSiteKeywordMap";
 import { printTBMReport } from "./tbmReportPrint";
 import { deleteTbmRecord } from "./tbmDelete";
 import EditTBMModal from "./EditTBMModal";
@@ -35,6 +36,7 @@ export default function TBMAdminClient() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [searchText, setSearchText] = useState("");
+  const siteKeywordMap = useSiteKeywordMap();
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
 
@@ -75,12 +77,14 @@ export default function TBMAdminClient() {
     let rows = (data ?? []) as TBMRecord[];
     if (searchText.trim()) {
       const s = searchText.trim().toLowerCase();
-      rows = rows.filter(r =>
-        r.site_name.toLowerCase().includes(s) ||
-        r.elevator_name.toLowerCase().includes(s) ||
-        r.user_name.toLowerCase().includes(s) ||
-        r.work_content.toLowerCase().includes(s)
-      );
+      rows = rows.filter(r => {
+        const siteLc = r.site_name.trim().toLowerCase();
+        return siteLc.includes(s) ||
+          (siteKeywordMap.get(siteLc) ?? "").includes(s) ||
+          r.elevator_name.toLowerCase().includes(s) ||
+          r.user_name.toLowerCase().includes(s) ||
+          r.work_content.toLowerCase().includes(s);
+      });
     }
     setRecords(rows);
     setTotal(count ?? 0);

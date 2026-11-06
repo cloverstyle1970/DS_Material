@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { generateDocNo } from "@/lib/document-no";
 import { fmtNum, parseNum } from "@/lib/format";
 import { isTkMaterial, TK_TEXT_CLASS, isRepairMaterial } from "@/lib/material-style";
+import { useSiteKeywordMap } from "@/lib/useSiteKeywordMap";
 import { PhotoIconBtn } from "@/components/ui/PhotoIconBtn";
 import DraggableModal from "@/components/common/DraggableModal";
 import SerialEntryModal from "./SerialEntryModal";
@@ -876,6 +877,7 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
   const [mats, setMats] = useState<Record<string, string>>({});
   const [q, setQ] = useState("");
   const [checked, setChecked] = useState<Set<number>>(new Set());
+  const siteKeywordMap = useSiteKeywordMap();
 
   useEffect(() => {
     // 헤더 상태가 '발주' 또는 '부분입고' 인 발주의 라인 중, 잔량이 남은 것(qty > receivedQty)만.
@@ -901,11 +903,13 @@ function OrderPopup({ onMultiSelect, onClose }: { onMultiSelect: (orders: Purcha
     if (!q) return true;
     const ql = q.toLowerCase();
     const refNo = (o.orderRefNo || o.orderNo || "").toLowerCase();
+    const siteLc = (o.siteName ?? "").trim().toLowerCase();
     return (
       o.materialName.toLowerCase().includes(ql) ||
       o.materialId.toLowerCase().includes(ql) ||
       (o.vendorName?.toLowerCase().includes(ql) ?? false) ||
-      (o.siteName?.toLowerCase().includes(ql) ?? false) ||
+      siteLc.includes(ql) ||
+      (siteKeywordMap.get(siteLc) ?? "").includes(ql) ||
       (o.requesterName?.toLowerCase().includes(ql) ?? false) ||
       (o.note?.toLowerCase().includes(ql) ?? false) ||
       refNo.includes(ql)

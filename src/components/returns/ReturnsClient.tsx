@@ -8,6 +8,7 @@ import { useViewMode } from "@/context/ViewModeContext";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNum } from "@/lib/format";
 import { isTkMaterial } from "@/lib/material-style";
+import { useSiteKeywordMap } from "@/lib/useSiteKeywordMap";
 
 type Tab = "pending" | "returned";
 
@@ -107,6 +108,8 @@ export default function ReturnsClient() {
     }
   }
 
+  const siteKeywordMap = useSiteKeywordMap();
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return transactions.filter(t => {
@@ -119,16 +122,19 @@ export default function ReturnsClient() {
         if (companyFilter === "DS" && isTk) return false;
       }
       if (!q) return true;
+      const siteNameLc = (t.siteName ?? "").trim().toLowerCase();
+      const siteKw = siteKeywordMap.get(siteNameLc) ?? "";
       return (
         t.materialName.toLowerCase().includes(q) ||
         t.materialId.toLowerCase().includes(q) ||
-        (t.siteName?.toLowerCase().includes(q) ?? false) ||
+        siteNameLc.includes(q) ||
+        siteKw.includes(q) ||
         (t.elevatorName?.toLowerCase().includes(q) ?? false) ||
         (t.serialNo?.toLowerCase().includes(q) ?? false) ||
         t.userName.toLowerCase().includes(q)
       );
     });
-  }, [transactions, query, dateFrom, dateTo, companyFilter]);
+  }, [transactions, query, dateFrom, dateTo, companyFilter, siteKeywordMap]);
 
   return (
     <>

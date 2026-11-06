@@ -6,6 +6,7 @@ import { useAuth, isAdmin, hasMenuPermission } from "@/context/AuthContext";
 import { useReloadOnActivate } from "@/context/TabActivationContext";
 import { supabase } from "@/lib/supabase";
 import { fmtNum } from "@/lib/format";
+import { useSiteKeywordMap } from "@/lib/useSiteKeywordMap";
 
 const MENU_HREF = "/quotes";
 
@@ -32,6 +33,7 @@ export default function QuotesListClient() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const siteKeywordMap = useSiteKeywordMap();
   const today = new Date().toISOString().slice(0, 10);
   const monthAgo = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
   const [dateFrom, setDateFrom] = useState(monthAgo);
@@ -83,8 +85,10 @@ export default function QuotesListClient() {
     .filter(r => {
       if (!search.trim()) return true;
       const s = search.trim().toLowerCase();
+      const siteLc = (r.site_name ?? "").trim().toLowerCase();
       return (r.quote_no?.toLowerCase().includes(s))
-        || ((r.site_name ?? "").toLowerCase().includes(s))
+        || siteLc.includes(s)
+        || (siteKeywordMap.get(siteLc) ?? "").includes(s)
         || ((r.work_title ?? "").toLowerCase().includes(s))
         || ((r.customer_name ?? "").toLowerCase().includes(s));
     });
