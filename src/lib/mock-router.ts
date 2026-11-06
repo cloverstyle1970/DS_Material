@@ -982,6 +982,15 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
     });
     return data.map(dbToRequest);
   }
+  {
+    const m = path.match(/^\/api\/material-requests\/(\d+)$/);
+    if (m) {
+      const id = Number(m[1]);
+      const { data, error } = await supabase.from("material_requests").select("*").eq("id", id).single();
+      if (error || !data) throw new MockApiError("not found", 404);
+      return dbToRequest(data);
+    }
+  }
   if (path === "/api/purchase-orders") {
     // 라인 단위 flat 목록. status 파라미터는 헤더 상태 필터. 콤마 리스트 지원.
     const status = params.get("status");
@@ -1681,6 +1690,16 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
           refId:   numId,
         });
       }
+      return dbToRequest(data);
+    }
+    if (action === "edit") {
+      const patch: Record<string, unknown> = {};
+      if (body.siteName !== undefined) patch.site_name = body.siteName || null;
+      if (body.items    !== undefined) patch.items     = body.items;
+      if (body.note     !== undefined) patch.note      = body.note || null;
+      const { data, error } = await supabase.from("material_requests")
+        .update(patch).eq("id", numId).select().single();
+      if (error) throw new MockApiError(error.message, 500);
       return dbToRequest(data);
     }
     throw new MockApiError("unknown action", 400);

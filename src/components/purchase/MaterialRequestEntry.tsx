@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef, KeyboardEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { MaterialRecord } from "@/lib/mock-materials";
+import { MaterialRequestRecord } from "@/lib/mock-material-requests";
 import { ElevatorRecord } from "@/lib/mock-elevators";
 import { api, getErrorMessage } from "@/lib/api-client";
 import { fmtNum } from "@/lib/format";
@@ -31,6 +32,8 @@ function todayISO() { return new Date().toISOString().slice(0, 10); }
 
 export default function MaterialRequestEntry() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams ? (Number(searchParams.get("editId")) || null) : null;
   const { user } = useAuth();
 
   const [reqDate,     setReqDate]     = useState(todayISO());
@@ -57,6 +60,24 @@ export default function MaterialRequestEntry() {
       .then(data => setSites(data.map(s => ({ id: s.id, name: s.name, companyType: s.companyType ?? null, search_keywords: (s as { search_keywords?: string | null }).search_keywords ?? null }))))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!editId) return;
+    api.get<MaterialRequestRecord>(`/api/material-requests/${editId}`)
+      .then(req => {
+        if (req.siteName) setSiteName(req.siteName);
+        if (req.note) setReference(req.note);
+        if (req.items.length > 0) {
+          setRows(req.items.map(item => newRow({
+            materialId:   item.materialId,
+            materialName: item.materialName,
+            qty:          item.qty,
+            elevatorName: item.elevatorName ?? "",
+          })));
+        }
+      })
+      .catch(() => {});
+  }, [editId]);
 
   useEffect(() => {
     if (!siteName) {
@@ -115,21 +136,32 @@ export default function MaterialRequestEntry() {
     if (valid.length === 0) { alert("품목을 1개 이상 입력해 주세요."); return; }
     setSaving(true);
     try {
-      await api.post("/api/material-requests", {
-        siteName: siteName || null,
-        items: valid.map(r => ({
-          materialId: r.materialId,
-          materialName: r.materialName,
-          qty: r.qty,
-          elevatorName: r.elevatorName || null,
-        })),
-        note: reference || null,
-        requesterId: user.id,
-        requesterName: user.name,
-        requesterDept: user.dept,
-      });
+      const items = valid.map(r => ({
+        materialId: r.materialId,
+        materialName: r.materialName,
+        qty: r.qty,
+        elevatorName: r.elevatorName || null,
+      }));
+      if (editId) {
+        await api.patch(`/api/material-requests/${editId}`, {
+          action: "edit",
+          siteName: siteName || null,
+          items,
+          note: reference || null,
+        });
+      } else {
+        await api.post("/api/material-requests", {
+          siteName: siteName || null,
+          items,
+          note: reference || null,
+          requesterId: user.id,
+          requesterName: user.name,
+          requesterDept: user.dept,
+        });
+      }
       if (goList) router.push("/requests");
-      else clearAll();
+      else if (!editId) clearAll();
+      else router.push("/requests");
     } catch (e) { alert(getErrorMessage(e)); }
     finally { setSaving(false); }
   }
@@ -146,7 +178,7 @@ export default function MaterialRequestEntry() {
       {/* 타이틀 */}
       <div className="flex items-center justify-between px-5 py-2.5 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0">
         <h1 className="text-sm font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-          <span className="text-slate-500">📋</span> 자재신청입력
+          <span className="text-slate-500">📋</span> {editId ? `자재신청 수정 (#${editId})` : "자재신청입력"}
         </h1>
         <div className="flex items-center gap-2">
         </div>

@@ -375,6 +375,23 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
     handleReqAction(id, "반려", { rejectReason: reason || undefined });
   }
 
+  async function handleReqDelete(id: number) {
+    if (!confirm("이 자재신청을 삭제하시겠습니까?")) return;
+    setActionLoading(id);
+    try {
+      await api.delete(`/api/material-requests/${id}`);
+      setRequests(await api.get<MaterialRequestRecord[]>("/api/material-requests"));
+    } catch (e) {
+      alert(getErrorMessage(e));
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  function canSelfEdit(r: MaterialRequestRecord): boolean {
+    return !!user && r.requesterId === user.id && r.status === "신청" && r.approvalStatus !== "approved";
+  }
+
   // ── 발주 액션 (라인 단위) ────────────────────────────────────────
   //    id 는 line.id. 입고완료/취소는 line 단위, 편집은 orderId(헤더) 단위.
   async function handleOrdLineAction(lineId: number, action: "입고완료" | "취소", data?: Record<string, unknown>) {
@@ -756,6 +773,16 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                             ) : null}
                           </div>
                         )}
+                        {canSelfEdit(r) && (
+                          <div className="flex gap-1 mt-2">
+                            <button type="button" disabled={actionLoading === r.id}
+                              onClick={() => router.push(`/requests/new?editId=${r.id}`)}
+                              className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 whitespace-nowrap">수정</button>
+                            <button type="button" disabled={actionLoading === r.id}
+                              onClick={() => handleReqDelete(r.id)}
+                              className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 whitespace-nowrap">삭제</button>
+                          </div>
+                        )}
                         {isOpen && (
                           <div className="mt-2 space-y-2">
                             {/* 반려 사유 */}
@@ -838,12 +865,12 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                       </th>
                     );
                   })}
-                  {canEditReq && <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">처리</th>}
+                  {(canEditReq || sortedReqs.some(canSelfEdit)) && <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">처리</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                 {sortedReqs.length === 0 ? (
-                  <tr><td colSpan={canEditReq ? 11 : 10} className="text-center py-16 text-gray-400 dark:text-gray-500">
+                  <tr><td colSpan={(canEditReq || sortedReqs.some(canSelfEdit)) ? 11 : 10} className="text-center py-16 text-gray-400 dark:text-gray-500">
                     {visibleRequests.length === 0
                       ? (restrictToTeam ? "같은 팀의 자재 신청 내역이 없습니다." : "자재 신청 내역이 없습니다.")
                       : "조건에 맞는 내역이 없습니다."}
@@ -946,6 +973,30 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                             )}
                             {(r.status === "완료" || r.status === "취소") && (
                               <span className="text-xs text-gray-300 dark:text-gray-600">{r.processorName ?? "-"}</span>
+                            )}
+                            {canSelfEdit(r) && (
+                              <div className="flex gap-1 mt-1">
+                                <button type="button" disabled={actionLoading === r.id}
+                                  onClick={() => router.push(`/requests/new?editId=${r.id}`)}
+                                  className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 whitespace-nowrap">수정</button>
+                                <button type="button" disabled={actionLoading === r.id}
+                                  onClick={() => handleReqDelete(r.id)}
+                                  className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 whitespace-nowrap">삭제</button>
+                              </div>
+                            )}
+                          </td>
+                        )}
+                        {!canEditReq && (canEditReq || sortedReqs.some(canSelfEdit)) && (
+                          <td className="px-2 py-3" onClick={e => e.stopPropagation()}>
+                            {canSelfEdit(r) && (
+                              <div className="flex gap-1">
+                                <button type="button" disabled={actionLoading === r.id}
+                                  onClick={() => router.push(`/requests/new?editId=${r.id}`)}
+                                  className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 whitespace-nowrap">수정</button>
+                                <button type="button" disabled={actionLoading === r.id}
+                                  onClick={() => handleReqDelete(r.id)}
+                                  className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 whitespace-nowrap">삭제</button>
+                              </div>
                             )}
                           </td>
                         )}
