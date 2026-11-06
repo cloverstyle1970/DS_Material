@@ -1176,7 +1176,7 @@ export default function OvertimeReportClient() {
                   if (listDateTo   && dt > listDateTo)   return false;
                   if (listQuery) {
                     const q = listQuery.toLowerCase();
-                    if (!r.site_name.toLowerCase().includes(q) && !r.work_reasons.join(",").toLowerCase().includes(q)) return false;
+                    if (!r.site_name.toLowerCase().includes(q) && !(r.work_reasons ?? []).join(",").toLowerCase().includes(q)) return false;
                   }
                   return true;
                 }).length;
@@ -1192,7 +1192,7 @@ export default function OvertimeReportClient() {
                 if (listDateTo   && dt > listDateTo)   return false;
                 if (listQuery) {
                   const q = listQuery.toLowerCase();
-                  if (!r.site_name.toLowerCase().includes(q) && !r.work_reasons.join(",").toLowerCase().includes(q)) return false;
+                  if (!r.site_name.toLowerCase().includes(q) && !(r.work_reasons ?? []).join(",").toLowerCase().includes(q)) return false;
                 }
                 return true;
               });
@@ -1234,7 +1234,7 @@ export default function OvertimeReportClient() {
 
                       {/* 3행: 작업사유 · 잔업 */}
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {r.work_reasons.length > 0 ? r.work_reasons.join(" · ") : "-"}
+                        {(r.work_reasons ?? []).length > 0 ? (r.work_reasons ?? []).join(" · ") : "-"}
                         {ot.display && (
                           <span className="ml-1.5 text-blue-600 dark:text-blue-400 font-semibold">{ot.display}</span>
                         )}
