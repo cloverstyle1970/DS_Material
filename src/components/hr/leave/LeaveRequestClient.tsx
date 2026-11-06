@@ -890,73 +890,105 @@ export default function LeaveRequestClient() {
               <span className="text-xs text-gray-400 ml-auto">{filtered.length}건</span>
             </div>
 
-            {/* 목록 테이블 */}
-            <div className="bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                    <th className="px-3 py-2 text-left font-medium">문서번호</th>
-                    <th className="px-3 py-2 text-left font-medium">유형</th>
-                    {isManager && <th className="px-3 py-2 text-left font-medium">작성자</th>}
-                    <th className="px-3 py-2 text-left font-medium">기간</th>
-                    <th className="px-3 py-2 text-left font-medium">사유</th>
-                    <th className="px-3 py-2 text-center font-medium">상태</th>
-                    <th className="px-3 py-2 text-center font-medium">작업</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {filtered.length === 0 && (
-                    <tr><td colSpan={isManager ? 7 : 6} className="text-center py-8 text-gray-400">문서가 없습니다.</td></tr>
-                  )}
-                  {filtered.map(r => {
-                    const author = accounts.find(a => a.id === r.author_id);
-                    const period = r.s_yr ? `20${r.s_yr}/${r.s_mo}/${r.s_dy}` : "—";
-                    return (
-                      <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200">
-                        <td className="px-3 py-2 font-mono text-blue-600 dark:text-blue-400">{r.request_no}</td>
-                        <td className="px-3 py-2">{r.leave_type}</td>
-                        {isManager && <td className="px-3 py-2">{author?.username ?? "—"}</td>}
-                        <td className="px-3 py-2">{period}</td>
-                        <td className="px-3 py-2 max-w-[120px] truncate">{r.reason ?? "—"}</td>
-                        <td className="px-3 py-2 text-center">
-                          <div className="inline-flex items-center gap-1 flex-wrap justify-center">
-                            <StatusBadge status={r.approval_status} />
-                            {(printCountMap[r.id] ?? 0) > 0 && (
-                              <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">🖨️ {printCountMap[r.id]}회</span>
-                            )}
+            {/* 카드 목록 */}
+            {filtered.length === 0 ? (
+              <div className="text-center text-sm text-gray-400 py-16">문서가 없습니다.</div>
+            ) : (
+              <div className="space-y-3">
+                {filtered.map(r => {
+                  const author   = accounts.find(a => a.id === r.author_id);
+                  const approver = accounts.find(a => a.id === r.approver_id);
+                  const pad = (v: string | null) => (v ?? "").padStart(2, "0");
+                  const sDate = r.s_yr ? `20${r.s_yr}-${pad(r.s_mo)}-${pad(r.s_dy)}` : "—";
+                  const eDate = r.e_yr ? `20${r.e_yr}-${pad(r.e_mo)}-${pad(r.e_dy)}` : "";
+                  const period = eDate && eDate !== sDate ? `${sDate} ~ ${eDate}` : sDate;
+                  return (
+                    <div key={r.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+                      {/* 1행: 뱃지 + 날짜 */}
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500">{r.request_no}</span>
+                          <StatusBadge status={r.approval_status} />
+                          {(printCountMap[r.id] ?? 0) > 0 && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                              🖨️ {printCountMap[r.id]}회
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0 tabular-nums">{sDate}</span>
+                      </div>
+
+                      {/* 2행: 유형 + 기간·일수 */}
+                      <p className="font-semibold text-gray-900 dark:text-gray-100 leading-tight mb-0.5">
+                        {r.leave_type}
+                        {r.duration_days != null && (
+                          <span className="ml-1.5 text-sm font-normal text-gray-500 dark:text-gray-400">({r.duration_days}일)</span>
+                        )}
+                      </p>
+
+                      {/* 3행: 기간 */}
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{period}</p>
+
+                      {/* 4행: 사유 */}
+                      {r.reason && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{r.reason}</p>
+                      )}
+
+                      {/* 5행: 작성자 · 승인자 */}
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        {author?.username ?? ""}
+                        {author?.dept && <span> ({author.dept})</span>}
+                        {approver && <span className="text-gray-400 dark:text-gray-500"> · 승인자: {approver.username}</span>}
+                      </p>
+
+                      {/* 반려 사유 */}
+                      {r.approval_status === "rejected" && r.reject_reason && (
+                        <p className="text-xs text-red-500 dark:text-red-400 mt-1 font-medium">반려: {r.reject_reason}</p>
+                      )}
+
+                      {/* 액션 버튼 */}
+                      <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 flex flex-col gap-1">
+                        {canApprove(r) && (
+                          <div className="flex gap-1">
+                            <button onClick={() => setSignModal(r)}
+                              className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50 whitespace-nowrap font-medium">
+                              승인
+                            </button>
+                            <button onClick={() => { setRejectModal({ id: r.id, no: r.request_no }); setRejectReason(""); }}
+                              className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 whitespace-nowrap font-medium">
+                              반려
+                            </button>
                           </div>
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="flex gap-1 justify-center flex-wrap">
-                            {canEdit(r) ? (
-                              <button onClick={() => openEdit(r)}
-                                className="px-2 py-0.5 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-600 dark:hover:bg-gray-500 dark:text-gray-200 rounded">수정</button>
-                            ) : (
-                              <button onClick={() => openEdit(r)}
-                                className="px-2 py-0.5 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 dark:text-blue-300 rounded">내용 확인</button>
-                            )}
-                            <button onClick={() => openEdit(r, true)}
-                              className="px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 rounded">인쇄</button>
-                            {canApprove(r) && (
-                              <>
-                                <button onClick={() => setSignModal(r)}
-                                  className="px-2 py-0.5 text-xs bg-green-100 hover:bg-green-200 text-green-700 rounded">승인</button>
-                                <button onClick={() => { setRejectModal({ id: r.id, no: r.request_no }); setRejectReason(""); }}
-                                  className="px-2 py-0.5 text-xs bg-red-100 hover:bg-red-200 text-red-700 rounded">반려</button>
-                              </>
-                            )}
-                            {canDelete(r) && (
-                              <button onClick={() => deleteRecord(r.id, r.request_no)}
-                                className="px-2 py-0.5 text-xs text-red-500 hover:text-red-700">삭제</button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        )}
+                        <div className="flex gap-1">
+                          {canEdit(r) ? (
+                            <button onClick={() => openEdit(r)}
+                              className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 whitespace-nowrap">
+                              수정
+                            </button>
+                          ) : (
+                            <button onClick={() => openEdit(r)}
+                              className="text-xs px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap">
+                              내용 확인
+                            </button>
+                          )}
+                          {canDelete(r) && (
+                            <button onClick={() => deleteRecord(r.id, r.request_no)}
+                              className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 whitespace-nowrap">
+                              삭제
+                            </button>
+                          )}
+                          <button onClick={() => openEdit(r, true)}
+                            className="text-xs px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap ml-auto">
+                            🖨️ 인쇄
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
