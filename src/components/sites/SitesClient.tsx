@@ -818,33 +818,36 @@ export default function SitesClient({ initial, elevators }: Props) {
         elevatorMatchBySite.has(s.name)
       );
     }
-    // 검색어 없으면 회사 필터만 적용
+    // 검색어 없으면 회사 필터만 적용 (상실은 기타로 분류)
     if (companyFilter === "기타")
-      return sites.filter(s => { const c = normalizeCompany(s.companyType); return c !== "TK" && c !== "DS"; });
-    return companyFilter !== "전체" ? sites.filter(s => normalizeCompany(s.companyType) === companyFilter) : sites;
+      return sites.filter(s => { const c = effectiveCompany(s); return c !== "TK" && c !== "DS"; });
+    return companyFilter !== "전체" ? sites.filter(s => effectiveCompany(s) === companyFilter) : sites;
   }, [sites, q, elevatorMatchBySite, companyFilter]);
 
+  // 상실 현장은 회사구분과 무관하게 기타로 분류
+  const effectiveCompany = (s: SiteRecord) =>
+    s.siteType === "상실" ? null : normalizeCompany(s.companyType);
+
   const siteStats = useMemo(() => {
-    const activeSites = sites.filter(s => s.siteType !== "상실");
-    const tkSites  = activeSites.filter(s => normalizeCompany(s.companyType) === "TK");
-    const dsSites  = activeSites.filter(s => normalizeCompany(s.companyType) === "DS");
-    const etcSites = activeSites.filter(s => {
+    // 상실 제외 후 집계 (전체·TK·DS·기타 모두)
+    const nonSangsil = sites.filter(s => s.siteType !== "상실");
+    const tkSites    = nonSangsil.filter(s => normalizeCompany(s.companyType) === "TK");
+    const dsSites    = nonSangsil.filter(s => normalizeCompany(s.companyType) === "DS");
+    const etcSites   = nonSangsil.filter(s => {
       const c = normalizeCompany(s.companyType);
       return c !== "TK" && c !== "DS";
     });
-    const countElevs = (siteList: SiteRecord[]) => {
+    const sangsilNames = new Set(sites.filter(s => s.siteType === "상실").map(s => s.name));
+    const activeElevs  = allElevators.filter(e => !sangsilNames.has(e.siteName));
+    const countElevs   = (siteList: SiteRecord[]) => {
       const nameSet = new Set(siteList.map(s => s.name));
-      return allElevators.filter(e => nameSet.has(e.siteName)).length;
+      return activeElevs.filter(e => nameSet.has(e.siteName)).length;
     };
-    const activeElevs = allElevators.filter(e => {
-      const site = sites.find(s => s.name === e.siteName);
-      return site?.siteType !== "상실";
-    });
     return {
-      total:    { sites: activeSites.length, elevs: activeElevs.length },
-      tk:       { sites: tkSites.length,     elevs: countElevs(tkSites)  },
-      ds:       { sites: dsSites.length,     elevs: countElevs(dsSites)  },
-      etc:      { sites: etcSites.length,    elevs: countElevs(etcSites) },
+      total: { sites: nonSangsil.length,  elevs: activeElevs.length    },
+      tk:    { sites: tkSites.length,     elevs: countElevs(tkSites)   },
+      ds:    { sites: dsSites.length,     elevs: countElevs(dsSites)   },
+      etc:   { sites: etcSites.length,    elevs: countElevs(etcSites)  },
     };
   }, [sites, allElevators]);
 
@@ -1324,7 +1327,7 @@ export default function SitesClient({ initial, elevators }: Props) {
                             );
                           })()}
                           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                            {companyBadge(site.companyType, isDark)}
+                            {companyBadge(site.siteType === "상실" ? null : site.companyType, isDark)}
                             {site.contractType && (
                               <span className={`text-xs px-1.5 py-0.5 rounded ${
                                 isDark ? "bg-white" : "border border-black"

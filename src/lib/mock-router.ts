@@ -717,15 +717,13 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
       return kind === "상실";
     }
 
-    // 상실 제외한 활성 현장만 집계
-    const activeSites = allSites.filter((s: any) => !isSangsil(s));
-    const sangsilIds  = new Set<number>(allSites.filter((s: any) => isSangsil(s)).map((s: any) => s.id));
+    // 상실 제외 후 집계 (전체·TK·DS·기타 모두)
+    const sangsilIds    = new Set<number>(allSites.filter((s: any) => isSangsil(s)).map((s: any) => s.id));
+    const activeSites   = allSites.filter((s: any) => !isSangsil(s));
+    const activeElevs   = allElevators.filter((e: any) => !sangsilIds.has(e.site_id));
+    const totalElevators = activeElevs.length;
 
     // 신DB: 호기=site_elevators(site_id), 현장 회사구분=managed_sites(id→company_type)
-    // 상실 현장 호기 제외
-    const activeElevators = allElevators.filter((e: any) => !sangsilIds.has(e.site_id));
-    const totalElevators  = activeElevators.length;
-
     const siteTypeMap = new Map<number, string>();
     activeSites.forEach((s: any) => siteTypeMap.set(s.id, normalizeType(s.company_type)));
 
@@ -737,7 +735,7 @@ async function routeGET(path: string, params: URLSearchParams): Promise<unknown>
     let dsElevators = 0;
     let otherElevators = 0;
 
-    activeElevators.forEach((e: any) => {
+    activeElevs.forEach((e: any) => {
       const type = siteTypeMap.get(e.site_id);
       if (type === "TK") tkeElevators++;
       else if (type === "DS") dsElevators++;
