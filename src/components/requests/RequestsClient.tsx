@@ -776,7 +776,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                         {canSelfEdit(r) && (
                           <div className="flex gap-1 mt-2">
                             <button type="button" disabled={actionLoading === r.id}
-                              onClick={() => router.push(`/requests/new?editId=${r.id}`)}
+                              onClick={() => router.push(`/claim/new?editId=${r.id}`)}
                               className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 whitespace-nowrap">수정</button>
                             <button type="button" disabled={actionLoading === r.id}
                               onClick={() => handleReqDelete(r.id)}
@@ -977,7 +977,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                             {canSelfEdit(r) && (
                               <div className="flex gap-1 mt-1">
                                 <button type="button" disabled={actionLoading === r.id}
-                                  onClick={() => router.push(`/requests/new?editId=${r.id}`)}
+                                  onClick={() => router.push(`/claim/new?editId=${r.id}`)}
                                   className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 whitespace-nowrap">수정</button>
                                 <button type="button" disabled={actionLoading === r.id}
                                   onClick={() => handleReqDelete(r.id)}
@@ -991,7 +991,7 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
                             {canSelfEdit(r) && (
                               <div className="flex gap-1">
                                 <button type="button" disabled={actionLoading === r.id}
-                                  onClick={() => router.push(`/requests/new?editId=${r.id}`)}
+                                  onClick={() => router.push(`/claim/new?editId=${r.id}`)}
                                   className="text-xs px-2 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 whitespace-nowrap">수정</button>
                                 <button type="button" disabled={actionLoading === r.id}
                                   onClick={() => handleReqDelete(r.id)}

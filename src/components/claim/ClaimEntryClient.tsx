@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useViewMode } from "@/context/ViewModeContext";
 import { supabase } from "@/lib/supabase";
@@ -95,6 +96,9 @@ export default function ClaimEntryClient() {
   const { user } = useAuth();
   const { viewMode } = useViewMode();
   const isMobile = viewMode === "mobile";
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams ? (Number(searchParams.get("editId")) || null) : null;
   const [mode, setMode] = useState<ClaimMode>("유상견적요청");
 
   // 헤더
@@ -166,6 +170,42 @@ export default function ClaimEntryClient() {
   useEffect(() => {
     api.get<SiteOption[]>("/api/sites").then(setSites).catch(() => {});
   }, []);
+
+  // 수정 모드: editId가 있으면 기존 자재신청 데이터 로딩
+  useEffect(() => {
+    if (!editId) return;
+    void (async () => {
+      const { data, error } = await supabase
+        .from("material_requests")
+        .select("*")
+        .eq("id", editId)
+        .single();
+      if (error || !data) return;
+      const r = data as { request_type: string | null; site_name: string | null; note: string | null; items: { materialId?: string; materialName?: string; qty?: number; elevatorName?: string | null }[] | null };
+      if (r.request_type === "무상신청")   setMode("무상신청");
+      else if (r.request_type === "당직선출고") setMode("당직선출고");
+      else setMode("당직선출고");
+      if (r.site_name) setSiteName(r.site_name);
+      const noteVal = r.note ?? "";
+      const slashIdx = noteVal.indexOf(" / ");
+      if (slashIdx !== -1) {
+        setWorkTitle(noteVal.slice(0, slashIdx));
+        setReason(noteVal.slice(slashIdx + 3));
+      } else {
+        setWorkTitle("");
+        setReason(noteVal);
+      }
+      const items = Array.isArray(r.items) ? r.items : [];
+      if (items.length > 0) {
+        setRows(items.map(item => newRow({
+          material_id:   item.materialId   ?? "",
+          material_name: item.materialName ?? "",
+          qty:           item.qty          ?? 1,
+          elevator_name: item.elevatorName ?? "",
+        })));
+      }
+    })();
+  }, [editId]);
 
   useEffect(() => {
     if (!user || !isAdmin(user)) return;
@@ -339,6 +379,8 @@ export default function ClaimEntryClient() {
 
   // 저장 버튼 클릭: 유상/당직은 바로 저장, 무상은 승인자 선택 모달 오픈
   function handleSaveClick() {
+    // 수정 모드: 승인자 재선택 없이 바로 저장
+    if (editId) { void doSubmit(); return; }
     if (mode !== "무상신청") { void doSubmit(); return; }
     setMessage(null);
     if (!user) { setMessage({ type: "error", text: "로그인이 필요합니다." }); return; }
@@ -375,6 +417,25 @@ export default function ClaimEntryClient() {
 
     setSaving(true);
     try {
+      // ── 수정 모드 (기존 material_requests 행 업데이트) ──────────────────
+      if (editId) {
+        const items = validItems.map(r => ({
+          materialId:   r.material_id,
+          materialName: r.material_name,
+          qty:          r.qty,
+          elevatorName: r.elevator_name || null,
+        }));
+        const { error } = await supabase.from("material_requests").update({
+          site_name: siteName,
+          items,
+          note: [workTitle, reason].filter(Boolean).join(" / ") || null,
+        }).eq("id", editId);
+        if (error) throw error;
+        setMessage({ type: "success", text: "자재신청이 수정되었습니다." });
+        await new Promise(res => setTimeout(res, 700));
+        router.push("/requests");
+        return;
+      }
       // 호기 헤더 — 견적요청/자재청구 알림 메시지 공용
       const elevSet = Array.from(new Set(validItems.map(r => r.elevator_name.trim()).filter(Boolean)));
       const headerElev = elevSet.length === 0 ? null : elevSet.join(", ");
@@ -546,12 +607,28 @@ export default function ClaimEntryClient() {
     <>
     <div className="min-h-full bg-gray-50 dark:bg-gray-900">
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">🔧 견적 및 자재청구 등록</h1>
-        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">유상/무상/당직 모드 선택 후 자재 청구를 접수합니다.</p>
+        {editId ? (
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">✏️ 자재신청 수정 <span className="text-sm font-normal text-gray-400">#{editId}</span></h1>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">현장·자재·메모를 수정 후 저장하세요.</p>
+            </div>
+            <button type="button" onClick={() => router.push("/requests")}
+              className="px-3 py-1.5 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+              취소
+            </button>
+          </div>
+        ) : (
+          <>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">🔧 견적 및 자재청구 등록</h1>
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">유상/무상/당직 모드 선택 후 자재 청구를 접수합니다.</p>
+          </>
+        )}
       </div>
 
 <div className="p-6 space-y-4 max-w-5xl">
-        {/* 모드 선택 */}
+        {/* 모드 선택 (수정 모드에서는 잠금) */}
+        {!editId && (
         <div className={sectionCls}>
           <label className={labelCls}>청구 구분</label>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -574,6 +651,7 @@ export default function ClaimEntryClient() {
             })}
           </div>
         </div>
+        )}
 
         {/* 헤더 */}
         <div className={sectionCls}>
@@ -918,18 +996,26 @@ export default function ClaimEntryClient() {
         )}
 
         <div className="flex justify-end gap-2">
+          {editId && (
+            <button type="button" onClick={() => router.push("/requests")}
+              className="px-5 py-2 rounded border border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+              취소
+            </button>
+          )}
           <button type="button" onClick={handleSaveClick} disabled={saving}
             className={`px-6 py-2 rounded text-white text-sm font-semibold disabled:opacity-50 ${
-              mode === "무상신청"
-                ? "bg-emerald-600 hover:bg-emerald-700"
-                : "bg-blue-600 hover:bg-blue-700"
+              editId
+                ? "bg-blue-600 hover:bg-blue-700"
+                : mode === "무상신청"
+                  ? "bg-emerald-600 hover:bg-emerald-700"
+                  : "bg-blue-600 hover:bg-blue-700"
             }`}>
-            {saving ? "저장 중..." : mode === "무상신청" ? "🆓 승인자 선택 후 저장" : `💾 ${MODES.find(m => m.key === mode)?.label} 저장`}
+            {saving ? "저장 중..." : editId ? "✓ 수정 완료" : mode === "무상신청" ? "🆓 승인자 선택 후 저장" : `💾 ${MODES.find(m => m.key === mode)?.label} 저장`}
           </button>
         </div>
 
-        {/* ─── 팀 청구이력 ───────────────────────────────── */}
-        <div className={sectionCls}>
+        {/* ─── 팀 청구이력 (수정 모드에서는 숨김) ─────────────────── */}
+        {!editId && <div className={sectionCls}>
           {/* 헤더 */}
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">📜 팀 청구이력</h2>
@@ -1105,7 +1191,7 @@ export default function ClaimEntryClient() {
               </tbody>
             </table>
           </div>
-        </div>
+        </div>}
 
         {/* ─── 자재담당자 설정 (관리자 전용) ─────────────────────────── */}
         {isAdmin(user) && (
