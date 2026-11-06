@@ -17,7 +17,7 @@ import { useViewMode } from "@/context/ViewModeContext";
 import Autocomplete from "@/components/common/Autocomplete";
 import TransactionBulkUploadModal from "./TransactionBulkUploadModal";
 
-interface SiteOption { id: number; name: string }
+interface SiteOption { id: number; name: string; alias?: string | null; search_keywords?: string | null }
 
 interface Props {
   mode: "입고" | "출고";
@@ -201,6 +201,18 @@ export default function StockHistoryClient({ mode, initial }: Props) {
     { key: null,           label: "비고",     sortable: false, optional: "note" },
   ], [isInbound]);
 
+  // 현장명 검색 키워드 맵: 현장명(lowered) → alias + search_keywords 를 소문자로 합쳐둠
+  // 거래내역의 siteName 은 managed_sites.site_name 의 스냅샷 문자열. 별칭·검색키워드로도 찾을 수 있게
+  // managed_sites 의 보조 필드를 매핑해 필터 단계에서 함께 검사한다.
+  const siteKeywordMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of sites) {
+      const parts = [s.alias, s.search_keywords].filter(Boolean).join(" ").toLowerCase();
+      if (parts) m.set(s.name.toLowerCase(), parts);
+    }
+    return m;
+  }, [sites]);
+
   const filtered = transactions.filter(t => {
     if (!inRange(t.createdAt, search.dateFrom, search.dateTo)) return false;
     if (companyFilter !== "전체") {
@@ -208,7 +220,11 @@ export default function StockHistoryClient({ mode, initial }: Props) {
       if (companyFilter === "TK" && !isTk) return false;
       if (companyFilter === "DS" && isTk) return false;
     }
-    if (search.siteName && !(t.siteName?.toLowerCase().includes(search.siteName.toLowerCase()))) return false;
+    if (search.siteName) {
+      const q = search.siteName.toLowerCase();
+      const siteName = (t.siteName ?? "").toLowerCase();
+      if (!siteName.includes(q) && !(siteKeywordMap.get(siteName) ?? "").includes(q)) return false;
+    }
     if (search.userName && !t.userName.toLowerCase().includes(search.userName.toLowerCase())) return false;
     if (search.matQuery) {
       const q = search.matQuery.trim().toLowerCase();
