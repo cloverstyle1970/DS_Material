@@ -1430,8 +1430,8 @@ export default function OvertimeLedgerClient() {
                   {reports.length === 0 ? "등록된 잔업보고서가 없습니다." : "검색 결과가 없습니다."}
                 </div>
               ) : (
-                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                  <table className="w-full text-xs">
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-x-auto">
+                  <table className="w-full text-xs min-w-[600px]">
                     <thead className="bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 uppercase text-[11px]">
                       <tr>
                         <th className="px-3 py-2 text-left">보고서번호</th>
