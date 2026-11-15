@@ -284,20 +284,85 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
         } else {
           note = userMemo || null;
         }
+        const actorId   = isEdit ? (createdByUserId ?? user.id) : user.id;
+        const actorName = isEdit ? (createdByUserName || user.name) : user.name;
         await api.post("/api/transactions", {
           type: "입고", materialId: r.materialId, materialName: r.materialName,
           qty: r.qty, siteName: siteName || null,
           elevatorName: r.elevatorName || null,
           serialNos: r.serialNos.length > 0 ? r.serialNos : null,
           note,
-          userId: isEdit ? (createdByUserId ?? user.id) : user.id,
-          userName: isEdit ? (createdByUserName || user.name) : user.name,
+          userId: actorId,
+          userName: actorName,
           batchId,
           transactionNo,
           unitPrice: r.unitPrice || 0,
           createdAt: inboundDate,
           requesterName: requesterName || null,
         });
+
+        // 능곡사무소 TK→DS 자동 변환: 거래처=티케이엘리베이터코리아(주)강서지사 + 현장=능곡사무소 + TK 자재
+        if (
+          vendorName.includes("티케이엘리베이터코리아") &&
+          siteName.trim() === "능곡사무소" &&
+          isTkMaterial(r.materialId)
+        ) {
+          const dsMaterialId = "D" + r.materialId;
+          // TK 자재 원본 조회 — sell_price로 DS 단가 계산에 사용
+          const { data: tkMat } = await supabase.from("materials")
+            .select("*").eq("id", r.materialId).maybeSingle();
+          const tm = tkMat as Record<string, unknown> | null;
+          const tkSellPrice = Number(tm?.sell_price ?? 0);
+          // DS 입고단가 = TK 판매단가 × 80%, DS 판매단가 = TK 판매단가
+          const dsBuyPrice  = Math.round(tkSellPrice * 0.8);
+          const dsSellPrice = tkSellPrice;
+          // DS 자재 없으면 TK 자재 정보 복사하여 자동 등록
+          const { data: existing } = await supabase.from("materials")
+            .select("id").eq("id", dsMaterialId).maybeSingle();
+          if (!existing) {
+            await supabase.from("materials").insert({
+              id:          dsMaterialId,
+              name:        tm?.name        ?? r.materialName,
+              model_no:    tm?.model_no    ?? null,
+              buy_price:   dsBuyPrice  || null,
+              sell_price:  dsSellPrice || null,
+              stock_qty:   0,
+              is_repair:   false,
+              track_serial: tm?.track_serial ?? false,
+              alias:       tm?.alias       ?? null,
+              storage_loc: tm?.storage_loc ?? null,
+            });
+          }
+          const sharedSns = r.serialNos.length > 0 ? r.serialNos : null;
+          // TK 출고 → 능곡사무소
+          await api.post("/api/transactions", {
+            type: "출고",
+            materialId: r.materialId, materialName: r.materialName,
+            qty: r.qty, siteName: "능곡사무소",
+            elevatorName: r.elevatorName || null,
+            serialNos: sharedSns,
+            note: "TK→DS 변환출고",
+            userId: actorId, userName: actorName,
+            batchId, transactionNo,
+            unitPrice: r.unitPrice || 0, createdAt: inboundDate,
+          });
+          // DS 입고 (단가: TK 판매단가 × 80%)
+          const { data: dsMat } = await supabase.from("materials")
+            .select("name").eq("id", dsMaterialId).maybeSingle();
+          await api.post("/api/transactions", {
+            type: "입고",
+            materialId: dsMaterialId,
+            materialName: (dsMat as { name: string } | null)?.name ?? r.materialName,
+            qty: r.qty, siteName: siteName || null,
+            elevatorName: r.elevatorName || null,
+            serialNos: sharedSns,
+            note: `TK→DS 변환입고 (TK: ${r.materialId})`,
+            userId: actorId, userName: actorName,
+            batchId, transactionNo,
+            unitPrice: dsBuyPrice, createdAt: inboundDate,
+            requesterName: requesterName || null,
+          });
+        }
       }
       // 발주 라인 상태 및 헤더 상태 갱신은 mock-router의 POST /api/transactions
       // 에서 note '발주 #<line_id>' 패턴을 인식해 자동 처리됨.

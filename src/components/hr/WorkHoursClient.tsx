@@ -419,8 +419,8 @@ export default function WorkHoursClient() {
                   ? monthCols.map(c => c.kind === "day" ? (
                       <th key={c.key} title={c.holiday ?? undefined}
                         className={`border border-gray-200 dark:border-gray-600 w-9 min-w-[36px] py-1 font-semibold
-                          ${c.off ? "bg-red-200 dark:bg-red-900/60" : "bg-gray-100 dark:bg-gray-700"}
-                          ${c.dow === 0 || c.holiday ? "text-red-600 dark:text-red-400" : c.dow === 6 ? "text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-200"}`}>
+                          ${c.off ? "bg-red-200 dark:bg-red-500/30" : "bg-gray-100 dark:bg-gray-700"}
+                          ${c.dow === 0 || c.holiday ? "text-red-600 dark:text-red-300" : c.dow === 6 ? "text-blue-600 dark:text-blue-300" : "text-gray-700 dark:text-gray-200"}`}>
                         <div>{c.d}</div>
                         <div className="text-[10px] font-normal">{DOW_KR[c.dow]}</div>
                       </th>
@@ -467,7 +467,7 @@ export default function WorkHoursClient() {
                             onClick={() => setDetail({ emp: r.emp, year, month })}
                             className={`border border-gray-200 dark:border-gray-600 text-center p-0 h-9 cursor-pointer
                               hover:outline hover:outline-2 hover:outline-blue-400 hover:-outline-offset-2
-                              ${c.off ? "bg-red-100 dark:bg-red-900/40" : ""}`}>
+                              ${c.off ? "bg-red-100 dark:bg-red-500/20" : ""}`}>
                             <span className={`text-[11px] ${label.cls}`}>{label.text}</span>
                           </td>
                         );
@@ -576,7 +576,7 @@ function DetailModal({ emp, year, month, row, holidays, inLoadedYear, onMonth, o
           <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_88px] border-l border-t border-gray-200 dark:border-gray-600">
             {[...DOW_KR].map((w, i) => (
               <div key={w} className={`${cellCls} py-1 text-center font-semibold bg-gray-100 dark:bg-gray-700
-                ${i === 0 ? "text-red-600 dark:text-red-400" : i === 6 ? "text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-200"}`}>{w}</div>
+                ${i === 0 ? "text-red-600 dark:text-red-300" : i === 6 ? "text-blue-600 dark:text-blue-300" : "text-gray-700 dark:text-gray-200"}`}>{w}</div>
             ))}
             <div className={`${cellCls} py-1 text-center font-semibold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200`}>주간 합계</div>
             {weeks.map(sun => {
@@ -595,9 +595,9 @@ function DetailModal({ emp, year, month, row, holidays, inLoadedYear, onMonth, o
                   return (
                     <div key={k} title={[holiday, ...(d?.notes ?? [])].filter(Boolean).join("\n") || undefined}
                       className={`${cellCls} min-h-[92px] p-1.5 flex flex-col gap-0.5
-                        ${off ? "bg-red-50 dark:bg-red-900/20" : "bg-white dark:bg-gray-800"} ${outside ? "opacity-40" : ""}`}>
+                        ${off ? "bg-red-50 dark:bg-red-500/10" : "bg-white dark:bg-gray-800"} ${outside ? "opacity-40" : ""}`}>
                       <div className="flex items-baseline gap-1">
-                        <span className={`font-semibold ${i === 0 || holiday ? "text-red-600 dark:text-red-400" : i === 6 ? "text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-200"}`}>
+                        <span className={`font-semibold ${i === 0 || holiday ? "text-red-600 dark:text-red-300" : i === 6 ? "text-blue-600 dark:text-blue-300" : "text-gray-700 dark:text-gray-200"}`}>
                           {outside ? `${dt.getMonth() + 1}/${dt.getDate()}` : dt.getDate()}
                         </span>
                         {holiday && <span className="truncate text-[10px] text-red-500 dark:text-red-400">{holiday}</span>}

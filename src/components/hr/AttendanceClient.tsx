@@ -349,7 +349,7 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
           <span key={s.key} className={`px-1.5 py-0.5 rounded ${KIND_CLS[s.kind]}`}>{s.short} {s.key}</span>
         ))}
         <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300">휴직 · 육휴 육아휴직</span>
-        <span className="px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">휴일 (토·일·공휴일·대체휴일)</span>
+        <span className="px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300">휴일 (토·일·공휴일·대체휴일)</span>
         {!canWrite && <span className="ml-2 text-gray-400">· 조회 전용</span>}
       </div>
 
@@ -369,8 +369,8 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
                 {days.map(d => (
                   <th key={d.key} title={d.holiday ?? undefined}
                     className={`border border-gray-200 dark:border-gray-600 w-8 min-w-[32px] py-1 font-semibold
-                      ${d.key === todayKey ? "bg-yellow-100 dark:bg-yellow-900/40" : d.off ? "bg-red-200 dark:bg-red-900/60" : "bg-gray-100 dark:bg-gray-700"}
-                      ${d.dow === 0 || d.holiday ? "text-red-600 dark:text-red-400" : d.dow === 6 ? "text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-200"}`}>
+                      ${d.key === todayKey ? "bg-yellow-100 dark:bg-yellow-900/40" : d.off ? "bg-red-200 dark:bg-red-500/30" : "bg-gray-100 dark:bg-gray-700"}
+                      ${d.dow === 0 || d.holiday ? "text-red-600 dark:text-red-300" : d.dow === 6 ? "text-blue-600 dark:text-blue-300" : "text-gray-700 dark:text-gray-200"}`}>
                     <div>{d.d}</div>
                     <div className="text-[10px] font-normal">{"일월화수목금토"[d.dow]}</div>
                   </th>
@@ -420,7 +420,7 @@ col.c-no { width: 18px; } col.c-nm { width: 44px; } col.c-sum { width: 22px; }
                           onClick={clickable ? ev => openCell(ev, e, d.key) : undefined}
                           className={`border border-gray-200 dark:border-gray-600 text-center p-0 h-9
                             ${!active ? "bg-gray-100 dark:bg-gray-900 bg-[repeating-linear-gradient(45deg,transparent,transparent_3px,rgba(128,128,128,0.15)_3px,rgba(128,128,128,0.15)_4px)]"
-                              : d.off ? "bg-red-100 dark:bg-red-900/40" : ""}
+                              : d.off ? "bg-red-100 dark:bg-red-500/20" : ""}
                             ${clickable ? "cursor-pointer hover:outline hover:outline-2 hover:outline-blue-400 hover:-outline-offset-2" : ""}`}>
                           {label && (
                             <span className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-0.5 rounded text-[11px] font-bold
