@@ -252,12 +252,12 @@ function resolveEmergencyFromDevices(installationPlace: string | null, devices: 
 function dbToElevator(r: any, siteName?: string, siteDevices?: any[] | null, sitePhone?: string | null): ElevatorRecord {
   // site_elevators 스키마: site_id(FK), installation_place(호기 식별 기준), unit_name, elevator_number, elevator_model
   // 호기 표시·선택값은 installation_place 를 기준으로 함 (unit_name 은 빈 값일 때만 fallback)
-  // 비통번호 우선순위: managed_sites.emergency_phone(레거시, 유지보수 표시 기준) → emergency_devices → site_elevators.emergency_phone
+  // 비통번호 우선순위: site_elevators.emergency_phone(호기 단위, 정본) → emergency_devices → managed_sites.emergency_phone(레거시 폴백)
   // extractPhoneNumber 로 "1호: " 같은 접두어를 제거하고 전화번호 패턴만 사용
   const emergencyPhone =
-    extractPhoneNumber(sitePhone ?? null) ??
-    resolveEmergencyFromDevices(r.installation_place, siteDevices ?? null) ??
     extractPhoneNumber(r.emergency_phone ?? null) ??
+    resolveEmergencyFromDevices(r.installation_place, siteDevices ?? null) ??
+    extractPhoneNumber(sitePhone ?? null) ??
     null;
   return {
     id:                   r.id,

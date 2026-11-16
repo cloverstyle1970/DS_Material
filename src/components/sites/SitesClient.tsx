@@ -693,13 +693,10 @@ export default function SitesClient({ initial, elevators }: Props) {
   const [query, setQuery]       = useState("");
   const [companyFilter, setCompanyFilter] = useState<"전체" | "DS" | "TK" | "기타">("전체");
   const [selected, setSelected] = useState<SiteRecord | null>(null);
-  const [showAdd, setShowAdd]   = useState(false);
-  const [editTarget, setEditTarget] = useState<SiteRecord | null>(null);
   // 호기 CRUD
   const [showElevatorForm, setShowElevatorForm]     = useState(false);
   const [editElevator, setEditElevator]             = useState<ElevatorRecord | null>(null);
   const [deleteElevatorTarget, setDeleteElevatorTarget] = useState<ElevatorRecord | null>(null);
-  const [editLimited, setEditLimited] = useState(false);
   const [page, setPage] = useState(1);
   const [checkedSiteIds, setCheckedSiteIds] = useState<Set<number>>(new Set());
 
@@ -1070,12 +1067,6 @@ export default function SitesClient({ initial, elevators }: Props) {
     const updated = await api.get<SiteRecord[]>("/api/sites").catch(() => null);
     if (!updated) { alert("현장 목록 조회에 실패했습니다."); return; }
     setSites(updated);
-    setShowAdd(false);
-    if (editTarget) {
-      const refreshed = updated.find(s => s.id === editTarget.id) ?? null;
-      setSelected(refreshed);
-      setEditTarget(null);
-    }
   }
 
   async function reloadElevators(siteName: string) {
@@ -1141,12 +1132,6 @@ export default function SitesClient({ initial, elevators }: Props) {
               title="유지보수(managed_sites) · 자재관리(site_elevators) 두 테이블의 DB 컬럼 구조 + 샘플 데이터를 엑셀로 내보냅니다"
               className="px-4 py-2 rounded-lg border border-indigo-200 text-sm text-indigo-700 hover:bg-indigo-50 transition-colors flex items-center gap-1.5 disabled:opacity-60">
               <span className="text-xs">🗂️</span> DB 구조 내보내기
-            </button>
-          )}
-          {canEdit && (
-            <button onClick={() => setShowAdd(true)} disabled={backupRunning}
-              className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-1.5 disabled:opacity-60">
-              + 현장 등록
             </button>
           )}
         </div>
@@ -1406,13 +1391,7 @@ export default function SitesClient({ initial, elevators }: Props) {
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {(canEditFull || canEditLimited) && (
-                      <button onClick={() => { setEditTarget(selected); setEditLimited(canEditLimited); }}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${isDark ? "bg-blue-900/40 text-blue-300 hover:bg-blue-900/60" : "bg-blue-50 text-blue-600 hover:bg-blue-100"}`}>
-                        수정
-                      </button>
-                    )}
-                    <button onClick={() => setSelected(null)}
+                      <button onClick={() => setSelected(null)}
                       className={`rounded-lg flex items-center justify-center gap-1 transition-colors ${
                         isMobile
                           ? "px-3 h-8 text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700"
@@ -1612,20 +1591,6 @@ export default function SitesClient({ initial, elevators }: Props) {
           )}
         </div>
       </div>
-
-      {/* 현장 등록 모달 */}
-      {showAdd && <AddSiteModal onClose={() => setShowAdd(false)} onSaved={reload} />}
-
-      {/* 현장 수정 모달 */}
-      {editTarget && (
-        <AddSiteModal
-          editSite={editTarget}
-          existingElevators={allElevators.filter(e => e.siteName === editTarget.name)}
-          onClose={() => { setEditTarget(null); setEditLimited(false); }}
-          onSaved={reload}
-          limitedEdit={editLimited}
-        />
-      )}
 
       {/* 호기 등록/수정 모달 */}
       {showElevatorForm && selected && (
