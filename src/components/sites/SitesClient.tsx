@@ -798,9 +798,9 @@ export default function SitesClient({ initial, elevators }: Props) {
     return matched;
   }, [allElevators, q]);
 
-  // 상실 현장은 회사구분과 무관하게 기타로 분류 (필터·배지 공용)
+  // 상실·고장지원 현장은 회사구분과 무관하게 기타로 분류 (필터·배지 공용)
   const effectiveCompany = (s: SiteRecord) =>
-    s.siteType === "상실" ? null : normalizeCompany(s.companyType);
+    (s.siteType === "상실" || s.siteType === "고장지원") ? null : normalizeCompany(s.companyType);
 
   const filteredSites = useMemo(() => {
     // 검색어가 있으면 회사 필터 무시하고 상실 포함 모든 현장 검색
@@ -826,8 +826,8 @@ export default function SitesClient({ initial, elevators }: Props) {
   }, [sites, q, elevatorMatchBySite, companyFilter]);
 
   const siteStats = useMemo(() => {
-    // 상실 제외 후 집계 (전체·TK·DS·기타 모두)
-    const nonSangsil = sites.filter(s => s.siteType !== "상실");
+    // 상실·고장지원 제외 후 집계 (전체·TK·DS·기타 모두)
+    const nonSangsil = sites.filter(s => s.siteType !== "상실" && s.siteType !== "고장지원");
     const tkSites    = nonSangsil.filter(s => normalizeCompany(s.companyType) === "TK");
     const dsSites    = nonSangsil.filter(s => normalizeCompany(s.companyType) === "DS");
     const etcSites   = nonSangsil.filter(s => {
