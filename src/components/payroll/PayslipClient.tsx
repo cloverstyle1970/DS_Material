@@ -16,6 +16,7 @@ interface AccountLite {
   username: string;
   dept: string | null;
   rank: string | null;
+  email: string | null;
 }
 
 interface PayslipItemRow {
@@ -41,6 +42,8 @@ interface RegisteredPayslip {
   net: number;
   calc_info: PayrollCalcInfo | null;
   remark: string | null;
+  email_status: string | null;
+  email_sent_at: string | null;
   items: PayslipItemRow[];
 }
 
@@ -74,6 +77,7 @@ export default function PayslipClient() {
   const [year, setYear] = useState<number>(today.getFullYear());
   const [month, setMonth] = useState<number>(today.getMonth() + 1);
   const [payDate, setPayDate] = useState<string>("");
+  const [periodId, setPeriodId] = useState<number | null>(null);
 
   const [accounts, setAccounts] = useState<AccountLite[]>([]);
   const [registered, setRegistered] = useState<RegisteredPayslip[]>([]);
@@ -95,6 +99,16 @@ export default function PayslipClient() {
   // 일괄 PDF 진행 상태
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; current_name: string } | null>(null);
 
+  // 이메일 발송
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [emailScheduledAt, setEmailScheduledAt] = useState<string>("");
+  const [emailScheduleSaving, setEmailScheduleSaving] = useState(false);
+  const [emailProgress, setEmailProgress] = useState<{
+    current: number; total: number; current_name: string;
+    errors: string[];
+  } | null>(null);
+  const [emailAccountMap, setEmailAccountMap] = useState<Map<number, string | null>>(new Map());
+
   const admin = user ? isAdmin(user) : false;
   const canRead   = !!user && (admin || hasMenuPermission(user, MENU_HREF, "read"));
   const canCreate = !!user && (admin || hasMenuPermission(user, MENU_HREF, "create"));
@@ -104,7 +118,7 @@ export default function PayslipClient() {
   const loadAccounts = useCallback(async () => {
     const { data } = await supabase
       .from("accounts")
-      .select("id, username, dept, rank")
+      .select("id, username, dept, rank, email")
       .eq("status", "재직")
       .order("username");
     setAccounts((data ?? []) as AccountLite[]);
@@ -115,7 +129,7 @@ export default function PayslipClient() {
     setLoading(true);
     const periodRes = await supabase
       .from("payroll_periods")
-      .select("id, pay_date")
+      .select("id, pay_date, email_scheduled_at")
       .eq("year", year)
       .eq("month", month)
       .maybeSingle();
@@ -123,14 +137,22 @@ export default function PayslipClient() {
     if (!periodRes.data) {
       setRegistered([]);
       setPayDate("");
+      setPeriodId(null);
+      setEmailScheduledAt("");
       setLoading(false);
       return;
     }
     setPayDate(periodRes.data.pay_date ?? "");
+    setPeriodId(periodRes.data.id);
+    setEmailScheduledAt(
+      periodRes.data.email_scheduled_at
+        ? new Date(periodRes.data.email_scheduled_at).toISOString().slice(0, 16)
+        : ""
+    );
 
     const psRes = await supabase
       .from("payslips")
-      .select("id, period_id, account_id, slip_no, emp_name, dept, rank, birth_yymmdd, company_name, gross, deduction, net, calc_info, remark")
+      .select("id, period_id, account_id, slip_no, emp_name, dept, rank, birth_yymmdd, company_name, gross, deduction, net, calc_info, remark, email_status, email_sent_at")
       .eq("period_id", periodRes.data.id)
       .order("emp_name");
 
@@ -306,6 +328,106 @@ export default function PayslipClient() {
       alert(`등록 실패: ${msg}`);
     } finally {
       setSaving(false);
+    }
+  }
+
+  // ─── 이메일 발송 ───────────────────────────────────────
+
+  async function openEmailModal() {
+    // 이메일 모달 열기 전에 account_id → email 맵 구성 (퇴직자 포함)
+    const ids = registered.filter(p => p.account_id).map(p => p.account_id as number);
+    if (ids.length > 0) {
+      const { data } = await supabase.from("accounts").select("id, email").in("id", ids);
+      setEmailAccountMap(new Map((data ?? []).map(r => [r.id as number, r.email as string | null])));
+    }
+    setEmailModalOpen(true);
+  }
+
+  async function handleSaveEmailSchedule() {
+    if (!periodId) return;
+    setEmailScheduleSaving(true);
+    const val = emailScheduledAt ? new Date(emailScheduledAt).toISOString() : null;
+    await supabase.from("payroll_periods").update({ email_scheduled_at: val }).eq("id", periodId);
+    setEmailScheduleSaving(false);
+  }
+
+  async function handleEmailSend() {
+    const toSend = registered.filter(p => {
+      if (!p.account_id) return false;
+      const email = emailAccountMap.get(p.account_id);
+      return email && p.email_status !== "sent";
+    });
+    if (toSend.length === 0) {
+      alert("발송할 대상이 없습니다.\n(이메일 미등록 또는 이미 발송 완료된 사원)");
+      return;
+    }
+    if (!confirm(`${toSend.length}명에게 ${year}년 ${month}월 급여명세서를 이메일로 발송합니다.\n계속하시겠습니까?`)) return;
+
+    const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+      import("html2canvas-pro"),
+      import("jspdf"),
+    ]);
+
+    const container = document.createElement("div");
+    container.style.cssText = "position:fixed;left:-99999px;top:0;width:98mm;background:white;z-index:-1;";
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const errors: string[] = [];
+
+    try {
+      for (let i = 0; i < toSend.length; i++) {
+        const p = toSend[i];
+        const email = emailAccountMap.get(p.account_id!)!;
+        setEmailProgress({ current: i + 1, total: toSend.length, current_name: p.emp_name, errors: [...errors] });
+
+        try {
+          // PDF 생성
+          flushSync(() => {
+            root.render(<PayslipCard payslip={p} year={year} month={month} payDate={payDate} no={registered.findIndex(r => r.id === p.id) + 1} />);
+          });
+          await new Promise(r => setTimeout(r, 150));
+          if (document.fonts?.ready) await document.fonts.ready;
+
+          const canvas = await html2canvas(container, { scale: 3, backgroundColor: "#ffffff", useCORS: true, logging: false });
+          const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+          const cardW = 98, cardH = (canvas.height * cardW) / canvas.width;
+          pdf.addImage(canvas.toDataURL("image/png"), "PNG", (297 - cardW) / 2, Math.max(10.5, (210 - cardH) / 2), cardW, cardH);
+
+          const pdfBase64 = pdf.output("datauristring").split(",")[1];
+          const filename = `${p.emp_name}_${year}년 ${String(month).padStart(2, "0")}월_급여명세서.pdf`;
+
+          // Edge Function 호출
+          const { error: fnErr } = await supabase.functions.invoke("payslip-email-send", {
+            body: { to: email, emp_name: p.emp_name, year, month, pdfBase64, filename },
+          });
+
+          const status = fnErr ? "failed" : "sent";
+          const sentAt = fnErr ? null : new Date().toISOString();
+          if (fnErr) errors.push(`${p.emp_name}: ${fnErr.message}`);
+
+          // DB 업데이트
+          await supabase.from("payslips").update({ email_status: status, email_sent_at: sentAt }).eq("id", p.id);
+          setRegistered(prev => prev.map(r => r.id === p.id ? { ...r, email_status: status, email_sent_at: sentAt } : r));
+
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          errors.push(`${p.emp_name}: ${msg}`);
+          await supabase.from("payslips").update({ email_status: "failed", email_sent_at: null }).eq("id", p.id);
+          setRegistered(prev => prev.map(r => r.id === p.id ? { ...r, email_status: "failed", email_sent_at: null } : r));
+        }
+      }
+
+      const successCount = toSend.length - errors.length;
+      if (errors.length > 0) {
+        alert(`발송 완료: ${successCount}명 성공, ${errors.length}명 실패\n\n실패 목록:\n${errors.join("\n")}`);
+      } else {
+        alert(`${successCount}명 모두 발송 완료되었습니다.`);
+      }
+      setEmailModalOpen(false);
+    } finally {
+      root.unmount();
+      document.body.removeChild(container);
+      setEmailProgress(null);
     }
   }
 
@@ -522,6 +644,21 @@ export default function PayslipClient() {
               <span>일괄 PDF 출력 ({registered.length}건)</span>
             </button>
           )}
+          {canCreate && registered.length > 0 && (
+            <button
+              type="button"
+              onClick={openEmailModal}
+              disabled={!!batchProgress || !!emailProgress}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <span>✉</span>
+              <span>이메일 발송
+                {emailScheduledAt && (
+                  <span className="ml-1.5 text-xs font-normal opacity-80">예약: {emailScheduledAt.replace("T", " ")}</span>
+                )}
+              </span>
+            </button>
+          )}
           {canUpdate && registered.length > 0 && (
             <button
               type="button"
@@ -551,6 +688,7 @@ export default function PayslipClient() {
                 <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600 dark:text-gray-300">지급계</th>
                 <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600 dark:text-gray-300">공제계</th>
                 <th className="px-3 py-2 text-right text-xs font-semibold text-emerald-600 dark:text-emerald-400">차인지급액</th>
+                <th className="px-3 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 w-20">이메일</th>
                 <th className="px-3 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 w-24">인쇄</th>
               </tr>
             </thead>
@@ -569,6 +707,15 @@ export default function PayslipClient() {
                   <td className="px-3 py-2 text-right text-gray-700 dark:text-gray-200 font-mono">{fmtNum(p.gross)}</td>
                   <td className="px-3 py-2 text-right text-gray-700 dark:text-gray-200 font-mono">{fmtNum(p.deduction)}</td>
                   <td className="px-3 py-2 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400">{fmtNum(p.net)}</td>
+                  <td className="px-3 py-2 text-center">
+                    {p.email_status === "sent" ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">✓ 발송</span>
+                    ) : p.email_status === "failed" ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300">✕ 실패</span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">미발송</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-center">
                     <button
                       type="button"
@@ -778,6 +925,146 @@ export default function PayslipClient() {
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
               브라우저 탭을 닫지 마세요.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* 이메일 발송 모달 */}
+      {emailModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 no-print">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">
+                이메일 발송 — {year}년 {month}월 급여명세서
+              </h2>
+              <button type="button" onClick={() => setEmailModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">✕</button>
+            </div>
+
+            <div className="p-5 overflow-y-auto flex-1 space-y-4">
+              {/* 예약 발송 설정 */}
+              <div className="flex items-end gap-3 flex-wrap p-3 rounded-lg bg-gray-50 dark:bg-gray-900">
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                    예약 발송 일시 <span className="text-gray-400 font-normal">(비워두면 예약 없음)</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={emailScheduledAt}
+                    onChange={e => setEmailScheduledAt(e.target.value)}
+                    className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSaveEmailSchedule}
+                  disabled={emailScheduleSaving || !periodId}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40"
+                >
+                  {emailScheduleSaving ? "저장 중..." : "예약 저장"}
+                </button>
+              </div>
+
+              {/* 수신자 목록 */}
+              <div>
+                {(() => {
+                  const withEmail    = registered.filter(p => p.account_id && emailAccountMap.get(p.account_id));
+                  const noEmail      = registered.filter(p => !p.account_id || !emailAccountMap.get(p.account_id));
+                  const alreadySent  = withEmail.filter(p => p.email_status === "sent").length;
+                  const toSend       = withEmail.filter(p => p.email_status !== "sent").length;
+                  return (
+                    <>
+                      <div className="flex gap-3 text-xs mb-2 flex-wrap">
+                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">발송 가능 {withEmail.length}명</span>
+                        <span className="text-gray-400">·</span>
+                        <span className="text-gray-500">이미 발송 {alreadySent}명</span>
+                        <span className="text-gray-400">·</span>
+                        <span className="text-blue-600 dark:text-blue-400">미발송 {toSend}명</span>
+                        {noEmail.length > 0 && (
+                          <><span className="text-gray-400">·</span>
+                          <span className="text-amber-600 dark:text-amber-400">이메일 없음 {noEmail.length}명</span></>
+                        )}
+                      </div>
+                      <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                        <div className="max-h-64 overflow-y-auto">
+                          <table className="w-full text-xs">
+                            <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
+                              <tr>
+                                <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">성명</th>
+                                <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">이메일</th>
+                                <th className="px-3 py-2 text-center font-medium text-gray-600 dark:text-gray-300 w-20">상태</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                              {registered.map(p => {
+                                const email = p.account_id ? (emailAccountMap.get(p.account_id) ?? null) : null;
+                                return (
+                                  <tr key={p.id} className={!email ? "opacity-50" : ""}>
+                                    <td className="px-3 py-1.5 text-gray-800 dark:text-gray-100">{p.emp_name}</td>
+                                    <td className="px-3 py-1.5 font-mono text-gray-600 dark:text-gray-300">
+                                      {email ?? <span className="text-amber-500">이메일 없음</span>}
+                                    </td>
+                                    <td className="px-3 py-1.5 text-center">
+                                      {p.email_status === "sent"   && <span className="text-emerald-600 dark:text-emerald-400">✓ 발송</span>}
+                                      {p.email_status === "failed" && <span className="text-red-500">✕ 실패</span>}
+                                      {!p.email_status && email    && <span className="text-gray-400">대기</span>}
+                                      {!p.email_status && !email   && <span className="text-amber-500">건너뜀</span>}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+
+            <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-2">
+              <button type="button" onClick={() => setEmailModalOpen(false)}
+                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                닫기
+              </button>
+              <button
+                type="button"
+                onClick={handleEmailSend}
+                className="px-4 py-1.5 text-sm font-medium rounded-md bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+              >
+                ✉ 지금 발송
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 이메일 발송 진행 모달 */}
+      {emailProgress && (
+        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 no-print">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6 text-center">
+            <div className="text-3xl mb-3">✉</div>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">이메일 발송 중...</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">{emailProgress.current}</span>
+              {" / "}
+              <span className="font-bold">{emailProgress.total}</span>
+              {" — "}
+              {emailProgress.current_name}
+            </p>
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-emerald-500 h-2 rounded-full transition-all duration-200"
+                style={{ width: `${(emailProgress.current / emailProgress.total) * 100}%` }}
+              />
+            </div>
+            {emailProgress.errors.length > 0 && (
+              <p className="mt-3 text-xs text-red-500 dark:text-red-400">
+                실패 {emailProgress.errors.length}건 발생
+              </p>
+            )}
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">브라우저 탭을 닫지 마세요.</p>
           </div>
         </div>
       )}
