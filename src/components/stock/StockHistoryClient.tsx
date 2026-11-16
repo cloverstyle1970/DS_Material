@@ -352,7 +352,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
       base["현장"] = t.siteName ?? "";
       base["호기"] = t.elevatorName ?? "";
       if (isInbound) {
-        base["신청자"] = requesterMap.get(t.id) ?? "";
+        base["신청자"] = t.requesterName ?? requesterMap.get(t.id) ?? "";
       }
       if (!isInbound) {
         base["수령인"] = receiverMap.get(t.id) ?? "";
@@ -490,8 +490,8 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                     <div><span className="text-gray-400">수량 </span>{fmtNum(t.qty)}</div>
                     {showStock && <div><span className="text-gray-400">재고 </span>{fmtNum(t.prevStock)} → {fmtNum(t.afterStock)}</div>}
                     <div className="truncate"><span className="text-gray-400">현장 </span>{t.siteName ?? "-"}{t.elevatorName ? ` (${t.elevatorName})` : ""}</div>
-                    {isInbound && requesterMap.get(t.id) && (
-                      <div className="truncate"><span className="text-gray-400">신청자 </span>{requesterMap.get(t.id)}</div>
+                    {isInbound && (t.requesterName ?? requesterMap.get(t.id)) && (
+                      <div className="truncate"><span className="text-gray-400">신청자 </span>{t.requesterName ?? requesterMap.get(t.id)}</div>
                     )}
                     {!isInbound && receiverMap.get(t.id) && (
                       <div className="truncate"><span className="text-gray-400">수령인 </span>{receiverMap.get(t.id)}</div>
@@ -627,7 +627,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                 </td>
                 {isInbound && (
                   <td className="px-2 py-3 text-left text-black dark:text-white whitespace-nowrap">
-                    {requesterMap.get(t.id) || "-"}
+                    {t.requesterName ?? requesterMap.get(t.id) ?? "-"}
                   </td>
                 )}
                 {!isInbound && (
