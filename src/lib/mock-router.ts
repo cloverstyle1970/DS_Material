@@ -1527,12 +1527,15 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
     if (action === "승인") {
       const { data: existing } = await supabase.from("material_requests")
         .select("requester_id, site_name, items").eq("id", numId).maybeSingle();
+      // approver_id/approver_name 은 신청 시점에 지정된 값 보존.
+      // 실제 승인 처리자는 processor_* 에 기록 (위임 승인 등으로 두 값이 다를 수 있음).
       const { data, error } = await supabase.from("material_requests")
         .update({
           approval_status: "approved",
-          approver_id:     processorId,
-          approver_name:   processorName,
           approved_at:     new Date().toISOString(),
+          processor_id:    processorId,
+          processor_name:  processorName,
+          processed_at:    new Date().toISOString(),
         }).eq("id", numId).select().single();
       if (error) throw new MockApiError(error.message, 500);
       const requesterId = (existing as { requester_id?: number } | null)?.requester_id;
@@ -1571,13 +1574,16 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
     if (action === "반려") {
       const { data: existing } = await supabase.from("material_requests")
         .select("requester_id, site_name, items").eq("id", numId).maybeSingle();
+      // approver_id/approver_name 은 신청 시점에 지정된 값 보존.
+      // 실제 반려 처리자는 processor_* 에 기록.
       const { data, error } = await supabase.from("material_requests")
         .update({
           approval_status: "rejected",
-          approver_id:     processorId,
-          approver_name:   processorName,
           rejected_at:     new Date().toISOString(),
           reject_reason:   body.rejectReason ?? null,
+          processor_id:    processorId,
+          processor_name:  processorName,
+          processed_at:    new Date().toISOString(),
         }).eq("id", numId).select().single();
       if (error) throw new MockApiError(error.message, 500);
       const requesterId = (existing as { requester_id?: number } | null)?.requester_id;
