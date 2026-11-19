@@ -26,6 +26,7 @@ export interface TransactionRecord {
   batchId?: string | null;
   unitPrice: number;
   requesterName: string | null;
+  vendorName: string | null;
 }
 
 const transactions: TransactionRecord[] = [];
@@ -93,6 +94,7 @@ export function addTransaction(data: AddTransactionInput): { record?: Transactio
     batchId:            data.batchId ?? null,
     unitPrice,
     requesterName:      null,
+    vendorName:         null,
   };
   transactions.push(record);
   return { record };

@@ -439,7 +439,8 @@ function dbToTransaction(r: any): TransactionRecord {
     createdAt:          r.created_at,
     batchId:            r.batch_id               ?? null,
     unitPrice:          r.unit_price             ?? 0,
-  requesterName:      r.requester_name         ?? null,
+    requesterName:      r.requester_name         ?? null,
+    vendorName:         r.vendor_name            ?? null,
   };
 }
 
@@ -455,6 +456,7 @@ async function supabaseAddTransaction(data: {
   unitPrice?: number | null;
   transactionNo?: string | null;
   requesterName?: string | null;
+  vendorName?: string | null;
 }): Promise<{ records?: TransactionRecord[]; error?: string }> {
   const { data: result, error } = await supabase.rpc("add_transaction", {
     p_type:            data.type,
@@ -492,6 +494,14 @@ async function supabaseAddTransaction(data: {
       console.error("[supabaseAddTransaction] requester_name 저장 실패 — migration-add-transaction-requester.sql 적용 여부 확인:", rErr.message);
     } else {
       records.forEach(r => { r.requesterName = data.requesterName as string; });
+    }
+  }
+  if (data.vendorName != null && records.length > 0) {
+    const { error: vErr } = await supabase.from("transactions").update({ vendor_name: data.vendorName }).in("id", ids);
+    if (vErr) {
+      console.error("[supabaseAddTransaction] vendor_name 저장 실패 — migration-add-transaction-vendor.sql 적용 여부 확인:", vErr.message);
+    } else {
+      records.forEach(r => { r.vendorName = data.vendorName as string; });
     }
   }
   return { records };
@@ -1716,7 +1726,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
         .eq("id", lineId).maybeSingle();
       if (!line) throw new MockApiError("line not found", 404);
       const { data: header } = await supabase.from("purchase_orders")
-        .select("id, site_name, user_id, requester_name").eq("id", line.order_id).maybeSingle();
+        .select("id, site_name, user_id, requester_name, vendor_name").eq("id", line.order_id).maybeSingle();
       if (!header) throw new MockApiError("header not found", 404);
 
       if (action === "입고완료") {
@@ -1741,6 +1751,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
           userId,
           userName,
           requesterName: header.requester_name ?? null,
+          vendorName: header.vendor_name ?? null,
         });
         if (txErr) throw new MockApiError(txErr, 400);
         if (inputReceivedAt && txs && txs.length > 0) {
@@ -1844,6 +1855,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
           userId,
           userName,
           requesterName: header.requester_name ?? null,
+          vendorName: header.vendor_name ?? null,
         });
         if (txErr) throw new MockApiError(txErr, 400);
         if (inputReceivedAt && txs && txs.length > 0) {

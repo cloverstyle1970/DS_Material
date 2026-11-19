@@ -299,6 +299,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
           unitPrice: r.unitPrice || 0,
           createdAt: inboundDate,
           requesterName: requesterName || null,
+          vendorName: vendorName || null,
         });
 
         // 능곡사무소 TK→DS 자동 변환: 거래처=티케이엘리베이터코리아(주)강서지사 + 현장=능곡사무소 + TK 자재
@@ -361,6 +362,7 @@ export default function InboundEntry({ editId }: { editId?: number } = {}) {
             batchId, transactionNo,
             unitPrice: dsBuyPrice, createdAt: inboundDate,
             requesterName: requesterName || null,
+            vendorName: vendorName || null,
           });
         }
       }

@@ -25,7 +25,7 @@ interface Props {
   initial: TransactionRecord[];
 }
 
-interface Search { dateFrom: string; dateTo: string; siteName: string; userName: string; matQuery: string }
+interface Search { dateFrom: string; dateTo: string; siteName: string; userName: string; matQuery: string; vendorName: string }
 
 type SortKey = "createdAt" | "materialName" | "materialId" | "qty" | "siteName" | "userName" | "unitPrice";
 type SortDir = "asc" | "desc";
@@ -40,7 +40,7 @@ function defaultSearch(): Search {
   const now = new Date();
   const curSun = new Date(now); curSun.setDate(now.getDate() - now.getDay());
   const prevSun = new Date(curSun); prevSun.setDate(curSun.getDate() - 7);
-  return { dateFrom: ymd(prevSun), dateTo: ymd(now), siteName: "", userName: "", matQuery: "" };
+  return { dateFrom: ymd(prevSun), dateTo: ymd(now), siteName: "", userName: "", matQuery: "", vendorName: "" };
 }
 
 function inRange(iso: string, from: string, to: string) {
@@ -77,6 +77,8 @@ export default function StockHistoryClient({ mode, initial }: Props) {
   const [requesterMap, setRequesterMap] = useState<Map<number, string>>(new Map());
   // 출고 모드 한정: transactionId → 수령인명. transaction.note 의 '수령인: XXX' 패턴을 직접 파싱.
   const [receiverMap, setReceiverMap] = useState<Map<number, string>>(new Map());
+  // 입고 모드 한정: transactionId → 거래처명. purchase_orders.vendor_name 조회.
+  const [vendorMap, setVendorMap] = useState<Map<number, string>>(new Map());
 
   useEffect(() => {
     api.get<TransactionRecord[]>(`/api/transactions?type=${encodeURIComponent(mode)}`)
@@ -134,35 +136,78 @@ export default function StockHistoryClient({ mode, initial }: Props) {
     setReceiverMap(next);
   }, [mode, transactions]);
 
-  // 입고 모드: note '발주 #N' 패턴 → purchase_orders.requester_name 매핑
+  // 입고 모드: note '발주 #N' 패턴 → purchase_orders.requester_name / vendor_name 매핑.
+  // N 은 purchase_order_lines.id (라인 ID) — purchase_orders.id(헤더 ID) 아님에 주의.
+  // 라인 → 헤더 join 으로 정확한 발주 정보를 가져온다.
   useEffect(() => {
-    if (mode !== "입고" || transactions.length === 0) { setRequesterMap(new Map()); return; }
-    const txOrderPairs: { txId: number; orderId: number }[] = [];
+    if (mode !== "입고" || transactions.length === 0) {
+      setRequesterMap(new Map());
+      setVendorMap(new Map());
+      return;
+    }
+    const txLinePairs: { txId: number; lineId: number }[] = [];
     for (const t of transactions) {
       const m = t.note?.match(/발주\s*#(\d+)/);
-      if (m) txOrderPairs.push({ txId: t.id, orderId: Number(m[1]) });
+      if (m) txLinePairs.push({ txId: t.id, lineId: Number(m[1]) });
     }
-    if (txOrderPairs.length === 0) { setRequesterMap(new Map()); return; }
-    const orderIds = Array.from(new Set(txOrderPairs.map(p => p.orderId)));
+    if (txLinePairs.length === 0) {
+      setRequesterMap(new Map());
+      setVendorMap(new Map());
+      return;
+    }
+    const lineIds = Array.from(new Set(txLinePairs.map(p => p.lineId)));
     let cancelled = false;
     (async () => {
-      const { data } = await supabase.from("purchase_orders")
-        .select("id, requester_name").in("id", orderIds);
-      if (cancelled || !data) return;
+      // 2단계 조회 — Supabase JS 관계 조인 문법 대신 명시적 join 으로 결과 shape 안정화.
+      // 1) lineIds → order_id
+      const { data: linesData } = await supabase.from("purchase_order_lines")
+        .select("id, order_id").in("id", lineIds);
+      if (cancelled || !linesData) return;
+      const lineToOrder = new Map<number, number>();
+      for (const row of linesData as { id: number; order_id: number }[]) {
+        lineToOrder.set(row.id, row.order_id);
+      }
+      // 2) order_ids → requester_name / vendor_name
+      const orderIds = Array.from(new Set(Array.from(lineToOrder.values())));
+      if (orderIds.length === 0) return;
+      const { data: ordersData } = await supabase.from("purchase_orders")
+        .select("id, requester_name, vendor_name").in("id", orderIds);
+      if (cancelled || !ordersData) return;
       const orderToRequester = new Map<number, string>();
-      for (const row of data as { id: number; requester_name: string | null }[]) {
+      const orderToVendor = new Map<number, string>();
+      for (const row of ordersData as { id: number; requester_name: string | null; vendor_name: string | null }[]) {
         if (row.requester_name) orderToRequester.set(row.id, row.requester_name);
+        if (row.vendor_name) orderToVendor.set(row.id, row.vendor_name);
       }
-      const next = new Map<number, string>();
-      for (const { txId, orderId } of txOrderPairs) {
-        const name = orderToRequester.get(orderId);
-        if (name) next.set(txId, name);
+      // 3) txId → requester/vendor
+      const nextReq = new Map<number, string>();
+      const nextVen = new Map<number, string>();
+      for (const { txId, lineId } of txLinePairs) {
+        const orderId = lineToOrder.get(lineId);
+        if (!orderId) continue;
+        const req = orderToRequester.get(orderId);
+        if (req) nextReq.set(txId, req);
+        const ven = orderToVendor.get(orderId);
+        if (ven) nextVen.set(txId, ven);
       }
-      setRequesterMap(next);
+      setRequesterMap(nextReq);
+      setVendorMap(nextVen);
     })();
     return () => { cancelled = true; };
   }, [mode, transactions]);
   const [search, setSearch] = useState<Search>(defaultSearch);
+  // 거래처 조회 우선순위: transactions.vendor_name 직접 저장값 → 없으면 발주 역추적(vendorMap)
+  const resolveVendor = useCallback((t: TransactionRecord): string =>
+    t.vendorName ?? vendorMap.get(t.id) ?? ""
+  , [vendorMap]);
+  const vendorNames = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of transactions) {
+      const v = resolveVendor(t);
+      if (v) set.add(v);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "ko"));
+  }, [transactions, resolveVendor]);
   const [companyFilter, setCompanyFilter] = useState<"전체" | "TK" | "DS">("전체");
   const [sortKey, setSortKey] = useState<SortKey>("createdAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -225,6 +270,10 @@ export default function StockHistoryClient({ mode, initial }: Props) {
         !alias.includes(q) &&
         !((t.serialNo ?? "").toLowerCase().includes(q))
       ) return false;
+    }
+    if (isInbound && search.vendorName) {
+      const vn = resolveVendor(t);
+      if (!vn.toLowerCase().includes(search.vendorName.toLowerCase())) return false;
     }
     return true;
   });
@@ -352,6 +401,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
       base["현장"] = t.siteName ?? "";
       base["호기"] = t.elevatorName ?? "";
       if (isInbound) {
+        base["거래처"] = resolveVendor(t);
         base["신청자"] = t.requesterName ?? requesterMap.get(t.id) ?? "";
       }
       if (!isInbound) {
@@ -375,7 +425,7 @@ export default function StockHistoryClient({ mode, initial }: Props) {
 
 
   const def = defaultSearch();
-  const hasFilter = search.dateFrom !== def.dateFrom || search.dateTo !== def.dateTo || search.siteName || search.userName || search.matQuery;
+  const hasFilter = search.dateFrom !== def.dateFrom || search.dateTo !== def.dateTo || search.siteName || search.userName || search.matQuery || search.vendorName;
 
   return (
     <>
@@ -421,6 +471,15 @@ export default function StockHistoryClient({ mode, initial }: Props) {
             placeholder="처리자"
             width="w-28"
           />
+          {isInbound && (
+            <Autocomplete
+              value={search.vendorName}
+              onChange={v => setSearch(p => ({ ...p, vendorName: v }))}
+              items={vendorNames}
+              placeholder="거래처"
+              width="w-32"
+            />
+          )}
           {hasFilter && (
             <button type="button" onClick={() => setSearch(defaultSearch())}
               className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 underline">초기화</button>
