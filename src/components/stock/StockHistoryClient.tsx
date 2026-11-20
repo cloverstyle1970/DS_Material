@@ -283,16 +283,37 @@ export default function StockHistoryClient({ mode, initial }: Props) {
     arr.sort((a, b) => {
       const av = a[sortKey];
       const bv = b[sortKey];
-      if (av == null && bv == null) return 0;
-      if (av == null) return 1;
-      if (bv == null) return -1;
       let cmp: number;
-      if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
+      if (av == null && bv == null) cmp = 0;
+      else if (av == null) cmp = 1;
+      else if (bv == null) cmp = -1;
+      else if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
       else cmp = String(av).localeCompare(String(bv), "ko");
-      return sortDir === "asc" ? cmp : -cmp;
+      const primary = sortDir === "asc" ? cmp : -cmp;
+      if (primary !== 0) return primary;
+      // 2차 정렬: 같은 1차 키(예: 동일 일자) 내에서는 입·출고번호로 묶어 보이게
+      // transactionNo 는 I-/O-YY-MM-NNN 형식 — 문자열 비교로 자연 그룹화됨
+      const an = a.transactionNo ?? "";
+      const bn = b.transactionNo ?? "";
+      const nocmp = an.localeCompare(bn);
+      if (nocmp !== 0) return sortDir === "asc" ? nocmp : -nocmp;
+      // 3차: 같은 전표 내에서는 id 순으로 안정적 배열
+      return sortDir === "asc" ? a.id - b.id : b.id - a.id;
     });
     return arr;
   }, [filtered, sortKey, sortDir]);
+
+  // 출고 모드 한정: 회수 상태별 건수 집계 (합계 요약 표시용)
+  const returnCounts = useMemo(() => {
+    if (isInbound) return { unused: 0, scrap: 0 };
+    let unused = 0, scrap = 0;
+    for (const t of sorted) {
+      if (t.returnStatus !== "returned") continue;
+      if (t.returnType === "unused") unused++;
+      else if (t.returnType === "scrap") scrap++;
+    }
+    return { unused, scrap };
+  }, [sorted, isInbound]);
 
   function toggleSort(key: SortKey) {
     if (key === sortKey) setSortDir(d => (d === "asc" ? "desc" : "asc"));
@@ -379,10 +400,11 @@ export default function StockHistoryClient({ mode, initial }: Props) {
 
   function downloadExcel() {
     const stamp = new Date().toISOString().slice(0,10).replace(/-/g,"");
+    // 선택이 있으면 선택 ∩ 검색결과, 없으면 검색결과(sorted) 전체 — 전체 transactions 를 쓰면 필터가 무시됨
     const list = selectedIds.size > 0
-      ? transactions.filter(t => selectedIds.has(t.id))
-      : transactions;
-    const label = selectedIds.size > 0 ? `선택${selectedIds.size}건` : "전체";
+      ? sorted.filter(t => selectedIds.has(t.id))
+      : sorted;
+    const label = selectedIds.size > 0 ? `선택${list.length}건` : "전체";
     const rows = list.map(t => {
       const base: Record<string, string | number> = {
         일자: fmtDateOnly(t.createdAt),
@@ -564,8 +586,21 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                   {!isInbound && (
                     <div className="mt-2 text-xs">
                       {t.returnStatus === "returned" ? (
-                        <span className={`px-2 py-0.5 rounded-full ${t.returnType === "unused" ? "bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" : "bg-green-50 text-green-700 dark:bg-green-900/40 dark:text-green-300"}`}>
+                        <span
+                          title={[
+                            t.returnType === "unused" ? "미사용 반납 (재입고)" : "폐자재 회수",
+                            t.returnedAt ? fmtDateOnly(t.returnedAt) : null,
+                            t.returnedByUserName,
+                          ].filter(Boolean).join(" · ")}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold border ${
+                            t.returnType === "unused"
+                              ? "bg-blue-100 text-blue-800 border-blue-400 dark:bg-blue-900/60 dark:text-blue-200 dark:border-blue-600 ring-1 ring-blue-200 dark:ring-blue-800/50"
+                              : "bg-green-100 text-green-800 border-green-400 dark:bg-green-900/60 dark:text-green-200 dark:border-green-600 ring-1 ring-green-200 dark:ring-green-800/50"
+                          }`}
+                        >
+                          <span className="text-[10px] leading-none">↩</span>
                           {t.returnType === "unused" ? "미사용반납" : "폐자재회수"}
+                          {t.returnedAt && <span className="font-normal opacity-70 ml-0.5">({fmtDateOnly(t.returnedAt).slice(5)})</span>}
                         </span>
                       ) : t.requiresReturn ? (
                         admin ? (
@@ -590,9 +625,27 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                   )}
                 </div>
               ))}
-              <div className="p-4 bg-gray-50 dark:bg-gray-700/40 flex items-center justify-between font-semibold text-sm">
-                <span>합계 {fmtNum(sorted.length)}건</span>
-                <span>수량 {fmtNum(sorted.reduce((a, c) => a + c.qty, 0))}{showFin ? ` · ₩${fmtNum(sorted.reduce((a, c) => a + c.qty * (c.unitPrice ?? 0), 0))}` : ""}</span>
+              <div className="p-4 bg-gray-50 dark:bg-gray-700/40 font-semibold text-sm space-y-2">
+                <div className="flex items-center justify-between">
+                  <span>합계 {fmtNum(sorted.length)}건</span>
+                  <span>수량 {fmtNum(sorted.reduce((a, c) => a + c.qty, 0))}{showFin ? ` · ₩${fmtNum(sorted.reduce((a, c) => a + c.qty * (c.unitPrice ?? 0), 0))}` : ""}</span>
+                </div>
+                {!isInbound && (returnCounts.unused > 0 || returnCounts.scrap > 0) && (
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end text-xs">
+                    {returnCounts.unused > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold border bg-blue-100 text-blue-800 border-blue-400 dark:bg-blue-900/60 dark:text-blue-200 dark:border-blue-600">
+                        <span className="text-[10px] leading-none">↩</span>
+                        미사용반납 {fmtNum(returnCounts.unused)}건
+                      </span>
+                    )}
+                    {returnCounts.scrap > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold border bg-green-100 text-green-800 border-green-400 dark:bg-green-900/60 dark:text-green-200 dark:border-green-600">
+                        <span className="text-[10px] leading-none">↩</span>
+                        폐자재회수 {fmtNum(returnCounts.scrap)}건
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )
@@ -697,11 +750,19 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                 {!isInbound && (
                   <td className="px-2 py-3 text-center whitespace-nowrap" onClick={e => e.stopPropagation()}>
                     {t.returnStatus === "returned" ? (
-                      <span className={`px-2 py-0.5 rounded-full ${
-                        t.returnType === "unused"
-                          ? "bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
-                          : "bg-green-50 text-green-700 dark:bg-green-900/40 dark:text-green-300"
-                      }`}>
+                      <span
+                        title={[
+                          t.returnType === "unused" ? "미사용 반납 (재입고)" : "폐자재 회수",
+                          t.returnedAt ? fmtDateOnly(t.returnedAt) : null,
+                          t.returnedByUserName,
+                        ].filter(Boolean).join(" · ")}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border ${
+                          t.returnType === "unused"
+                            ? "bg-blue-100 text-blue-800 border-blue-400 dark:bg-blue-900/60 dark:text-blue-200 dark:border-blue-600 ring-1 ring-blue-200 dark:ring-blue-800/50"
+                            : "bg-green-100 text-green-800 border-green-400 dark:bg-green-900/60 dark:text-green-200 dark:border-green-600 ring-1 ring-green-200 dark:ring-green-800/50"
+                        }`}
+                      >
+                        <span className="text-[10px] leading-none">↩</span>
                         {t.returnType === "unused" ? "미사용반납" : "폐자재회수"}
                       </span>
                     ) : t.requiresReturn ? (
@@ -758,7 +819,24 @@ export default function StockHistoryClient({ mode, initial }: Props) {
                 <td className={`px-2 py-3 text-right tabular-nums font-bold ${isInbound ? "text-blue-600 dark:text-blue-400" : "text-orange-500 dark:text-orange-400"}`}>
                   {showFin ? `₩${fmtNum(sorted.reduce((acc, curr) => acc + (curr.qty * (curr.unitPrice ?? 0)), 0))}` : ""}
                 </td>
-                <td colSpan={(isInbound ? 4 : 6) + (admin ? 1 : 0)} className="px-2 py-3"></td>
+                <td colSpan={(isInbound ? 4 : 6) + (admin ? 1 : 0)} className="px-2 py-3 text-right">
+                  {!isInbound && (returnCounts.unused > 0 || returnCounts.scrap > 0) && (
+                    <div className="inline-flex items-center gap-1.5 flex-wrap justify-end">
+                      {returnCounts.unused > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border bg-blue-100 text-blue-800 border-blue-400 dark:bg-blue-900/60 dark:text-blue-200 dark:border-blue-600">
+                          <span className="text-[10px] leading-none">↩</span>
+                          미사용반납 {fmtNum(returnCounts.unused)}건
+                        </span>
+                      )}
+                      {returnCounts.scrap > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border bg-green-100 text-green-800 border-green-400 dark:bg-green-900/60 dark:text-green-200 dark:border-green-600">
+                          <span className="text-[10px] leading-none">↩</span>
+                          폐자재회수 {fmtNum(returnCounts.scrap)}건
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </td>
               </tr>
             )}
           </tbody>

@@ -551,10 +551,11 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
 
   function downloadReqs() {
     const stamp = new Date().toISOString().slice(0,10).replace(/-/g,"");
+    // 선택이 있으면 선택 ∩ 검색결과, 없으면 검색결과(sortedReqs) 전체 — 전체 requests 를 쓰면 필터 무시됨
     const list = selectedReqIds.size > 0
-      ? requests.filter(r => selectedReqIds.has(r.id))
-      : requests;
-    const label = selectedReqIds.size > 0 ? `선택${selectedReqIds.size}건` : "전체";
+      ? sortedReqs.filter(r => selectedReqIds.has(r.id))
+      : sortedReqs;
+    const label = selectedReqIds.size > 0 ? `선택${list.length}건` : "전체";
     const rows = list.flatMap(r =>
       r.items.map(item => ({
         신청일시: fmtDate(r.requestedAt),
@@ -575,10 +576,11 @@ export default function RequestsClient({ initialRequests, initialOrders, initial
 
   function downloadOrds() {
     const stamp = new Date().toISOString().slice(0,10).replace(/-/g,"");
+    // 선택이 있으면 선택 ∩ 검색결과, 없으면 검색결과(sortedOrds) 전체 — 전체 orders 를 쓰면 필터 무시됨
     const list = selectedOrdIds.size > 0
-      ? orders.filter(o => selectedOrdIds.has(o.id))
-      : orders;
-    const label = selectedOrdIds.size > 0 ? `선택${selectedOrdIds.size}건` : "전체";
+      ? sortedOrds.filter(o => selectedOrdIds.has(o.id))
+      : sortedOrds;
+    const label = selectedOrdIds.size > 0 ? `선택${list.length}건` : "전체";
     const rows = list.map(o => ({
       발주일자: fmtDateOnly(o.orderedAt),
       참조번호: o.orderRefNo || extractOrderRef(o.note) || "",
