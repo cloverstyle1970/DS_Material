@@ -2,7 +2,7 @@
 // Maps /api/* URL patterns to mock-*.ts functions directly, bypassing HTTP.
 
 import { supabase } from "./supabase";
-import { insertNotification } from "./notify";
+import { insertNotification, sendKakao } from "./notify";
 import { getNotifyTargetIds } from "./material-managers";
 import type { SiteRecord } from "./mock-sites";
 import type { ElevatorRecord } from "./mock-elevators";
@@ -1526,7 +1526,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
     // ── 무상신청 승인 ──────────────────────────────────────────────
     if (action === "승인") {
       const { data: existing } = await supabase.from("material_requests")
-        .select("requester_id, site_name, items").eq("id", numId).maybeSingle();
+        .select("requester_id, requester_name, site_name, items").eq("id", numId).maybeSingle();
       // approver_id/approver_name 은 신청 시점에 지정된 값 보존.
       // 실제 승인 처리자는 processor_* 에 기록 (위임 승인 등으로 두 값이 다를 수 있음).
       const { data, error } = await supabase.from("material_requests")
@@ -1554,19 +1554,32 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
           refType: "material_request",
           refId:   numId,
         });
+        sendKakao("MET_MAT_APPROVED_REQUESTER", requesterId, {
+          "#{승인자}":  processorName ?? "",
+          "#{현장명}":  (existing as { site_name?: string | null })?.site_name ?? "",
+          "#{자재목록}": summary,
+        }).catch(e => console.warn("[kakao] 무상신청 승인완료(신청자) 실패:", e));
       }
       // 자재담당자에게 알림 — 승인 완료, 출고 처리 필요 (본인·신청자 중복 제외)
       const excludes = [Number(processorId), requesterId].filter(Boolean) as number[];
       const managerIds = await getNotifyTargetIds(excludes);
-      await Promise.all(managerIds.map(uid => insertNotification({
-        userId:  uid,
-        type:    "material_request",
-        title:   "무상 자재신청 승인 완료 — 출고 처리 필요",
-        message: `${sitePart}${summary}`,
-        link:    "/requests",
-        refType: "material_request",
-        refId:   numId,
-      })));
+      const siteNameForKakao = (existing as { site_name?: string | null })?.site_name ?? "";
+      await Promise.all(managerIds.map(uid => {
+        sendKakao("MET_MAT_APPROVED_MANAGER", uid, {
+          "#{신청자}":  (existing as { requester_name?: string | null })?.requester_name ?? "",
+          "#{현장명}":  siteNameForKakao,
+          "#{자재목록}": summary,
+        }).catch(e => console.warn("[kakao] 무상신청 승인완료(담당자) 실패:", e));
+        return insertNotification({
+          userId:  uid,
+          type:    "material_request",
+          title:   "무상 자재신청 승인 완료 — 출고 처리 필요",
+          message: `${sitePart}${summary}`,
+          link:    "/requests",
+          refType: "material_request",
+          refId:   numId,
+        });
+      }));
       return dbToRequest(data);
     }
 
@@ -1601,6 +1614,12 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
           refType: "material_request",
           refId:   numId,
         });
+        sendKakao("MET_MAT_REJECTED", requesterId, {
+          "#{반려자}":  processorName ?? "",
+          "#{현장명}":  (existing as { site_name?: string | null })?.site_name ?? "",
+          "#{자재목록}": summary,
+          "#{반려사유}": body.rejectReason ?? "",
+        }).catch(e => console.warn("[kakao] 무상신청 반려 실패:", e));
       }
       return dbToRequest(data);
     }

@@ -1,4 +1,4 @@
-import { insertNotification } from "@/lib/notify";
+import { insertNotification, sendKakao } from "@/lib/notify";
 
 const LEDGER_HREF = "/hr/overtime-ledger";
 
@@ -21,6 +21,12 @@ export async function notifyOvertimeApprovalRequest(params: {
     refType: "overtime_report",
     refId:   reportId,
   });
+  sendKakao("MET_OT_APPROVE_REQ", approverId, {
+    "#{신청자}":  authorName,
+    "#{현장명}":  siteName,
+    "#{날짜}":    startAt.slice(0, 10),
+    "#{문서번호}": reportNo,
+  }).catch(e => console.warn("[kakao] overtime approval req failed:", e));
 }
 
 /** 승인 완료 알림 → 작성자에게 */

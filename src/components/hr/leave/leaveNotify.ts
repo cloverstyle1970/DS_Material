@@ -1,4 +1,4 @@
-import { insertNotification } from "@/lib/notify";
+import { insertNotification, sendKakao } from "@/lib/notify";
 
 const LEAVE_HREF  = "/hr/leave-ledger";
 
@@ -20,6 +20,11 @@ export async function notifyLeaveApprovalRequest(params: {
     refType: "leave_request",
     refId:   requestId,
   });
+  sendKakao("MET_LEAVE_APPROVE_REQ", approverId, {
+    "#{신청자}":  authorName,
+    "#{휴가종류}": leaveType,
+    "#{문서번호}": requestNo,
+  }).catch(e => console.warn("[kakao] leave approval req failed:", e));
 }
 
 /** 승인 완료 알림 → 작성자에게 */

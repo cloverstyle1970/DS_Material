@@ -8,7 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { api } from "@/lib/api-client";
 import { MaterialRecord } from "@/lib/mock-materials";
 import { visibleUserIds } from "@/lib/crew";
-import { insertNotification } from "@/lib/notify";
+import { insertNotification, sendKakao } from "@/lib/notify";
 import { isRepairMaterial, isTkMaterial, TK_TEXT_CLASS } from "@/lib/material-style";
 import { PhotoIconBtn } from "@/components/ui/PhotoIconBtn";
 import { getMaterialManagers, setMaterialManagerIds, type MaterialManager } from "@/lib/material-managers";
@@ -612,6 +612,11 @@ export default function ClaimEntryClient() {
             refType: "material_request",
             refId:   requestId,
           }).catch(e => console.warn("[notify] 승인자 알림 실패:", e));
+          sendKakao("MET_MAT_APPROVE_REQ", approverId, {
+            "#{신청자}":  user.name ?? "",
+            "#{현장명}":  siteName,
+            "#{자재목록}": summary,
+          }).catch(e => console.warn("[kakao] 무상신청 승인요청 실패:", e));
         }
       }
       // 폼 리셋

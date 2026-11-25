@@ -32,6 +32,41 @@ export async function insertNotification(params: NotifyParams): Promise<void> {
   sendWebPush(params).catch(e => console.warn("[push] send failed:", e));
 }
 
+/**
+ * 카카오 알림톡 발송 — fire-and-forget.
+ * recipientAccountId 의 phone 을 accounts 에서 조회한 뒤 met-kakao-send Edge Function 호출.
+ * 번호 없거나 발송 실패 시 warn 출력 후 무시 (다른 채널에 영향 없음).
+ */
+export async function sendKakao(
+  templateCode: string,
+  recipientAccountId: number,
+  variables: Record<string, string>,
+): Promise<void> {
+  const { data: acc } = await supabase
+    .from("accounts")
+    .select("phone")
+    .eq("id", recipientAccountId)
+    .single();
+  const phone = (acc?.phone ?? "").replace(/[^0-9]/g, "");
+  if (phone.length < 10) return;
+
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token ?? SUPABASE_ANON_KEY;
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/met-kakao-send`, {
+    method: "POST",
+    headers: {
+      "Content-Type":  "application/json",
+      "apikey":        SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${token}`,
+    },
+    body: JSON.stringify({ templateCode, to: phone, variables }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    console.warn("[kakao] send failed", templateCode, res.status, err?.error);
+  }
+}
+
 async function sendWebPush(params: NotifyParams): Promise<void> {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token ?? SUPABASE_ANON_KEY;
