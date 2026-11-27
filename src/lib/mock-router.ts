@@ -1623,7 +1623,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
           "#{현장명}":  (existing as { site_name?: string | null })?.site_name ?? "",
           "#{자재요약}": summary,
           "#{신청번호}": String(numId),
-          "#{반려사유}": body.rejectReason ?? "",
+          "#{사유}":    body.rejectReason ?? "",
         }).catch(e => console.warn("[kakao] 무상신청 반려 실패:", e));
       }
       return dbToRequest(data);
