@@ -423,6 +423,9 @@ export default function LeaveLedgerClient() {
     if (!f.s_hr || !f.s_mi) { alert("시작 시간을 입력해주세요."); return; }
     if (!f.e_yr || !f.e_mo || !f.e_dy) { alert("종료 날짜를 입력해주세요."); return; }
     if (!f.e_hr || !f.e_mi) { alert("종료 시간을 입력해주세요."); return; }
+    { const p = (v: string) => v.padStart(2, "0");
+      if (`${p(f.e_yr)}${p(f.e_mo)}${p(f.e_dy)}${p(f.e_hr)}${p(f.e_mi)}` < `${p(f.s_yr)}${p(f.s_mo)}${p(f.s_dy)}${p(f.s_hr)}${p(f.s_mi)}`)
+        { alert("종료 일시가 시작 일시보다 이전입니다."); return; } }
     if (!f.reason.trim()) { alert("사유를 입력해주세요."); return; }
     if (submitForApproval && !f.approver_id) { alert("승인자를 지정해주세요."); return; }
     setSaving(true);
@@ -473,6 +476,9 @@ export default function LeaveLedgerClient() {
     if (!f.s_hr || !f.s_mi) { alert("시작 시간을 입력해주세요."); return; }
     if (!f.e_yr || !f.e_mo || !f.e_dy) { alert("종료 날짜를 입력해주세요."); return; }
     if (!f.e_hr || !f.e_mi) { alert("종료 시간을 입력해주세요."); return; }
+    { const p = (v: string) => v.padStart(2, "0");
+      if (`${p(f.e_yr)}${p(f.e_mo)}${p(f.e_dy)}${p(f.e_hr)}${p(f.e_mi)}` < `${p(f.s_yr)}${p(f.s_mo)}${p(f.s_dy)}${p(f.s_hr)}${p(f.s_mi)}`)
+        { alert("종료 일시가 시작 일시보다 이전입니다."); return; } }
     if (!f.reason.trim()) { alert("사유를 입력해주세요."); return; }
     if (!f.approver_id) { alert("승인자를 지정해주세요."); return; }
     setAuthorSignPending(true);

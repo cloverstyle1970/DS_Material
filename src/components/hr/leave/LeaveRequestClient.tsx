@@ -350,6 +350,11 @@ export default function LeaveRequestClient() {
   async function save(submitForApproval: boolean, authorSig?: string) {
     if (!user) return;
     if (!f.s_yr || !f.s_mo || !f.s_dy) { alert("시작 날짜를 입력해주세요."); return; }
+    if (f.e_yr && f.e_mo && f.e_dy) {
+      const p = (v: string) => v.padStart(2, "0");
+      if (`${p(f.e_yr)}${p(f.e_mo)}${p(f.e_dy)}` < `${p(f.s_yr)}${p(f.s_mo)}${p(f.s_dy)}`)
+        { alert("종료 날짜가 시작 날짜보다 이전입니다."); return; }
+    }
     if (submitForApproval && !f.approver_id) { alert("승인자를 지정해주세요."); return; }
     setSaving(true);
     try {
@@ -401,6 +406,11 @@ export default function LeaveRequestClient() {
   // 승인 요청: 검증 → 작성자 서명 모달
   function handleApprovalRequest() {
     if (!f.s_yr || !f.s_mo || !f.s_dy) { alert("시작 날짜를 입력해주세요."); return; }
+    if (f.e_yr && f.e_mo && f.e_dy) {
+      const p = (v: string) => v.padStart(2, "0");
+      if (`${p(f.e_yr)}${p(f.e_mo)}${p(f.e_dy)}` < `${p(f.s_yr)}${p(f.s_mo)}${p(f.s_dy)}`)
+        { alert("종료 날짜가 시작 날짜보다 이전입니다."); return; }
+    }
     if (!f.approver_id) { alert("승인자를 지정해주세요."); return; }
     setAuthorSignPending(true);
   }
