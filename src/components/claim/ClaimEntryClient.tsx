@@ -496,7 +496,6 @@ export default function ClaimEntryClient() {
           patch.processor_id    = null;
           patch.processor_name  = null;
           patch.processed_at    = null;
-          patch.submitted_at    = new Date().toISOString();
         }
         const { error } = await supabase.from("material_requests").update(patch).eq("id", editId);
         if (error) throw error;
