@@ -583,9 +583,10 @@ export default function ClaimEntryClient() {
           requester_name:  user.name,
           requester_dept:  user.dept ?? "",
           request_type:    mode,
-        }).select("id").single();
+        }).select("id, request_no").single();
         if (error) throw error;
-        const requestId = (inserted as { id?: number } | null)?.id ?? null;
+        const requestId  = (inserted as { id?: number; request_no?: string } | null)?.id ?? null;
+        const requestNo  = (inserted as { id?: number; request_no?: string } | null)?.request_no ?? "";
         const msg = mode === "당직선출고"
           ? "당직 선출고 신청이 접수되었습니다. 관리자가 즉시 출고 처리합니다."
           : `무상 자재신청이 접수되었습니다. ${approverName ? `${approverName}님께 승인 요청을 보냈습니다.` : "담당자 승인 후 처리됩니다."}`;
@@ -615,7 +616,8 @@ export default function ClaimEntryClient() {
           sendKakao("MET_MAT_APPROVE_REQ", approverId, {
             "#{신청자명}": user.name ?? "",
             "#{현장명}":  siteName,
-            "#{자재목록}": summary,
+            "#{신청자재}": summary,
+            "#{신청번호}": requestNo,
           }).catch(e => console.warn("[kakao] 무상신청 승인요청 실패:", e));
         }
       }
