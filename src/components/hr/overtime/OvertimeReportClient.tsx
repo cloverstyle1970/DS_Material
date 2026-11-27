@@ -488,6 +488,7 @@ export default function OvertimeReportClient() {
     if (!user) return;
     if (!f.site_name.trim()) { alert("현장명을 입력해주세요."); return; }
     if (!startDT || !endDT)  { alert("작업일시를 입력해주세요."); return; }
+    if (endDT <= startDT)    { alert("종료 일시가 시작 일시보다 이전이거나 같습니다."); return; }
     if (submitForApproval && !f.approver_id) { alert("잔업 승인자를 지정해주세요."); return; }
     setSaving(true);
     try {

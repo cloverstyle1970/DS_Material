@@ -649,6 +649,7 @@ export default function OvertimeLedgerClient() {
     if (submitForApproval) {
       if (!f.work_instructor.trim()) { alert("작업지시자를 입력해주세요."); return; }
       if (!startDT || !endDT) { alert("작업일시를 입력해주세요."); return; }
+      if (endDT <= startDT)   { alert("종료 일시가 시작 일시보다 이전이거나 같습니다."); return; }
       if (!f.work_content.trim()) { alert("작업일지(작업내용)를 입력해주세요."); return; }
       if (!f.approver_id) { alert("잔업 승인자를 지정해주세요."); return; }
     }
