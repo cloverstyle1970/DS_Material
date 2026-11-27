@@ -110,6 +110,8 @@ export default function ClaimEntryClient() {
   interface PhotoSlot { key: string; file: File | null; previewUrl: string | null }
   const [photos, setPhotos] = useState<PhotoSlot[]>([{ key: crypto.randomUUID(), file: null, previewUrl: null }]);
   const [existingPhotoUrls, setExistingPhotoUrls] = useState<string[]>([]);
+  // 수정 모드 로드 시 기존 상태 (반려 건 재제출 판별용)
+  const [existingApprovalStatus, setExistingApprovalStatus] = useState<string | null>(null);
   function addPhotoSlot() { setPhotos(prev => [...prev, { key: crypto.randomUUID(), file: null, previewUrl: null }]); }
   function removePhotoSlot(key: string) {
     setPhotos(prev => {
@@ -188,7 +190,9 @@ export default function ClaimEntryClient() {
         items: { materialId?: string; materialName?: string; qty?: number; elevatorName?: string | null }[] | null;
         approver_id: number | null; approver_name: string | null;
         photo_urls: string[] | null;
+        approval_status: string | null;
       };
+      setExistingApprovalStatus(r.approval_status ?? null);
       if (r.request_type === "무상신청")        setMode("무상신청");
       else if (r.request_type === "당직선출고") setMode("당직선출고");
       else if (r.request_type === "유상견적")   setMode("유상견적요청");
@@ -483,9 +487,42 @@ export default function ClaimEntryClient() {
           patch.approver_id   = approverId   ?? null;
           patch.approver_name = approverName ?? null;
         }
+        // 반려된 무상신청을 수정 저장 → 승인요청으로 재제출
+        const isResubmitAfterReject = mode === "무상신청" && existingApprovalStatus === "rejected";
+        if (isResubmitAfterReject) {
+          patch.approval_status = "pending";
+          patch.rejected_at     = null;
+          patch.reject_reason   = null;
+          patch.processor_id    = null;
+          patch.processor_name  = null;
+          patch.processed_at    = null;
+          patch.submitted_at    = new Date().toISOString();
+        }
         const { error } = await supabase.from("material_requests").update(patch).eq("id", editId);
         if (error) throw error;
-        setMessage({ type: "success", text: "자재신청이 수정되었습니다." });
+        // 재제출: 승인자에게 알림 재전송
+        if (isResubmitAfterReject && approverId) {
+          const itemLabelEdit = (r: { material_name: string; material_id: string }) =>
+            r.material_name.trim() || r.material_id || "자재";
+          const firstNameEdit = validItems[0] ? itemLabelEdit(validItems[0]) : "";
+          const summaryEdit = validItems.length <= 1 ? firstNameEdit : `${firstNameEdit} 외 ${validItems.length - 1}건`;
+          void insertNotification({
+            userId:  approverId,
+            type:    "approval_request",
+            title:   "무상 자재신청 승인 요청 (재제출)",
+            message: `[${siteName}] ${summaryEdit} — ${user.name}님이 반려 사항을 수정해 재제출했습니다.`,
+            link:    "/requests",
+            refType: "material_request",
+            refId:   editId,
+          }).catch(e => console.warn("[notify] 재제출 승인자 알림 실패:", e));
+          sendKakao("MET_MAT_APPROVE_REQ", approverId, {
+            "#{신청자명}": user.name ?? "",
+            "#{현장명}":  siteName,
+            "#{자재요약}": summaryEdit,
+            "#{신청번호}": String(editId),
+          }).catch(e => console.warn("[kakao] 재제출 승인요청 실패:", e));
+        }
+        setMessage({ type: "success", text: isResubmitAfterReject ? "반려 사항을 수정하여 재제출했습니다. 승인자에게 알림이 전송되었습니다." : "자재신청이 수정되었습니다." });
         await new Promise(res => setTimeout(res, 700));
         router.push("/requests");
         return;
