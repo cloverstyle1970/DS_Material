@@ -1526,7 +1526,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
     // ── 무상신청 승인 ──────────────────────────────────────────────
     if (action === "승인") {
       const { data: existing } = await supabase.from("material_requests")
-        .select("requester_id, requester_name, site_name, items, request_no").eq("id", numId).maybeSingle();
+        .select("requester_id, requester_name, site_name, items").eq("id", numId).maybeSingle();
       // approver_id/approver_name 은 신청 시점에 지정된 값 보존.
       // 실제 승인 처리자는 processor_* 에 기록 (위임 승인 등으로 두 값이 다를 수 있음).
       const { data, error } = await supabase.from("material_requests")
@@ -1558,7 +1558,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
           "#{승인자명}": processorName ?? "",
           "#{현장명}":  (existing as { site_name?: string | null })?.site_name ?? "",
           "#{신청자재}": summary,
-          "#{신청번호}": (existing as { request_no?: string | null })?.request_no ?? "",
+          "#{신청번호}": String(numId),
         }).catch(e => console.warn("[kakao] 무상신청 승인완료(신청자) 실패:", e));
       }
       // 자재담당자에게 알림 — 승인 완료, 출고 처리 필요 (본인·신청자 중복 제외)
@@ -1570,7 +1570,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
           "#{신청자명}": (existing as { requester_name?: string | null })?.requester_name ?? "",
           "#{현장명}":  siteNameForKakao,
           "#{신청자재}": summary,
-          "#{신청번호}": (existing as { request_no?: string | null })?.request_no ?? "",
+          "#{신청번호}": String(numId),
         }).catch(e => console.warn("[kakao] 무상신청 승인완료(담당자) 실패:", e));
         return insertNotification({
           userId:  uid,
@@ -1588,7 +1588,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
     // ── 무상신청 반려 ──────────────────────────────────────────────
     if (action === "반려") {
       const { data: existing } = await supabase.from("material_requests")
-        .select("requester_id, site_name, items, request_no").eq("id", numId).maybeSingle();
+        .select("requester_id, site_name, items").eq("id", numId).maybeSingle();
       // approver_id/approver_name 은 신청 시점에 지정된 값 보존.
       // 실제 반려 처리자는 processor_* 에 기록.
       const { data, error } = await supabase.from("material_requests")
@@ -1620,7 +1620,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
           "#{승인자명}": processorName ?? "",
           "#{현장명}":  (existing as { site_name?: string | null })?.site_name ?? "",
           "#{신청자재}": summary,
-          "#{신청번호}": (existing as { request_no?: string | null })?.request_no ?? "",
+          "#{신청번호}": String(numId),
           "#{반려사유}": body.rejectReason ?? "",
         }).catch(e => console.warn("[kakao] 무상신청 반려 실패:", e));
       }
