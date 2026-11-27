@@ -377,7 +377,7 @@ export default function LeaveRequestClient() {
         if (ie) throw new Error(ie.message);
         const newRecId = (inserted as { id: number } | null)?.id ?? 0;
         if (submitForApproval && f.approver_id)
-          notifyLeaveApprovalRequest({ approverId: f.approver_id, authorName: authorAcc?.username ?? user.name, requestNo: no, requestId: newRecId, leaveType: f.leave_type }).catch(console.warn);
+          notifyLeaveApprovalRequest({ approverId: f.approver_id, authorId: user.id, authorName: authorAcc?.username || user.name, requestNo: no, requestId: newRecId, leaveType: f.leave_type, period: `${f.s_yr}.${f.s_mo}.${f.s_dy} ~ ${f.e_yr}.${f.e_mo}.${f.e_dy}` }).catch(console.warn);
       } else {
         const updatePayload = authorSig ? { ...corePayload, author_signature: authorSig } : corePayload;
         let updateQ = supabase.from("leave_requests").update(updatePayload).eq("id", editingId!);
@@ -386,7 +386,7 @@ export default function LeaveRequestClient() {
         if (error) throw new Error(error.message);
         const rec = records.find(r => r.id === editingId);
         if (submitForApproval && f.approver_id && rec)
-          notifyLeaveApprovalRequest({ approverId: f.approver_id, authorName: authorAcc?.username ?? user.name, requestNo: rec.request_no, requestId: rec.id, leaveType: f.leave_type }).catch(console.warn);
+          notifyLeaveApprovalRequest({ approverId: f.approver_id, authorId: editingRecord?.author_id ?? user.id, authorName: authorAcc?.username || user.name, requestNo: rec.request_no, requestId: rec.id, leaveType: f.leave_type, period: `${f.s_yr}.${f.s_mo}.${f.s_dy} ~ ${f.e_yr}.${f.e_mo}.${f.e_dy}` }).catch(console.warn);
       }
       await load(); setEditingId(null);
     } catch (e: unknown) {
@@ -468,7 +468,7 @@ export default function LeaveRequestClient() {
     if (user && !isAdmin(user)) approveQ = approveQ.eq("approver_id", user.id);
     const { error } = await approveQ;
     if (error) { alert("오류: " + error.message); return; }
-    notifyLeaveApproved({ authorId: target.author_id, approverName: authorAcc?.username ?? user.name, requestNo: target.request_no, requestId: target.id }).catch(console.warn);
+    notifyLeaveApproved({ authorId: target.author_id, authorName: accounts.find(a => a.id === target.author_id)?.username ?? "", approverName: authorAcc?.username ?? user.name, requestNo: target.request_no, requestId: target.id, leaveType: target.leave_type }).catch(console.warn);
     setSignModal(null); await load();
     if (editingId === target.id) setForm(prev => ({ ...prev }));
   }
@@ -489,7 +489,7 @@ export default function LeaveRequestClient() {
     const { error } = await rejectQ;
     if (error) { alert("오류: " + error.message); return; }
     const rec = records.find(r => r.id === rejectModal.id);
-    if (rec) notifyLeaveRejected({ authorId: rec.author_id, approverName: authorAcc?.username ?? user.name, requestNo: rec.request_no, requestId: rec.id, reason: rejectReason.trim() }).catch(console.warn);
+    if (rec) notifyLeaveRejected({ authorId: rec.author_id, authorName: accounts.find(a => a.id === rec.author_id)?.username ?? "", approverName: authorAcc?.username ?? user.name, requestNo: rec.request_no, requestId: rec.id, leaveType: rec.leave_type, reason: rejectReason.trim() }).catch(console.warn);
     setRejectModal(null); setRejectReason(""); await load();
   }
 

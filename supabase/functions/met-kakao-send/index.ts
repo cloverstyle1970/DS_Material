@@ -2,6 +2,7 @@
 // POST body { templateCode: string, to: string, variables: Record<string, string> }
 //   - templateCode: MET_MAT_APPROVE_REQ | MET_MAT_APPROVED_REQUESTER | MET_MAT_APPROVED_MANAGER
 //                   | MET_MAT_REJECTED | MET_LEAVE_APPROVE_REQ | MET_OT_APPROVE_REQ
+//                   | MET_LEAVE_RESULT | MET_OT_RESULT
 //   - to: 수신자 전화번호 (숫자만 또는 010-0000-0000 형식)
 //   - variables: 템플릿 변수 (#{키}: 값)
 //
@@ -22,6 +23,8 @@ const TEMPLATE_IDS: Record<string, string> = {
   MET_MAT_REJECTED:           "KA01TP261119080358893omu4iIZcdPW",
   MET_LEAVE_APPROVE_REQ:      "KA01TP261119071957698Tid7MaeOUDi",
   MET_OT_APPROVE_REQ:         "KA01TP261119071253356YDztlhsiJf5",
+  MET_LEAVE_RESULT:           "KA01TP261119072744483qP0NdiE6tCb",
+  MET_OT_RESULT:              "KA01TP261119071800857VHn6GhX64ir",
 };
 
 const corsHeaders: Record<string, string> = {
@@ -68,11 +71,11 @@ Deno.serve(async (req: Request) => {
   // @ts-expect-error Deno
   const PFID       = (Deno.env.get("SOLAPI_PFID")       ?? "").trim();
   // @ts-expect-error Deno
-  const SENDER     = (Deno.env.get("SOLAPI_SENDER")     ?? "").trim();
+  const SENDER     = (Deno.env.get("SOLAPI_SENDER")     ?? "").trim(); // 문자 대체발송 미사용 시 빈값 허용
 
-  if (!API_KEY || !API_SECRET || !PFID || !SENDER) {
+  if (!API_KEY || !API_SECRET || !PFID) {
     return jsonResponse(
-      { error: "SOLAPI 환경변수 미설정 (SOLAPI_API_KEY / SOLAPI_API_SECRET / SOLAPI_PFID / SOLAPI_SENDER)" },
+      { error: "SOLAPI 환경변수 미설정 (SOLAPI_API_KEY / SOLAPI_API_SECRET / SOLAPI_PFID)" },
       { status: 500 },
     );
   }
@@ -111,17 +114,18 @@ Deno.serve(async (req: Request) => {
   const salt      = crypto.randomUUID().replace(/-/g, "");
   const signature = await hmacSha256Hex(API_SECRET, date + salt);
 
-  const solapiBody = {
-    messages: [{
-      to:   phone,
-      from: SENDER,
-      kakaoOptions: {
-        pfId:       PFID,
-        templateId,
-        variables,
-      },
-    }],
+  const message: Record<string, unknown> = {
+    to:   phone,
+    kakaoOptions: {
+      pfId:        PFID,
+      templateId,
+      variables,
+      disableSms:  true,
+    },
   };
+  if (SENDER) message.from = SENDER;
+
+  const solapiBody = { messages: [message] };
 
   try {
     const res = await fetch(SOLAPI_URL, {
@@ -136,6 +140,12 @@ Deno.serve(async (req: Request) => {
     if (!res.ok) {
       console.error("[met-kakao-send] SOLAPI error", res.status, JSON.stringify(result));
       return jsonResponse({ error: result?.errorMessage ?? `HTTP ${res.status}`, detail: result }, { status: 502 });
+    }
+    // HTTP 200이어도 failedMessageList가 있으면 발송 실패
+    const failed = result?.failedMessageList ?? [];
+    if (failed.length > 0) {
+      console.error("[met-kakao-send] SOLAPI failed messages", JSON.stringify(failed));
+      return jsonResponse({ error: failed[0]?.errorMessage ?? "발송 실패", detail: failed }, { status: 502 });
     }
     return jsonResponse({ ok: true, result });
   } catch (e) {

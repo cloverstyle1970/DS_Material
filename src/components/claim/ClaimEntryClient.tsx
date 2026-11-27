@@ -613,7 +613,7 @@ export default function ClaimEntryClient() {
             refId:   requestId,
           }).catch(e => console.warn("[notify] 승인자 알림 실패:", e));
           sendKakao("MET_MAT_APPROVE_REQ", approverId, {
-            "#{신청자}":  user.name ?? "",
+            "#{신청자명}": user.name ?? "",
             "#{현장명}":  siteName,
             "#{자재목록}": summary,
           }).catch(e => console.warn("[kakao] 무상신청 승인요청 실패:", e));

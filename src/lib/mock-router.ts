@@ -1555,7 +1555,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
           refId:   numId,
         });
         sendKakao("MET_MAT_APPROVED_REQUESTER", requesterId, {
-          "#{승인자}":  processorName ?? "",
+          "#{승인자명}": processorName ?? "",
           "#{현장명}":  (existing as { site_name?: string | null })?.site_name ?? "",
           "#{자재목록}": summary,
         }).catch(e => console.warn("[kakao] 무상신청 승인완료(신청자) 실패:", e));
@@ -1566,7 +1566,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
       const siteNameForKakao = (existing as { site_name?: string | null })?.site_name ?? "";
       await Promise.all(managerIds.map(uid => {
         sendKakao("MET_MAT_APPROVED_MANAGER", uid, {
-          "#{신청자}":  (existing as { requester_name?: string | null })?.requester_name ?? "",
+          "#{신청자명}": (existing as { requester_name?: string | null })?.requester_name ?? "",
           "#{현장명}":  siteNameForKakao,
           "#{자재목록}": summary,
         }).catch(e => console.warn("[kakao] 무상신청 승인완료(담당자) 실패:", e));
@@ -1615,7 +1615,7 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
           refId:   numId,
         });
         sendKakao("MET_MAT_REJECTED", requesterId, {
-          "#{반려자}":  processorName ?? "",
+          "#{승인자명}": processorName ?? "",
           "#{현장명}":  (existing as { site_name?: string | null })?.site_name ?? "",
           "#{자재목록}": summary,
           "#{반려사유}": body.rejectReason ?? "",

@@ -756,7 +756,7 @@ export default function OvertimeLedgerClient() {
       .update({ approval_status: "approved", approved_at: new Date().toISOString(), approver_signature: sig })
       .eq("id", signModal.id);
     if (error) { alert("오류: " + error.message); return; }
-    notifyOvertimeApproved({ authorId: signModal.author_id, approverName: authorAcc?.username ?? user.name, reportNo: signModal.report_no, reportId: signModal.id }).catch(console.warn);
+    notifyOvertimeApproved({ authorId: signModal.author_id, authorName: accounts.find(a => a.id === signModal.author_id)?.username ?? "", approverName: authorAcc?.username ?? user.name, reportNo: signModal.report_no, reportId: signModal.id, startAt: signModal.start_at }).catch(console.warn);
     setSignModal(null); await load();
   }
 
@@ -780,7 +780,7 @@ export default function OvertimeLedgerClient() {
     }).eq("id", rejectModal.id);
     if (error) { alert("오류: " + error.message); return; }
     const rep = reports.find(r => r.id === rejectModal.id);
-    if (rep) notifyOvertimeRejected({ authorId: rep.author_id, approverName: authorAcc?.username ?? user.name, reportNo: rep.report_no, reportId: rep.id, reason: rejectReason.trim() }).catch(console.warn);
+    if (rep) notifyOvertimeRejected({ authorId: rep.author_id, authorName: accounts.find(a => a.id === rep.author_id)?.username ?? "", approverName: authorAcc?.username ?? user.name, reportNo: rep.report_no, reportId: rep.id, startAt: rep.start_at, reason: rejectReason.trim() }).catch(console.warn);
     setRejectModal(null); setRejectReason(""); await load();
   }
 
