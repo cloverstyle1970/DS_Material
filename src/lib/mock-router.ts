@@ -1539,9 +1539,10 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
         }).eq("id", numId).select().single();
       if (error) throw new MockApiError(error.message, 500);
       const requesterId = (existing as { requester_id?: number } | null)?.requester_id;
-      const items = (((existing as { items?: unknown }) ?? {}).items as Array<{ materialName?: string }>) ?? [];
+      const items = (((existing as { items?: unknown }) ?? {}).items as Array<{ materialName?: string; materialId?: string }>) ?? [];
       const first = items[0];
-      const summary = !first?.materialName ? "" : items.length === 1 ? first.materialName : `${first.materialName} 외 ${items.length - 1}건`;
+      const firstName = first ? (first.materialName?.trim() || first.materialId || "자재") : "";
+      const summary = !firstName ? "" : items.length === 1 ? firstName : `${firstName} 외 ${items.length - 1}건`;
       const sitePart = ((existing as { site_name?: string | null })?.site_name ?? null) ? `${(existing as { site_name: string }).site_name} · ` : "";
       // 신청자에게 승인 알림
       if (requesterId && requesterId !== Number(processorId)) {
@@ -1603,9 +1604,10 @@ async function routePATCH(path: string, body: AnyBody): Promise<unknown> {
       if (error) throw new MockApiError(error.message, 500);
       const requesterId = (existing as { requester_id?: number } | null)?.requester_id;
       if (requesterId && requesterId !== Number(processorId)) {
-        const items = (((existing as { items?: unknown }) ?? {}).items as Array<{ materialName?: string }>) ?? [];
+        const items = (((existing as { items?: unknown }) ?? {}).items as Array<{ materialName?: string; materialId?: string }>) ?? [];
         const first = items[0];
-        const summary = !first?.materialName ? "" : items.length === 1 ? first.materialName : `${first.materialName} 외 ${items.length - 1}건`;
+        const firstName = first ? (first.materialName?.trim() || first.materialId || "자재") : "";
+        const summary = !firstName ? "" : items.length === 1 ? firstName : `${firstName} 외 ${items.length - 1}건`;
         const sitePart = ((existing as { site_name?: string | null })?.site_name ?? null) ? `${(existing as { site_name: string }).site_name} · ` : "";
         await insertNotification({
           userId:  requesterId,

@@ -493,7 +493,9 @@ export default function ClaimEntryClient() {
       // 호기 헤더 — 견적요청/자재청구 알림 메시지 공용
       const elevSet = Array.from(new Set(validItems.map(r => r.elevator_name.trim()).filter(Boolean)));
       const headerElev = elevSet.length === 0 ? null : elevSet.join(", ");
-      const firstName = validItems[0]?.material_name ?? "";
+      const itemLabel = (r: { material_name: string; material_id: string }) =>
+        r.material_name.trim() || r.material_id || "자재";
+      const firstName = validItems[0] ? itemLabel(validItems[0]) : "";
       const summary = validItems.length <= 1 ? firstName : `${firstName} 외 ${validItems.length - 1}건`;
       async function notifyRecipients(payload: {
         type: string; title: string; message: string; link: string; refType: string; refId: number | null;
